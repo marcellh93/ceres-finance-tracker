@@ -32,6 +32,14 @@ Two distinct concepts that together cover all five account types:
 
 This matches how individuals think about money, keeping accounting complexity out of the user's way.
 
+### Working Assumptions
+These are decisions that are in effect but have not been captured as formal open questions. They apply for Phase 1 and 2 and should be revisited before Phase 3.
+
+- **Single timezone:** Transaction dates are local dates. Reports use local date boundaries. No timezone conversion.
+- **Amounts always positive:** Direction (income vs. expense) is derived from category type, not from a negative sign on the amount. Bank import logic must convert negative debits to positive amounts.
+- **Reports are synchronous:** All report queries run within a single HTTP request. No background jobs or caching. Acceptable for Phase 1/2 user volumes.
+- **Phase 1 is personal use first:** The primary purpose of Phase 1 is to build something the developer uses daily. Real usage will surface data model or UX issues before Phase 3 opens the app to others. This is intentional — not just a technical constraint.
+
 ---
 
 ## Core Financial Concepts
@@ -70,6 +78,12 @@ This matches how individuals think about money, keeping accounting complexity ou
 - Install .NET SDK via `brew install dotnet` or the official installer
 - `dotnet` CLI to scaffold, run, and build the project
 - VS Code with the C# Dev Kit extension (or Rider) for IDE support
+
+### Secrets and Configuration
+- Connection strings and sensitive config must never be committed to source control
+- Use `dotnet user-secrets` for local development (stores secrets outside the project directory)
+- `appsettings.Development.json` is gitignored — local overrides go there
+- Production secrets (Phase 3+) managed via the hosting platform's secret store (e.g. Azure Key Vault, environment variables)
 
 ---
 
@@ -122,6 +136,7 @@ work, the cost of fixing it here is low. That cost grows significantly once Phas
 - Each account has a type: Asset or Liability
 - Investment accounts (brokerage, retirement funds, pensions) are treated as Asset accounts — balance is tracked at the account level, no individual holdings in this phase
 - Seeded with a small set of generic placeholder accounts on first run — users are expected to rename them to their actual account names or delete them if not applicable
+- **Opening balance prompt** — the account creation form includes a starting balance field (defaults to zero). On save, the app automatically creates an opening balance transaction for the entered amount, tagged to the system "Opening Balance" category. The user never has to construct this manually. The transaction is visible in history and editable if the amount was entered incorrectly.
 
 **Starter Accounts**
 
@@ -189,7 +204,7 @@ Always live — no generation required. Updates automatically as transactions ar
 - Net Worth Statement
 - Income & Expense Summary
 - Expense Breakdown by Category
-- Transaction History
+- Transaction History — requires pagination (strategy TBD, see Open Questions)
 
 ---
 
@@ -208,10 +223,13 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 
 - Account Balances Summary report
 - Nice-to-have reports (Net Worth Over Time, Monthly Cash Flow Trend, etc.)
-- CSV and OFX file import (bulk-import transactions from a bank statement download)
+- CSV and OFX file import (bulk-import transactions from a bank statement download) — note: bank exports represent debits as negative numbers; the import logic must flip signs and infer income/expense direction from the mapped category
 - CSV export
 - Recurring transactions
 - Saved report configurations
+- **Split transactions (optional)** — allow a single transaction to be split across multiple categories with individual amounts per line (e.g. one supermarket payment split between Groceries and Household Supplies). Splitting is always opt-in — users who don't need it continue recording one transaction per category as normal. Requires schema change: the current 1:1 Transaction→Category relationship becomes a 1:many TransactionLine table.
+- **Cleared / reconciliation status** — allow users to mark a transaction or transfer as "cleared" once they have verified it against a bank statement. Two mechanisms: (1) manual checkbox on the transaction/transfer row, (2) upload a bank statement (CSV) and let the app match and mark records automatically. Requires a `ClearedAt` date (or `IsCleared` boolean) on both Transaction and Transfer.
+- **File attachments on transfers** — allow files (e.g. bank wire confirmation PDFs) to be attached to a transfer, mirroring the existing attachment feature on transactions. Requires a `TransferAttachment` entity with the same structure as `TransactionAttachment`.
 - **Investment holdings tracking** — individual positions within an investment account (ticker/name, number of units, purchase price, current price, unrealized gain/loss). Prices updated manually, no live feed.
 
 ### Budgeting (Phase 2)
@@ -267,7 +285,7 @@ This phase introduces the foundational changes needed for any multi-user product
 - **Authentication** — user registration and login with username + password (hashed with Argon2, never stored in plain text)
 - **MFA (Multi-Factor Authentication)** — mandatory for all users via authenticator app (Google Authenticator, Authy, etc.). Time-based one-time codes (TOTP). No SMS — SMS-based MFA is vulnerable to SIM-swap attacks and considered weak for financial apps
 - **Multi-tenancy** — all data (accounts, transactions, categories) scoped to the logged-in user
-- **Per-user settings** — the single-row Settings table from Phase 1 migrates to a per-user preferences table so each user has their own number and date formatting preferences
+- **Per-user settings** — the single-row Settings table from Phase 1 migrates to a per-user preferences table so each user has their own number and date formatting preferences (see models.md → Settings entity for column details)
 - **Hosting setup** — deploy to a server so the app is reachable outside your machine
 - No business model yet — access is invite-only for collaborators/beta testers
 - **GDPR & legal compliance** — required before any user outside yourself can access the app. See [`legal.md`](legal.md) for the full checklist. Minimum before Phase 3 launch:
@@ -383,7 +401,20 @@ E2E tests (Playwright, Selenium) are explicitly out of scope — high maintenanc
 - [x] How to handle transfers between accounts? — Confirmed: a dedicated Transfer entity linking source and destination accounts directly. No category. Excluded from all income/expense reports. Cross-currency transfers not supported. Has its own Transfer History report. See models.md for detail.
 - [x] Number formatting and localization — Confirmed: user-configurable preferences stored in a Settings table. Options: number format (US vs European), date format (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD), date separator (slash, dash, dot). Phase 1: single-row app-wide settings. Phase 3: migrates to per-user preferences when multi-user support is introduced. See models.md for detail.
 - [x] Starter categories — Confirmed: app seeds a default set on first run (6 income, 17 expense categories). Users can add, rename, or delete any of them. Full list in the Phase 1 features section.
-- [ ] File attachment storage for Phase 3 — local filesystem works for Phase 1/2 but doesn't scale when hosted. Decide between cloud storage (e.g. Azure Blob Storage, S3) or server disk storage before Phase 3. This decision affects how the attachment feature is architected from the start.
+- [x] File attachment storage for Phase 1/2 — Confirmed: local filesystem using `uploads/{transactionId}/{guid}{extension}`. Files served via controller action, not wwwroot. See models.md for StoredPath convention.
+- [ ] File attachment storage for Phase 3 — local filesystem does not scale to hosted multi-user. Must decide between cloud storage (Azure Blob Storage, S3) and server disk before Phase 3 begins. **This decision must be made before the attachment feature is built in Phase 1** — `StoredPath` will need a data migration if the storage backend changes after data exists.
+- [ ] Timezone handling — transaction dates are currently stored as local date with no timezone. Works for single user. Must decide on a timezone strategy before Phase 3: store UTC and convert for display, require users to set their timezone in Settings, or accept local-date ambiguity. Affects report period boundaries (start/end of month) for users in different timezones.
+- [ ] Pagination strategy for Transaction History — no pagination defined. Must be decided before Phase 1 is complete. Options: page-based (page 1, 2, 3), cursor-based (load more), or server-side with fixed page size.
+- [ ] Authentication framework for Phase 3 — ASP.NET Core Identity (standard, adds ~5 DB tables, handles MFA, tokens), third-party provider (Auth0, Keycloak — less code, external dependency), or custom. Must be decided before any Phase 3 code is written. Affects database schema and middleware pipeline.
+- [ ] Hosting platform for Phase 3 — Azure, AWS, DigitalOcean, Fly.io, or bare VPS. Determines deployment pipeline, managed vs. self-hosted database, TLS setup, and file attachment storage options. All other Phase 3 infrastructure decisions depend on this.
+- [ ] Email service for Phase 3 — authentication requires email verification and password reset. No provider chosen (SendGrid, AWS SES, Mailgun, SMTP). Required before Phase 3 auth can launch.
+- [ ] Invite mechanism for Phase 3 — "invite-only beta" is stated but not designed. No invitation entity, flow, or admin mechanism exists. Must be planned before Phase 3 launch.
+- [ ] Multi-tenancy implementation — "all data scoped to logged-in user" requires adding UserId FK to every top-level entity (Account, Category, Budget, CategoryBudget, SavedReport, Transfer, Settings). No migration plan exists. Must be designed before Phase 3 code begins to avoid retrofitting every query.
+- [ ] Settings migration for Phase 3 — the single Phase 1 Settings row becomes per-user in Phase 3. What do new users get as default settings? The existing row's values? Hardcoded defaults? Must be decided when writing the migration.
+- [ ] Default currency when creating a new account — is a currency required with no default, derived from Settings, or from the last account created? Must be decided before the account creation form is built.
+- [ ] Intra-day transaction ordering — `Transaction.Date` is a `date` type with no time component (ADR-0009). Two transactions on the same day have no defined sequence. Running balance within a day cannot be shown in entry order. Options: add an optional `Time` column, add a sequence integer, or accept that within-day order is undefined. Must be decided before the Transaction History view is built.
+- [ ] One transaction per budget goal — `Transaction.BudgetId` is a single nullable FK. A transaction can be linked to at most one goal Budget. Users who want one payment to count toward multiple goals (e.g. partially funding two savings targets) cannot do so. Options: leave the single-FK limit and document it, or replace BudgetId with a many-to-many junction table (`TransactionBudgetContribution` with an Amount per budget). The junction approach is a schema change that affects every budget report query.
+- [ ] Budget/transaction currency mismatch — nothing in the schema prevents a transaction in one currency from being tagged to a Budget denominated in a different currency via `BudgetId`. The Budget's actual-spend calculation would silently mix currencies. Options: enforce at the application level when tagging a transaction to a budget, or add a database constraint. Must be decided before the budget tagging feature is built.
 
 ---
 

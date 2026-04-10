@@ -147,6 +147,21 @@ Represents a financial account the user owns or owes on.
 | Description   | varchar | nullable       | e.g. "Main checking account"           |
 | IsActive      | bit     | NOT NULL       | False = deactivated, hidden from UI but history preserved |
 
+**Deactivated accounts in calculations:**
+A deactivated account still counts toward net worth and account balance reports. Deactivation
+means the account is closed or no longer in active use — the money still exists (or the debt
+is still owed). Excluding it from calculations would silently produce a wrong net worth figure.
+Deactivated accounts are hidden from pickers and the active account list, but included in
+all aggregation queries.
+
+**Opening balance:**
+Account has no balance column — balance is always derived from transactions. When a user creates
+an account and enters a starting balance, the app automatically creates an opening balance
+transaction for that amount, tagged to the system "Opening Balance" category. The creation form
+prompts for a starting balance (can be zero). The user never has to construct this transaction
+manually — the app does it on their behalf. The transaction is visible in transaction history
+labeled as the opening entry and can be edited if the user entered the wrong amount.
+
 **Why AccountTypeId instead of storing "Asset" directly?**
 Storing the string on every row means a rename requires updating every account record.
 With a lookup table it changes in one place — and the string value can never drift. (3NF)
@@ -174,6 +189,13 @@ User-defined labels for classifying transactions.
 | Name           | varchar | NOT NULL     | e.g. "Groceries", "Salary"     |
 | CategoryTypeId | int     | FK, NOT NULL | → CategoryType                 |
 | IsActive       | bit     | NOT NULL     | False = deactivated, hidden from pickers but existing transactions unaffected |
+| IsSystem       | bit     | NOT NULL     | True = seeded by the app, not editable or deletable by the user |
+
+**System categories:**
+Some categories are seeded by the app and must not be renamed or deleted because the application
+logic depends on them by name or ID. Currently one: "Opening Balance" (Income type, IsSystem = true).
+It is excluded from all income/expense report totals — its only purpose is to anchor the starting
+balance of an account. The UI must hide edit and delete controls for any category where IsSystem = true.
 
 ---
 
@@ -184,18 +206,41 @@ The central record. Every dollar movement lives here.
 | Column      | Type    | Constraints  | Notes                                         |
 |-------------|---------|--------------|-----------------------------------------------|
 | Id          | int     | PK           |                                               |
-| Date        | date    | NOT NULL     | When the transaction occurred                 |
-| Amount      | decimal | NOT NULL     | Always stored as a positive number            |
-| Description | varchar | nullable     | e.g. "Whole Foods run"                        |
-| AccountId   | int     | FK, NOT NULL | → Account (which account was affected)        |
-| CategoryId  | int     | FK, NOT NULL | → Category (what kind of transaction this is) |
-| BudgetId    | int     | FK, nullable | → Budget (optional — tags this transaction to a goal budget) |
+| Date        | date         | NOT NULL     | When the transaction occurred — stored as local date, no timezone (see note) |
+| Amount      | decimal(18,2)| NOT NULL     | Always stored as a positive number — direction derived from Category → CategoryType |
+| Description | varchar      | nullable     | e.g. "Whole Foods run"                        |
+| AccountId   | int          | FK, NOT NULL | → Account (which account was affected)        |
+| CategoryId  | int          | FK, NOT NULL | → Category (what kind of transaction this is) |
+| BudgetId    | int          | FK, nullable | → Budget (optional — tags this transaction to a goal budget) |
 
 **Note on Income vs. Expense classification:**
 Whether a transaction is income or expense is not stored on this table. That classification
 already lives in Category → CategoryType. Duplicating it here would create a transitive
 dependency — a 3NF violation — because the value would depend on CategoryId, not on the
 transaction's own key. If the two ever disagreed, there would be no way to know which is correct.
+
+**Note on date and timezone:**
+Date is stored as a local date with no timezone component. The assumption is that the user
+records transactions in their local timezone and reports use the same timezone for period
+boundaries (start/end of month, year). In Phase 3 (multi-user), this assumption must be
+revisited — users in different timezones will have different interpretations of "today."
+
+**Note on BudgetId when a Budget is deactivated:**
+If the linked Budget is deactivated, the FK on this row is preserved. The transaction
+still contributed to that budget's actual spend while it was active. Transaction History
+views should display the budget name even when the budget is deactivated, so the link
+remains interpretable.
+
+**Flagged — split transactions (Phase 2):**
+Currently one Transaction links to exactly one Category. Users who want to split a single
+payment across multiple categories (e.g. one supermarket receipt split between Groceries
+and Household Supplies) cannot do so. This will require a `TransactionLine` junction table
+(TransactionId, CategoryId, Amount) replacing the direct CategoryId FK. Splitting is
+opt-in — the current single-category flow remains the default. See Phase 2 in planning.md.
+
+**Flagged — cleared / reconciliation status (Phase 2):**
+There is no field to mark a transaction as verified against a bank statement. Adding this
+requires a `ClearedAt date` (or `IsCleared bit`) column on this table. See Phase 2 in planning.md.
 
 ---
 
@@ -209,7 +254,7 @@ The actual file is saved to the filesystem — only the reference lives in the d
 | Id            | int      | PK           |                                                            |
 | TransactionId | int      | FK, NOT NULL | → Transaction                                              |
 | FileName      | varchar  | NOT NULL     | Original filename as uploaded (e.g. "receipt.pdf")        |
-| StoredPath    | varchar  | NOT NULL     | Path on disk where the file is saved                       |
+| StoredPath    | varchar  | NOT NULL     | Path used to locate the file. Phase 1/2: absolute filesystem path. Phase 3+: cloud storage URL or blob key — provider TBD, see open question in planning.md |
 | ContentType   | varchar  | NOT NULL     | MIME type (e.g. "application/pdf", "image/jpeg")           |
 | FileSizeBytes | bigint   | NOT NULL     | Size of the file in bytes                                  |
 | UploadedAt    | datetime | NOT NULL     | When the file was attached                                 |
@@ -218,6 +263,14 @@ The actual file is saved to the filesystem — only the reference lives in the d
 Storing binary file data (BLOBs) in SQL Server bloats the database, slows down every backup,
 and makes queries against other columns slower. The filesystem is purpose-built for files.
 The database holds the path so the app can find it — that's the right split of responsibility.
+
+**StoredPath naming convention:**
+Files are saved under `uploads/{transactionId}/{guid}{extension}`.
+The GUID prevents filename collisions. The transactionId subdirectory groups a transaction's
+attachments together and makes manual inspection easier. `FileName` preserves the original
+name for display in the UI — `StoredPath` is never shown to the user.
+Files must be served via a controller action, not directly — they must not be accessible
+without authentication and must not be placed inside `wwwroot`.
 
 ---
 
@@ -230,14 +283,23 @@ from all income/expense report calculations. Both accounts must share the same c
 | Column          | Type     | Constraints  | Notes                                       |
 |-----------------|----------|--------------|---------------------------------------------|
 | Id              | int      | PK           |                                             |
-| Date            | date     | NOT NULL     | When the transfer occurred                  |
-| Amount          | decimal  | NOT NULL     | Always stored as a positive number          |
+| Date            | date     | NOT NULL     | When the transfer occurred — local date, no timezone |
+| Amount          | decimal(18,2) | NOT NULL | Always stored as a positive number          |
 | SourceAccountId | int      | FK, NOT NULL | → Account (money leaves here)               |
 | DestAccountId   | int      | FK, NOT NULL | → Account (money arrives here)              |
 | Description     | varchar  | nullable     | e.g. "Monthly savings transfer"             |
 
 **Constraint:** SourceAccountId and DestAccountId must reference accounts with the same currency.
 Cross-currency transfers are not supported — they would require a conversion rate, which is out of scope.
+
+**Flagged — cleared / reconciliation status (Phase 2):**
+Same as Transaction — no field exists to mark a transfer as verified against a bank statement.
+Requires a `ClearedAt date` (or `IsCleared bit`) column on this table. See Phase 2 in planning.md.
+
+**Flagged — file attachments on transfers (Phase 2):**
+There is currently no way to attach a file (e.g. a bank wire confirmation PDF) to a transfer.
+Requires a `TransferAttachment` entity mirroring the structure of `TransactionAttachment`,
+with a `TransferId` FK instead of `TransactionId`. See Phase 2 in planning.md.
 
 ---
 
@@ -251,11 +313,15 @@ Feeds the Category Budget Progress bars on the dashboard.
 | Id         | int     | PK           |                                                  |
 | CategoryId | int     | FK, NOT NULL | → Category (must be an Expense category)         |
 | CurrencyId | int     | FK, NOT NULL | → Currency                                       |
-| LimitAmount| decimal | NOT NULL     | Maximum amount to spend in this category per month |
-| IsActive   | bit     | NOT NULL     | False = deactivated, hidden from dashboard       |
+| LimitAmount| decimal(18,2) | NOT NULL  | Maximum amount to spend in this category per month |
+| IsActive   | bit           | NOT NULL  | False = deactivated, hidden from dashboard       |
 
 **Note:** CategoryBudget only applies to Expense categories — setting a cap on an Income
 category is not meaningful. This constraint should be enforced at the application level.
+
+**Uniqueness constraint:** Only one active CategoryBudget per CategoryId + CurrencyId combination
+is permitted. Two active limits for the same category and currency would produce ambiguous
+dashboard progress bars. Enforce via unique index on (CategoryId, CurrencyId) where IsActive = true.
 
 ---
 
@@ -269,7 +335,7 @@ Transactions are optionally tagged to a budget to count toward its actual amount
 |--------------|----------|--------------|----------------------------------------------------|
 | Id           | int      | PK           |                                                    |
 | Name         | varchar  | NOT NULL     | e.g. "Trip to Japan", "Kitchen Renovation"         |
-| TargetAmount | decimal  | NOT NULL     | The planned total for this goal                    |
+| TargetAmount | decimal(18,2) | NOT NULL | The planned total for this goal                    |
 | CurrencyId   | int      | FK, NOT NULL | → Currency                                         |
 | StartDate    | date     | NOT NULL     | When tracking begins                               |
 | EndDate      | date     | nullable     | Null = open-ended goal                             |
@@ -339,6 +405,12 @@ only the scope changes.
 **Note:** Settings has no foreign keys — it stands alone. It is not linked to any other entity
 in Phase 1. The per-user migration in Phase 3 will add a UserId column and remove the
 single-row constraint.
+
+**Initialization:** The single Settings row is seeded by EF Core on first run with the
+following defaults: `NumberFormat = "comma_decimal"`, `DateFormat = "DD/MM/YYYY"`,
+`DateSeparator = "/"`. These defaults reflect the primary user's locale (Spain).
+The app must not crash if the Settings row is missing — on startup, check for its existence
+and create it with defaults if absent.
 
 ---
 
@@ -418,7 +490,7 @@ feature if there is clear demand for it.
 | Entity | Rule | Reason |
 |--------|------|--------|
 | Account | Deactivate (`IsActive = false`) — never hard delete | Has transactions linked to it. Hard delete would orphan financial history. |
-| Category | Deactivate (`IsActive = false`) — never hard delete | Has transactions linked to it. Hard delete would orphan financial history. |
+| Category | Deactivate (`IsActive = false`) — never hard delete. System categories (`IsSystem = true`) cannot be deactivated either. | Has transactions linked to it. Hard delete would orphan financial history. System categories are required for app logic. |
 | Transaction | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. Removes its contribution from any linked Budget's actual spend. |
 | Transfer | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. |
 | CategoryBudget | Deactivate (`IsActive = false`) — never hard delete | Historical dashboard and report data depends on it. |
@@ -434,3 +506,13 @@ feature if there is clear demand for it.
 **Deactivate vs. soft delete — the distinction:**
 - **Deactivate** (`IsActive`): the record is still in active use by historical data. It is hidden from pickers and active views but continues to appear correctly in past transactions and reports.
 - **Soft delete** (`DeletedAt`): the user intentionally removed the record and it has no ongoing role in history. It is fully hidden but can be restored on request.
+
+---
+
+## Phase 2 — Entities To Be Defined
+
+### InvestmentHolding (Phase 2)
+
+To be defined when Phase 2 begins. Will link to Account and track individual positions within
+an investment account: ticker or name, number of units, purchase price, current price (updated
+manually), unrealized gain/loss (derived). See planning.md Phase 2 section for full context.

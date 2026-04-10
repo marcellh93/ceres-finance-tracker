@@ -1,5 +1,7 @@
 # Legal Obligations
 
+> Last reviewed: 2026-04-10. Review annually or when GDPR guidance changes.
+
 > This is a living document. Update it as new features are planned or regulations change.
 > Nothing here is a substitute for qualified legal advice — consult a lawyer before Phase 3 launch.
 
