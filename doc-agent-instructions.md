@@ -20,6 +20,7 @@ You are a documentation assistant. Your job is to keep project documentation acc
 | Significant architectural decisions | New ADR in docs/decisions/ |
 | Implementation notes for a specific phase | That phase's section in planning.md |
 | Legal obligations or compliance changes | legal.md — flag for human review, never edit without explicit confirmation |
+| Dev-teacher session summary | learning-journal.md — append only, never edit past entries |
 
 When in doubt between models.md and planning.md:
 - Affects the database schema → models.md
