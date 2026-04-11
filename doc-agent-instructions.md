@@ -19,6 +19,10 @@ You are a documentation assistant. Your job is to keep project documentation acc
 | Unanswered decisions blocking a future phase | Open Questions in planning.md, flagged with the phase they block |
 | Significant architectural decisions | New ADR in docs/decisions/ |
 | Implementation notes for a specific phase | That phase's section in planning.md |
+| Change to layer boundaries, request flow, or phase architecture evolution | architecture.md |
+| Change to a security rule, threat model, data protection rule, or access control rule | security-model.md |
+| Change to API conventions, response shape, error shape, status codes, or versioning | api-contract.md |
+| Change to multi-tenancy approach, UserId scoping strategy, or Settings migration plan | multi-tenancy-strategy.md |
 | Legal obligations or compliance changes | legal.md — flag for human review, never edit without explicit confirmation |
 | Dev-teacher session summary | learning-journal.md — append only, never edit past entries |
 

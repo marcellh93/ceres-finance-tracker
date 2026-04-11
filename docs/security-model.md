@@ -1,0 +1,244 @@
+# Security Model
+
+> **Diataxis type:** Reference + Explanation — defines what we are protecting against and the rules that enforce protection. Individual implementation details live in `planning.md` (Phase 3) and the relevant ADRs; this document is the unified view.
+
+## Index
+
+1. [Threat Model](#threat-model)
+2. [Data Protection Rules](#data-protection-rules)
+3. [Access Control Rules](#access-control-rules)
+4. [Authentication and Session Rules](#authentication-and-session-rules)
+5. [Transport and Infrastructure Rules](#transport-and-infrastructure-rules)
+6. [Input Validation Rules](#input-validation-rules)
+7. [File Handling Rules](#file-handling-rules)
+8. [Security Rules by Phase](#security-rules-by-phase)
+
+---
+
+## Threat Model
+
+### What we are protecting
+
+This is a personal finance application. The data it holds is among the most sensitive personal data a user can have: account balances, income, spending habits, financial goals, and (in Phase 4) tax information. The threat impact is high even for a small user base.
+
+**Primary assets:**
+- Financial transaction records and account data
+- Authentication credentials (passwords, TOTP secrets)
+- Session tokens
+- File attachments (receipts, invoices — may contain personal or tax-sensitive information)
+- Audit logs (login history, IP addresses)
+
+### Who the adversary is
+
+| Adversary | Capability | Target |
+|-----------|-----------|--------|
+| **External attacker** | Network access to the hosted app | Credentials, other users' financial data |
+| **Curious user** | Valid account, knowledge of URL patterns | Other users' data via ID manipulation |
+| **Compromised session** | Stolen session cookie or token | All data accessible to the victim user |
+| **Database dump attacker** | Read access to a database backup | Plaintext passwords, TOTP secrets, financial data |
+| **Passive network observer** | Ability to intercept HTTP traffic | Credentials, session tokens (mitigated by HTTPS) |
+
+### What we are not trying to defend against
+
+- Malware running on the user's own device (out of scope for any web app)
+- A malicious hosting platform administrator (trust the hosting provider)
+- Quantum computing attacks on current cryptography (not a near-term threat at this scale)
+
+---
+
+## Data Protection Rules
+
+### Passwords
+
+- **Never store plaintext.** Hash with Argon2id using explicitly pinned parameters: `m=19456` (19 MB), `t=2` iterations, `p=1` parallelism (OWASP minimum baseline).
+- **Never use bcrypt** for new implementations — Argon2id is the current standard.
+- **Do not rely on library defaults** — pin the parameters explicitly. Default values in libraries may be weaker than the minimum.
+- **Policy:** minimum 8 characters, no maximum below 64 (NIST SP 800-63B). No mandatory complexity rules (uppercase, symbols) — NIST advises against them. Check against a breached password list (Have I Been Pwned API or a local top-N list) on registration and password change.
+
+### TOTP Secrets
+
+- The TOTP seed (generated during MFA setup and encoded in the QR code) must be stored **encrypted at rest** in the database.
+- A plaintext seed in a database dump allows offline generation of valid TOTP codes, bypassing MFA entirely.
+- ASP.NET Core Identity stores TOTP secrets via `IUserTwoFactorTokenProvider` — verify that ASP.NET Core Data Protection encryption is applied before Phase 3 launch.
+
+### Session Tokens
+
+- Persistent "remember me" tokens: store only a hash of the token in the database — never the raw value. Rotate the token on each use (issue new, invalidate old).
+- Regular session tokens: managed by ASP.NET Core's cookie authentication. Regenerate immediately after login to prevent session fixation.
+- On logout: mark the `UserSession` row as revoked in the database. Clearing the cookie alone is insufficient — a stolen cookie can still be replayed.
+
+### Database Credentials
+
+- The application's runtime user has DML rights only: `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
+- A separate migration user holds DDL rights and runs `dotnet ef database update`.
+- Credentials are never stored in source control. Local development: `dotnet user-secrets`. Production: hosting platform secret store (Azure Key Vault, environment variables, or equivalent). See `planning.md → Secrets & Config`.
+
+### Sensitive Fields at Rest
+
+| Data | Protection |
+|------|-----------|
+| Passwords | Argon2id hash (never stored) |
+| TOTP secrets | Encrypted at rest via ASP.NET Core Data Protection |
+| Session tokens | Stored as hash; raw token in cookie only |
+| Financial records | PostgreSQL at-rest encryption at the infrastructure layer (hosting platform responsibility) |
+| File attachments | Stored outside `wwwroot` — not publicly accessible; served only through authenticated controller actions |
+| IP addresses (audit log, UserSession) | Stored in plaintext — necessary for security features (IP enforcement, IP blocking, audit trail) |
+
+---
+
+## Access Control Rules
+
+### IDOR Prevention (Insecure Direct Object Reference)
+
+Every controller action that loads a resource by ID must scope the query to the authenticated user:
+
+```
+WHERE Id = ? AND UserId = currentUserId
+```
+
+This applies to: Transactions, Accounts, Transfers, Budgets, CategoryBudgets, SavedReports, RecurringTransactions, TransactionAttachments.
+
+**When a resource is not found (either because it does not exist or belongs to another user): return `404`, not `403`.**
+
+Returning `403` confirms the resource exists, which tells an attacker that their guessed ID was valid. A resource the user cannot see should appear not to exist.
+
+### System-Level Controls (IsSystem)
+
+Categories with `IsSystem = true` are seeded by the app and cannot be renamed or deleted by any user. This rule is enforced **server-side in the service layer**, not just hidden in the UI. A direct HTTP request bypassing the UI must be rejected. UI-only enforcement is not enforcement.
+
+### Role Boundaries (Phase 3+)
+
+Phase 3 is single-role (all authenticated users have the same permissions over their own data). If an admin role is introduced later, admin access to other users' data must be explicitly designed and audited — it is not a natural extension of the current model.
+
+### File Access Control
+
+Files stored in `uploads/` are never served directly by the web server. Every file download goes through an authenticated controller action that:
+1. Verifies the requesting user owns the file (via the TransactionAttachment record)
+2. Returns the file via `FileStreamResult` with `Content-Disposition: attachment; filename*=UTF-8''...` (RFC 5987 encoding for non-ASCII filenames)
+3. Re-verifies the stored MIME type — do not trust the stored extension alone
+
+---
+
+## Authentication and Session Rules
+
+### Login
+
+- **Account enumeration prevention:** login and password-reset endpoints return identical error messages and take identical wall-clock time regardless of whether the email exists. Always run Argon2id hash even when the user is not found — hash a dummy value and discard the result. The timing difference between "user not found" (no hash) and "wrong password" (Argon2id takes ~300ms) leaks whether an email is registered.
+- **Rate limiting:** login and registration endpoints are rate-limited. Minimum: 10 requests per minute per IP. Supplement with account-level lockout: after N consecutive failed attempts on the same account (e.g. 10), lock for a fixed period (e.g. 15 minutes) and notify the user via email.
+- **MFA:** mandatory TOTP for all users. No SMS — vulnerable to SIM-swap. See ADR rationale in `planning.md`.
+- **TOTP replay prevention:** track recently accepted codes per user in a short-lived store. Reject any code used more than once within its validity window. ASP.NET Core Identity does not do this by default.
+
+### Sessions
+
+See `docs/decisions/ADR-0019-session-management-user-configurable-with-ip-controls.md` for the full decision.
+
+Summary:
+- Sessions are tracked server-side in `UserSession` (one row per active session per device)
+- Session token regenerated on login (session fixation prevention) — always enforced
+- Logout marks the server-side record as revoked — always enforced
+- Session lifetime, IP enforcement, and IP blocking are user-configurable with risk disclosure
+
+### Cookie Configuration
+
+Authentication cookies must be set with:
+- `HttpOnly = true` — blocks JavaScript access, mitigates XSS cookie theft
+- `Secure = true` — HTTPS-only transmission
+- `SameSite = Strict` or `Lax` — CSRF mitigation as a second layer alongside anti-forgery tokens
+
+---
+
+## Transport and Infrastructure Rules
+
+### HTTPS
+
+All traffic must use HTTPS. HTTP must redirect to HTTPS. HSTS (`Strict-Transport-Security`) must be configured once HTTPS is enforced. Configure in `Program.cs` via `UseHttpsRedirection()` and `UseHsts()`.
+
+### Reverse Proxy
+
+When the app runs behind a reverse proxy (nginx, Caddy, or a hosting platform load balancer), register `app.UseForwardedHeaders()` with `ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto` **before all other middleware**. Without this, `Request.IsHttps` returns false, HSTS does not activate, and redirect-to-HTTPS logic fails silently. Restrict trusted proxy addresses via `KnownProxies` or `KnownNetworks`.
+
+### HTTP Security Headers
+
+Every response must include:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing |
+| `X-Frame-Options` | `DENY` | Prevents clickjacking |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limits referrer information leakage |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Enforces HTTPS after first visit |
+| `Content-Security-Policy` | Define before any JS is introduced | Restricts script/style sources, mitigates XSS |
+
+Use `NetEscapades.AspNetCore.SecurityHeaders` or custom middleware.
+
+### CORS
+
+Required when the React SPA is on a different origin from the API (Phase 3). Configure via `AddCors` / `UseCors` in `Program.cs`. Whitelist only known frontend origins. **Never combine `AllowAnyOrigin` with `AllowCredentials`** — the CORS specification prohibits this and it collapses same-origin protection.
+
+### CSRF
+
+All state-changing forms must include CSRF anti-forgery tokens. ASP.NET Core's built-in anti-forgery middleware handles this via `[ValidateAntiForgeryToken]` on controllers and the `<form>` tag helper. JSON API endpoints authenticated via cookies also require anti-forgery protection — configure the anti-forgery middleware to validate on API routes.
+
+---
+
+## Input Validation Rules
+
+- **Validate at the boundary:** all user input is validated at the controller/ViewModel level before reaching services. Services trust input from controllers but validate cross-entity business rules (e.g. currency matching).
+- **ViewModels, not entities:** form inputs bind to ViewModel classes with validation attributes (`[Required]`, `[StringLength]`, etc.), not directly to EF Core entity classes. This prevents mass-assignment vulnerabilities.
+- **Length limits:** define `[StringLength]` on all string fields in ViewModels to match the database column constraint. Never accept unbounded string input.
+- **CSV export injection:** any exported CSV field must be sanitized. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix such values with a single quote to neutralize them.
+
+---
+
+## File Handling Rules
+
+### Upload (validation)
+
+1. **MIME whitelist:** accept only `image/jpeg`, `image/png`, `image/webp`, `application/pdf`. Reject all other MIME types.
+2. **Magic bytes check:** verify the file's actual byte signature matches the declared MIME type. Do not trust the `Content-Type` header or the file extension — they can be spoofed.
+3. **Size limit:** enforce a maximum file size (e.g. 10 MB) at the server level, not just in client-side form validation.
+4. **Filename sanitization:** generate a new system-assigned filename (UUID + allowed extension) for storage. Store the original filename in `TransactionAttachment.FileName` for display only — never use it for filesystem paths. Prevents path traversal attacks.
+5. **Polyglot awareness:** a file can have valid JPEG bytes at the start and contain embedded scripts later (a "polyglot file"). Magic bytes check reduces but does not eliminate this risk — the MIME whitelist and strict `Content-Disposition` headers on serving are the remaining controls.
+
+### Serving (security)
+
+1. **Authentication required:** every file download goes through an authenticated controller action. Static file serving for the `uploads/` directory must be disabled.
+2. **Ownership check:** verify the requesting user owns the file before streaming it.
+3. **Content-Disposition header:** always set `Content-Disposition: attachment; filename*=UTF-8''...` (RFC 5987). This forces the browser to download the file rather than render it inline, mitigating stored XSS via uploaded HTML files.
+4. **MIME re-verification:** use the stored MIME type from the database when setting the response `Content-Type` — do not re-derive it from the filename extension at serve time.
+
+---
+
+## Security Rules by Phase
+
+| Rule | Phase 1 | Phase 2 | Phase 3 |
+|------|---------|---------|---------|
+| HTTPS enforced | — | — | Required |
+| HSTS configured | — | — | Required |
+| Argon2id for passwords | — | — | Required |
+| TOTP mandatory | — | — | Required |
+| TOTP replay prevention | — | — | Required |
+| TOTP secrets encrypted at rest | — | — | Required |
+| HTTP security headers | — | Required (CSP when JS added) | Required |
+| CSRF anti-forgery tokens | Required | Required | Required |
+| UUID primary keys | Required | Required | Required |
+| IDOR prevention (UserId scoping) | — (single user) | — (single user) | Required |
+| Account enumeration prevention | — | — | Required |
+| Rate limiting on auth endpoints | — | — | Required |
+| Account lockout after failed logins | — | — | Required |
+| Session fixation prevention | — | — | Required |
+| Secure cookie flags | — | — | Required |
+| IP enforcement (user-configurable) | — | — | Required |
+| IP blocking | — | — | Required |
+| Active session list + revocation | — | — | Required |
+| CORS policy | — | — (no separate origin) | Required |
+| Forwarded headers middleware | — | — | Required |
+| File upload MIME whitelist | Required (if built) | Required | Required |
+| File upload magic bytes check | Required (if built) | Required | Required |
+| File serving via authenticated action | Required (if built) | Required | Required |
+| CSV export injection sanitization | — | Required (if export built) | Required |
+| Dependency vulnerability scanning | Manual | Manual | CI pipeline |
+| Database least privilege (DML user) | Recommended | Recommended | Required |
+| GDPR compliance | — | — | Required before any external user |
+
+> Phase 1 and 2 are single-user and local. Many security controls are not required because there is no network exposure and no other users. All controls marked Required for Phase 3 must be in place before the app is reachable from outside the developer's machine.

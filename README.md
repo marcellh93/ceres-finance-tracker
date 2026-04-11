@@ -49,5 +49,9 @@ Open `http://localhost:5000` in your browser.
 
 - `docs/planning.md` — feature phases, scope, project structure
 - `docs/models.md` — data model, entities, relationships, deletion rules
+- `docs/architecture.md` — layer model, request flow, how the architecture evolves across phases
+- `docs/security-model.md` — threat model, data protection rules, access control rules
+- `docs/api-contract.md` — API conventions, response shape, versioning strategy (Phase 3+)
+- `docs/multi-tenancy-strategy.md` — Phase 3 migration plan for scoping all data to users
 - `docs/legal.md` — GDPR obligations, data retention policy
 - `docs/decisions/` — Architecture Decision Records

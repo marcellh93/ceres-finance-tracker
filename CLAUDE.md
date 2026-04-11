@@ -73,6 +73,10 @@ dotnet test                                  # run all tests
 
 - `docs/planning.md` — feature phases, scope decisions, project structure
 - `docs/models.md` — all entities, relationships, normalization, deletion rules
+- `docs/architecture.md` — layer model, request flow, how the architecture evolves across phases
+- `docs/security-model.md` — threat model, data protection rules, access control rules (unified view)
+- `docs/api-contract.md` — API conventions, response shape, versioning strategy (Phase 3+)
+- `docs/multi-tenancy-strategy.md` — Phase 3 migration plan for scoping all data to users
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
 - `doc-agent-instructions.md` — documentation working instructions (routing rules, ADR numbering, health checks)

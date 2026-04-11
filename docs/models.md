@@ -205,6 +205,7 @@ User-defined labels for classifying transactions.
 | CategoryTypeId | int     | FK, NOT NULL | → CategoryType                 |
 | IsActive       | bit     | NOT NULL     | False = deactivated, hidden from pickers but existing transactions unaffected |
 | IsSystem       | bit     | NOT NULL     | True = seeded by the app, not editable or deletable by the user |
+| LifestyleTag   | varchar | nullable     | "Needs" or "Wants" — used for ratio-based budgeting framework reports (50/30/20). Null = untagged. Only meaningful for Expense categories; ignored on Income and system categories. Seeded expense categories ship with suggested default tags. Prompted once when a user creates a custom category. |
 
 **System categories:**
 Some categories are seeded by the app and must not be renamed or deleted because the application
@@ -305,6 +306,30 @@ When streaming a file to the user, the controller action must:
 - Set `Content-Disposition: attachment; filename*=UTF-8''<percent-encoded FileName>` — forces the browser to download rather than render, preventing stored XSS via uploaded HTML or SVG. Use the RFC 5987 `filename*` parameter for non-ASCII characters and to prevent header injection via filenames containing quotes or semicolons. A plain `filename` parameter may be included alongside it as a fallback for older clients.
 - Set `Content-Type` from the stored `ContentType` value, not from the filename or from any user-supplied header.
 - Re-verify the MIME type whitelist at serve time — reject any record whose `ContentType` is not on the allowed list, even if it passed the upload check.
+
+---
+
+### RecurringTransaction
+
+A template for a predictable financial event that repeats on a regular schedule (salary, rent, subscriptions). Does **not** create transactions automatically — instead surfaces a reminder when the due date arrives, which the user must confirm before a real `Transaction` record is written. This prevents unverified entries from appearing in the ledger.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| Name | varchar | NOT NULL | User-given label, e.g. "Monthly Rent", "Salary" |
+| EstimatedAmount | decimal(18,2) | NOT NULL | Default amount pre-filled in the confirmation form — the user can adjust before confirming |
+| AccountId | uuid | FK, NOT NULL | → Account |
+| CategoryId | uuid | FK, NOT NULL | → Category |
+| Frequency | varchar | NOT NULL | "monthly", "weekly", "biweekly", "annual" |
+| DayOfPeriod | int | nullable | Day within the frequency period when the reminder fires. Monthly: day of month (e.g. 1 = 1st). Weekly: day of week (1 = Monday). Null for annual entries where NextDueDate is managed directly. |
+| NextDueDate | date | NOT NULL | Date on which the next reminder appears. Advances to the next period automatically after the user confirms. |
+| IsActive | bit | NOT NULL | False = paused, hidden from the dashboard pending list |
+
+**How confirmation works:** when `NextDueDate` is reached (or within a configurable look-ahead window, e.g. 3 days before), the dashboard shows a pending reminder count. The user opens the reminder to see a pre-filled transaction form using the template values. They adjust any field if needed — the actual amount or date may differ from the estimate — then confirm to write a real `Transaction` record. On confirmation, `NextDueDate` advances to the next period. Dismissing a reminder does not create a transaction and does not advance the schedule.
+
+**Why not auto-create:** amounts vary (utility bills, freelance income), payment dates shift (holidays, bank processing delays), and some periods may be skipped or cancelled. Auto-creation silently produces wrong data in the ledger. The reminder model keeps the user in control while eliminating the need to remember when entries are due.
+
+**Deletion rule:** hard delete allowed. Deleting a template does not affect any previously confirmed transactions. Pausing (`IsActive = false`) is preferred for temporary suspension.
 
 ---
 

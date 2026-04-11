@@ -184,8 +184,18 @@ These are intentionally generic. The goal is to give users something to work wit
 
 ### Transactions
 - Record transactions with: date, amount, description, category, account
-- Attach one or more files to a transaction (receipts, invoices)
 - Balance updates automatically per account
+
+### Recurring Transaction Reminders
+
+Recurring transactions are managed as a template (RecurringTransaction entity) that drives reminders — not auto-creation. The user confirms each reminder to generate a real Transaction record.
+
+- User defines a recurring template: name, estimated amount, account, category, frequency (monthly/weekly/etc.), and day within the period
+- The system computes `NextDueDate` from frequency and day; does not auto-advance — advances only when the user confirms or dismisses the reminder
+- When a reminder is due, it surfaces as a dashboard notification (count of pending reminders due this month) and in a dedicated Reminders list
+- Confirming a reminder opens the New Transaction form pre-filled from the template; the user reviews and saves it as a real transaction
+- Dismissing a reminder advances `NextDueDate` without creating a transaction (e.g. user paid in cash, or the bill didn't arrive)
+- Estimated amount is a hint, not enforced — the user edits the pre-filled amount before saving if the actual amount differs
 
 ### Categories
 - User-defined categories for income and expenses
@@ -230,6 +240,8 @@ Always live — no generation required. Updates automatically as transactions ar
 - Current net worth (total assets − total liabilities)
 - Total income vs. total expenses for the current month
 - Simple account balance list per currency
+- Savings rate for the current month ((Income − Expenses) ÷ Income), displayed as a percentage
+- Count of pending recurring transaction reminders due this month
 
 > Visual/graphical dashboard charts are planned for Phase 2. Phase 1 shows the same data as numbers only.
 
@@ -258,12 +270,11 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 - Nice-to-have reports (Net Worth Over Time, Monthly Cash Flow Trend, etc.)
 - CSV and OFX file import (bulk-import transactions from a bank statement download) — note: bank exports represent debits as negative numbers; the import logic must flip signs and infer income/expense direction from the mapped category
 - CSV export — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications (Excel, LibreOffice) when the exported file is opened. A crafted transaction description like `=HYPERLINK("http://evil.com","click")` in an export could execute when the user opens it. Prefix any cell value starting with those characters with a single quote (`'`) to neutralize it.
-- Recurring transactions
+- File attachments on transactions (receipts, invoices)
 - Saved report configurations
 - **Split transactions (optional)** — allow a single transaction to be split across multiple categories with individual amounts per line (e.g. one supermarket payment split between Groceries and Household Supplies). Splitting is always opt-in — users who don't need it continue recording one transaction per category as normal. Requires schema change: the current 1:1 Transaction→Category relationship becomes a 1:many TransactionLine table.
 - **Cleared / reconciliation status** — allow users to mark a transaction or transfer as "cleared" once they have verified it against a bank statement. Two mechanisms: (1) manual checkbox on the transaction/transfer row, (2) upload a bank statement (CSV) and let the app match and mark records automatically. Requires a `ClearedAt` date (or `IsCleared` boolean) on both Transaction and Transfer.
 - **File attachments on transfers** — allow files (e.g. bank wire confirmation PDFs) to be attached to a transfer, mirroring the existing attachment feature on transactions. Requires a `TransferAttachment` entity with the same structure as `TransactionAttachment`.
-- **Investment holdings tracking** — individual positions within an investment account (ticker/name, number of units, purchase price, current price, unrealized gain/loss). Prices updated manually, no live feed.
 
 ### Budgeting (Phase 2)
 
@@ -307,28 +318,26 @@ Distinct from reports: reports are formal documents you produce on demand; these
 decision is deferred until Phase 2 begins. This is the natural point where the first JS
 dependency enters the project.
 
-### Financial Health Metrics (Phase 2/3)
+### Financial Health Metrics (Phase 2)
 
 Features that help users understand how their spending and saving habits compare to
-established personal finance frameworks. Two tiers based on implementation complexity:
+established personal finance frameworks.
 
-**Phase 2 — Savings rate (no schema change required)**
+**Savings rate**
 - Savings rate = (Income − Expenses) ÷ Income for a selected period, expressed as a percentage
-- Displayed on the dashboard and available as a report metric
+- Displayed on the Phase 1 dashboard (current month) and available as a Phase 2 report metric
 - No category tagging needed — derived entirely from existing income/expense totals
 
-**Phase 3 — Ratio-based frameworks (requires needs/wants tag on Category)**
-Methods like the **50/30/20 rule** (50% needs, 30% wants, 20% savings) require each
-expense category to be tagged as either a "need" or a "want." This is a user-defined,
-subjective classification — the app cannot decide it automatically.
+**Ratio-based frameworks (50/30/20)**
 
-Implementation path:
-- Add an optional `LifestyleTag` field to `Category` (values: Needs, Wants, untagged) — see Open Questions
-- User tags their categories once via the Category settings page
-- A "Financial Health" report shows: actual % spent on Needs, Wants, and Savings vs. the
-  target ratios of whichever framework the user selects
-- Framework options to support: 50/30/20 (most common), 80/20 (save 20%, spend 80% freely)
-- Untagged categories are excluded from framework calculations with a visible warning
+Methods like the 50/30/20 rule (50% needs, 30% wants, 20% savings) require each expense category to be tagged as either a "need" or a "want." The `LifestyleTag` column is added to `Category` in Phase 1 to support this feature in Phase 2 without a migration.
+
+Implementation approach:
+- **Starter categories ship with suggested default tags** — e.g. Rent → Needs, Dining Out → Wants. These are defaults, not enforced.
+- **Creation-time prompt** — when a user creates a custom Expense category, the form includes a "Needs / Wants / Skip for now" prompt. Income and system categories do not show the prompt.
+- **Untagged is a visible bucket** — the Financial Health report shows four sections: Needs %, Wants %, Savings %, and Untagged %. Untagged is never silently excluded; the report is useful even if the user has not tagged everything.
+- Framework options: 50/30/20 (most common), 80/20 (save 20%, spend 80% freely)
+- Users can re-tag any category at any time from the Category settings page
 
 ---
 
@@ -382,7 +391,8 @@ These features require Phase 3 (auth + hosting) to already be in place.
 |---------|-------------------------------|
 | **Personal vs. Business flag on Accounts and Categories** | Separates personal and business activity so reports can filter by context — essential for tax purposes |
 | **IVA / VAT tracking** | Autónomos in Spain charge IVA to clients and pay it quarterly to Hacienda — track IVA collected and IVA paid separately |
-| **Investment income tracking** | Dividends and capital gains (realized, from selling holdings) are reportable income in Spain — tie into holdings added in Phase 2 |
+| **Investment holdings tracking** | Individual positions within an investment account (ticker/name, number of units, purchase price, current price, unrealized gain/loss). Prices updated manually, no live feed. |
+| **Investment income tracking** | Dividends and capital gains (realized, from selling holdings) are reportable income in Spain — recorded as transactions in the investment account |
 | **Quarterly tax summary (Modelo 130 / 303)** | Report summarizing taxable income and IVA figures per quarter, matching what autónomos file |
 | **Client tracking** | Associate income transactions with specific clients to see revenue per client |
 | **Invoice reference on transactions** | Link a transaction to an invoice number for traceability |
@@ -502,7 +512,7 @@ Integration tests require a real PostgreSQL database. Chosen approach:
 - [x] Intra-day transaction ordering — resolved: `CreatedAt datetime NOT NULL` added to both `Transaction` and `Transfer`. Set by the application on insert, never editable. Used as a tiebreaker when ordering records that share the same `Date`. Distinct from `Date` — `Date` is when the financial event occurred (user-provided); `CreatedAt` is when the record was entered (system-generated). Default sort: `ORDER BY Date DESC, CreatedAt DESC`. See ADR-0013.
 - [ ] One transaction per budget goal — `Transaction.BudgetId` is a single nullable FK. A transaction can be linked to at most one goal Budget. Users who want one payment to count toward multiple goals (e.g. partially funding two savings targets) cannot do so. Options: leave the single-FK limit and document it, or replace BudgetId with a many-to-many junction table (`TransactionBudgetContribution` with an Amount per budget). The junction approach is a schema change that affects every budget report query.
 - [x] Budget/transaction currency mismatch — resolved: enforced at the application level. When tagging a transaction to a budget, the app validates that `transaction.Account.CurrencyId == budget.CurrencyId` and rejects the combination with a validation error if they differ. A database constraint is not used — EF Core cannot express a cross-table currency match as a simple FK or CHECK constraint without a trigger. See ADR-0016. Because there is no database-level guard, integration tests must aggressively cover this: a transaction linked to a budget in a different currency must be rejected at the service layer, and mixing currencies must never silently corrupt budget spend totals.
-- [ ] Category needs/wants tag for budgeting frameworks (Phase 3) — ratio-based frameworks like 50/30/20 require each expense category to be tagged as a "need" or a "want." Options: add an optional `LifestyleTag` enum column to `Category` (Needs / Wants / untagged), or handle it as a separate mapping table. Must be decided before the Financial Health report is built. Income categories and system categories are excluded from this tagging.
+- [x] Category needs/wants tag for budgeting frameworks — resolved: `LifestyleTag` varchar column added to `Category` (values: "Needs", "Wants", null = untagged). Seeded expense categories ship with suggested default tags. Users are prompted at category creation time (Expense categories only). Untagged is a visible fourth bucket in the Financial Health report — never silently excluded. See Financial Health Metrics section.
 - [ ] WCAG 2.1 AA compliance (Phase 3) — semantic HTML is the baseline from Phase 1, but full accessibility audit and WCAG 2.1 AA compliance testing must be completed before Phase 3 opens the app to other users. Some users may rely on screen readers or keyboard navigation. EU Accessibility Act obligations may also apply — see legal.md.
 - [ ] MVC → Web API decoupling (Phase 3) — when the React SPA transition occurs, the ASP.NET Core MVC backend must be restructured as a pure Web API. No migration plan exists. Must be designed before Phase 3 frontend work begins. Affects routing, authentication integration, CORS policy, and how the frontend is served or deployed.
 - [ ] Mobile app — React Native (Phase 3+) — a mobile app is a natural future requirement for a personal finance tracker. React Native is the leading candidate given the React frontend decision. No scope, timeline, or platform targets (iOS, Android, or both) have been defined. Must be planned before any Phase 3+ mobile investment is made.
