@@ -48,10 +48,14 @@ Every category of personal data processed must have a documented legal basis und
 Only collect data that is necessary for the stated purpose. Do not add data fields speculatively.
 
 ### Security
-- Passwords must be hashed (never stored in plain text) — use bcrypt or Argon2
+- Passwords must be hashed (never stored in plain text) — use Argon2id with explicitly pinned parameters: m=19456 (19 MB memory), t=2 iterations, p=1 parallelism (OWASP minimum baseline). Do not use bcrypt for new implementations — Argon2id is the current standard
+- TOTP shared secrets (the seed generated during MFA setup) must be stored encrypted at rest — plaintext storage nullifies MFA protection if the database is dumped
+- The application's runtime database user must have DML rights only (SELECT, INSERT, UPDATE, DELETE) — a separate migration-only role holds schema modification rights
 - Data in transit must use HTTPS/TLS
 - Database access must be restricted and credentials stored securely (not in source code)
 - File attachments must not be publicly accessible without authentication
+- All state-changing forms must use CSRF anti-forgery tokens — ASP.NET Core's built-in anti-forgery middleware handles this via `[ValidateAntiForgeryToken]` on controllers and tag helper `<form>` elements
+- HTTP security headers must be set on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and HSTS once HTTPS is enforced. A Content Security Policy header must be defined before any JavaScript is introduced.
 
 ### Data Breach Notification
 - GDPR requires notifying the relevant supervisory authority within **72 hours** of becoming aware of a breach
@@ -130,6 +134,22 @@ These must be written, published, and accessible before any user outside yoursel
 - [ ] HTTPS enforced — no unencrypted connections
 - [ ] Passwords hashed with Argon2
 - [ ] MFA enforced for all users via TOTP authenticator app (no SMS)
+- [ ] TOTP shared secrets confirmed stored encrypted at rest
+- [ ] TOTP replay prevention implemented — used codes tracked per user and rejected if resubmitted within their validity window
+- [ ] Session management implemented: session fixation prevention (token regeneration on login), server-side invalidation on logout, user-configurable lifetime (short vs. persistent "remember me"), persistent tokens stored as hashes with rotation on each use
+- [ ] Secure cookie flags configured: HttpOnly, Secure, SameSite=Strict or Lax
+- [ ] IP enforcement toggle implemented with risk disclosure; IP blocking available to users from Security settings page
+- [ ] Active session list and per-session revocation available to users on Security settings page
+- [ ] Privacy policy updated to disclose persistent session data retention period
+- [ ] CSRF anti-forgery tokens applied to all state-changing forms and verified by controllers
+- [ ] HTTP security headers configured: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, HSTS, and CSP
+- [ ] Forwarded headers middleware configured (`UseForwardedHeaders`) — required for correct HTTPS detection and real client IP resolution when behind a reverse proxy
+- [ ] IDOR prevention verified — every resource endpoint confirmed to scope queries to the authenticated user; integration tests cover cross-user access attempts (must return 403 or 404)
+- [ ] Password policy enforced: minimum 8 characters, breached password list check, Argon2id parameters pinned explicitly (not left at library defaults)
+- [ ] Account enumeration prevention verified — login and password-reset return identical responses and timing for existing and non-existing emails
+- [ ] Account-level lockout implemented — N consecutive failed login attempts trigger a temporary lock with email notification to the account owner
+- [ ] CORS policy defined and restricted to known frontend origin(s) if any API endpoint is exposed cross-origin
+- [ ] Dependency vulnerability scan completed before launch; automated scanning integrated into build pipeline
 - [ ] Auto-purge for soft-deleted records and audit logs implemented and tested
 - [ ] Right to erasure flow tested — confirm financial records are retained, personal identifiers anonymised
 - [ ] WCAG 2.1 AA compliance audit completed before opening to other users

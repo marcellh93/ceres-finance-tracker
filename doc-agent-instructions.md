@@ -42,6 +42,42 @@ Each project has phases with explicit gates. Never suggest features or documenta
 
 Check the highest existing ADR number in docs/decisions/ before creating a new one. Increment by one. Never reuse a number.
 
+## Security review methodology
+
+When asked to review documentation or architecture for security gaps, always run two explicit passes — never a single organic read-through.
+
+**Pass 1 — Structured checklist, per phase:**
+For each planned phase in the project, check explicitly:
+
+| Area | Questions to ask |
+|------|-----------------|
+| Authentication | Hashing algorithm and parameters specified? Password policy defined? Account enumeration prevention documented? Session fixation prevention stated? |
+| Session management | Timeout documented? Server-side invalidation on logout required? Cookie flags (HttpOnly, Secure, SameSite) specified? |
+| Transport | HTTPS enforced? HSTS configured? Forwarded headers middleware required for reverse proxy? |
+| Input validation | Validation layer documented? ViewModel convention stated? Length limits defined? |
+| Access control | IDOR prevention documented? Server-side enforcement of business rules (not just UI hiding)? Role/ownership checks required on every resource endpoint? |
+| Secrets | Credentials out of source control? DB least privilege documented (runtime user vs. migration user)? Sensitive secrets (e.g. TOTP seeds, API keys) encrypted at rest? |
+| File handling | Upload whitelist, size limit, magic bytes check, path traversal prevention documented? Serve-time security (Content-Disposition, ownership check, MIME re-verification) documented? |
+| Dependencies | Vulnerability scanning process documented (e.g. `dotnet list package --vulnerable`, Dependabot)? |
+| Infrastructure | DB user least privilege stated? CORS policy documented if SPA or API is involved? |
+| Cryptography | Algorithm parameters specified (not just algorithm name)? |
+
+Do not skip future phases — planning documents must be audited for all phases, not just the current one.
+
+**Pass 2 — Adversarial / ethical hacker pass:**
+After the checklist, switch to attacker mode. For each documented feature or flow, ask:
+- What happens if I bypass the UI entirely (direct HTTP request)?
+- What if I send unexpected input (negative numbers, empty strings, other users' IDs)?
+- What if I intercept or replay a token or code?
+- What if two requests arrive simultaneously?
+- What does the error response reveal?
+
+This pass is what surfaces gaps like TOTP replay, CSV injection, IsSystem UI-only enforcement, sequential ID enumeration, and account enumeration via timing.
+
+**Why two passes matter:** Organic read-throughs anchor on what is present and miss what is absent. Pass 1 catches missing documentation. Pass 2 catches documented features with exploitable implementation assumptions.
+
+---
+
 ## Documentation health checks
 
 When asked to audit documentation, check:
@@ -53,6 +89,10 @@ When asked to audit documentation, check:
 5. Do any documents reference features, files, or entities that do not exist yet without a phase label?
 6. Are there open questions that should have been resolved before the current phase began?
 7. Does any document contradict another?
+
+## On commits
+
+When committing on the user's behalf, use exactly the message they provide — no additions, no `Co-Authored-By` trailer, no extra lines.
 
 ## On /sync-docs
 

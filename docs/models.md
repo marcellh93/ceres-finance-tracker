@@ -95,6 +95,21 @@ The Transactions table only stores `CategoryId` as a foreign key and looks the r
 
 ## Entity Definitions
 
+### Primary Key Strategy
+
+User-created entities use `uuid` as their primary key. System lookup tables use `int`.
+
+| PK type | Applied to | Reason |
+|---------|-----------|--------|
+| `uuid` | Account, Category, Transaction, Transfer, TransactionAttachment, CategoryBudget, Budget, SavedReport, UserSession, UserBlockedIp | Appear in user-facing URLs — UUIDs prevent sequential ID enumeration and information leakage |
+| `int` | Currency, AccountType, CategoryType, ReportType, Settings | System-seeded, never appear in URLs, conventional int is fine |
+
+FK columns follow the referenced table's PK type: `Account.AccountTypeId` stays `int` (points to a lookup table), but `Transaction.AccountId` is `uuid` (points to Account).
+
+**EF Core implementation:** `Guid` in C# maps to `uuid` in PostgreSQL natively via Npgsql. UUIDs are generated client-side on insert via `Guid.NewGuid()` — no database sequence or trigger required.
+
+---
+
 ### Currency
 
 Lookup table. Defines the supported currencies. Each account is assigned one currency.
@@ -140,7 +155,7 @@ Represents a financial account the user owns or owes on.
 
 | Column        | Type    | Constraints    | Notes                                  |
 |---------------|---------|----------------|----------------------------------------|
-| Id            | int     | PK             |                                        |
+| Id            | uuid    | PK             |                                        |
 | Name          | varchar | NOT NULL       | e.g. "Chase Checking"                  |
 | AccountTypeId | int     | FK, NOT NULL   | → AccountType                          |
 | CurrencyId    | int     | FK, NOT NULL   | → Currency                             |
@@ -160,7 +175,7 @@ an account and enters a starting balance, the app automatically creates an openi
 transaction for that amount, tagged to the system "Opening Balance" category. The creation form
 prompts for a starting balance (can be zero). The user never has to construct this transaction
 manually — the app does it on their behalf. The transaction is visible in transaction history
-labeled as the opening entry and can be edited if the user entered the wrong amount.
+labeled as the opening entry. The Amount and Date fields are editable if the user entered the wrong value. The CategoryId is locked — the service layer must reject any attempt to change it away from the Opening Balance system category, regardless of how the request arrives. Allowing a category change would silently move the opening balance into income reports and distort all financial totals.
 
 **Why AccountTypeId instead of storing "Asset" directly?**
 Storing the string on every row means a rename requires updating every account record.
@@ -185,7 +200,7 @@ User-defined labels for classifying transactions.
 
 | Column         | Type    | Constraints  | Notes                          |
 |----------------|---------|--------------|--------------------------------|
-| Id             | int     | PK           |                                |
+| Id             | uuid    | PK           |                                |
 | Name           | varchar | NOT NULL     | e.g. "Groceries", "Salary"     |
 | CategoryTypeId | int     | FK, NOT NULL | → CategoryType                 |
 | IsActive       | bit     | NOT NULL     | False = deactivated, hidden from pickers but existing transactions unaffected |
@@ -196,6 +211,7 @@ Some categories are seeded by the app and must not be renamed or deleted because
 logic depends on them by name or ID. Currently one: "Opening Balance" (Income type, IsSystem = true).
 It is excluded from all income/expense report totals — its only purpose is to anchor the starting
 balance of an account. The UI must hide edit and delete controls for any category where IsSystem = true.
+The service layer must also enforce this — reject any edit or delete request for an IsSystem category regardless of how the request arrives. UI-only enforcement is bypassed by direct HTTP requests.
 
 ---
 
@@ -205,14 +221,14 @@ The central record. Every dollar movement lives here.
 
 | Column      | Type    | Constraints  | Notes                                         |
 |-------------|---------|--------------|-----------------------------------------------|
-| Id          | int     | PK           |                                               |
+| Id          | uuid    | PK           |                                               |
 | Date        | date         | NOT NULL     | When the transaction occurred — stored as local date, no timezone (see note) |
 | Amount      | decimal(18,2)| NOT NULL     | Always stored as a positive number — direction derived from Category → CategoryType |
 | Description | varchar      | nullable     | e.g. "Whole Foods run"                        |
-| AccountId   | int          | FK, NOT NULL | → Account (which account was affected)        |
-| CategoryId  | int          | FK, NOT NULL | → Category (what kind of transaction this is) |
+| AccountId   | uuid         | FK, NOT NULL | → Account (which account was affected)        |
+| CategoryId  | uuid         | FK, NOT NULL | → Category (what kind of transaction this is) |
 | CreatedAt   | datetime     | NOT NULL     | Set by the application on insert. Used as tiebreaker when ordering transactions that share the same date. Not editable — reflects when the record was entered, not when the transaction occurred. |
-| BudgetId    | int          | FK, nullable | → Budget (optional — tags this transaction to a goal budget) |
+| BudgetId    | uuid         | FK, nullable | → Budget (optional — tags this transaction to a goal budget) |
 
 **Note on Income vs. Expense classification:**
 Whether a transaction is income or expense is not stored on this table. That classification
@@ -252,8 +268,8 @@ The actual file is saved to the filesystem — only the reference lives in the d
 
 | Column        | Type     | Constraints  | Notes                                                      |
 |---------------|----------|--------------|------------------------------------------------------------|
-| Id            | int      | PK           |                                                            |
-| TransactionId | int      | FK, NOT NULL | → Transaction                                              |
+| Id            | uuid     | PK           |                                                            |
+| TransactionId | uuid     | FK, NOT NULL | → Transaction                                              |
 | FileName      | varchar  | NOT NULL     | Original filename as uploaded (e.g. "receipt.pdf")        |
 | StoredPath    | varchar  | NOT NULL     | Path used to locate the file. Phase 1/2: absolute filesystem path. Phase 3+: cloud storage URL or blob key — provider TBD, see open question in planning.md |
 | ContentType   | varchar  | NOT NULL     | MIME type (e.g. "application/pdf", "image/jpeg")           |
@@ -267,11 +283,28 @@ The database holds the path so the app can find it — that's the right split of
 
 **StoredPath naming convention:**
 Files are saved under `uploads/{transactionId}/{guid}{extension}`.
-The GUID prevents filename collisions. The transactionId subdirectory groups a transaction's
+The transactionId is a UUID (the PK of the Transaction record). A second GUID prevents filename collisions within the same transaction. The transactionId subdirectory groups a transaction's
 attachments together and makes manual inspection easier. `FileName` preserves the original
 name for display in the UI — `StoredPath` is never shown to the user.
 Files must be served via a controller action, not directly — they must not be accessible
 without authentication and must not be placed inside `wwwroot`.
+
+**File upload security requirements:**
+The following constraints must be enforced in the service layer before any file is written to disk:
+- **Allowed MIME types (whitelist):** `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `application/pdf`. Reject anything not on this list — do not use a blacklist.
+- **Maximum file size:** 10 MB per file. Enforce in both the controller (via `RequestSizeLimitAttribute` or `IFormFile.Length` check) and the service layer.
+- **Path traversal prevention:** The stored path must be constructed entirely from application-controlled values (`transactionId` and a freshly generated `Guid`) — never from any part of the user-supplied filename. Never pass `FileName` to any filesystem API. Only `StoredPath` (constructed by the app) is used for disk operations.
+- **Content-type verification:** Do not trust the MIME type declared by the browser in the HTTP request. Verify the actual file content using magic bytes (file header inspection) before saving. Libraries such as `MimeDetective` can handle this.
+- **File extension:** Derive the stored file extension from the verified MIME type, not from the original filename.
+- **Polyglot file awareness:** magic bytes verification reduces risk but does not eliminate polyglot files — files that are simultaneously valid as two formats (e.g. a file that passes JPEG header checks but also contains executable HTML). The `Content-Disposition: attachment` header set at serve time is the primary defence against polyglots rendering in the browser. Both layers must be consistently applied — a single endpoint missing the header breaks the protection.
+- **Attachment limits:** enforce a maximum number of attachments per transaction (e.g. 10 files) and a maximum total storage per user (e.g. 1 GB) at the service layer. Without these caps, a user could attach large volumes of files and exhaust disk space. Limits should be configurable via application settings, not hardcoded.
+
+**File serving security requirements:**
+When streaming a file to the user, the controller action must:
+- Verify that the authenticated user owns the transaction the attachment belongs to before streaming — never serve a file based on `StoredPath` alone.
+- Set `Content-Disposition: attachment; filename*=UTF-8''<percent-encoded FileName>` — forces the browser to download rather than render, preventing stored XSS via uploaded HTML or SVG. Use the RFC 5987 `filename*` parameter for non-ASCII characters and to prevent header injection via filenames containing quotes or semicolons. A plain `filename` parameter may be included alongside it as a fallback for older clients.
+- Set `Content-Type` from the stored `ContentType` value, not from the filename or from any user-supplied header.
+- Re-verify the MIME type whitelist at serve time — reject any record whose `ContentType` is not on the allowed list, even if it passed the upload check.
 
 ---
 
@@ -283,13 +316,15 @@ from all income/expense report calculations. Both accounts must share the same c
 
 | Column          | Type     | Constraints  | Notes                                       |
 |-----------------|----------|--------------|---------------------------------------------|
-| Id              | int      | PK           |                                             |
+| Id              | uuid     | PK           |                                             |
 | Date            | date     | NOT NULL     | When the transfer occurred — local date, no timezone |
 | Amount          | decimal(18,2) | NOT NULL | Always stored as a positive number          |
-| SourceAccountId | int      | FK, NOT NULL | → Account (money leaves here)               |
-| DestAccountId   | int      | FK, NOT NULL | → Account (money arrives here)              |
+| SourceAccountId | uuid     | FK, NOT NULL | → Account (money leaves here)               |
+| DestAccountId   | uuid     | FK, NOT NULL | → Account (money arrives here)              |
 | Description     | varchar  | nullable     | e.g. "Monthly savings transfer"             |
 | CreatedAt       | datetime | NOT NULL     | Set by the application on insert. Used as tiebreaker when ordering transfers that share the same date. Not editable — reflects when the record was entered, not when the transfer occurred. |
+
+**Constraint:** SourceAccountId and DestAccountId must not be equal — a transfer from an account to itself is logically invalid and must be rejected by the service layer.
 
 **Constraint:** SourceAccountId and DestAccountId must reference accounts with the same currency.
 Cross-currency transfers are not supported — they would require a conversion rate, which is out of scope.
@@ -312,8 +347,8 @@ Feeds the Category Budget Progress bars on the dashboard.
 
 | Column     | Type    | Constraints  | Notes                                            |
 |------------|---------|--------------|--------------------------------------------------|
-| Id         | int     | PK           |                                                  |
-| CategoryId | int     | FK, NOT NULL | → Category (must be an Expense category)         |
+| Id         | uuid    | PK           |                                                  |
+| CategoryId | uuid    | FK, NOT NULL | → Category (must be an Expense category)         |
 | CurrencyId | int     | FK, NOT NULL | → Currency                                       |
 | LimitAmount| decimal(18,2) | NOT NULL  | Maximum amount to spend in this category per month |
 | IsActive   | bit           | NOT NULL  | False = deactivated, hidden from dashboard       |
@@ -325,6 +360,8 @@ category is not meaningful. This constraint should be enforced at the applicatio
 is permitted. Two active limits for the same category and currency would produce ambiguous
 dashboard progress bars. Enforce via unique index on (CategoryId, CurrencyId) where IsActive = true.
 
+**Currency matching for actual spend:** When calculating how much has been spent against a CategoryBudget, only transactions from accounts whose `CurrencyId` matches the budget's `CurrencyId` are included. An expense recorded from a USD account does not count toward a EUR budget for the same category — they are tracked independently.
+
 ---
 
 ### Budget
@@ -335,7 +372,7 @@ Transactions are optionally tagged to a budget to count toward its actual amount
 
 | Column       | Type     | Constraints  | Notes                                              |
 |--------------|----------|--------------|----------------------------------------------------|
-| Id           | int      | PK           |                                                    |
+| Id           | uuid     | PK           |                                                    |
 | Name         | varchar  | NOT NULL     | e.g. "Trip to Japan", "Kitchen Renovation"         |
 | TargetAmount | decimal(18,2) | NOT NULL | The planned total for this goal                    |
 | CurrencyId   | int      | FK, NOT NULL | → Currency                                         |
@@ -370,13 +407,13 @@ parameters (date range, filters) so it can be re-run at any time without re-ente
 
 | Column      | Type     | Constraints  | Notes                                                          |
 |-------------|----------|--------------|----------------------------------------------------------------|
-| Id          | int      | PK           |                                                                |
+| Id          | uuid     | PK           |                                                                |
 | Name        | varchar  | NOT NULL     | User-given name, e.g. "March 2026 Overview"                   |
 | ReportTypeId| int      | FK, NOT NULL | → ReportType                                                   |
 | DateFrom    | date     | nullable     | Start of the date range filter                                 |
 | DateTo      | date     | nullable     | End of the date range filter                                   |
-| CategoryId  | int      | FK, nullable | → Category (optional filter by category)                       |
-| AccountId   | int      | FK, nullable | → Account (optional filter by account)                         |
+| CategoryId  | uuid     | FK, nullable | → Category (optional filter by category)                       |
+| AccountId   | uuid     | FK, nullable | → Account (optional filter by account)                         |
 | CurrencyId  | int      | FK, nullable | → Currency (optional filter — scopes report to one currency)   |
 | CreatedAt   | datetime | NOT NULL     | When this saved configuration was created                      |
 | DeletedAt   | datetime | nullable     | Null = active. Set when user deletes — record is hidden but recoverable |
@@ -465,13 +502,24 @@ These are never stored as columns — they are always calculated at query time:
 
 | Value              | How it is calculated                                                  |
 |--------------------|-----------------------------------------------------------------------|
-| Account Balance    | SUM of transaction amounts for a given account                        |
+| Account Balance    | Depends on AccountType — see sign convention note below               |
 | Total Assets       | SUM of balances for all accounts where AccountType = "Asset"          |
 | Total Liabilities  | SUM of balances for all accounts where AccountType = "Liability"      |
 | Net Worth (Equity) | Total Assets − Total Liabilities                                      |
 | Total Income       | SUM of amounts where CategoryType = "Income" for a date range, scoped to a currency        |
 | Total Expenses     | SUM of amounts where CategoryType = "Expense" for a date range, scoped to a currency       |
 | Net Cash Flow      | Total Income − Total Expenses (within the same currency)                                   |
+
+**Account balance — sign convention by account type:**
+The formula differs depending on whether the account is an Asset or a Liability. Transfers also affect the balance, not just transactions.
+
+- **Asset account balance** = SUM(Income transaction amounts) − SUM(Expense transaction amounts) + SUM(incoming transfer amounts) − SUM(outgoing transfer amounts)
+- **Liability account balance** = SUM(Expense transaction amounts) − SUM(Income transaction amounts) − SUM(incoming transfer amounts) + SUM(outgoing transfer amounts)
+
+For an Asset account (e.g. checking): income and transfers in add to the balance; expenses and transfers out subtract.
+For a Liability account (e.g. credit card): expenses add to the balance (debt grows); income (e.g. refunds) and transfers in (debt payments) subtract from it.
+
+Liability balances are always positive in normal use — they represent what is owed. Net Worth = Total Assets − Total Liabilities holds because both totals are expressed as positive numbers.
 
 ---
 
@@ -518,6 +566,24 @@ feature if there is clear demand for it.
 
 ---
 
+## Database Indexes
+
+These must be created via Fluent API in `OnModelCreating` or via explicit migration scripts. EF Core creates indexes for FK columns automatically, but does not create indexes for non-FK columns, compound columns, or filtered indexes — those must be defined explicitly via `HasIndex(...).HasFilter(...)`.
+
+| Table | Index columns | Type | Reason |
+|-------|--------------|------|--------|
+| Transaction | (AccountId) | Standard | Account balance and transaction history queries filter by account |
+| Transaction | (CategoryId) | Standard | Expense breakdown and category budget spend queries filter by category |
+| Transaction | (Date DESC) | Standard | All date-range report queries order by date |
+| Transaction | (BudgetId) WHERE BudgetId IS NOT NULL | Filtered | Budget actual spend calculation — partial index avoids indexing the majority of null rows |
+| Transfer | (SourceAccountId) | Standard | Transfer history queries filter by source account |
+| Transfer | (DestAccountId) | Standard | Transfer history queries filter by destination account |
+| Transfer | (Date DESC) | Standard | Transfer history date ordering |
+| CategoryBudget | (CategoryId, CurrencyId) WHERE IsActive = true | Filtered compound | Enforces the uniqueness constraint and speeds up dashboard lookups |
+| SavedReport | (DeletedAt) WHERE DeletedAt IS NOT NULL | Filtered | Soft-delete purge job filters on DeletedAt |
+
+---
+
 ## Phase 2 — Entities To Be Defined
 
 ### InvestmentHolding (Phase 2)
@@ -525,3 +591,48 @@ feature if there is clear demand for it.
 To be defined when Phase 2 begins. Will link to Account and track individual positions within
 an investment account: ticker or name, number of units, purchase price, current price (updated
 manually), unrealized gain/loss (derived). See planning.md Phase 2 section for full context.
+
+---
+
+## Phase 3 — Entities To Be Defined
+
+### UserSession (Phase 3)
+
+Tracks active authenticated sessions server-side. Enables multi-device support, user-visible session management, per-session revocation, and per-session IP enforcement. One row per active session per device.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | UUID — not int, prevents sequential ID enumeration |
+| UserId | int | FK, NOT NULL | → User (Phase 3 auth entity) |
+| TokenHash | varchar | NOT NULL | Hash of the session token — raw token is never stored |
+| DeviceName | varchar | nullable | User-provided label shown on the Security settings page (e.g. "MacBook Pro") |
+| IpAddress | varchar | NOT NULL | IP at session creation — stored for display and IP enforcement checks |
+| CreatedAt | datetime | NOT NULL | When the session was created |
+| LastActivityAt | datetime | NOT NULL | Updated on each authenticated request |
+| ExpiresAt | datetime | NOT NULL | Short sessions: idle or browser-close expiry. Persistent ("remember me"): e.g. 30 days rolling |
+| IsRevoked | bit | NOT NULL | True = session terminated (logout, user-revoked, IP blocked, or admin action) |
+| IsPersistent | bit | NOT NULL | True = "remember me" session with long-lived rotating token |
+
+**IP enforcement is per session:** when the user has IP enforcement enabled, each incoming request is validated against the `IpAddress` of its own session row — not against a single account-wide IP. This means multiple devices with different IPs are fully compatible with IP enforcement on, since each device has its own session anchored to its own creation IP. See planning.md Phase 3 for the full behavioral specification.
+
+**Token rotation:** on each request using a persistent session token, issue a new token and invalidate the old one, storing only the hash of the new token. This limits replay exposure if a token is intercepted.
+
+---
+
+### UserBlockedIp (Phase 3)
+
+Records IP addresses explicitly blocked by a user. Any request from a blocked IP is rejected and all active sessions from that IP are revoked immediately. Users manage this list from the Security settings page, informed by the login/logout audit log.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | FK, NOT NULL | → User |
+| IpAddress | varchar | NOT NULL | The blocked IP address |
+| BlockedAt | datetime | NOT NULL | When the user added this block |
+| Note | varchar | nullable | User-provided reason (e.g. "suspicious login from unknown location") |
+
+**Uniqueness constraint:** one active block per (UserId, IpAddress) combination.
+
+**Effect on existing sessions:** when a block is created, all `UserSession` rows for that user where `IpAddress` matches must be set to `IsRevoked = true` immediately.
+
+**Relationship to IP enforcement toggle:** IP blocking is always active regardless of whether the user has IP enforcement enabled. Blocking is a manual, explicit action; enforcement is an automatic per-request check. They are independent.
