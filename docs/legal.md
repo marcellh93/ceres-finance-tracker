@@ -84,7 +84,12 @@ Only collect data that is necessary for the stated purpose. Do not add data fiel
 | Soft-deleted SavedReports | 90 days from `DeletedAt` | Auto-purge after 90 days |
 | Audit logs (Phase 3+) | 6 months from creation | Auto-purge after 6 months |
 | Deactivated accounts/categories | Indefinite | Never purge — required for historical integrity |
-| User account (upon account closure) | Anonymise immediately, retain financial records for legal period | Replace personal identifiers with anonymous tokens |
+| User account — natural churn (no erasure request) | 30-day grace period, then sealed archive for 150 days, then permanent deletion at 180 days | Grace: data intact, free reactivation. Archive: compressed file on filesystem, restoration available at a cost. Day 180: archive file deleted, no restoration possible. |
+| User account — GDPR erasure request (Art. 17) | Anonymise personal identifiers immediately | Replace name, email, and direct identifiers with anonymous tokens. Retain anonymised financial records for legal period. No archive created — restoration is not possible. |
+
+> **Policy disclosure requirement:** The 30-day grace period and 180-day archive window are product policy, not legal minimums. They must be stated explicitly in the Privacy Policy before Phase 3 launch. If these windows change, the Privacy Policy must be updated before the change takes effect.
+
+> **Closure type must be recorded at account closure time.** Natural churn and GDPR erasure have different downstream rules. A user who submitted an erasure request must never have a restoration archive created, even if they later change their mind. See ADR-0029 for the `CustomerArchive` schema and lifecycle.
 
 ---
 
@@ -151,7 +156,9 @@ These must be written, published, and accessible before any user outside yoursel
 - [ ] CORS policy defined and restricted to known frontend origin(s) if any API endpoint is exposed cross-origin
 - [ ] Dependency vulnerability scan completed before launch; automated scanning integrated into build pipeline
 - [ ] Auto-purge for soft-deleted records and audit logs implemented and tested
-- [ ] Right to erasure flow tested — confirm financial records are retained, personal identifiers anonymised
+- [ ] Right to erasure flow tested — confirm financial records are retained, personal identifiers anonymised, and `ClosureType = GdprErasure` is recorded with no archive file created
+- [ ] CustomerArchive background job implemented, monitored, and tested — permanent deletion must execute on schedule at 180 days; a missed deletion job constitutes retaining data past the disclosed window
+- [ ] Restoration service confirmed out of scope for Phase 3 — only archive creation and scheduled deletion are in scope at this phase
 - [ ] WCAG 2.1 AA compliance audit completed before opening to other users
 - [ ] EU Accessibility Act scope assessed with legal counsel — confirm whether and how it applies to this product at this stage
 

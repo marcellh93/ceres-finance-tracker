@@ -661,3 +661,40 @@ Records IP addresses explicitly blocked by a user. Any request from a blocked IP
 **Effect on existing sessions:** when a block is created, all `UserSession` rows for that user where `IpAddress` matches must be set to `IsRevoked = true` immediately.
 
 **Relationship to IP enforcement toggle:** IP blocking is always active regardless of whether the user has IP enforcement enabled. Blocking is a manual, explicit action; enforcement is an automatic per-request check. They are independent.
+
+### CustomerArchive (Phase 3)
+
+Created when a user account is closed. Records the closure type and manages the archive lifecycle. See ADR-0029 for the full lifecycle specification.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | References the now-inactive user record |
+| ClosureType | varchar | NOT NULL | Enum: `NaturalChurn` \| `GdprErasure` |
+| ClosedAt | datetime | NOT NULL | UTC timestamp of account closure |
+| GracePeriodEndsAt | datetime | nullable | 30 days after `ClosedAt`; null for `GdprErasure` |
+| PermanentDeletionScheduledAt | datetime | nullable | 180 days after `ClosedAt`; null for `GdprErasure` |
+| ArchiveFilePath | varchar | nullable | Filesystem path to the sealed archive file; null for `GdprErasure` or after deletion |
+| ArchivedFileDeletedAt | datetime | nullable | Stamped when the archive file is permanently deleted |
+| RestorationFee | decimal(18,2) | nullable | Set at archive creation time by policy; null for `GdprErasure` |
+| RestoredAt | datetime | nullable | Stamped when restoration completes; null if never restored |
+
+**Critical constraint:** `ClosureType = GdprErasure` rows must never have an `ArchiveFilePath` set. Enforced at the service layer, not just the UI.
+
+**Deletion rule:** `CustomerArchive` rows are never hard deleted — they are the audit trail of the closure itself. Only the `ArchiveFilePath` file is deleted at `PermanentDeletionScheduledAt`.
+
+### AdminAuditLog (Phase 3)
+
+Append-only record of every action performed by an admin. No endpoint exposes edit or delete on this table. See ADR-0028.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| AdminUserId | uuid | FK, NOT NULL | → User (the admin who performed the action) |
+| TargetUserId | uuid | FK, nullable | → User (the user affected); null for system-level actions |
+| Action | varchar | NOT NULL | Enum: `Deactivate`, `Reactivate`, `ForceLogout`, `Impersonate`, `ImpersonateEnd`, `GdprExport`, `GdprErasure`, `PasswordReset`, `PlanOverride` |
+| Detail | jsonb | nullable | Before/after state or relevant parameters for the action |
+| PerformedAt | datetime | NOT NULL | UTC timestamp |
+| ImpersonationSessionId | uuid | nullable | Groups all actions within one impersonation session |
+
+**Append-only:** INSERT is the only permitted operation. No UPDATE or DELETE — not even for admins.

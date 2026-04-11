@@ -62,9 +62,16 @@ Never expose sequential integer IDs in URLs. System lookup tables (Currency, Acc
 Use query parameters for filtering, sorting, and pagination — not path segments:
 
 ```
+# Phase 1 — date range filter only, no pagination parameters
+GET /Transactions?from=2026-01-01&to=2026-01-31
+GET /Transactions?accountId={uuid}&from=2026-01-01&to=2026-01-31
+
+# Phase 3 — offset-based pagination added
 GET /api/transactions?accountId={uuid}&from=2026-01-01&to=2026-01-31&page=1&pageSize=50
 GET /api/accounts?currencyId=1
 ```
+
+> **Phase 1 note:** Transaction History returns the most recent 50 records by default. When the user applies a date range filter, all records within the range are returned with no cap — no `page` or `pageSize` parameters exist in Phase 1. Offset-based pagination (`page`, `pageSize`) is introduced in Phase 3. See ADR-0027.
 
 ---
 

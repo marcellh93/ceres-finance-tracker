@@ -108,7 +108,16 @@ Categories with `IsSystem = true` are seeded by the app and cannot be renamed or
 
 ### Role Boundaries (Phase 3+)
 
-Phase 3 is single-role (all authenticated users have the same permissions over their own data). If an admin role is introduced later, admin access to other users' data must be explicitly designed and audited — it is not a natural extension of the current model.
+Phase 3 is single-role (all authenticated users have the same permissions over their own data). The admin role is introduced in Phase 3 alongside user auth.
+
+**Admin access model (ADR-0028):**
+
+- Admin routes live under `/admin/*` in an ASP.NET Core Area, gated at the area level with `[Authorize(Roles = "Admin")]` — not per-controller
+- Admins do not have direct read access to a user's transaction data. Support access goes through an **impersonation session**, which is fully audited (start, every action, end) via `AdminAuditLog`
+- Every admin mutation writes an append-only `AdminAuditLog` record. No endpoint exposes edit or delete on this table — not even to admins
+- Impersonation of other admin accounts is not permitted
+- GDPR erasure flows are the only context where cascading deletes are permitted; they require an explicit confirmation step and produce an audit record
+- Admin file serving (e.g. viewing a user's attachment during impersonation) must apply the same ownership-and-authentication checks as user-facing file access — admin role does not bypass file access controls
 
 ### File Access Control
 
