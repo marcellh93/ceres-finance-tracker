@@ -4,9 +4,9 @@
 
 ## Context
 All financial amount fields across the data model (Transaction.Amount, Transfer.Amount,
-CategoryBudget.LimitAmount, Budget.TargetAmount) are typed as `decimal`. EF Core maps
-`decimal` to `decimal(18,2)` in SQL Server by default, but this is an implicit behaviour
-that is invisible in the model definition and easy to change accidentally.
+CategoryBudget.LimitAmount, Budget.TargetAmount) are typed as `decimal`. EF Core via Npgsql maps `decimal` to PostgreSQL's `numeric` type with no precision or scale
+by default — unlimited precision, which is an implicit behaviour that is invisible in the
+model definition and easy to change accidentally.
 
 In a finance app, the precision of monetary values is a correctness concern. Two decimal
 places is the standard for fiat currencies (EUR, USD, GBP, COP, ARS, VED — all supported

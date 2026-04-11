@@ -15,8 +15,8 @@ Do not build Phase 2+ features until Phase 1 is complete and in daily use.
 
 - **Runtime:** .NET 9 on macOS
 - **Framework:** ASP.NET Core MVC — server-side rendering via Razor (`.cshtml`). No separate API.
-- **ORM:** Entity Framework Core with SQL Server provider
-- **Database:** SQL Server via Docker (Intel Mac: `mcr.microsoft.com/mssql/server`; Apple Silicon: `mcr.microsoft.com/azure-sql-edge`)
+- **ORM:** Entity Framework Core with PostgreSQL provider (Npgsql)
+- **Database:** PostgreSQL — install locally via Homebrew (`brew install postgresql@16`) or Postgres.app. No Docker required for local development.
 - **Tests:** xUnit + Moq + FluentAssertions
 
 ## Key Commands
@@ -65,7 +65,7 @@ dotnet test                                  # run all tests
 - Do not implement currency conversion — explicitly out of scope
 - Do not support cross-currency transfers — out of scope
 - Do not store derived values (net worth, account balance, budget actual spend) as columns
-- Do not store file attachments as BLOBs in SQL Server
+- Do not store file attachments as BLOBs in the database
 - Do not use SMS for MFA when it is eventually built — TOTP only
 - Do not hard delete Accounts or Categories — they have transaction history attached
 

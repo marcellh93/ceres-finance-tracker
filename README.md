@@ -5,37 +5,31 @@ Personal finance tracker for individuals and freelancers. Track accounts, transa
 ## Stack
 
 - **Backend:** ASP.NET Core MVC (.NET 9) — server-side rendering, no separate API
-- **Database:** Microsoft SQL Server (via Docker)
-- **ORM:** Entity Framework Core
+- **Database:** PostgreSQL
+- **ORM:** Entity Framework Core (Npgsql provider)
 - **Frontend:** Razor views (`.cshtml`) — HTML with C# templating, no JS framework
 - **Tests:** xUnit, Moq, FluentAssertions
 
 ## Prerequisites
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) — pull the correct SQL Server image for your Mac:
-
-```bash
-# Intel Mac
-docker pull mcr.microsoft.com/mssql/server:2022-latest
-
-# Apple Silicon (M1/M2/M3/M4)
-docker pull mcr.microsoft.com/azure-sql-edge
-```
+- **PostgreSQL** — either:
+  - Homebrew: `brew install postgresql@16 && brew services start postgresql@16`
+  - Or [Postgres.app](https://postgresapp.com) — menubar app, zero config
 
 ## Quick Start
 
-**1. Start the database**
+**1. Start PostgreSQL and create the database**
 
 ```bash
-# Intel Mac
-docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=YourPassword123!" \
-  -p 1433:1433 --name finance-sql -d mcr.microsoft.com/mssql/server:2022-latest
+# If using Homebrew (start once; runs on login automatically after)
+brew services start postgresql@16
 
-# Apple Silicon
-docker run -e "ACCEPT_EULA=1" -e "MSSQL_SA_PASSWORD=YourPassword123!" \
-  -p 1433:1433 --name finance-sql -d mcr.microsoft.com/azure-sql-edge
+# Create the database
+createdb finance_tracker
 ```
+
+If using Postgres.app, start it from the menubar, then run `createdb finance_tracker` in the terminal.
 
 **2. Apply migrations**
 

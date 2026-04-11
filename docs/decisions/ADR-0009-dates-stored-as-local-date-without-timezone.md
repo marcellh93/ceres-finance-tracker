@@ -22,7 +22,7 @@ Storing UTC timestamps adds complexity (timezone offset stored where? Settings? 
 Server locale?) with no practical benefit for a single-user local app.
 
 ## Decision
-All date fields on Transaction and Transfer use SQL Server's `date` type — a calendar date
+All date fields on Transaction and Transfer use the `date` type — a calendar date
 with no time component and no timezone. The date is whatever the user enters or selects.
 Report period boundaries are calendar comparisons (WHERE Date >= '2026-01-01' AND Date < '2026-02-01').
 

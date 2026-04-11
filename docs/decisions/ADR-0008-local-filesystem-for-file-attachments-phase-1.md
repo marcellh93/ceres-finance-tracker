@@ -6,7 +6,7 @@
 Transactions can have one or more file attachments (receipts, invoices). The files need to
 be stored somewhere. The options are:
 
-1. **Database BLOBs:** Store file bytes in SQL Server. Simple, atomic with the record, but
+1. **Database BLOBs:** Store file bytes in the database. Simple, atomic with the record, but
    bloats the database, slows backups, and degrades query performance on unrelated columns.
 
 2. **Local filesystem:** Store files on disk, store only the path in the database. Fast,

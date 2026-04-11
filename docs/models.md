@@ -211,6 +211,7 @@ The central record. Every dollar movement lives here.
 | Description | varchar      | nullable     | e.g. "Whole Foods run"                        |
 | AccountId   | int          | FK, NOT NULL | → Account (which account was affected)        |
 | CategoryId  | int          | FK, NOT NULL | → Category (what kind of transaction this is) |
+| CreatedAt   | datetime     | NOT NULL     | Set by the application on insert. Used as tiebreaker when ordering transactions that share the same date. Not editable — reflects when the record was entered, not when the transaction occurred. |
 | BudgetId    | int          | FK, nullable | → Budget (optional — tags this transaction to a goal budget) |
 
 **Note on Income vs. Expense classification:**
@@ -260,7 +261,7 @@ The actual file is saved to the filesystem — only the reference lives in the d
 | UploadedAt    | datetime | NOT NULL     | When the file was attached                                 |
 
 **Why not store the file in the database?**
-Storing binary file data (BLOBs) in SQL Server bloats the database, slows down every backup,
+Storing binary file data (BLOBs) in the database bloats it, slows down every backup,
 and makes queries against other columns slower. The filesystem is purpose-built for files.
 The database holds the path so the app can find it — that's the right split of responsibility.
 
@@ -288,6 +289,7 @@ from all income/expense report calculations. Both accounts must share the same c
 | SourceAccountId | int      | FK, NOT NULL | → Account (money leaves here)               |
 | DestAccountId   | int      | FK, NOT NULL | → Account (money arrives here)              |
 | Description     | varchar  | nullable     | e.g. "Monthly savings transfer"             |
+| CreatedAt       | datetime | NOT NULL     | Set by the application on insert. Used as tiebreaker when ordering transfers that share the same date. Not editable — reflects when the record was entered, not when the transfer occurred. |
 
 **Constraint:** SourceAccountId and DestAccountId must reference accounts with the same currency.
 Cross-currency transfers are not supported — they would require a conversion rate, which is out of scope.
@@ -395,20 +397,22 @@ always contains exactly one row. In Phase 3 (multi-user), this table is replaced
 per-user preferences table tied to the authenticated user — the columns remain the same,
 only the scope changes.
 
-| Column          | Type    | Constraints | Notes                                                              |
-|-----------------|---------|-------------|--------------------------------------------------------------------|
-| Id              | int     | PK          |                                                                    |
-| NumberFormat    | varchar | NOT NULL    | `"period_decimal"` (1,234.56) or `"comma_decimal"` (1.234,56)    |
-| DateFormat      | varchar | NOT NULL    | `"DD/MM/YYYY"`, `"MM/DD/YYYY"`, or `"YYYY-MM-DD"`                |
-| DateSeparator   | varchar | NOT NULL    | `"/"` (slash), `"-"` (dash), or `"."` (dot)                      |
+| Column            | Type    | Constraints  | Notes                                                              |
+|-------------------|---------|--------------|-------------------------------------------------------------------|
+| Id                | int     | PK           |                                                                   |
+| NumberFormat      | varchar | NOT NULL     | `"period_decimal"` (1,234.56) or `"comma_decimal"` (1.234,56)   |
+| DateFormat        | varchar | NOT NULL     | `"DD/MM/YYYY"`, `"MM/DD/YYYY"`, or `"YYYY-MM-DD"`               |
+| DateSeparator     | varchar | NOT NULL     | `"/"` (slash), `"-"` (dash), or `"."` (dot)                     |
+| DefaultCurrencyId | int     | FK, NOT NULL | → Currency. Pre-selected in the account creation form. Seeds to EUR on first run. Editable via the Settings page. |
 
-**Note:** Settings has no foreign keys — it stands alone. It is not linked to any other entity
-in Phase 1. The per-user migration in Phase 3 will add a UserId column and remove the
-single-row constraint.
+**Note:** Settings has one foreign key — `DefaultCurrencyId → Currency`. The per-user
+migration in Phase 3 will add a UserId column and remove the single-row constraint.
 
 **Initialization:** The single Settings row is seeded by EF Core on first run with the
 following defaults: `NumberFormat = "comma_decimal"`, `DateFormat = "DD/MM/YYYY"`,
-`DateSeparator = "/"`. These defaults reflect the primary user's locale (Spain).
+`DateSeparator = "/"`, `DefaultCurrencyId = EUR`. These defaults reflect the primary
+user's locale (Spain). No setup prompt — defaults are applied silently and are
+editable via the Settings page.
 The app must not crash if the Settings row is missing — on startup, check for its existence
 and create it with defaults if absent.
 
@@ -432,6 +436,11 @@ Currency ──< CategoryBudget
 Currency ──< Budget
 
 ReportType ──< SavedReport >── Currency (optional)
+                    │
+                    ├──> Account  (optional filter)
+                    └──> Category (optional filter)
+
+Currency ──< Settings (via DefaultCurrencyId)
 ```
 
 - One Currency → many Accounts

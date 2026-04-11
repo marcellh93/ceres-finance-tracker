@@ -25,6 +25,7 @@
 | **LOPDGDD** (Spain, Ley Orgánica 3/2018) | Spanish national implementation of GDPR | Phase 3 |
 | **Código de Comercio** (Spain) | Financial record retention — 6 years minimum | Phase 1 (your own data) |
 | **Ley General Tributaria** (Spain) | Tax-relevant record retention — 4 years (6 recommended) | Phase 1 (your own data) |
+| **EU Accessibility Act** (Directive 2019/882) | Accessibility requirements for digital products and services — applies to private sector | Phase 3 — assess scope before launch. Financial apps are within the directive's product categories. Transposed into Spanish law (Real Decreto 1112/2018 for public sector; private sector obligations phased from 2025). Flag for legal review before Phase 3. |
 | **PSD2** (EU Directive 2015/2366) | Open banking / bank connectivity | Phase 4 — bank connectivity feature |
 | **PCI DSS** | Payment card data security | Phase 5 — only if handling card payment data directly |
 
@@ -131,6 +132,8 @@ These must be written, published, and accessible before any user outside yoursel
 - [ ] MFA enforced for all users via TOTP authenticator app (no SMS)
 - [ ] Auto-purge for soft-deleted records and audit logs implemented and tested
 - [ ] Right to erasure flow tested — confirm financial records are retained, personal identifiers anonymised
+- [ ] WCAG 2.1 AA compliance audit completed before opening to other users
+- [ ] EU Accessibility Act scope assessed with legal counsel — confirm whether and how it applies to this product at this stage
 
 ### Phase 4 (Bank Connectivity — PSD2)
 - [ ] Confirm Nordigen/GoCardless DPA covers GDPR requirements
@@ -150,3 +153,4 @@ These must be written, published, and accessible before any user outside yoursel
 - [ ] Will the app eventually need to register as a data controller with AEPD? (Required in Spain once processing data of others at scale)
 - [ ] Does the bank connectivity feature (Phase 4) require any licensing under PSD2 as an AISP (Account Information Service Provider)?
 - [ ] What jurisdiction's law governs the Terms of Service if the user base becomes international?
+- [ ] EU Accessibility Act — confirm exact private sector obligations and timeline under Spanish transposition law before Phase 3 launch. Requires qualified legal advice.

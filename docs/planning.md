@@ -39,6 +39,7 @@ These are decisions that are in effect but have not been captured as formal open
 - **Amounts always positive:** Direction (income vs. expense) is derived from category type, not from a negative sign on the amount. Bank import logic must convert negative debits to positive amounts.
 - **Reports are synchronous:** All report queries run within a single HTTP request. No background jobs or caching. Acceptable for Phase 1/2 user volumes.
 - **Phase 1 is personal use first:** The primary purpose of Phase 1 is to build something the developer uses daily. Real usage will surface data model or UX issues before Phase 3 opens the app to others. This is intentional — not just a technical constraint.
+- **Accessible HTML is a baseline, not a feature:** Razor Views must use semantic HTML from the start — proper `<label>` elements, heading hierarchy, keyboard-navigable forms, sufficient color contrast. This is a quality bar applied to all phases, not a separate deliverable. Full WCAG 2.1 AA compliance testing is a Phase 3 requirement before opening to other users (see Open Questions).
 
 ---
 
@@ -65,7 +66,8 @@ These are decisions that are in effect but have not been captured as formal open
 - **Runtime:** .NET 9 (cross-platform, runs natively on macOS via the .NET SDK)
 - **Framework:** ASP.NET Core MVC (server-side rendering — backend renders HTML directly, no API layer needed)
 - **ORM:** Entity Framework Core
-- **Database:** Microsoft SQL Server (via Docker — no native macOS build exists, but the official Docker image works on Intel Macs; Apple Silicon Macs use Azure SQL Edge instead, which is ARM-compatible and speaks the same T-SQL)
+- **Database:** PostgreSQL — runs natively on macOS. Install via Homebrew (`brew install postgresql@16`) or [Postgres.app](https://postgresapp.com). No Docker required for local development.
+- **EF Core provider:** `Npgsql.EntityFrameworkCore.PostgreSQL`
 - **Package manager:** NuGet (built into `dotnet` CLI)
 
 ### Frontend — Razor Views (HTML with C# templating)
@@ -73,6 +75,26 @@ These are decisions that are in effect but have not been captured as formal open
 - Razor files (`.cshtml`) are essentially HTML files where you can embed C# to display dynamic data
 - No JavaScript required to start — forms submit to the server, the server responds with a rendered page
 - Additional frontend decisions (styling, interactivity) TBD as the project progresses
+
+### Frontend — React (Phase 2+)
+
+React is the chosen framework when the transition away from Razor Views occurs.
+
+**Why React:** The app is heading toward a hosted, multi-user product (Phase 3) with a business model (Phase 5), and a mobile app is a natural future requirement for a personal finance tracker. React's market dominance and its ecosystem (React Native for mobile, Next.js for SSR) make it the right long-term choice. It also serves the developer's employability goals.
+
+**Three-stage migration path:**
+
+| Stage | Phase | Description |
+|-------|-------|-------------|
+| Razor only | Phase 1 (current) | No React. Server-side rendering via Razor Views. |
+| Hybrid | Phase 2 | Embed React components into specific Razor pages for interactive UI elements (e.g. dashboard charts). MVC stays intact — no API needed yet. |
+| Full SPA evaluation | Phase 3+ | Evaluate full SPA approach. App is hosted, multi-user, and behind auth — API separation makes sense and the SPA model fits well (tool-like UI, no SEO concerns for authenticated pages). |
+
+**Architectural note — SPA and mobile:** When the full SPA transition happens, the ASP.NET Core MVC backend must be decoupled into a pure Web API. This enables reuse by a future mobile app (React Native), cleanly separates frontend and backend responsibilities, and is the right moment because the app is behind authentication (no SEO concern for the main app at that point).
+
+**SEO note:** If any public-facing pages exist outside the login wall (landing page, pricing, marketing), those must use server-side rendering (Next.js or a separate static site) to remain indexable. Do not assume the entire app is exempt from SEO — only authenticated sections are. Flag this when building any public-facing pages in Phase 3+.
+
+---
 
 ### Tooling (macOS setup needed)
 - Install .NET SDK via `brew install dotnet` or the official installer
@@ -274,6 +296,29 @@ Distinct from reports: reports are formal documents you produce on demand; these
 decision is deferred until Phase 2 begins. This is the natural point where the first JS
 dependency enters the project.
 
+### Financial Health Metrics (Phase 2/3)
+
+Features that help users understand how their spending and saving habits compare to
+established personal finance frameworks. Two tiers based on implementation complexity:
+
+**Phase 2 — Savings rate (no schema change required)**
+- Savings rate = (Income − Expenses) ÷ Income for a selected period, expressed as a percentage
+- Displayed on the dashboard and available as a report metric
+- No category tagging needed — derived entirely from existing income/expense totals
+
+**Phase 3 — Ratio-based frameworks (requires needs/wants tag on Category)**
+Methods like the **50/30/20 rule** (50% needs, 30% wants, 20% savings) require each
+expense category to be tagged as either a "need" or a "want." This is a user-defined,
+subjective classification — the app cannot decide it automatically.
+
+Implementation path:
+- Add an optional `LifestyleTag` field to `Category` (values: Needs, Wants, untagged) — see Open Questions
+- User tags their categories once via the Category settings page
+- A "Financial Health" report shows: actual % spent on Needs, Wants, and Savings vs. the
+  target ratios of whichever framework the user selects
+- Framework options to support: 50/30/20 (most common), 80/20 (save 20%, spend 80% freely)
+- Untagged categories are excluded from framework calculations with a visible warning
+
 ---
 
 ## Planned Features (Phase 3 — Hosted Beta)
@@ -411,19 +456,23 @@ E2E tests (Playwright, Selenium) are explicitly out of scope — high maintenanc
 - [ ] Invite mechanism for Phase 3 — "invite-only beta" is stated but not designed. No invitation entity, flow, or admin mechanism exists. Must be planned before Phase 3 launch.
 - [ ] Multi-tenancy implementation — "all data scoped to logged-in user" requires adding UserId FK to every top-level entity (Account, Category, Budget, CategoryBudget, SavedReport, Transfer, Settings). No migration plan exists. Must be designed before Phase 3 code begins to avoid retrofitting every query.
 - [ ] Settings migration for Phase 3 — the single Phase 1 Settings row becomes per-user in Phase 3. What do new users get as default settings? The existing row's values? Hardcoded defaults? Must be decided when writing the migration.
-- [ ] Default currency when creating a new account — is a currency required with no default, derived from Settings, or from the last account created? Must be decided before the account creation form is built.
-- [ ] Intra-day transaction ordering — `Transaction.Date` is a `date` type with no time component (ADR-0009). Two transactions on the same day have no defined sequence. Running balance within a day cannot be shown in entry order. Options: add an optional `Time` column, add a sequence integer, or accept that within-day order is undefined. Must be decided before the Transaction History view is built.
+- [x] Default currency when creating a new account — resolved: stored as `DefaultCurrencyId` in the Settings table (FK → Currency). Seeds to EUR on first run with no user prompt — Phase 1 is single-user with a known locale. Editable via the Settings page. The account creation form pre-selects this currency but allows per-account override. First-run setup UI deferred to Phase 3 when new users with unknown preferences exist. See ADR-0015.
+- [x] Intra-day transaction ordering — resolved: `CreatedAt datetime NOT NULL` added to both `Transaction` and `Transfer`. Set by the application on insert, never editable. Used as a tiebreaker when ordering records that share the same `Date`. Distinct from `Date` — `Date` is when the financial event occurred (user-provided); `CreatedAt` is when the record was entered (system-generated). Default sort: `ORDER BY Date DESC, CreatedAt DESC`. See ADR-0013.
 - [ ] One transaction per budget goal — `Transaction.BudgetId` is a single nullable FK. A transaction can be linked to at most one goal Budget. Users who want one payment to count toward multiple goals (e.g. partially funding two savings targets) cannot do so. Options: leave the single-FK limit and document it, or replace BudgetId with a many-to-many junction table (`TransactionBudgetContribution` with an Amount per budget). The junction approach is a schema change that affects every budget report query.
-- [ ] Budget/transaction currency mismatch — nothing in the schema prevents a transaction in one currency from being tagged to a Budget denominated in a different currency via `BudgetId`. The Budget's actual-spend calculation would silently mix currencies. Options: enforce at the application level when tagging a transaction to a budget, or add a database constraint. Must be decided before the budget tagging feature is built.
+- [x] Budget/transaction currency mismatch — resolved: enforced at the application level. When tagging a transaction to a budget, the app validates that `transaction.Account.CurrencyId == budget.CurrencyId` and rejects the combination with a validation error if they differ. A database constraint is not used — EF Core cannot express a cross-table currency match as a simple FK or CHECK constraint without a trigger. See ADR-0016.
+- [ ] Category needs/wants tag for budgeting frameworks (Phase 3) — ratio-based frameworks like 50/30/20 require each expense category to be tagged as a "need" or a "want." Options: add an optional `LifestyleTag` enum column to `Category` (Needs / Wants / untagged), or handle it as a separate mapping table. Must be decided before the Financial Health report is built. Income categories and system categories are excluded from this tagging.
+- [ ] WCAG 2.1 AA compliance (Phase 3) — semantic HTML is the baseline from Phase 1, but full accessibility audit and WCAG 2.1 AA compliance testing must be completed before Phase 3 opens the app to other users. Some users may rely on screen readers or keyboard navigation. EU Accessibility Act obligations may also apply — see legal.md.
+- [ ] MVC → Web API decoupling (Phase 3) — when the React SPA transition occurs, the ASP.NET Core MVC backend must be restructured as a pure Web API. No migration plan exists. Must be designed before Phase 3 frontend work begins. Affects routing, authentication integration, CORS policy, and how the frontend is served or deployed.
+- [ ] Mobile app — React Native (Phase 3+) — a mobile app is a natural future requirement for a personal finance tracker. React Native is the leading candidate given the React frontend decision. No scope, timeline, or platform targets (iOS, Android, or both) have been defined. Must be planned before any Phase 3+ mobile investment is made.
 
 ---
 
 ## Next Steps
 
 1. Install .NET SDK on macOS
-2. Install Docker Desktop and pull the appropriate SQL Server image (SQL Server 2022 for Intel, Azure SQL Edge for Apple Silicon)
+2. Install PostgreSQL locally via Homebrew (`brew install postgresql@16`) or Postgres.app
 3. Scaffold the ASP.NET Core MVC project
 4. Define data models: Account, Transaction, Category
-5. Set up Entity Framework Core with the SQL Server provider
+5. Set up Entity Framework Core with the PostgreSQL provider (Npgsql)
 6. Build Controllers and Razor Views for each feature area
 7. Wire up forms and navigation between pages
