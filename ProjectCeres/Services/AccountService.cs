@@ -125,14 +125,27 @@ public class AccountService(AppDbContext db) : IAccountService
 
     public async Task<decimal> GetBalanceAsync(Guid id)
     {
-        // Income transactions increase balance; expense transactions decrease it.
+        var account = await db.Accounts
+            .Include(a => a.AccountType)
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (account is null) return 0;
+
         var transactions = await db.Transactions
             .Where(t => t.AccountId == id)
             .Include(t => t.Category)
                 .ThenInclude(c => c.CategoryType)
             .ToListAsync();
 
+        bool isLiability = account.AccountType.Name == "Liability";
+
+        // For assets:     income adds, expense subtracts.
+        // For liabilities: expense adds (increases what you owe), income subtracts.
         return transactions.Sum(t =>
-            t.Category.CategoryType.Name == "Income" ? t.Amount : -t.Amount);
+        {
+            bool isIncome = t.Category.CategoryType.Name == "Income";
+            bool addsToBalance = isLiability ? !isIncome : isIncome;
+            return addsToBalance ? t.Amount : -t.Amount;
+        });
     }
 }

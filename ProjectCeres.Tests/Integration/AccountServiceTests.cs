@@ -46,6 +46,17 @@ public class AccountServiceTests : IAsyncLifetime
             OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
         });
 
+    private Task<Account> CreateLiabilityAccountAsync(decimal openingBalance = 0m) =>
+        _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name               = $"Test Credit Card {Guid.NewGuid():N}",
+            AccountTypeId      = 2,  // Liability
+            CurrencyId         = 1,  // EUR
+            Description        = null,
+            OpeningBalance     = openingBalance,
+            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
+        });
+
     // -------------------------------------------------------------------------
     // Tests
     // -------------------------------------------------------------------------
@@ -105,6 +116,28 @@ public class AccountServiceTests : IAsyncLifetime
         var balance = await _service.GetBalanceAsync(account.Id);
 
         balance.Should().Be(1400m); // 2000 - 600
+    }
+
+    [Fact]
+    public async Task GetBalanceAsync_LiabilityAccount_ExpenseIncreasesBalance()
+    {
+        // Charging an expense to a credit card must increase (not decrease) the balance.
+        var account = await CreateLiabilityAccountAsync(openingBalance: 0m);
+
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = Guid.NewGuid(),
+            Date       = DateOnly.FromDateTime(DateTime.Today),
+            Amount     = 300m,
+            AccountId  = account.Id,
+            CategoryId = HousingCategoryId, // Expense
+            CreatedAt  = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var balance = await _service.GetBalanceAsync(account.Id);
+
+        balance.Should().Be(300m); // owe 300, not -300
     }
 
     [Fact]

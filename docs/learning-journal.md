@@ -591,3 +591,92 @@ Same principle — `hover:text-gray-900` prevents the inherited anchor hover rul
 ### What to cover next
 
 Build the Budget controller and views (the last missing CRUD feature in Phase 1).
+
+---
+
+## 2026-04-13 — Liability balance sign-convention bug fix
+
+### What was built
+
+A bug was diagnosed and fixed where recording an expense transaction against a credit card (Liability account) caused the displayed balance to decrease instead of increase. The root cause was a sign-convention error in two service methods: both used a single formula — income adds, expense subtracts — that is correct for Asset accounts but inverted for Liability accounts. Both `AccountService.GetBalanceAsync` and the inline balance calculation in `ReportService.GetNetWorthAsync` were corrected. Unit tests were rewritten to be account-type-aware, and a new integration test was added to pin the liability case specifically.
+
+### Concepts covered
+
+**Account balance derivation** — In this app, an account's balance is never stored as a column; it is always computed on the fly by summing its transactions. This avoids update anomalies (the stored value going stale) at the cost of a query per balance display.
+
+**Sign convention for Asset vs. Liability accounts** — For an Asset (e.g. checking account), income transactions increase your balance and expenses decrease it. For a Liability (e.g. credit card), the relationship inverts: an expense transaction increases what you owe (the balance grows), while an income-type transaction such as a merchant refund reduces it. The two account types require opposite formulas.
+
+**`CategoryType` as the source of transaction direction** — Amounts on `Transaction` are always stored as positive numbers. Whether a transaction adds to or subtracts from a balance is not stored on the transaction itself — it is derived by looking up `Transaction → Category → CategoryType.Name`. Storing the direction on both the category and the transaction would be a 3NF violation (a transitive dependency on `CategoryId`, not on the transaction PK).
+
+**Implementation vs. specification divergence** — `docs/models.md` already documented the correct liability sign convention before this session. The bug was a case where the code was not written to match the spec. Comparing the implementation against the documented design is a valid debugging strategy when something behaves unexpectedly.
+
+**`Math.Abs` as a smell** — `ReportService` applied `Math.Abs(balance)` to liability balances before accumulating them into the liabilities total. This masked the incorrect sign but still produced a wrong magnitude when the underlying formula was wrong. A `Math.Abs` call on a value that should already be positive is a hint that the preceding formula may be computing the wrong sign.
+
+**xUnit `IAsyncLifetime`** — Interface used in integration tests to run async setup (`InitializeAsync`) and teardown (`DisposeAsync`) around each test class. Equivalent to a constructor/destructor but awaitable, required because EF Core operations are async.
+
+### Key code produced
+
+```csharp
+// AccountService.GetBalanceAsync — after fix
+bool isLiability = account.AccountType.Name == "Liability";
+
+// For assets:     income adds, expense subtracts.
+// For liabilities: expense adds (increases what you owe), income subtracts.
+return transactions.Sum(t =>
+{
+    bool isIncome = t.Category.CategoryType.Name == "Income";
+    bool addsToBalance = isLiability ? !isIncome : isIncome;
+    return addsToBalance ? t.Amount : -t.Amount;
+});
+```
+
+The key insight: `addsToBalance` flips depending on account type. For an Asset, income adds (`isIncome == true → addsToBalance = true`). For a Liability, expense adds (`isIncome == false → !isIncome == true → addsToBalance = true`). One boolean inversion replaces the need for two separate code paths.
+
+```csharp
+// ReportService.GetNetWorthAsync — after fix (no more Math.Abs)
+bool isLiability = account.AccountType.Name == "Liability";
+
+var balance = account.Transactions.Sum(t =>
+{
+    bool isIncome = t.Category.CategoryType.Name == "Income";
+    bool addsToBalance = isLiability ? !isIncome : isIncome;
+    return addsToBalance ? t.Amount : -t.Amount;
+});
+
+if (!isLiability)
+    assets += balance;
+else
+    liabilities += balance; // already positive: expenses add, income subtracts
+```
+
+`Math.Abs` was removed because with the correct formula, liability balances are already positive in normal use — no correction needed.
+
+### Commands run
+
+- `dotnet test` — Compiles the solution and runs all xUnit tests. No flags; runs all test projects found in the solution. Used twice: once before the fix (would have failed the new liability test) and once after to confirm all 37 tests pass.
+- `brew install pnpm` — Installs pnpm via Homebrew. Required because the MSBuild pre-build target in `ProjectCeres.csproj` calls `pnpm run build:css` to compile Tailwind CSS before every build. Without pnpm on PATH, `dotnet run` exits with error code 127 (command not found).
+- `brew upgrade` — Upgrades all installed Homebrew formulae and casks to their latest versions. Run after installing pnpm because Homebrew reported 50 outdated packages.
+
+### Decisions made
+
+- **No new architectural decision**: The fix aligned the code with the already-documented spec in `docs/models.md` (lines 542–551). No ADR was created because no new design decision was made — the existing decision was simply implemented correctly.
+- **Rewrite `BalanceCalculationTests` rather than add to it**: The existing unit tests tested the old (broken) single-formula directly. Keeping them would have left tests that pass but verify wrong behavior for liabilities. They were rewritten with explicit `isLiability` parameter and split into Asset and Liability sections.
+
+### Logic explained
+
+**Why the balance went the wrong way:**
+1. User records a €300 grocery purchase on their credit card (Liability account), categorised as "Housing / Rent" (Expense type).
+2. `GetBalanceAsync` loads all transactions for the account and runs: `t.Category.CategoryType.Name == "Income" ? t.Amount : -t.Amount`.
+3. "Housing / Rent" is Expense, so the formula returns `−300`.
+4. The account balance was previously 0, so the result is `−300` — displayed as a negative number, implying the user has a credit, not a debt.
+5. Correct behavior: an expense on a credit card increases what you owe, so the balance should be `+300`.
+6. Fix: detect that the account is a Liability and invert the formula: expense → adds, income → subtracts.
+
+### Open items
+
+- `DayOfPeriod` on `RecurringTransaction` remains a stub field (carried from prior session).
+- Budget controller and views are still pending (the last missing CRUD feature in Phase 1).
+
+### What to cover next
+
+Build the Budget controller and views to complete Phase 1 CRUD coverage.

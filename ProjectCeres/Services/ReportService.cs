@@ -27,13 +27,19 @@ public class ReportService(AppDbContext db) : IReportService
 
                 foreach (var account in g)
                 {
-                    var balance = account.Transactions.Sum(t =>
-                        t.Category.CategoryType.Name == "Income" ? t.Amount : -t.Amount);
+                    bool isLiability = account.AccountType.Name == "Liability";
 
-                    if (account.AccountType.Name == "Asset")
+                    var balance = account.Transactions.Sum(t =>
+                    {
+                        bool isIncome = t.Category.CategoryType.Name == "Income";
+                        bool addsToBalance = isLiability ? !isIncome : isIncome;
+                        return addsToBalance ? t.Amount : -t.Amount;
+                    });
+
+                    if (!isLiability)
                         assets += balance;
                     else
-                        liabilities += Math.Abs(balance); // liabilities reported as positive magnitude
+                        liabilities += balance; // already positive: expenses add, income subtracts
                 }
 
                 return new NetWorthEntry(g.Key.Code, g.Key.Symbol, assets, liabilities, assets - liabilities);
