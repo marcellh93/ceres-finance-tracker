@@ -139,10 +139,13 @@ public class AccountService(AppDbContext db) : IAccountService
 
         bool isLiability = account.AccountType.Name == "Liability";
 
-        // For assets:     income adds, expense subtracts.
-        // For liabilities: expense adds (increases what you owe), income subtracts.
+        // System categories (e.g. Opening Balance) are a neutral starting point — always add.
+        // For regular transactions:
+        //   Assets:      income adds, expense subtracts.
+        //   Liabilities: expense adds (increases what you owe), income subtracts (e.g. refund).
         return transactions.Sum(t =>
         {
+            if (t.Category.IsSystem) return t.Amount;
             bool isIncome = t.Category.CategoryType.Name == "Income";
             bool addsToBalance = isLiability ? !isIncome : isIncome;
             return addsToBalance ? t.Amount : -t.Amount;

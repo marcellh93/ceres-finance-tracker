@@ -29,8 +29,10 @@ public class ReportService(AppDbContext db) : IReportService
                 {
                     bool isLiability = account.AccountType.Name == "Liability";
 
+                    // Same formula as AccountService.GetBalanceAsync.
                     var balance = account.Transactions.Sum(t =>
                     {
+                        if (t.Category.IsSystem) return t.Amount;
                         bool isIncome = t.Category.CategoryType.Name == "Income";
                         bool addsToBalance = isLiability ? !isIncome : isIncome;
                         return addsToBalance ? t.Amount : -t.Amount;
@@ -39,7 +41,7 @@ public class ReportService(AppDbContext db) : IReportService
                     if (!isLiability)
                         assets += balance;
                     else
-                        liabilities += balance; // already positive: expenses add, income subtracts
+                        liabilities += balance;
                 }
 
                 return new NetWorthEntry(g.Key.Code, g.Key.Symbol, assets, liabilities, assets - liabilities);

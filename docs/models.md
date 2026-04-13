@@ -219,6 +219,13 @@ It is excluded from all income/expense report totals — its only purpose is to 
 balance of an account. The UI must hide edit and delete controls for any category where IsSystem = true.
 The service layer must also enforce this — reject any edit or delete request for an IsSystem category regardless of how the request arrives. UI-only enforcement is bypassed by direct HTTP requests.
 
+**Opening Balance and the balance sign convention:**
+Although the Opening Balance category carries `CategoryTypeId = Income`, it is treated as a neutral
+starting point — not as income or expense — in all balance calculations. The service layer checks
+`Category.IsSystem` *before* applying the income/expense direction rule, and always adds the amount
+to the balance regardless of account type. This means a liability account's opening balance correctly
+increases what is owed, even though it is stored as an Income-typed transaction.
+
 ---
 
 ### Transaction
@@ -542,8 +549,10 @@ These are never stored as columns — they are always calculated at query time:
 **Account balance — sign convention by account type:**
 The formula differs depending on whether the account is an Asset or a Liability. Transfers also affect the balance, not just transactions.
 
-- **Asset account balance** = SUM(Income transaction amounts) − SUM(Expense transaction amounts) + SUM(incoming transfer amounts) − SUM(outgoing transfer amounts)
-- **Liability account balance** = SUM(Expense transaction amounts) − SUM(Income transaction amounts) − SUM(incoming transfer amounts) + SUM(outgoing transfer amounts)
+- **Asset account balance** = SUM(system transaction amounts) + SUM(Income transaction amounts) − SUM(Expense transaction amounts) + SUM(incoming transfer amounts) − SUM(outgoing transfer amounts)
+- **Liability account balance** = SUM(system transaction amounts) + SUM(Expense transaction amounts) − SUM(Income transaction amounts) − SUM(incoming transfer amounts) + SUM(outgoing transfer amounts)
+
+System transactions (i.e. `IsSystem = true`, currently only "Opening Balance") always add to the balance regardless of account type — they are a neutral starting point, not income or expense.
 
 For an Asset account (e.g. checking): income and transfers in add to the balance; expenses and transfers out subtract.
 For a Liability account (e.g. credit card): expenses add to the balance (debt grows); income (e.g. refunds) and transfers in (debt payments) subtract from it.

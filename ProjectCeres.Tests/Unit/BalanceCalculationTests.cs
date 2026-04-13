@@ -15,10 +15,22 @@ public class BalanceCalculationTests
     private static decimal CalculateBalance(IEnumerable<Transaction> transactions, bool isLiability) =>
         transactions.Sum(t =>
         {
+            if (t.Category.IsSystem) return t.Amount;
             bool isIncome = t.Category.CategoryType.Name == "Income";
             bool addsToBalance = isLiability ? !isIncome : isIncome;
             return addsToBalance ? t.Amount : -t.Amount;
         });
+
+    private static Transaction OpeningBalance(decimal amount) => new()
+    {
+        Id     = Guid.NewGuid(),
+        Amount = amount,
+        Category = new Category
+        {
+            IsSystem     = true,
+            CategoryType = new CategoryType { Name = "Income" }
+        }
+    };
 
     private static Transaction Income(decimal amount) => new()
     {
@@ -39,6 +51,30 @@ public class BalanceCalculationTests
             CategoryType = new CategoryType { Name = "Expense" }
         }
     };
+
+    // -------------------------------------------------------------------------
+    // Opening balance (system category — always adds, regardless of account type)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void OpeningBalance_OnAsset_AddsToBalance()
+    {
+        CalculateBalance([OpeningBalance(500m)], isLiability: false).Should().Be(500m);
+    }
+
+    [Fact]
+    public void OpeningBalance_OnLiability_AddsToBalance()
+    {
+        // Opening balance represents existing debt — must increase the liability balance.
+        CalculateBalance([OpeningBalance(111.53m)], isLiability: true).Should().Be(111.53m);
+    }
+
+    [Fact]
+    public void Liability_OpeningBalancePlusExpense_SumsCorrectly()
+    {
+        var txns = new[] { OpeningBalance(111.53m), Expense(15.83m) };
+        CalculateBalance(txns, isLiability: true).Should().Be(127.36m);
+    }
 
     // -------------------------------------------------------------------------
     // Asset accounts
