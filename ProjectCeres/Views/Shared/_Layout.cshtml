@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Project Ceres</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <a class="nav-brand" asp-controller="Dashboard" asp-action="Index">Project Ceres</a>
+            <ul class="nav-links list-none m-0 p-0">
+                <li><a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
+                <li><a class="nav-link" asp-controller="Accounts" asp-action="Index">Accounts</a></li>
+                <li><a class="nav-link" asp-controller="Transactions" asp-action="Index">Transactions</a></li>
+                <li><a class="nav-link" asp-controller="Transfers" asp-action="Index">Transfers</a></li>
+                <li><a class="nav-link" asp-controller="RecurringTransactions" asp-action="Index">Reminders</a></li>
+                <li><a class="nav-link" asp-controller="Categories" asp-action="Index">Categories</a></li>
+                <li><a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a></li>
+                <li><a class="nav-link" asp-controller="Settings" asp-action="Edit">Settings</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="page-content">
+            @if (TempData["SuccessMessage"] is string success)
+            {
+                <div class="alert alert-success">@success</div>
+            }
+            @if (TempData["ErrorMessage"] is string error)
+            {
+                <div class="alert alert-error">@error</div>
+            }
+
+            @RenderBody()
+        </div>
+    </main>
+
+    <footer>
+        &copy; 2026 Project Ceres
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

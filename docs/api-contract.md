@@ -219,7 +219,7 @@ Adding new optional response fields or new endpoints is not breaking — do not 
 
 ### No versioning by header
 
-Do not version via `Accept: application/vnd.financetracker.v1+json`. Header-based versioning is invisible in logs and harder to test. URL prefix is the explicit, debuggable choice.
+Do not version via `Accept: application/vnd.projectceres.v1+json`. Header-based versioning is invisible in logs and harder to test. URL prefix is the explicit, debuggable choice.
 
 ---
 

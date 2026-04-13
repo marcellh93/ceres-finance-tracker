@@ -1,0 +1,28 @@
+@model IReadOnlyList<NetWorthEntry>
+@{ ViewData["Title"] = "Net Worth Statement"; }
+
+<h1>Net Worth Statement</h1>
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No accounts found.</p>
+}
+else
+{
+    @foreach (var entry in Model)
+    {
+        <h2>@entry.CurrencyCode</h2>
+        <table class="summary-table">
+            <tr><th>Assets</th><td class="amount-income">@entry.CurrencySymbol @NumberFormatHelper.FormatAmount(entry.Assets, ViewData["NumberFormat"] as string)</td></tr>
+            <tr><th>Liabilities</th><td class="amount-expense">@entry.CurrencySymbol @NumberFormatHelper.FormatAmount(entry.Liabilities, ViewData["NumberFormat"] as string)</td></tr>
+            <tr class="total-row">
+                <th>Net Worth</th>
+                <td class="@(entry.NetWorth >= 0 ? "amount-income" : "amount-expense")">
+                    @entry.CurrencySymbol @NumberFormatHelper.FormatAmount(entry.NetWorth, ViewData["NumberFormat"] as string)
+                </td>
+            </tr>
+        </table>
+    }
+}
+
+<a asp-action="Index" class="btn btn-secondary">← Reports</a>

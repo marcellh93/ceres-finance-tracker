@@ -1,0 +1,11 @@
+@model RecurringTransaction
+@{ ViewData["Title"] = "Dismiss Reminder"; }
+
+<h1>Dismiss "@Model.Name"?</h1>
+<p>No transaction will be recorded. The next due date will advance to the following period.</p>
+
+<form asp-action="Dismiss" method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+    <button type="submit" class="btn btn-danger">Yes, Dismiss</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

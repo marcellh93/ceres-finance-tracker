@@ -23,7 +23,30 @@ Mapping from ViewModel to entity is done manually in the service layer. No AutoM
 
 Read-only display views may receive entity objects or lightweight read models directly — the mass assignment risk only applies to write operations.
 
-Input validation via Data Annotations (`[Required]`, `[Range]`, `[MaxLength]`, etc.) is declared on the ViewModel, not on the entity. Controllers check `ModelState.IsValid` before calling any service.
+Input validation via Data Annotations (`[Required]`, `[Range]`, `[StringLength]`, etc.) is declared on the ViewModel, not on the entity. Controllers check `ModelState.IsValid` before calling any service.
+
+**Validation implementation rules:**
+
+1. **All validation attributes carry an explicit `ErrorMessage` string.** Default framework messages ("The X field is required.") are not used — every message is written to be readable in the UI.
+
+2. **Required value-type fields (`int`, `Guid`) must be declared as nullable.** `[Required]` only fires when a property can be `null` — it is silently ignored on non-nullable structs, which always have a value (e.g. `Guid.Empty`, `0`). Any FK field or dropdown field that must be selected by the user is declared as `int?` or `Guid?` with `[Required]`.
+
+   ```csharp
+   // Wrong — [Required] never fires, Guid always has a value
+   [Required]
+   public Guid AccountId { get; set; }
+
+   // Correct — [Required] fires when nothing is selected
+   [Required(ErrorMessage = "Please select an account.")]
+   public Guid? AccountId { get; set; }
+   ```
+
+3. **Controllers unwrap nullable values with `.Value` after validation passes.** Once `ModelState.IsValid` is true, any `[Required]` nullable field is guaranteed non-null, so the unwrap is safe.
+
+   ```csharp
+   if (!ModelState.IsValid) return View(vm);
+   await _service.CreateAsync(vm.AccountId!.Value, vm.CategoryId!.Value, ...);
+   ```
 
 ## Consequences
 

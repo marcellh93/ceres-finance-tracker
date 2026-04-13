@@ -1,0 +1,43 @@
+@model IEnumerable<Transfer>
+@{ ViewData["Title"] = "Transfers"; }
+
+<div class="page-header">
+    <h1>Transfers</h1>
+    <a asp-action="Create" class="btn btn-primary">+ New Transfer</a>
+</div>
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No transfers recorded yet.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Amount</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in Model)
+            {
+                <tr>
+                    <td>@t.Date.ToString("dd/MM/yyyy")</td>
+                    <td>@t.SourceAccount.Name</td>
+                    <td>@t.DestAccount.Name</td>
+                    <td>@NumberFormatHelper.FormatAmount(t.Amount, ViewData["NumberFormat"] as string) @t.SourceAccount.Currency.Code</td>
+                    <td>@(t.Description ?? "—")</td>
+                    <td class="actions">
+                        <a asp-action="Edit" asp-route-id="@t.Id">Edit</a>
+                        <a asp-action="Delete" asp-route-id="@t.Id" class="link-danger">Delete</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

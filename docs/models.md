@@ -7,6 +7,7 @@
    - [Second Normal Form (2NF)](#second-normal-form-2nf--every-column-depends-on-the-whole-key)
    - [Third Normal Form (3NF)](#third-normal-form-3nf--every-column-depends-on-nothing-but-the-key)
 2. [Entity Definitions](#entity-definitions)
+   - [Primary Key Strategy](#primary-key-strategy)
    - [Currency](#currency)
    - [AccountType](#accounttype)
    - [Account](#account)
@@ -14,6 +15,7 @@
    - [Category](#category)
    - [Transaction](#transaction)
    - [TransactionAttachment](#transactionattachment)
+   - [RecurringTransaction](#recurringtransaction)
    - [Transfer](#transfer)
    - [CategoryBudget](#categorybudget)
    - [Budget](#budget)
@@ -24,6 +26,9 @@
 4. [Derived Values](#derived-values)
 5. [Multi-Currency Reporting](#multi-currency-reporting)
 6. [Deletion Rules](#deletion-rules)
+7. [Database Indexes](#database-indexes)
+8. [Phase 2 — Entities To Be Defined](#phase-2--entities-to-be-defined)
+9. [Phase 3 — Entities To Be Defined](#phase-3--entities-to-be-defined)
 
 ---
 
@@ -463,8 +468,7 @@ only the scope changes.
 |-------------------|---------|--------------|-------------------------------------------------------------------|
 | Id                | int     | PK           |                                                                   |
 | NumberFormat      | varchar | NOT NULL     | `"period_decimal"` (1,234.56) or `"comma_decimal"` (1.234,56)   |
-| DateFormat        | varchar | NOT NULL     | `"DD/MM/YYYY"`, `"MM/DD/YYYY"`, or `"YYYY-MM-DD"`               |
-| DateSeparator     | varchar | NOT NULL     | `"/"` (slash), `"-"` (dash), or `"."` (dot)                     |
+| DateFormat        | varchar | NOT NULL     | `"DD/MM/YYYY"`, `"MM/DD/YYYY"`, or `"YYYY-MM-DD"`. The separator is embedded in the format string — no separate separator field is needed. |
 | DefaultCurrencyId | int     | FK, NOT NULL | → Currency. Pre-selected in the account creation form. Seeds to EUR on first run. Editable via the Settings page. |
 
 **Note:** Settings has one foreign key — `DefaultCurrencyId → Currency`. The per-user
@@ -472,7 +476,7 @@ migration in Phase 3 will add a UserId column and remove the single-row constrai
 
 **Initialization:** The single Settings row is seeded by EF Core on first run with the
 following defaults: `NumberFormat = "comma_decimal"`, `DateFormat = "DD/MM/YYYY"`,
-`DateSeparator = "/"`, `DefaultCurrencyId = EUR`. These defaults reflect the primary
+`DefaultCurrencyId = EUR`. These defaults reflect the primary
 user's locale (Spain). No setup prompt — defaults are applied silently and are
 editable via the Settings page.
 The app must not crash if the Settings row is missing — on startup, check for its existence

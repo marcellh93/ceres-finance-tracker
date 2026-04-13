@@ -1,0 +1,22 @@
+@{ ViewData["Title"] = "Reports"; }
+
+<h1>Reports</h1>
+
+<ul class="report-list">
+    <li>
+        <a asp-action="NetWorth">Net Worth Statement</a>
+        <p>Current asset and liability balances by currency.</p>
+    </li>
+    <li>
+        <a asp-action="IncomeExpense">Income &amp; Expense Summary</a>
+        <p>Total income, expenses, and savings rate for a period.</p>
+    </li>
+    <li>
+        <a asp-action="ExpenseBreakdown">Expense Breakdown by Category</a>
+        <p>Where your money went, ranked by category spend.</p>
+    </li>
+    <li>
+        <a asp-action="TransactionHistory">Transaction History</a>
+        <p>Full filtered and paginated transaction log.</p>
+    </li>
+</ul>

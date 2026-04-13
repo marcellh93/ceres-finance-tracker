@@ -1,4 +1,4 @@
-# Finance Tracker
+# Project Ceres
 
 Personal finance tracker for individuals and freelancers. Track accounts, transactions, transfers, budgets, and net worth across multiple currencies. Replaces spreadsheets.
 
@@ -26,21 +26,21 @@ Personal finance tracker for individuals and freelancers. Track accounts, transa
 brew services start postgresql@16
 
 # Create the database
-createdb finance_tracker
+createdb project_ceres
 ```
 
-If using Postgres.app, start it from the menubar, then run `createdb finance_tracker` in the terminal.
+If using Postgres.app, start it from the menubar, then run `createdb project_ceres` in the terminal.
 
 **2. Apply migrations**
 
 ```bash
-dotnet ef database update --project FinanceTracker
+dotnet ef database update --project ProjectCeres
 ```
 
 **3. Run the app**
 
 ```bash
-dotnet run --project FinanceTracker
+dotnet run --project ProjectCeres
 ```
 
 Open `http://localhost:5000` in your browser.

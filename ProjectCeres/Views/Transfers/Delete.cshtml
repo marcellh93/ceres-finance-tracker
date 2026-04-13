@@ -1,0 +1,12 @@
+@model Transfer
+@{ ViewData["Title"] = "Delete Transfer"; }
+
+<h1>Delete this transfer?</h1>
+<p><strong>@Model.SourceAccount.Name → @Model.DestAccount.Name</strong> — @Model.Date.ToString("dd/MM/yyyy") — @NumberFormatHelper.FormatAmount(Model.Amount, ViewData["NumberFormat"] as string)</p>
+<p>This cannot be undone.</p>
+
+<form asp-action="Delete" method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

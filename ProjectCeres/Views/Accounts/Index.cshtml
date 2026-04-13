@@ -1,0 +1,46 @@
+@model IEnumerable<Account>
+@{ ViewData["Title"] = "Accounts"; }
+
+<div class="page-header">
+    <h1>Accounts</h1>
+    <a asp-action="Create" class="btn btn-primary">+ New Account</a>
+</div>
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No accounts yet. <a asp-action="Create">Create your first account.</a></p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Currency</th>
+                <th>Balance</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var account in Model)
+            {
+                <tr class="@(account.IsActive ? "" : "row-inactive")">
+                    <td>@account.Name</td>
+                    <td>@account.AccountType.Name</td>
+                    <td>@account.Currency.Code</td>
+                    <td>@NumberFormatHelper.FormatAmount(((Dictionary<Guid,decimal>)ViewBag.Balances)[account.Id], ViewData["NumberFormat"] as string)</td>
+                    <td>@(account.IsActive ? "Active" : "Inactive")</td>
+                    <td class="actions">
+                        @if (account.IsActive)
+                        {
+                            <a asp-action="Edit" asp-route-id="@account.Id">Edit</a>
+                            <a asp-action="Deactivate" asp-route-id="@account.Id">Deactivate</a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

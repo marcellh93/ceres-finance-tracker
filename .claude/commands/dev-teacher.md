@@ -1,21 +1,55 @@
 ---
 name: dev-teacher
-description: Narrated walkthrough for building your application — explains every concept, term, and decision as the code is written.
+description: After a coding session, extracts the theory behind what was built and writes it to learning-journal.md. Use this skill when the user asks to document, journal, or write up what was learned or explained in a session — NOT for building or explaining code live. Triggers on phrases like "write up what we covered", "update the learning journal", "document what we built", "summarise the session for my notes".
 ---
 
-Build a section of your project step by step, with every decision explained as it happens.
+This skill runs _after_ a coding session. It does not build or run code. Its job is to extract the theory from what happened and write it to `learning-journal.md`, including key code produced during the session with the reasoning attached.
 
-1. Read the relevant section of models.md or planning.md for the component being built
-2. Check any ADRs that cover decisions related to it
-3. Build it piece by piece — never dump a full file at once
-4. Narrate every term and decision inline as it appears, tied back to the project docs
-5. Do a plain-English cold run after any non-obvious logic (migrations, queries, MVC pipeline)
-6. At the end of the session, produce a structured summary for learning-journal.md:
-   - What was built
-   - Every concept explained, with a one-line definition
-   - Key code produced, with the reasoning attached
-   - Any decisions flagged for an ADR or doc update
-   - What to cover next
+## Steps
 
-Leave nothing unnamed. Every keyword, type, and pattern gets a plain-English explanation the moment it appears, no matter how basic it seems.
-Do not build anything outside Phase 1 scope unless explicitly asked.
+1. **Read back through the session silently.** Identify: what was built or changed, every concept/term/pattern that appeared, every decision and why it was made, key code produced, every command run in the terminal, anything flagged for an ADR or doc update, and what should come next.
+
+2. **Append a dated entry to `learning-journal.md`** using the template below. If the file doesn't exist, create it with `# Learning Journal` as the first line.
+
+```markdown
+## [Date] — [Component or feature name]
+
+### What was built
+
+[One paragraph describing what the session produced, in plain English.]
+
+### Concepts covered
+
+**[Term]** — [One plain-English sentence defining what this is and why it matters here. Define every term that appeared — nothing is too basic to include.]
+
+### Key code produced
+
+[Snippet from the session, with an explanation of why it was written this way attached.]
+
+### Commands run
+
+- `[command]` — [What this command does. For every flag used, explain what it means and why it was included.]
+
+### Decisions made
+
+- **[Decision]**: [What was decided and why. Reference the relevant doc or ADR if one exists.]
+
+### Logic explained
+
+[Only include if a non-obvious process was walked through — e.g. a migration, a query pipeline, an MVC lifecycle. Write it as a numbered plain-English sequence.]
+
+### Open items
+
+- [Anything flagged for an ADR, doc update, or future session]
+
+### What to cover next
+
+[One or two sentences on the natural next step based on this session.]
+```
+
+3. **Reply with only:** `✅ Learning journal updated — [component name], [date]. [N] concepts documented.`
+
+## Rules
+
+- Never build or run code — only document what was already produced in the session
+- Always append — never overwrite existing entries

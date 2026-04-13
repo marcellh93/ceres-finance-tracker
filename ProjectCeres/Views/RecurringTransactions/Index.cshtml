@@ -1,0 +1,52 @@
+@model IEnumerable<RecurringTransaction>
+@{ ViewData["Title"] = "Recurring Reminders"; }
+
+<div class="page-header">
+    <h1>Recurring Reminders</h1>
+    <a asp-action="Create" class="btn btn-primary">+ New Reminder</a>
+</div>
+
+@{
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    var due   = Model.Where(r => r.IsActive && r.NextDueDate <= today).OrderBy(r => r.NextDueDate).ToList();
+    var upcoming = Model.Where(r => r.IsActive && r.NextDueDate > today).OrderBy(r => r.NextDueDate).ToList();
+    var inactive = Model.Where(r => !r.IsActive).OrderBy(r => r.Name).ToList();
+}
+
+@if (due.Any())
+{
+    <h2>Due Now</h2>
+    @await Html.PartialAsync("_ReminderTable", due)
+}
+
+@if (upcoming.Any())
+{
+    <h2>Upcoming</h2>
+    @await Html.PartialAsync("_ReminderTable", upcoming)
+}
+
+@if (inactive.Any())
+{
+    <h2>Inactive</h2>
+    <table class="data-table">
+        <thead>
+            <tr><th>Name</th><th>Account</th><th>Category</th><th>Frequency</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var r in inactive)
+            {
+                <tr class="row-inactive">
+                    <td>@r.Name</td>
+                    <td>@r.Account.Name</td>
+                    <td>@r.Category.Name</td>
+                    <td>@r.Frequency</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No recurring reminders set up yet.</p>
+}

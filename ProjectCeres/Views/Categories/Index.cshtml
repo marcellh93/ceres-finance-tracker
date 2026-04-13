@@ -1,0 +1,49 @@
+@model IEnumerable<Category>
+@{ ViewData["Title"] = "Categories"; }
+
+<div class="page-header">
+    <h1>Categories</h1>
+    <a asp-action="Create" class="btn btn-primary">+ New Category</a>
+</div>
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No categories found.</p>
+}
+else
+{
+    @foreach (var group in Model.GroupBy(c => c.CategoryType.Name).OrderBy(g => g.Key))
+    {
+        <h2>@group.Key</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Lifestyle Tag</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var category in group.OrderBy(c => c.Name))
+                {
+                    <tr class="@(category.IsActive ? "" : "row-inactive")">
+                        <td>
+                            @category.Name
+                            @if (category.IsSystem) { <span class="badge">system</span> }
+                        </td>
+                        <td>@(category.LifestyleTag ?? "—")</td>
+                        <td>@(category.IsActive ? "Active" : "Inactive")</td>
+                        <td class="actions">
+                            @if (!category.IsSystem && category.IsActive)
+                            {
+                                <a asp-action="Edit" asp-route-id="@category.Id">Edit</a>
+                                <a asp-action="Deactivate" asp-route-id="@category.Id">Deactivate</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}

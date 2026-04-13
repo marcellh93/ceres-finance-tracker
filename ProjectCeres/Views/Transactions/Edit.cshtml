@@ -1,0 +1,97 @@
+@model TransactionEditViewModel
+@{ ViewData["Title"] = "Edit Transaction"; }
+
+<h1>Edit Transaction</h1>
+
+<form asp-action="Edit" method="post">
+    <input asp-for="Id" type="hidden" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
+
+    <div class="form-group">
+        <label asp-for="Date"></label>
+        <input asp-for="Date" type="date" class="form-control" />
+        <span asp-validation-for="Date" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="AccountId"></label>
+        <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control"></select>
+        <span asp-validation-for="AccountId" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="CategoryId"></label>
+        <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control"></select>
+        <span asp-validation-for="CategoryId" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Amount"></label>
+        <input type="text" id="Amount" name="Amount"
+               value="@NumberFormatHelper.FormatInputValue(Model.Amount, ViewData["NumberFormat"] as string)"
+               class="form-control" />
+        <span asp-validation-for="Amount" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Description"></label>
+        <input asp-for="Description" class="form-control" />
+        <span asp-validation-for="Description" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="BudgetId"></label>
+        <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
+            <option value="">— None —</option>
+        </select>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+@if (ViewBag.Attachments is IEnumerable<ProjectCeres.Models.TransactionAttachment> attachments)
+{
+    <section class="attachments">
+        <h2>Attachments</h2>
+
+        @if (attachments.Any())
+        {
+            <ul>
+                @foreach (var a in attachments)
+                {
+                    <li>
+                        <a asp-controller="Attachments" asp-action="Download" asp-route-id="@a.Id">
+                            @a.FileName
+                        </a>
+                        <small>(@((a.FileSizeBytes / 1024.0).ToString("N0")) KB)</small>
+                        <form asp-controller="Attachments" asp-action="Delete"
+                              asp-route-id="@a.Id" asp-route-transactionId="@Model.Id"
+                              method="post" class="inline-form">
+                            <button type="submit" class="btn-link btn-danger"
+                                onclick="return confirm('Delete this attachment?')">Remove</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No attachments.</p>
+        }
+
+        <form asp-controller="Attachments" asp-action="Upload"
+              asp-route-transactionId="@Model.Id"
+              method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
+            <button type="submit" class="btn btn-secondary">Upload</button>
+            <small>Max 10 MB. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
+        </form>
+    </section>
+}
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

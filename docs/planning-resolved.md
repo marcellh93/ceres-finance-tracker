@@ -1,0 +1,20 @@
+# Project Ceres — Resolved Decisions Archive
+
+Decisions that were open questions and have since been resolved. Moved here from `planning.md`
+to keep the active file lean. Decisions that produced ADRs are cross-referenced.
+
+---
+
+- [x] **Authentication?** — Not needed for Phase 1/2 (local). Required in Phase 3 before hosting.
+- [x] **Should accounts be linked to a currency?** — Yes. Each account has one currency. Supported at launch: EUR, USD, GBP, COP, ARS, VED. Reports filter by currency — no conversion. See models.md.
+- [x] **How to handle transfers between accounts?** — Dedicated Transfer entity linking source and destination directly. No category. Excluded from all income/expense reports. Cross-currency transfers not supported. Has its own Transfer History report. See models.md.
+- [x] **Number formatting and localization** — User-configurable preferences in a Settings table. Options: number format (US vs European), date format (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD), date separator. Phase 1: single-row app-wide settings. Phase 3: migrates to per-user preferences. See models.md.
+- [x] **Starter categories** — App seeds a default set on first run (6 income, 17 expense categories). Users can add, rename, or delete any of them. Full list in planning.md Phase 1 features section.
+- [x] **File attachment storage for Phase 1/2** — Local filesystem using `uploads/{transactionId}/{guid}{extension}`. Files served via controller action, not wwwroot. See models.md for StoredPath convention.
+- [x] **Pagination strategy for Transaction History** — See ADR-0027. Phase 1: default view shows the most recent 50 transactions; advanced search / date range filter returns all records in the range with no cap. Phase 3: switch to offset-based pagination (`?page=1&pageSize=50`). Cursor-based deferred unless Phase 3 scale warrants it.
+- [x] **Default currency when creating a new account** — Stored as `DefaultCurrencyId` in Settings (FK → Currency). Seeds to EUR on first run. Editable via Settings page. Account creation form pre-selects this currency but allows per-account override. See ADR-0015.
+- [x] **Intra-day transaction ordering** — `CreatedAt datetime NOT NULL` added to both Transaction and Transfer. Set by the application on insert, never editable. Used as a tiebreaker when ordering records sharing the same Date. Default sort: `ORDER BY Date DESC, CreatedAt DESC`. See ADR-0013.
+- [x] **Budget/transaction currency mismatch** — Enforced at the application level. App validates `transaction.Account.CurrencyId == budget.CurrencyId` and rejects mismatches with a validation error. No database constraint (EF Core cannot express cross-table currency match without a trigger). Integration tests must cover this aggressively. See ADR-0016.
+- [x] **Category needs/wants tag for budgeting frameworks** — `LifestyleTag` varchar column added to Category (values: "Needs", "Wants", null = untagged). Seeded categories ship with suggested default tags. Users prompted at Expense category creation time. Untagged is a visible fourth bucket in the Financial Health report. See Financial Health Metrics in planning-phase2.md.
+- [x] **Database backup strategy (Phase 1)** — weekly `pg_dump` via macOS `launchd` every Sunday at 7am, output to iCloud Drive (`Database backup/project_ceres_YYYY-MM-DD.sql`). Syncs off-device automatically via iCloud. Before Phase 3 launch, a managed cloud backup solution must replace this local approach.
+- [x] **Opening balance cutover UX** — (1) Default starting date is today. User can change it, but the app shows an explanation of how moving the date affects their account balance and history before confirming. (2) Transactions dated before the opening balance date are blocked — not just warned. The app tells the user what they need to do to allow it (move the opening balance date first).

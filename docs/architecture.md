@@ -163,32 +163,66 @@ The service layer is where business rules live — validation, cross-entity cons
 ## What Lives Where
 
 ```
-FinanceTracker/
+ProjectCeres/
   Controllers/         ← one per feature area (AccountsController, TransactionsController, etc.)
   Services/
-    Interfaces/        ← IAccountService, ITransactionService, etc.
-    AccountService.cs
-    TransactionService.cs
-    CategoryService.cs
-    TransferService.cs
-    BudgetService.cs
-    RecurringTransactionService.cs
-    ReportService.cs   ← orchestrates report generators
-    Reports/
-      IReportGenerator.cs
-      NetWorthReportGenerator.cs
-      IncomeExpenseReportGenerator.cs
-      ExpenseBreakdownReportGenerator.cs
-      TransactionHistoryReportGenerator.cs
+    ← interfaces and implementations colocated (IAccountService.cs + AccountService.cs, etc.)
+    ISettingsService.cs / SettingsService.cs         ← single Settings row; EnsureExistsAsync called at startup
+    IAccountService.cs / AccountService.cs           ← CRUD, derived balance, Opening Balance auto-creation
+    ICategoryService.cs / CategoryService.cs         ← CRUD, deactivate, IsSystem guard
+    ITransactionService.cs / TransactionService.cs   ← CRUD (hard delete), paginated history
+    ITransferService.cs / TransferService.cs         ← CRUD (hard delete), same-currency enforcement
+    IBudgetService.cs / BudgetService.cs             ← CRUD, deactivate, derived actual spend
+    IRecurringTransactionService.cs / RecurringTransactionService.cs  ← Confirm + Dismiss (advances NextDueDate)
+    IReportService.cs / ReportService.cs             ← net worth, income/expense summary, breakdown, history
+    IDashboardService.cs / DashboardService.cs       ← MTD totals, savings rate, pending reminders count
+    IFileAttachmentService.cs / FileAttachmentService.cs  ← magic-byte upload, safe path, serve, delete
   Models/              ← EF Core entity classes (Account.cs, Transaction.cs, etc.)
-  ViewModels/          ← data shapes passed to Razor Views (AccountViewModel.cs, etc.)
+  ViewModels/          ← one Create + one Edit ViewModel per write operation
+  Helpers/
+    NumberFormatHelper.cs  ← locale-aware decimal formatting: FormatAmount (display) + FormatInputValue (input pre-fill)
+  Filters/
+    NumberFormatActionFilter.cs  ← global IAsyncActionFilter; reads Settings.NumberFormat, injects ViewData["NumberFormat"] before every action
+  ModelBinders/
+    DecimalModelBinder.cs          ← parses decimal/decimal? form fields using the user's configured culture (comma or period)
+    DecimalModelBinderProvider.cs  ← registers DecimalModelBinder for all decimal and decimal? parameters
   Data/
-    FinanceTrackerDbContext.cs
+    AppDbContext.cs
     Migrations/
   Views/               ← Razor .cshtml files, one folder per controller
-  wwwroot/             ← static files (CSS, JS bundles)
+  Styles/
+    app.css            ← Tailwind CSS input file — @tailwind directives + @apply component classes
+  wwwroot/
+    css/site.css       ← generated CSS output (do not edit by hand — overwritten on every build)
   uploads/             ← file attachments (outside wwwroot — not publicly accessible)
-  Program.cs           ← app startup, DI registration, middleware pipeline
+  package.json         ← pnpm manifest — Tailwind CSS dev dependency
+  tailwind.config.js   ← Tailwind config — content paths point to all .cshtml files
+  Program.cs           ← app startup, DI registration, middleware pipeline, EnsureExistsAsync call
 ```
 
 See `docs/planning.md → Project Structure` for the full annotated directory listing.
+
+---
+
+## Frontend Build Pipeline (Phase 1)
+
+Tailwind CSS is the only frontend build step in Phase 1. It runs entirely at build time — no JavaScript is shipped to the browser.
+
+```
+Styles/app.css  (Tailwind input — @apply component definitions)
+       │
+       │  pnpm run build:css
+       │  (tailwindcss CLI scans all .cshtml files, generates only used utilities)
+       ↓
+wwwroot/css/site.css  (minified, generated output — served as a static file)
+```
+
+**How the build is triggered:**
+
+| Scenario | Command |
+|----------|---------|
+| Normal development | `dotnet run` / `dotnet build` — MSBuild `<Target BeforeTargets="Build">` runs `pnpm run build:css` automatically |
+| Active view editing | `pnpm --dir ProjectCeres run watch:css` in a second terminal — rebuilds CSS on every `.cshtml` change |
+| CI / production | `dotnet publish` triggers the pre-build target, CSS is included in the published output |
+
+**Phase 2 transition:** When React is introduced, the Tailwind CLI will be replaced by Vite (which includes Tailwind as a PostCSS plugin). The `@apply`-based component classes in `app.css` will be replaced by shadcn/ui React components using inline Tailwind utilities.

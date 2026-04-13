@@ -1,0 +1,57 @@
+@model IReadOnlyList<Transaction>
+@{ ViewData["Title"] = "Transaction History"; }
+
+<h1>Transaction History</h1>
+
+<form asp-action="TransactionHistory" method="get" class="filter-bar">
+    <select name="currencyId" asp-items="ViewBag.Currencies" class="form-control"></select>
+    <input type="date" name="from" value="@ViewBag.From" class="form-control" />
+    <input type="date" name="to"   value="@ViewBag.To"   class="form-control" />
+    <select name="accountId" class="form-control">
+        <option value="">All Accounts</option>
+        @foreach (var item in (SelectList)ViewBag.Accounts)
+        {
+            <option value="@item.Value" selected="@(item.Value == ViewBag.AccountId?.ToString())">@item.Text</option>
+        }
+    </select>
+    <select name="categoryId" class="form-control">
+        <option value="">All Categories</option>
+        @foreach (var item in (SelectList)ViewBag.Categories)
+        {
+            <option value="@item.Value" selected="@(item.Value == ViewBag.CategoryId?.ToString())">@item.Text</option>
+        }
+    </select>
+    <button type="submit" class="btn btn-secondary">Apply</button>
+</form>
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No transactions found for the selected filters.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th><th>Account</th><th>Category</th><th>Description</th><th>Type</th><th>Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in Model)
+            {
+                <tr>
+                    <td>@t.Date.ToString("dd/MM/yyyy")</td>
+                    <td>@t.Account.Name</td>
+                    <td>@t.Category.Name</td>
+                    <td>@(t.Description ?? "—")</td>
+                    <td>@t.Category.CategoryType.Name</td>
+                    <td class="@(t.Category.CategoryType.Name == "Income" ? "amount-income" : "amount-expense")">
+                        @NumberFormatHelper.FormatAmount(t.Amount, ViewData["NumberFormat"] as string)
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<a asp-action="Index" class="btn btn-secondary">← Reports</a>

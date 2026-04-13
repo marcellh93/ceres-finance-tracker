@@ -1,0 +1,11 @@
+@model Account
+@{ ViewData["Title"] = "Deactivate Account"; }
+
+<h1>Deactivate "@Model.Name"?</h1>
+<p>The account will be marked inactive. Its transaction history will be preserved.</p>
+
+<form asp-action="Deactivate" method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+    <button type="submit" class="btn btn-danger">Yes, Deactivate</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

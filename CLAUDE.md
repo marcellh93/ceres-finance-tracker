@@ -1,4 +1,4 @@
-# Finance Tracker — Claude Code Guide
+# Project Ceres — Claude Code Guide
 
 ## Project Overview
 
@@ -13,19 +13,22 @@ Do not build Phase 2+ features until Phase 1 is complete and in daily use.
 
 ## Tech Stack
 
-- **Runtime:** .NET 9 on macOS
+- **Runtime:** .NET 10 on macOS
 - **Framework:** ASP.NET Core MVC — server-side rendering via Razor (`.cshtml`). No separate API.
 - **ORM:** Entity Framework Core with PostgreSQL provider (Npgsql)
 - **Database:** PostgreSQL — install locally via Homebrew (`brew install postgresql@16`) or Postgres.app. No Docker required for local development.
+- **CSS:** Tailwind CSS v3 — utility-first CSS, built via pnpm + Tailwind CLI. Input: `ProjectCeres/Styles/app.css`. Output: `ProjectCeres/wwwroot/css/site.css`. Build is triggered automatically by `dotnet build` via an MSBuild pre-build target.
+- **Package manager (frontend):** pnpm
 - **Tests:** xUnit + Moq + FluentAssertions
 
 ## Key Commands
 
 ```bash
-dotnet run --project FinanceTracker          # start the app
+dotnet run --project ProjectCeres          # start the app (also builds CSS)
 dotnet ef migrations add <Name>              # create a migration
 dotnet ef database update                    # apply migrations
 dotnet test                                  # run all tests
+pnpm --dir ProjectCeres run watch:css        # watch and rebuild CSS on view changes
 ```
 
 ## Architecture Rules (Non-Obvious)
@@ -62,6 +65,7 @@ dotnet test                                  # run all tests
 
 - Do not add authentication — Phase 3 only
 - Do not add JavaScript or charting libraries — Phase 2 only
+- Do not add shadcn/ui — Phase 2 only (requires React, which is a Phase 2 introduction)
 - Do not implement currency conversion — explicitly out of scope
 - Do not support cross-currency transfers — out of scope
 - Do not store derived values (net worth, account balance, budget actual spend) as columns
@@ -71,7 +75,7 @@ dotnet test                                  # run all tests
 
 ## Docs
 
-- `docs/planning.md` — feature phases, scope decisions, project structure
+- `docs/planning.md` — Phase 1 features, working assumptions, open questions. Phase 2+: see `planning-phase2.md`, `planning-phase3.md`, `planning-future.md`
 - `docs/models.md` — all entities, relationships, normalization, deletion rules
 - `docs/architecture.md` — layer model, request flow, how the architecture evolves across phases
 - `docs/security-model.md` — threat model, data protection rules, access control rules (unified view)
@@ -79,4 +83,4 @@ dotnet test                                  # run all tests
 - `docs/multi-tenancy-strategy.md` — Phase 3 migration plan for scoping all data to users
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
-- `doc-agent-instructions.md` — documentation working instructions (routing rules, ADR numbering, health checks)
+- When an open question in `docs/planning.md` is resolved, remove it from Open Questions and append it to `docs/planning-resolved.md`
