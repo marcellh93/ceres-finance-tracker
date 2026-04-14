@@ -1,5 +1,21 @@
 # Project Ceres — Phase 2 Planning (Local Extended)
 
+> **Diataxis type:** Reference — defines Phase 2 scope, planned features, and open decisions for the local extended phase.
+
+## Index
+
+1. [Financial Reports](#financial-reports)
+2. [Planned Features (Phase 2)](#planned-features-phase-2)
+   - [CSV Import flow](#csv-import-flow)
+   - [Budgeting](#budgeting-phase-2)
+     - [CategoryBudget applicability](#categorybudget-applicability)
+   - [Visual Dashboard](#visual-dashboard-phase-2)
+   - [Financial Health Metrics](#financial-health-metrics-phase-2)
+   - [Opening Balance Cutover UX](#opening-balance-cutover-ux-phase-2)
+3. [Open Questions (Phase 2)](#open-questions-phase-2)
+
+---
+
 **Gate: Phase 1 must be fully complete and in daily use before this phase begins.**
 
 Phase 2 adds depth — features that make the app significantly more powerful but that require
@@ -44,6 +60,29 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 - **UI component library — shadcn/ui:** Migrate views from Tailwind `@apply`-based classes to shadcn/ui React components. Requires the Phase 2 React introduction. Inline Tailwind utilities replace `@apply` patterns.
 - **JavaScript / charting libraries:** Interactive dashboard charts — requires React. **Chart.js** is the leading candidate (decision deferred until Phase 2 begins).
 - CSV and OFX file import — note: bank exports represent debits as negative numbers; the import logic must flip signs and infer income/expense direction from the mapped category.
+
+**CSV Import flow**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Controller
+    participant ImportService
+    participant TransactionService
+    participant DbContext
+
+    User->>Controller: Upload CSV file
+    Controller->>ImportService: ParseAsync(file)
+    ImportService->>ImportService: Map columns to fields
+    ImportService->>ImportService: Flip sign on negative debits → positive amount
+    ImportService->>ImportService: Infer income/expense from mapped category
+    loop Each valid row
+        ImportService->>TransactionService: CreateAsync(rowViewModel)
+        TransactionService->>DbContext: Insert Transaction
+    end
+    ImportService-->>Controller: ImportResult (rows saved, rows failed + reasons)
+    Controller->>User: Summary (n imported, n errors with row detail)
+```
 - **CSV export** — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix any such cell value with a single quote (`'`) to neutralize CSV injection.
 - File attachments on transactions (receipts, invoices)
 - Saved report configurations
@@ -58,6 +97,17 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 - Set a monthly limit per expense category (e.g. Groceries ≤ €300/month)
 - Dashboard shows progress bar: spent vs. limit for the current month
 - Report shows actual vs. limit across months
+
+**CategoryBudget applicability**
+
+```mermaid
+flowchart TD
+    A([Create CategoryBudget]) --> B{CategoryType = Expense?}
+    B -- No --> Z1[Reject: budgets only apply to Expense categories]
+    B -- Yes --> C{Active budget already exists\nfor this Category + Currency?}
+    C -- Yes --> Z2[Reject: duplicate active budget not allowed]
+    C -- No --> D[Write CategoryBudget row]
+```
 
 **Goal Budgets — purpose-driven financial targets**
 

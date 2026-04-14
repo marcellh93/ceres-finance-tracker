@@ -1,9 +1,22 @@
 # Project Ceres — Planning
 
+> **Diataxis type:** Reference — defines Phase 1 scope, working assumptions, business rules, and open decisions.
+
 ## Index
 
 1. [Goal](#goal)
 2. [Planned Features — Phase 1 (Local MVP)](#planned-features-phase-1--local-mvp)
+   - [Accounts](#accounts)
+     - [Create Account with Opening Balance — flow](#create-account-with-opening-balance--flow)
+   - [Transactions](#transactions)
+     - [Transaction classification logic](#transaction-classification-logic)
+     - [Transfer validation](#transfer-validation)
+   - [Recurring Transaction Reminders](#recurring-transaction-reminders)
+     - [Confirm Reminder — flow](#confirm-reminder--flow)
+     - [Dismiss Reminder — flow](#dismiss-reminder--flow)
+   - [Categories](#categories)
+     - [Account deletion rule](#account-deletion-rule)
+     - [Category deletion rule](#category-deletion-rule)
 3. [Testing Strategy](#testing-strategy)
 4. [Open Questions / Decisions](#open-questions--decisions)
 5. [Next Steps](#next-steps)
@@ -77,6 +90,33 @@ work, the cost of fixing it here is low. That cost grows significantly once Phas
 - Seeded with a small set of generic placeholder accounts on first run — users are expected to rename them to their actual account names or delete them if not applicable
 - **Opening balance prompt** — the account creation form includes a starting balance field (defaults to zero). On save, the app automatically creates an opening balance transaction for the entered amount, tagged to the system "Opening Balance" category. The user never has to construct this manually. The transaction is visible in history and editable if the amount was entered incorrectly.
 
+**Create Account with Opening Balance — flow**
+
+```mermaid
+sequenceDiagram
+    participant Controller
+    participant AccountService
+    participant DbContext
+    participant DB as PostgreSQL
+
+    Controller->>AccountService: CreateAsync(viewModel)
+    AccountService->>DbContext: Begin transaction
+    AccountService->>DbContext: Add Account row
+    alt openingBalance > 0
+        AccountService->>DbContext: Add Transaction row (IsSystem category, amount = openingBalance)
+    end
+    AccountService->>DbContext: SaveChangesAsync
+    DbContext->>DB: INSERT Account [+ Transaction] atomically
+    alt Save fails
+        DbContext-->>AccountService: Exception
+        AccountService->>DbContext: Rollback
+        AccountService-->>Controller: Throw domain exception
+    else Save succeeds
+        AccountService->>DbContext: Commit
+        AccountService-->>Controller: New Account Id
+    end
+```
+
 **Starter Accounts**
 
 | Account          | Type      | Notes                                            |
@@ -92,6 +132,58 @@ work, the cost of fixing it here is low. That cost grows significantly once Phas
 - Balance updates automatically per account
 - **Liability payments** — a single-entry form on the Transactions page lets users record a payment from an asset account toward a liability account in one step. The form has a type toggle ("Transaction" / "Liability Payment") that conditionally shows/hides the relevant fields. Liability payments appear inline in the Transactions Index list alongside regular transactions. They are excluded from income/expense report totals. See ADR-0031.
 
+**Transaction classification logic**
+
+```mermaid
+flowchart TD
+    A([Transaction amount]) --> B{Category.IsSystem?}
+    B -- Yes --> C[Add to balance unconditionally\nOpening balance — neutral starting point]
+    B -- No --> D{AccountType?}
+    D -- Asset --> E{CategoryType?}
+    E -- Income --> F[+ Add to balance]
+    E -- Expense --> G[− Subtract from balance]
+    D -- Liability --> H{CategoryType?}
+    H -- Expense --> I[+ Add to balance\nDebt grows]
+    H -- Income --> J[− Subtract from balance\nRefund reduces debt]
+```
+
+**Transfer validation**
+
+```mermaid
+flowchart TD
+    A([Create Transfer]) --> B{Source ≠ Destination?}
+    B -- No --> Z1[Reject: self-transfer not allowed]
+    B -- Yes --> C{Same currency?}
+    C -- No --> Z2[Reject: cross-currency transfers not supported]
+    C -- Yes --> D{Amount > 0?}
+    D -- No --> Z3[Reject: amount must be positive]
+    D -- Yes --> E[Write Transfer row]
+```
+
+**Account deletion rule**
+
+```mermaid
+flowchart TD
+    A([Delete Account requested]) --> B{Has linked transactions\nor transfers?}
+    B -- Yes --> C[Deactivate: IsActive = false\nHide from pickers, keep in net worth]
+    B -- No --> C
+    C --> D[Never hard delete]
+```
+
+**Category deletion rule**
+
+```mermaid
+flowchart TD
+    A([Edit or Delete Category requested]) --> B{IsSystem = true?}
+    B -- Yes --> Z1[Reject: system categories cannot be edited or deleted]
+    B -- No --> C{Delete or Deactivate?}
+    C -- Delete --> D{Has linked transactions?}
+    D -- Yes --> E[Deactivate: IsActive = false]
+    D -- No --> E
+    C -- Deactivate --> E
+    E --> F[Hidden from pickers\nExisting transactions unaffected]
+```
+
 ### Recurring Transaction Reminders
 
 Recurring transactions are managed as a template (RecurringTransaction entity) that drives reminders — not auto-creation. The user confirms each reminder to generate a real Transaction record.
@@ -102,6 +194,45 @@ Recurring transactions are managed as a template (RecurringTransaction entity) t
 - Confirming a reminder opens the New Transaction form pre-filled from the template; the user reviews and saves it as a real transaction
 - Dismissing a reminder advances `NextDueDate` without creating a transaction (e.g. user paid in cash, or the bill didn't arrive)
 - Estimated amount is a hint, not enforced — the user edits the pre-filled amount before saving if the actual amount differs
+
+**Confirm Reminder — flow**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Controller
+    participant RecurringService
+    participant TransactionService
+    participant DbContext
+
+    User->>Controller: Open due reminder
+    Controller->>RecurringService: GetTemplateAsync(id)
+    RecurringService-->>Controller: Pre-filled form data
+    Controller->>User: Transaction form (pre-filled, editable)
+    User->>Controller: Submit confirmed transaction
+    Controller->>TransactionService: CreateAsync(viewModel)
+    TransactionService->>DbContext: Insert Transaction row
+    Controller->>RecurringService: AdvanceDueDateAsync(id)
+    RecurringService->>DbContext: Update NextDueDate → next period
+    DbContext-->>Controller: Saved
+    Controller->>User: Redirect to Transactions list
+```
+
+**Dismiss Reminder — flow**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Controller
+    participant RecurringService
+    participant DbContext
+
+    User->>Controller: Dismiss reminder (no transaction)
+    Controller->>RecurringService: DismissAsync(id)
+    RecurringService->>DbContext: Update NextDueDate → next period
+    DbContext-->>Controller: Saved
+    Controller->>User: Redirect (reminder removed from pending list)
+```
 
 ### Categories
 

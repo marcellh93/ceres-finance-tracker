@@ -16,21 +16,28 @@
 
 The application is structured in three layers. Each layer has a defined responsibility and may only talk to the layer directly below it.
 
-```
-┌─────────────────────────────┐
-│          UI Layer           │  Razor Views (.cshtml) — HTML rendered server-side
-│                             │  React components (Phase 2+) — embedded in Razor pages
-│                             │  React SPA (Phase 3+) — full client-side rendering
-├─────────────────────────────┤
-│    Application Logic Layer  │  Controllers — receive HTTP requests, call services
-│                             │  Services — all business logic (AccountService, etc.)
-│                             │  IReportGenerator — Strategy pattern for report types
-├─────────────────────────────┤
-│    Infrastructure Layer     │  EF Core DbContext — translates LINQ to SQL
-│                             │  PostgreSQL — the database
-│                             │  Local filesystem — file attachment storage (Phase 1/2)
-│                             │  Cloud storage — file attachment storage (Phase 3+, TBD)
-└─────────────────────────────┘
+```mermaid
+graph TD
+    subgraph UI["UI Layer"]
+        RV["Razor Views (.cshtml)\nHTML rendered server-side"]
+        RC["React components (Phase 2+)\nEmbedded in Razor pages"]
+        SPA["React SPA (Phase 3+)\nFull client-side rendering"]
+    end
+
+    subgraph App["Application Logic Layer"]
+        CTRL["Controllers\nReceive HTTP requests, call services"]
+        SVC["Services\nAll business logic (AccountService, etc.)"]
+    end
+
+    subgraph Infra["Infrastructure Layer"]
+        DB["EF Core DbContext\nTranslates LINQ to SQL"]
+        PG["PostgreSQL"]
+        FS["Local filesystem\nFile attachments (Phase 1/2)"]
+        CS["Cloud storage\nFile attachments (Phase 3+, TBD)"]
+    end
+
+    UI --> App
+    App --> Infra
 ```
 
 Controllers do not call the database directly. Services do not render HTML. The UI layer does not contain business logic. These constraints are enforced by convention, not by the framework — they must be maintained as the codebase grows.
@@ -41,57 +48,45 @@ Controllers do not call the database directly. Services do not render HTML. The 
 
 ### Phase 1 — Server-Side MVC (current)
 
-```
-Browser
-  │  HTTP request (GET /Transactions, POST /Transactions/Create, etc.)
-  ↓
-Controller
-  │  Validates form input via ViewModel / [ModelState]
-  │  Calls the appropriate service method
-  ↓
-Service (e.g. TransactionService)
-  │  Contains all business logic
-  │  Reads/writes data via DbContext
-  ↓
-DbContext (EF Core)
-  │  Translates LINQ queries to SQL
-  ↓
-PostgreSQL
-  ↑  Returns result rows
-DbContext
-  ↑  Returns C# entity objects or DTOs
-Service
-  ↑  Returns a ViewModel or domain object to the controller
-Controller
-  │  Passes ViewModel to the Razor View
-  ↓
-Razor View (.cshtml)
-  │  Renders HTML server-side
-  ↓
-Browser
-  ←  Full HTML page response
-```
-
 Every page load is a full round-trip. Forms submit via POST. There is no JavaScript-driven partial update in Phase 1.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Controller
+    participant Service
+    participant DbContext
+    participant PostgreSQL
+
+    Browser->>Controller: HTTP request (GET / POST)
+    Controller->>Controller: Validate ModelState
+    Controller->>Service: Call service method
+    Service->>DbContext: LINQ query / SaveChangesAsync
+    DbContext->>PostgreSQL: SQL
+    PostgreSQL-->>DbContext: Result rows
+    DbContext-->>Service: Entity objects / DTOs
+    Service-->>Controller: ViewModel
+    Controller->>Browser: Razor View → Full HTML page
+```
 
 ### Phase 2 — Hybrid (React components embedded in Razor)
 
-Razor still drives page rendering. Selected pages (e.g. the dashboard) embed interactive React components for charts and live data panels. The React components fetch data from dedicated controller actions that return JSON, not HTML.
+Razor still drives page rendering. The delta from Phase 1: selected pages (e.g. the dashboard) embed interactive React components that fetch JSON from dedicated controller actions — a second async request path layered on top of the initial page load.
 
-```
-Browser
-  ↓  Initial page load — same as Phase 1
-Razor View
-  ←  Full HTML page, includes a <div id="root"> mount point
-  ↓  React component boots inside the page
-React component
-  │  Fetches data via fetch() / axios to a JSON action
-  ↓
-Controller action (returns JSON)
-  ↓  Same service + DbContext path as above
-  ←  JSON response
-React component
-  ←  Renders interactively in the browser
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant RazorView as Razor View
+    participant ReactComponent as React Component
+    participant JSONAction as Controller (JSON action)
+
+    Note over Browser,JSONAction: Initial page load — same as Phase 1
+    RazorView->>Browser: Full HTML + React mount point (<div id="root">)
+
+    Note over Browser,JSONAction: React async data fetch (new in Phase 2)
+    ReactComponent->>JSONAction: fetch() / axios → GET /api/dashboard
+    JSONAction-->>ReactComponent: JSON response
+    ReactComponent->>Browser: Interactive render (no page reload)
 ```
 
 MVC routing still owns the page. React owns only the component. No separate frontend server or build pipeline beyond a Vite bundle is needed.
@@ -100,21 +95,24 @@ MVC routing still owns the page. React owns only the component. No separate fron
 
 The app is hosted, behind authentication, with no SEO concern for authenticated pages. The SPA model becomes viable and appropriate.
 
-```
-Browser (React SPA)
-  │  All routing handled client-side by React Router
-  │  Auth token stored in memory or HttpOnly cookie
-  ↓
-ASP.NET Core Web API (decoupled from MVC)
-  │  Pure JSON API — no Razor Views
-  │  All endpoints require authentication
-  ↓
-Service layer (unchanged from Phase 1/2)
-  ↓
-DbContext → PostgreSQL
-```
+The delta from Phase 2: Razor Views are removed entirely. The backend becomes a pure JSON Web API. All routing moves to the client. Auth tokens replace session cookies.
 
-The backend transitions from an MVC application (Controllers that return Views) to a Web API (Controllers that return JSON only). The frontend is a standalone React application, served separately or as static files.
+```mermaid
+sequenceDiagram
+    participant SPA as React SPA (Browser)
+    participant WebAPI as ASP.NET Core Web API
+    participant Service
+    participant DbContext
+
+    Note over SPA,DbContext: All routing is client-side (React Router). No Razor Views.
+    SPA->>WebAPI: HTTP request + auth token (HttpOnly cookie)
+    WebAPI->>WebAPI: Authenticate + scope to UserId
+    WebAPI->>Service: Call service method
+    Service->>DbContext: LINQ query / SaveChangesAsync
+    DbContext-->>Service: Entity objects / DTOs
+    Service-->>WebAPI: Result
+    WebAPI-->>SPA: JSON response
+```
 
 **Public-facing pages** (landing page, marketing, pricing) are outside the SPA — they require server-side rendering for SEO and must be handled separately (Next.js or a static site).
 

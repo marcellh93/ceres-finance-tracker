@@ -1,12 +1,15 @@
 # Data Models
 
+> **Diataxis type:** Reference — defines every entity, its columns, relationships, and deletion rules.
+
 ## Index
 
 1. [Database Normalization — Plain English](#database-normalization--plain-english)
    - [First Normal Form (1NF)](#first-normal-form-1nf--one-fact-per-cell)
    - [Second Normal Form (2NF)](#second-normal-form-2nf--every-column-depends-on-the-whole-key)
    - [Third Normal Form (3NF)](#third-normal-form-3nf--every-column-depends-on-nothing-but-the-key)
-2. [Entity Definitions](#entity-definitions)
+2. [Domain Model](#domain-model)
+3. [Entity Definitions](#entity-definitions)
    - [Primary Key Strategy](#primary-key-strategy)
    - [Currency](#currency)
    - [AccountType](#accounttype)
@@ -22,13 +25,13 @@
    - [ReportType](#reporttype)
    - [SavedReport](#savedreport)
    - [Settings](#settings)
-3. [Relationships](#relationships)
-4. [Derived Values](#derived-values)
-5. [Multi-Currency Reporting](#multi-currency-reporting)
-6. [Deletion Rules](#deletion-rules)
-7. [Database Indexes](#database-indexes)
-8. [Phase 2 — Entities To Be Defined](#phase-2--entities-to-be-defined)
-9. [Phase 3 — Entities To Be Defined](#phase-3--entities-to-be-defined)
+4. [Relationships](#relationships)
+5. [Derived Values](#derived-values)
+6. [Multi-Currency Reporting](#multi-currency-reporting)
+7. [Deletion Rules](#deletion-rules)
+8. [Database Indexes](#database-indexes)
+9. [Phase 2 — Entities To Be Defined](#phase-2--entities-to-be-defined)
+10. [Phase 3 — Entities To Be Defined](#phase-3--entities-to-be-defined)
 
 ---
 
@@ -95,6 +98,100 @@ If the category name changes, you'd have to update every transaction row — tha
 **Fixed:**
 `CategoryName` and `CategoryType` belong in a Categories table.
 The Transactions table only stores `CategoryId` as a foreign key and looks the rest up from there.
+
+---
+
+## Domain Model
+
+Conceptual overview — relationships and responsibilities only. For column-level detail see the entity definitions below.
+
+```mermaid
+classDiagram
+    direction TB
+
+    class Currency["Currency\n(lookup)"]
+    class AccountType["AccountType\n(lookup)"]
+    class CategoryType["CategoryType\n(lookup)"]
+    class ReportType["ReportType\n(lookup)"]
+
+    class Account {
+        Asset or Liability
+        IsActive
+    }
+    class Category {
+        Income or Expense
+        IsSystem
+        IsActive
+        LifestyleTag
+    }
+    class Transaction {
+        Amount always positive
+        Direction via Category type
+    }
+    class Transfer {
+        No category
+        Same currency enforced
+    }
+    class LiabilityPayment {
+        Asset → Liability
+        No category
+    }
+    class TransactionAttachment {
+        File on disk
+        Path in DB
+    }
+    class RecurringTransaction {
+        Template only
+        No auto-creation
+    }
+    class CategoryBudget {
+        Expense only
+        Monthly cap
+    }
+    class Budget {
+        Goal-based
+        Actual spend derived
+    }
+    class SavedReport {
+        Stores parameters
+        Soft delete
+    }
+    class Settings {
+        Single row (Phase 1)
+        Per-user (Phase 3)
+    }
+
+    AccountType "1" --> "many" Account : classifies
+    Currency "1" --> "many" Account : denominated in
+
+    Account "1" --> "many" Transaction : records movement on
+    Category "1" --> "many" Transaction : classifies
+    CategoryType "1" --> "many" Category : types
+    Budget "1" --> "many" Transaction : optionally tagged to
+
+    Account "1" --> "many" Transfer : source
+    Account "1" --> "many" Transfer : destination
+
+    Account "1" --> "many" LiabilityPayment : asset side
+    Account "1" --> "many" LiabilityPayment : liability side
+
+    Transaction "1" --> "many" TransactionAttachment : has files
+
+    Account "1" --> "many" RecurringTransaction : default account
+    Category "1" --> "many" RecurringTransaction : default category
+
+    Category "1" --> "many" CategoryBudget : caps spending for
+    Currency "1" --> "many" CategoryBudget : scoped to
+
+    Currency "1" --> "many" Budget : denominated in
+
+    ReportType "1" --> "many" SavedReport : typed as
+    Currency "1" --> "o" SavedReport : optional filter
+    Account "1" --> "o" SavedReport : optional filter
+    Category "1" --> "o" SavedReport : optional filter
+
+    Currency "1" --> "1" Settings : default currency
+```
 
 ---
 

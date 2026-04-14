@@ -1,5 +1,17 @@
 # Project Ceres — Phase 3 Planning (Hosted Beta)
 
+> **Diataxis type:** Reference — defines Phase 3 scope, security requirements, and open decisions for the hosted beta.
+
+## Index
+
+1. [Planned Features (Phase 3)](#planned-features-phase-3)
+   - [Login with TOTP — happy path](#login-with-totp--happy-path)
+   - [Session token lifecycle](#session-token-lifecycle)
+   - [IDOR enforcement](#idor-enforcement)
+2. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
+
+---
+
 **Gate: Phase 2 must be fully complete before starting.**
 
 The app moves from local to a hosted server. Goal: make the app accessible to a small group
@@ -11,6 +23,29 @@ changes needed for any multi-user product.
 ## Planned Features (Phase 3)
 
 - **Authentication** — user registration and login with username + password (hashed with Argon2, never stored in plain text)
+
+**Login with TOTP — happy path**
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Controller
+    participant AuthService
+    participant SessionStore as UserSession (DB)
+
+    User->>Controller: POST /login (email + password)
+    Controller->>AuthService: ValidateCredentialsAsync(email, password)
+    AuthService->>AuthService: Argon2id hash + compare
+    AuthService-->>Controller: Credentials valid
+    Controller->>User: Prompt for TOTP code
+    User->>Controller: POST /login/totp (6-digit code)
+    Controller->>AuthService: ValidateTotpAsync(userId, code)
+    AuthService->>AuthService: Verify code window + replay check
+    AuthService-->>Controller: TOTP valid
+    Controller->>SessionStore: Create UserSession row (hash token, store IP)
+    SessionStore-->>Controller: Session created
+    Controller->>User: Set HttpOnly cookie → redirect to dashboard
+```
 - **Password policy** — minimum 8 characters, no maximum below 64 (NIST SP 800-63B). Do not enforce mandatory complexity rules — check against a breached password list (Have I Been Pwned API or local top-N list) instead. Hashing: Argon2id with pinned parameters: m=19456 (19 MB memory), t=2 iterations, p=1 parallelism (OWASP minimum baseline). Do not rely on library defaults.
 - **Account enumeration prevention** — login and password-reset endpoints must return identical error messages and take identical wall-clock time regardless of whether the email exists. Always run the Argon2id hash even when the user is not found — hash against a dummy value and discard the result.
 - **MFA** — mandatory for all users via authenticator app (TOTP). No SMS — vulnerable to SIM-swap attacks.
@@ -21,6 +56,29 @@ changes needed for any multi-user product.
   - **User-configurable:** session lifetime (short vs. persistent "remember me"). Persistent sessions: long-lived token in `HttpOnly` secure cookie, store only a hash in the database, rotate token on each use.
   - **IP enforcement (user-configurable):** per session, not per user. Each `UserSession` stores its creation IP. Multiple devices with different IPs are fully compatible.
   - **IP blocking:** users can block specific IPs from Security settings. Any request from a blocked IP is rejected and all active sessions from that IP revoked.
+
+**Session token lifecycle**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active: Login successful (token hashed in DB, HttpOnly cookie set)
+
+    Active --> Active: Subsequent request (token rotated, old hash replaced)
+
+    Active --> RevokedByLogout: User logs out
+    Active --> RevokedByUser: User revokes session from device list
+    Active --> RevokedByIP: Request arrives from blocked IP
+
+    state RevokedByLogout <<fork>>
+    state RevokedByUser <<fork>>
+    state RevokedByIP <<fork>>
+
+    RevokedByLogout --> Revoked
+    RevokedByUser --> Revoked
+    RevokedByIP --> Revoked
+
+    Revoked --> [*]: Session no longer accepted (cookie cleared)
+```
 - **Secure cookie configuration** — `HttpOnly = true`, `Secure = true`, `SameSite = Strict` or `Lax`. Configure via `CookieAuthenticationOptions` in `Program.cs`.
 - **Multi-tenancy** — all data scoped to the logged-in user
 - **Per-user settings** — single-row Settings table migrates to per-user preferences table
@@ -28,6 +86,16 @@ changes needed for any multi-user product.
 - **HTTP security headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS once HTTPS is enforced. Define `Content-Security-Policy` when Phase 2 JS is added — avoid inline scripts. Use `NetEscapades.AspNetCore.SecurityHeaders` or custom middleware.
 - **Rate limiting** — protect login and registration against brute-force. Fixed window (e.g. 10 requests/min/IP) minimum. Add account-level lockout: after N consecutive failed attempts (e.g. 10), lock for a fixed period (e.g. 15 min) and notify by email. Lockout counter resets on successful login.
 - **IDOR prevention** — every controller action loading a resource by ID must scope the query to the authenticated user's data. Integration tests must cover: User A targeting User B's resource must return 404, not 403.
+
+**IDOR enforcement**
+
+```mermaid
+flowchart TD
+    A([Controller action: load resource by Id]) --> B[Query: WHERE Id = ? AND UserId = authenticatedUserId]
+    B --> C{Row found?}
+    C -- Yes --> D[Proceed — return resource]
+    C -- No --> E[Return 404\nDo not return 403 — never confirm the resource exists]
+```
 - **UUID primary keys** — all user-created entities use `uuid` PKs, not sequential integers. System lookup tables retain `int` PKs. Decision applies from Phase 1 — no migration required later. See models.md Primary Key Strategy.
 - **CORS policy** — required when a separate frontend origin is introduced. Whitelist only known frontend origin(s). Never combine `AllowAnyOrigin` with `AllowCredentials`.
 - **Dependency vulnerability scanning** — run `dotnet list package --vulnerable` before each release. In Phase 3, integrate into CI pipeline on every code push.
