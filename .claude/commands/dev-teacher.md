@@ -1,55 +1,65 @@
 ---
 name: dev-teacher
-description: After a coding session, extracts the theory behind what was built and writes it to learning-journal.md. Use this skill when the user asks to document, journal, or write up what was learned or explained in a session — NOT for building or explaining code live. Triggers on phrases like "write up what we covered", "update the learning journal", "document what we built", "summarise the session for my notes".
+description: After a coding session, routes what was learned into the structured developer guide at docs/guide/. Use this skill when the user asks to document, journal, or write up what was learned or explained in a session — NOT for building or explaining code live. Triggers on phrases like "write up what we covered", "update the guide", "document what we built", "summarise the session for my notes".
 ---
 
-This skill runs _after_ a coding session. It does not build or run code. Its job is to extract the theory from what happened and write it to `learning-journal.md`, including key code produced during the session with the reasoning attached.
+This skill runs _after_ a coding session. It does not build or run code. Its job is to extract concepts, patterns, and decisions from the session and route them into the correct topic files in `docs/guide/`.
 
 ## Steps
 
-1. **Read back through the session silently.** Identify: what was built or changed, every concept/term/pattern that appeared, every decision and why it was made, key code produced, every command run in the terminal, anything flagged for an ADR or doc update, and what should come next.
+1. **Review the session silently.** Identify every concept explained, every pattern used, every command run, and every decision made.
 
-2. **Append a dated entry to `learning-journal.md`** using the template below. If the file doesn't exist, create it with `# Learning Journal` as the first line.
+2. **Read `docs/guide/syllabus.md`** to find which module files are relevant. Identify the 1–3 topic files that best cover what was discussed.
+
+3. **For each identified file:**
+   - If the file **exists**: read it, then append new material under the correct section headings. Do not duplicate concepts already documented.
+   - If the file **does not exist**: create it with the standard structure below, then update `syllabus.md` to mark it ✅.
+
+4. **Write content using this structure** (include only sections that have material):
 
 ```markdown
-## [Date] — [Component or feature name]
+# [Topic Title]
 
-### What was built
+[One-sentence description of what this topic covers.]
 
-[One paragraph describing what the session produced, in plain English.]
+---
 
-### Concepts covered
+## Concepts
 
-**[Term]** — [One plain-English sentence defining what this is and why it matters here. Define every term that appeared — nothing is too basic to include.]
+### [Term or Concept Name]
+[Plain-English definition. Why this concept matters in this stack. One or two paragraphs max.]
 
-### Key code produced
-
-[Snippet from the session, with an explanation of why it was written this way attached.]
-
-### Commands run
-
-- `[command]` — [What this command does. For every flag used, explain what it means and why it was included.]
-
-### Decisions made
-
-- **[Decision]**: [What was decided and why. Reference the relevant doc or ADR if one exists.]
-
-### Logic explained
-
-[Only include if a non-obvious process was walked through — e.g. a migration, a query pipeline, an MVC lifecycle. Write it as a numbered plain-English sequence.]
-
-### Open items
-
-- [Anything flagged for an ADR, doc update, or future session]
-
-### What to cover next
-
-[One or two sentences on the natural next step based on this session.]
+```csharp
+// Annotated code example if the concept is best shown in code
 ```
 
-3. **Reply with only:** `✅ Learning journal updated — [component name], [date]. [N] concepts documented.`
+## Key Patterns
+
+### [Pattern name]
+[What problem this pattern solves, and why it was used this way.]
+
+```csharp
+// Key code with inline comments explaining non-obvious choices
+```
+
+## Commands
+
+| Command | What it does |
+|---------|-------------|
+| `command --flag` | What the command does. For every flag, explain what it means and why it was used. |
+
+## Pitfalls
+
+- **[Pitfall name]**: What goes wrong and why. How to avoid it.
+```
+
+5. **Reply with only:** `✅ Guide updated — [list of files changed], [date]. [N] concepts added.`
 
 ## Rules
 
-- Never build or run code — only document what was already produced in the session
-- Always append — never overwrite existing entries
+- Never build or run code — only document what was already covered in the session
+- Read the target file before writing — never duplicate a concept already there
+- Append to existing sections — never overwrite or restructure content that already exists
+- Route to the most specific file that fits — prefer a narrow topic file over a broad one
+- If a concept spans two files (e.g. a DI pattern explained in the context of EF Core), write the core definition in the primary file and add a cross-reference link in the secondary file
+- Never add a dated session header — content is organized by topic, not by date

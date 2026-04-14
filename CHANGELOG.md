@@ -27,7 +27,7 @@
 - `docs/security-model.md` — threat model, data protection, access control
 - `docs/api-contract.md` — API conventions, response shapes, versioning strategy
 - `docs/multi-tenancy-strategy.md` — Phase 3 migration plan
-- `docs/learning-journal.md` — session learnings log including full Phase 1 retrospective
+- `docs/guide/` — structured developer guide organized by stack topic (replaced learning-journal.md); 23 topic files across 7 modules
 - `docs/roadmap-phase-one.md` — Phase 1 feature roadmap
 - `doc-agent-instructions.md` — documentation routing rules and ADR numbering guide
 - `dev-teacher` Claude Code command for post-session learning journals

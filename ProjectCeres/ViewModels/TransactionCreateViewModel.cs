@@ -4,6 +4,9 @@ namespace ProjectCeres.ViewModels;
 
 public class TransactionCreateViewModel
 {
+    /// <summary>"Regular" or "LiabilityPayment"</summary>
+    public string TransactionType { get; set; } = "Regular";
+
     [Required(ErrorMessage = "Date is required.")]
     public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Today);
 
@@ -18,10 +21,14 @@ public class TransactionCreateViewModel
     [Display(Name = "Account")]
     public Guid? AccountId { get; set; }
 
-    [Required(ErrorMessage = "Please select a category.")]
+    // Regular transaction fields
     [Display(Name = "Category")]
     public Guid? CategoryId { get; set; }
 
     [Display(Name = "Budget")]
     public Guid? BudgetId { get; set; }
+
+    // LiabilityPayment field
+    [Display(Name = "Liability Account")]
+    public Guid? LiabilityAccountId { get; set; }
 }

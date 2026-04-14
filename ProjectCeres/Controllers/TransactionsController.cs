@@ -14,18 +14,18 @@ public class TransactionsController(ITransactionService transactionService, AppD
     public async Task<IActionResult> Index(Guid? accountId, DateOnly? from, DateOnly? to, int page = 1)
     {
         var offset = (page - 1) * PageSize;
-        var transactions = await transactionService.GetRecentAsync(accountId, from, to, PageSize, offset);
-        var total = await transactionService.CountAsync(accountId, from, to);
+        var items  = await transactionService.GetRecentAsync(accountId, from, to, PageSize, offset);
+        var total  = await transactionService.CountAsync(accountId, from, to);
 
-        ViewBag.AccountId   = accountId;
-        ViewBag.From        = from;
-        ViewBag.To          = to;
-        ViewBag.Page        = page;
-        ViewBag.TotalPages  = (int)Math.Ceiling(total / (double)PageSize);
-        ViewBag.Accounts    = new SelectList(
+        ViewBag.AccountId  = accountId;
+        ViewBag.From       = from;
+        ViewBag.To         = to;
+        ViewBag.Page       = page;
+        ViewBag.TotalPages = (int)Math.Ceiling(total / (double)PageSize);
+        ViewBag.Accounts   = new SelectList(
             await db.Accounts.Where(a => a.IsActive).OrderBy(a => a.Name).ToListAsync(), "Id", "Name");
 
-        return View(transactions);
+        return View(items);
     }
 
     public async Task<IActionResult> Create()
@@ -38,6 +38,20 @@ public class TransactionsController(ITransactionService transactionService, AppD
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(TransactionCreateViewModel vm)
     {
+        // Conditional server-side validation — required fields differ by type
+        if (vm.TransactionType == "LiabilityPayment")
+        {
+            ModelState.Remove("CategoryId");
+            if (vm.LiabilityAccountId is null)
+                ModelState.AddModelError("LiabilityAccountId", "Please select a liability account.");
+        }
+        else
+        {
+            ModelState.Remove("LiabilityAccountId");
+            if (vm.CategoryId is null)
+                ModelState.AddModelError("CategoryId", "Please select a category.");
+        }
+
         if (!ModelState.IsValid)
         {
             await PopulateViewBagAsync();
@@ -47,8 +61,9 @@ public class TransactionsController(ITransactionService transactionService, AppD
         try
         {
             await transactionService.CreateAsync(vm);
-
-            TempData["SuccessMessage"] = "Transaction recorded.";
+            TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
+                ? "Liability payment recorded."
+                : "Transaction recorded.";
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)
@@ -61,21 +76,16 @@ public class TransactionsController(ITransactionService transactionService, AppD
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var t = await transactionService.GetByIdAsync(id);
-        if (t is null) return NotFound();
+        var vm = await transactionService.GetByIdForEditAsync(id);
+        if (vm is null) return NotFound();
 
-        var vm = new TransactionEditViewModel
+        // Attachments only apply to regular transactions
+        if (vm.TransactionType == "Regular")
         {
-            Id          = t.Id,
-            Date        = t.Date,
-            Amount      = t.Amount,
-            Description = t.Description,
-            AccountId   = t.AccountId,
-            CategoryId  = t.CategoryId,
-            BudgetId    = t.BudgetId
-        };
+            var t = await db.Transactions.Include(t => t.Attachments).FirstOrDefaultAsync(t => t.Id == id);
+            ViewBag.Attachments = t?.Attachments;
+        }
 
-        ViewBag.Attachments = t.Attachments;
         await PopulateViewBagAsync();
         return View(vm);
     }
@@ -84,6 +94,19 @@ public class TransactionsController(ITransactionService transactionService, AppD
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(TransactionEditViewModel vm)
     {
+        if (vm.TransactionType == "LiabilityPayment")
+        {
+            ModelState.Remove("CategoryId");
+            if (vm.LiabilityAccountId is null)
+                ModelState.AddModelError("LiabilityAccountId", "Please select a liability account.");
+        }
+        else
+        {
+            ModelState.Remove("LiabilityAccountId");
+            if (vm.CategoryId is null)
+                ModelState.AddModelError("CategoryId", "Please select a category.");
+        }
+
         if (!ModelState.IsValid)
         {
             await PopulateViewBagAsync();
@@ -93,8 +116,9 @@ public class TransactionsController(ITransactionService transactionService, AppD
         try
         {
             await transactionService.UpdateAsync(vm);
-
-            TempData["SuccessMessage"] = "Transaction updated.";
+            TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
+                ? "Liability payment updated."
+                : "Transaction updated.";
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)
@@ -107,9 +131,9 @@ public class TransactionsController(ITransactionService transactionService, AppD
 
     public async Task<IActionResult> Delete(Guid id)
     {
-        var t = await transactionService.GetByIdAsync(id);
-        if (t is null) return NotFound();
-        return View(t);
+        var vm = await transactionService.GetByIdForEditAsync(id);
+        if (vm is null) return NotFound();
+        return View(vm);
     }
 
     [HttpPost]
@@ -119,7 +143,7 @@ public class TransactionsController(ITransactionService transactionService, AppD
         try
         {
             await transactionService.DeleteAsync(id);
-            TempData["SuccessMessage"] = "Transaction deleted.";
+            TempData["SuccessMessage"] = "Deleted.";
         }
         catch (InvalidOperationException ex)
         {
@@ -131,13 +155,23 @@ public class TransactionsController(ITransactionService transactionService, AppD
 
     private async Task PopulateViewBagAsync()
     {
-        ViewBag.Accounts = new SelectList(
-            await db.Accounts.Where(a => a.IsActive).OrderBy(a => a.Name).ToListAsync(), "Id", "Name");
+        var accounts = await db.Accounts
+            .Where(a => a.IsActive)
+            .Include(a => a.AccountType)
+            .OrderBy(a => a.Name)
+            .ToListAsync();
+
+        ViewBag.Accounts          = new SelectList(accounts, "Id", "Name");
+        ViewBag.AssetAccounts     = new SelectList(accounts.Where(a => a.AccountType.Name == "Asset"),     "Id", "Name");
+        ViewBag.LiabilityAccounts = new SelectList(accounts.Where(a => a.AccountType.Name == "Liability"), "Id", "Name");
+
         ViewBag.Categories = new SelectList(
-            await db.Categories.Where(c => c.IsActive)
+            await db.Categories
+                .Where(c => c.IsActive && !c.IsSystem)
                 .Include(c => c.CategoryType)
                 .OrderBy(c => c.CategoryType.Name).ThenBy(c => c.Name)
                 .ToListAsync(), "Id", "Name");
+
         ViewBag.Budgets = new SelectList(
             await db.Budgets.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(), "Id", "Name");
     }

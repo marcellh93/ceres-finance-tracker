@@ -170,8 +170,9 @@ ProjectCeres/
     ISettingsService.cs / SettingsService.cs         ← single Settings row; EnsureExistsAsync called at startup
     IAccountService.cs / AccountService.cs           ← CRUD, derived balance, Opening Balance auto-creation
     ICategoryService.cs / CategoryService.cs         ← CRUD, deactivate, IsSystem guard
-    ITransactionService.cs / TransactionService.cs   ← CRUD (hard delete), paginated history
-    ITransferService.cs / TransferService.cs         ← CRUD (hard delete), same-currency enforcement
+    ITransactionService.cs / TransactionService.cs               ← CRUD (hard delete), paginated unified history (routes to ILiabilityPaymentService for LiabilityPayment type)
+    ILiabilityPaymentService.cs / LiabilityPaymentService.cs    ← CRUD (hard delete), type/currency/date validation; called by TransactionService
+    ITransferService.cs / TransferService.cs                    ← CRUD (hard delete), same-currency enforcement
     IBudgetService.cs / BudgetService.cs             ← CRUD, deactivate, derived actual spend
     IRecurringTransactionService.cs / RecurringTransactionService.cs  ← Confirm + Dismiss (advances NextDueDate)
     IReportService.cs / ReportService.cs             ← net worth, income/expense summary, breakdown, history

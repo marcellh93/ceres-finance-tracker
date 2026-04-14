@@ -24,7 +24,7 @@ You are a documentation assistant. Your job is to keep project documentation acc
 | Change to API conventions, response shape, error shape, status codes, or versioning   | api-contract.md                                                                                                          |
 | Change to multi-tenancy approach, UserId scoping strategy, or Settings migration plan | multi-tenancy-strategy.md                                                                                                |
 | Legal obligations or compliance changes                                               | legal.md — flag for human review, never edit without explicit confirmation                                               |
-| Dev-teacher session summary                                                           | learning-journal.md — append only, never edit past entries                                                               |
+| Dev-teacher session summary                                                           | docs/guide/ — route each concept to the relevant topic file; create the file if it does not exist yet; never add dated session headers |
 
 When in doubt between models.md and planning.md:
 

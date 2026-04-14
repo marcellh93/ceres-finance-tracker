@@ -90,6 +90,7 @@ work, the cost of fixing it here is low. That cost grows significantly once Phas
 
 - Record transactions with: date, amount, description, category, account
 - Balance updates automatically per account
+- **Liability payments** — a single-entry form on the Transactions page lets users record a payment from an asset account toward a liability account in one step. The form has a type toggle ("Transaction" / "Liability Payment") that conditionally shows/hides the relevant fields. Liability payments appear inline in the Transactions Index list alongside regular transactions. They are excluded from income/expense report totals. See ADR-0031.
 
 ### Recurring Transaction Reminders
 

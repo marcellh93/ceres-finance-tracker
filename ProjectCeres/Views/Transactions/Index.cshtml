@@ -1,4 +1,4 @@
-@model IEnumerable<Transaction>
+@model IEnumerable<TransactionListItemViewModel>
 @{ ViewData["Title"] = "Transactions"; }
 
 <div class="page-header">
@@ -31,7 +31,7 @@ else
             <tr>
                 <th>Date</th>
                 <th>Account</th>
-                <th>Category</th>
+                <th>Details</th>
                 <th>Description</th>
                 <th>Type</th>
                 <th>Amount</th>
@@ -39,20 +39,35 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var t in Model)
+            @foreach (var item in Model)
             {
                 <tr>
-                    <td>@t.Date.ToString("dd/MM/yyyy")</td>
-                    <td>@t.Account.Name</td>
-                    <td>@t.Category.Name</td>
-                    <td>@(t.Description ?? "—")</td>
-                    <td>@t.Category.CategoryType.Name</td>
-                    <td class="@(t.Category.CategoryType.Name == "Income" ? "amount-income" : "amount-expense")">
-                        @NumberFormatHelper.FormatAmount(t.Amount, ViewData["NumberFormat"] as string)
-                    </td>
+                    <td>@item.Date.ToString("dd/MM/yyyy")</td>
+
+                    @if (item.TransactionType == "LiabilityPayment")
+                    {
+                        <td>@item.AssetAccountName</td>
+                        <td>→ @item.LiabilityAccountName</td>
+                        <td>@(item.Description ?? "—")</td>
+                        <td>Liability Payment</td>
+                        <td class="amount-neutral">
+                            @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
+                        </td>
+                    }
+                    else
+                    {
+                        <td>@item.AccountName</td>
+                        <td>@item.CategoryName</td>
+                        <td>@(item.Description ?? "—")</td>
+                        <td>@item.CategoryTypeName</td>
+                        <td class="@(item.CategoryTypeName == "Income" ? "amount-income" : "amount-expense")">
+                            @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
+                        </td>
+                    }
+
                     <td class="actions">
-                        <a asp-action="Edit" asp-route-id="@t.Id">Edit</a>
-                        <a asp-action="Delete" asp-route-id="@t.Id" class="link-danger">Delete</a>
+                        <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="link-danger">Delete</a>
                     </td>
                 </tr>
             }

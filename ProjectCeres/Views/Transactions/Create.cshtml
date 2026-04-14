@@ -7,31 +7,68 @@
     <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
 
     <div class="form-group">
+        <label>Type</label>
+        <div class="radio-group">
+            <label>
+                <input type="radio" name="TransactionType" value="Regular"
+                       @(Model.TransactionType == "Regular" ? "checked" : "") />
+                Transaction
+            </label>
+            <label>
+                <input type="radio" name="TransactionType" value="LiabilityPayment"
+                       @(Model.TransactionType == "LiabilityPayment" ? "checked" : "") />
+                Liability Payment
+            </label>
+        </div>
+    </div>
+
+    <div class="form-group">
         <label asp-for="Date"></label>
         <input asp-for="Date" type="date" class="form-control" />
         <span asp-validation-for="Date" class="field-error"></span>
     </div>
 
     <div class="form-group">
-        <label asp-for="AccountId"></label>
-        <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control">
+        <label id="account-label" asp-for="AccountId"></label>
+        <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control" id="account-select">
             <option value="">— Select account —</option>
         </select>
         <span asp-validation-for="AccountId" class="field-error"></span>
     </div>
 
-    <div class="form-group">
-        <label asp-for="CategoryId"></label>
-        <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control">
-            <option value="">— Select category —</option>
-        </select>
-        <span asp-validation-for="CategoryId" class="field-error"></span>
+    @* Regular-only fields *@
+    <div id="regular-fields">
+        <div class="form-group">
+            <label asp-for="CategoryId"></label>
+            <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control">
+                <option value="">— Select category —</option>
+            </select>
+            <span asp-validation-for="CategoryId" class="field-error"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="BudgetId"></label>
+            <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
+                <option value="">— None —</option>
+            </select>
+        </div>
+    </div>
+
+    @* LiabilityPayment-only fields *@
+    <div id="liability-fields" style="display:none">
+        <div class="form-group">
+            <label asp-for="LiabilityAccountId"></label>
+            <select asp-for="LiabilityAccountId" asp-items="ViewBag.LiabilityAccounts" class="form-control">
+                <option value="">— Select liability account —</option>
+            </select>
+            <span asp-validation-for="LiabilityAccountId" class="field-error"></span>
+        </div>
     </div>
 
     <div class="form-group">
         <label asp-for="Amount"></label>
         <input type="text" id="Amount" name="Amount" value="" class="form-control" />
-        <small>Always enter a positive amount. Income vs. expense is determined by the selected category.</small>
+        <small id="amount-hint">Always enter a positive amount. Income vs. expense is determined by the selected category.</small>
         <span asp-validation-for="Amount" class="field-error"></span>
     </div>
 
@@ -41,19 +78,37 @@
         <span asp-validation-for="Description" class="field-error"></span>
     </div>
 
-    <div class="form-group">
-        <label asp-for="BudgetId"></label>
-        <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
-            <option value="">— None —</option>
-        </select>
-    </div>
-
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Record Transaction</button>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Record Transaction</button>
         <a asp-action="Index" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        (function () {
+            const radios         = document.querySelectorAll('input[name="TransactionType"]');
+            const regularFields  = document.getElementById('regular-fields');
+            const liabilityFields = document.getElementById('liability-fields');
+            const accountLabel   = document.getElementById('account-label');
+            const amountHint     = document.getElementById('amount-hint');
+            const submitBtn      = document.getElementById('submit-btn');
+
+            function applyType(type) {
+                const isLiability = type === 'LiabilityPayment';
+                regularFields.style.display  = isLiability ? 'none' : '';
+                liabilityFields.style.display = isLiability ? '' : 'none';
+                accountLabel.textContent      = isLiability ? 'Paying From (Asset Account)' : 'Account';
+                amountHint.style.display      = isLiability ? 'none' : '';
+                submitBtn.textContent         = isLiability ? 'Record Payment' : 'Record Transaction';
+            }
+
+            radios.forEach(r => r.addEventListener('change', () => applyType(r.value)));
+
+            // Apply on load to reflect server-side state (e.g. validation failure redisplay)
+            const checked = document.querySelector('input[name="TransactionType"]:checked');
+            if (checked) applyType(checked.value);
+        })();
+    </script>
 }

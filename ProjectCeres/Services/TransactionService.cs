@@ -5,65 +5,164 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class TransactionService(AppDbContext db, IAccountService accountService) : ITransactionService
+public class TransactionService(
+    AppDbContext db,
+    IAccountService accountService,
+    ILiabilityPaymentService liabilityPaymentService) : ITransactionService
 {
-    public async Task<IEnumerable<Transaction>> GetRecentAsync(
+    public async Task<IEnumerable<TransactionListItemViewModel>> GetRecentAsync(
         Guid? accountId = null,
         DateOnly? from = null,
         DateOnly? to = null,
         int limit = 50,
         int offset = 0)
     {
-        var query = db.Transactions
-            .Where(t => !t.Category.IsSystem)   // opening balance is system-managed, not shown here
+        // --- Regular transactions ---
+        var txQuery = db.Transactions
+            .Where(t => !t.Category.IsSystem)
             .Include(t => t.Account)
-            .Include(t => t.Category)
-                .ThenInclude(c => c.CategoryType)
-            .Include(t => t.Attachments)
+            .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .AsQueryable();
 
         if (accountId.HasValue)
-            query = query.Where(t => t.AccountId == accountId.Value);
+            txQuery = txQuery.Where(t => t.AccountId == accountId.Value);
         if (from.HasValue)
-            query = query.Where(t => t.Date >= from.Value);
+            txQuery = txQuery.Where(t => t.Date >= from.Value);
         if (to.HasValue)
-            query = query.Where(t => t.Date <= to.Value);
+            txQuery = txQuery.Where(t => t.Date <= to.Value);
 
-        return await query
-            .OrderByDescending(t => t.Date)
-            .ThenByDescending(t => t.CreatedAt)
+        var transactions = await txQuery.ToListAsync();
+
+        var txItems = transactions.Select(t => new TransactionListItemViewModel
+        {
+            Id               = t.Id,
+            Date             = t.Date,
+            Amount           = t.Amount,
+            Description      = t.Description,
+            TransactionType  = "Regular",
+            AccountName      = t.Account.Name,
+            CategoryName     = t.Category.Name,
+            CategoryTypeName = t.Category.CategoryType.Name
+        });
+
+        // --- Liability payments ---
+        var lpQuery = db.LiabilityPayments
+            .Include(p => p.AssetAccount)
+            .Include(p => p.LiabilityAccount)
+            .AsQueryable();
+
+        if (accountId.HasValue)
+            lpQuery = lpQuery.Where(p => p.AssetAccountId == accountId.Value || p.LiabilityAccountId == accountId.Value);
+        if (from.HasValue)
+            lpQuery = lpQuery.Where(p => p.Date >= from.Value);
+        if (to.HasValue)
+            lpQuery = lpQuery.Where(p => p.Date <= to.Value);
+
+        var payments = await lpQuery.ToListAsync();
+
+        var lpItems = payments.Select(p => new TransactionListItemViewModel
+        {
+            Id                   = p.Id,
+            Date                 = p.Date,
+            Amount               = p.Amount,
+            Description          = p.Description,
+            TransactionType      = "LiabilityPayment",
+            AssetAccountName     = p.AssetAccount.Name,
+            LiabilityAccountName = p.LiabilityAccount.Name
+        });
+
+        // --- Merge, sort, paginate ---
+        return txItems
+            .Concat(lpItems)
+            .OrderByDescending(i => i.Date)
+            .ThenByDescending(i => i.Id)   // stable secondary sort
             .Skip(offset)
             .Take(limit)
-            .ToListAsync();
+            .ToList();
     }
 
     public async Task<int> CountAsync(Guid? accountId = null, DateOnly? from = null, DateOnly? to = null)
     {
-        var query = db.Transactions
+        var txQuery = db.Transactions
             .Where(t => !t.Category.IsSystem)
             .AsQueryable();
 
         if (accountId.HasValue)
-            query = query.Where(t => t.AccountId == accountId.Value);
+            txQuery = txQuery.Where(t => t.AccountId == accountId.Value);
         if (from.HasValue)
-            query = query.Where(t => t.Date >= from.Value);
+            txQuery = txQuery.Where(t => t.Date >= from.Value);
         if (to.HasValue)
-            query = query.Where(t => t.Date <= to.Value);
+            txQuery = txQuery.Where(t => t.Date <= to.Value);
 
-        return await query.CountAsync();
+        var lpQuery = db.LiabilityPayments.AsQueryable();
+
+        if (accountId.HasValue)
+            lpQuery = lpQuery.Where(p => p.AssetAccountId == accountId.Value || p.LiabilityAccountId == accountId.Value);
+        if (from.HasValue)
+            lpQuery = lpQuery.Where(p => p.Date >= from.Value);
+        if (to.HasValue)
+            lpQuery = lpQuery.Where(p => p.Date <= to.Value);
+
+        return await txQuery.CountAsync() + await lpQuery.CountAsync();
     }
 
-    public async Task<Transaction?> GetByIdAsync(Guid id) =>
-        await db.Transactions
+    public async Task<TransactionEditViewModel?> GetByIdForEditAsync(Guid id)
+    {
+        // Try regular transaction first
+        var t = await db.Transactions
             .Include(t => t.Account)
-            .Include(t => t.Category)
-                .ThenInclude(c => c.CategoryType)
+            .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .Include(t => t.Budget)
             .Include(t => t.Attachments)
             .FirstOrDefaultAsync(t => t.Id == id);
 
-    public async Task<Transaction> CreateAsync(TransactionCreateViewModel vm)
+        if (t is not null)
+        {
+            return new TransactionEditViewModel
+            {
+                Id              = t.Id,
+                TransactionType = "Regular",
+                Date            = t.Date,
+                Amount          = t.Amount,
+                Description     = t.Description,
+                AccountId       = t.AccountId,
+                CategoryId      = t.CategoryId,
+                BudgetId        = t.BudgetId
+            };
+        }
+
+        // Fall back to liability payment
+        var p = await db.LiabilityPayments
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (p is not null)
+        {
+            return new TransactionEditViewModel
+            {
+                Id                 = p.Id,
+                TransactionType    = "LiabilityPayment",
+                Date               = p.Date,
+                Amount             = p.Amount,
+                Description        = p.Description,
+                AccountId          = p.AssetAccountId,
+                LiabilityAccountId = p.LiabilityAccountId
+            };
+        }
+
+        return null;
+    }
+
+    public async Task CreateAsync(TransactionCreateViewModel vm)
     {
+        if (vm.TransactionType == "LiabilityPayment")
+        {
+            await liabilityPaymentService.CreateAsync(vm);
+            return;
+        }
+
+        if (vm.CategoryId is null)
+            throw new InvalidOperationException("Please select a category.");
+
         await ValidateNotBeforeOpeningBalanceAsync(vm.AccountId!.Value, vm.Date);
 
         var transaction = new Transaction
@@ -80,11 +179,19 @@ public class TransactionService(AppDbContext db, IAccountService accountService)
 
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync();
-        return transaction;
     }
 
     public async Task UpdateAsync(TransactionEditViewModel vm)
     {
+        if (vm.TransactionType == "LiabilityPayment")
+        {
+            await liabilityPaymentService.UpdateAsync(vm);
+            return;
+        }
+
+        if (vm.CategoryId is null)
+            throw new InvalidOperationException("Please select a category.");
+
         await ValidateNotBeforeOpeningBalanceAsync(vm.AccountId!.Value, vm.Date);
 
         var transaction = await db.Transactions.FindAsync(vm.Id)
@@ -101,11 +208,17 @@ public class TransactionService(AppDbContext db, IAccountService accountService)
 
     public async Task DeleteAsync(Guid id)
     {
-        var transaction = await db.Transactions.FindAsync(id)
-            ?? throw new InvalidOperationException($"Transaction {id} not found.");
+        // Try regular transaction first
+        var transaction = await db.Transactions.FindAsync(id);
+        if (transaction is not null)
+        {
+            db.Transactions.Remove(transaction);
+            await db.SaveChangesAsync();
+            return;
+        }
 
-        db.Transactions.Remove(transaction);
-        await db.SaveChangesAsync();
+        // Fall back to liability payment
+        await liabilityPaymentService.DeleteAsync(id);
     }
 
     private async Task ValidateNotBeforeOpeningBalanceAsync(Guid accountId, DateOnly date)

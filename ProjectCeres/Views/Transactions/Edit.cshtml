@@ -5,7 +5,24 @@
 
 <form asp-action="Edit" method="post">
     <input asp-for="Id" type="hidden" />
+    <input asp-for="TransactionType" type="hidden" />
     <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
+
+    <div class="form-group">
+        <label>Type</label>
+        <div class="radio-group">
+            <label>
+                <input type="radio" name="TransactionType" value="Regular"
+                       @(Model.TransactionType == "Regular" ? "checked" : "") />
+                Transaction
+            </label>
+            <label>
+                <input type="radio" name="TransactionType" value="LiabilityPayment"
+                       @(Model.TransactionType == "LiabilityPayment" ? "checked" : "") />
+                Liability Payment
+            </label>
+        </div>
+    </div>
 
     <div class="form-group">
         <label asp-for="Date"></label>
@@ -14,15 +31,40 @@
     </div>
 
     <div class="form-group">
-        <label asp-for="AccountId"></label>
-        <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control"></select>
+        <label id="account-label" asp-for="AccountId"></label>
+        <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control">
+            <option value="">— Select account —</option>
+        </select>
         <span asp-validation-for="AccountId" class="field-error"></span>
     </div>
 
-    <div class="form-group">
-        <label asp-for="CategoryId"></label>
-        <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control"></select>
-        <span asp-validation-for="CategoryId" class="field-error"></span>
+    @* Regular-only fields *@
+    <div id="regular-fields">
+        <div class="form-group">
+            <label asp-for="CategoryId"></label>
+            <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control">
+                <option value="">— Select category —</option>
+            </select>
+            <span asp-validation-for="CategoryId" class="field-error"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="BudgetId"></label>
+            <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
+                <option value="">— None —</option>
+            </select>
+        </div>
+    </div>
+
+    @* LiabilityPayment-only fields *@
+    <div id="liability-fields" style="display:none">
+        <div class="form-group">
+            <label asp-for="LiabilityAccountId"></label>
+            <select asp-for="LiabilityAccountId" asp-items="ViewBag.LiabilityAccounts" class="form-control">
+                <option value="">— Select liability account —</option>
+            </select>
+            <span asp-validation-for="LiabilityAccountId" class="field-error"></span>
+        </div>
     </div>
 
     <div class="form-group">
@@ -39,20 +81,15 @@
         <span asp-validation-for="Description" class="field-error"></span>
     </div>
 
-    <div class="form-group">
-        <label asp-for="BudgetId"></label>
-        <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
-            <option value="">— None —</option>
-        </select>
-    </div>
-
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Changes</button>
         <a asp-action="Index" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
 
-@if (ViewBag.Attachments is IEnumerable<ProjectCeres.Models.TransactionAttachment> attachments)
+@* Attachments section — only shown for regular transactions *@
+@if (Model.TransactionType == "Regular" &&
+     ViewBag.Attachments is IEnumerable<ProjectCeres.Models.TransactionAttachment> attachments)
 {
     <section class="attachments">
         <h2>Attachments</h2>
@@ -94,4 +131,27 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        (function () {
+            const radios          = document.querySelectorAll('input[name="TransactionType"]');
+            const regularFields   = document.getElementById('regular-fields');
+            const liabilityFields = document.getElementById('liability-fields');
+            const accountLabel    = document.getElementById('account-label');
+            const hiddenType      = document.querySelector('input[type="hidden"][name="TransactionType"]');
+
+            function applyType(type) {
+                const isLiability = type === 'LiabilityPayment';
+                regularFields.style.display   = isLiability ? 'none' : '';
+                liabilityFields.style.display = isLiability ? '' : 'none';
+                accountLabel.textContent      = isLiability ? 'Paying From (Asset Account)' : 'Account';
+                if (hiddenType) hiddenType.value = type;
+            }
+
+            radios.forEach(r => r.addEventListener('change', () => applyType(r.value)));
+
+            // Apply on load to reflect the pre-selected type
+            const checked = document.querySelector('input[name="TransactionType"]:checked');
+            if (checked) applyType(checked.value);
+        })();
+    </script>
 }

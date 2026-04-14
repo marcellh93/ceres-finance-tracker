@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TransactionAttachment> TransactionAttachments => Set<TransactionAttachment>();
     public DbSet<Transfer> Transfers => Set<Transfer>();
+    public DbSet<LiabilityPayment> LiabilityPayments => Set<LiabilityPayment>();
     public DbSet<RecurringTransaction> RecurringTransactions => Set<RecurringTransaction>();
     public DbSet<CategoryBudget> CategoryBudgets => Set<CategoryBudget>();
     public DbSet<Budget> Budgets => Set<Budget>();
@@ -35,6 +36,19 @@ public class AppDbContext : DbContext
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
     {
+        // LiabilityPayment references Account twice — explicit config required.
+        modelBuilder.Entity<LiabilityPayment>()
+            .HasOne(p => p.AssetAccount)
+            .WithMany()
+            .HasForeignKey(p => p.AssetAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<LiabilityPayment>()
+            .HasOne(p => p.LiabilityAccount)
+            .WithMany()
+            .HasForeignKey(p => p.LiabilityAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Transfer references Account twice — must be explicit so EF Core knows
         // which FK maps to which navigation property.
         modelBuilder.Entity<Transfer>()

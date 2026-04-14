@@ -377,6 +377,53 @@ with a `TransferId` FK instead of `TransactionId`. See Phase 2 in planning.md.
 
 ---
 
+### LiabilityPayment
+
+Represents a payment made from an asset account toward a liability account — for example,
+paying a credit card balance from a checking account. Records the event atomically as a
+single entry visible in the Transactions list.
+
+A liability payment is semantically distinct from a `Transfer`:
+- A `Transfer` moves money between two accounts the user owns, with no P&L effect (asset → asset or liability → liability).
+- A `LiabilityPayment` reduces a debt while simultaneously reducing an asset — a balance-sheet event that affects both sides.
+
+Like `Transfer`, a `LiabilityPayment` has no category and is excluded from all income/expense
+report calculations. Net worth is not changed by a liability payment (the asset decrease is
+exactly offset by the liability decrease).
+
+| Column             | Type          | Constraints  | Notes                                        |
+|--------------------|---------------|--------------|----------------------------------------------|
+| Id                 | uuid          | PK           |                                              |
+| Date               | date          | NOT NULL     | When the payment occurred — local date, no timezone |
+| Amount             | decimal(18,2) | NOT NULL     | Always stored as a positive number           |
+| AssetAccountId     | uuid          | FK, NOT NULL | → Account (money leaves here — must be Asset type) |
+| LiabilityAccountId | uuid          | FK, NOT NULL | → Account (debt reduced here — must be Liability type) |
+| Description        | varchar       | nullable     | e.g. "Credit card payment March"            |
+| CreatedAt          | datetime      | NOT NULL     | Set by the application on insert. Tiebreaker for same-date ordering. |
+
+**Constraint:** `AssetAccountId` must reference an account with `AccountType.Name == "Asset"`. Enforced at the service layer.
+
+**Constraint:** `LiabilityAccountId` must reference an account with `AccountType.Name == "Liability"`. Enforced at the service layer.
+
+**Constraint:** Both accounts must share the same currency. Cross-currency payments are not supported.
+
+**Constraint:** Date must not be before the opening balance date of either account. Enforced at the service layer.
+
+**Balance calculation impact:**
+- Asset account balance: liability payment amounts are subtracted (money left the account).
+- Liability account balance: liability payment amounts are subtracted (debt was reduced).
+- Both subtractions are applied in `AccountService.GetBalanceAsync` by querying `LiabilityPayments` separately from `Transactions`.
+
+**UI integration:**
+`LiabilityPayment` records are surfaced within the Transactions UI — not on a separate page.
+The Create/Edit form has a type toggle ("Transaction" / "Liability Payment") that conditionally
+shows/hides the relevant fields. The Transactions Index list merges both `Transaction` and
+`LiabilityPayment` rows into a unified view using `TransactionListItemViewModel`.
+
+**Deletion rule:** hard delete with confirmation prompt (same as `Transaction` and `Transfer`).
+
+---
+
 ### CategoryBudget
 
 A monthly spending cap for an expense category. Resets every month.
@@ -547,17 +594,19 @@ These are never stored as columns — they are always calculated at query time:
 | Net Cash Flow      | Total Income − Total Expenses (within the same currency)                                   |
 
 **Account balance — sign convention by account type:**
-The formula differs depending on whether the account is an Asset or a Liability. Transfers also affect the balance, not just transactions.
+The formula differs depending on whether the account is an Asset or a Liability. Transfers and LiabilityPayments also affect the balance, not just transactions.
 
-- **Asset account balance** = SUM(system transaction amounts) + SUM(Income transaction amounts) − SUM(Expense transaction amounts) + SUM(incoming transfer amounts) − SUM(outgoing transfer amounts)
-- **Liability account balance** = SUM(system transaction amounts) + SUM(Expense transaction amounts) − SUM(Income transaction amounts) − SUM(incoming transfer amounts) + SUM(outgoing transfer amounts)
+- **Asset account balance** = SUM(system transaction amounts) + SUM(Income transaction amounts) − SUM(Expense transaction amounts) + SUM(incoming transfer amounts) − SUM(outgoing transfer amounts) − SUM(outgoing liability payment amounts)
+- **Liability account balance** = SUM(system transaction amounts) + SUM(Expense transaction amounts) − SUM(Income transaction amounts) − SUM(incoming transfer amounts) + SUM(outgoing transfer amounts) − SUM(liability payment amounts received)
 
 System transactions (i.e. `IsSystem = true`, currently only "Opening Balance") always add to the balance regardless of account type — they are a neutral starting point, not income or expense.
 
-For an Asset account (e.g. checking): income and transfers in add to the balance; expenses and transfers out subtract.
-For a Liability account (e.g. credit card): expenses add to the balance (debt grows); income (e.g. refunds) and transfers in (debt payments) subtract from it.
+For an Asset account (e.g. checking): income and transfers in add to the balance; expenses, transfers out, and liability payments out subtract.
+For a Liability account (e.g. credit card): expenses add to the balance (debt grows); income (e.g. refunds), transfers in (debt payments via Transfer), and liability payments (via `LiabilityPayment`) subtract from it.
 
 Liability balances are always positive in normal use — they represent what is owed. Net Worth = Total Assets − Total Liabilities holds because both totals are expressed as positive numbers.
+
+`AccountService.GetBalanceAsync` handles this by running two extra aggregation queries against `LiabilityPayments` (one for `AssetAccountId`, one for `LiabilityAccountId`) and subtracting both from the transaction-derived balance.
 
 ---
 
@@ -588,6 +637,7 @@ feature if there is clear demand for it.
 | Category | Deactivate (`IsActive = false`) — never hard delete. System categories (`IsSystem = true`) cannot be deactivated either. | Has transactions linked to it. Hard delete would orphan financial history. System categories are required for app logic. |
 | Transaction | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. Removes its contribution from any linked Budget's actual spend. |
 | Transfer | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. |
+| LiabilityPayment | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. |
 | CategoryBudget | Deactivate (`IsActive = false`) — never hard delete | Historical dashboard and report data depends on it. |
 | Budget | Deactivate (`IsActive = false`) — never hard delete | Transactions are linked to it. Deleting would orphan those links and erase goal tracking history. |
 | TransactionAttachment | Hard delete allowed | File and record removed together. No history depends on an attachment. |
@@ -617,6 +667,9 @@ These must be created via Fluent API in `OnModelCreating` or via explicit migrat
 | Transfer | (SourceAccountId) | Standard | Transfer history queries filter by source account |
 | Transfer | (DestAccountId) | Standard | Transfer history queries filter by destination account |
 | Transfer | (Date DESC) | Standard | Transfer history date ordering |
+| LiabilityPayment | (AssetAccountId) | Standard | Balance calculation and list queries filter by paying account |
+| LiabilityPayment | (LiabilityAccountId) | Standard | Balance calculation and list queries filter by receiving account |
+| LiabilityPayment | (Date DESC) | Standard | Unified transaction list date ordering |
 | CategoryBudget | (CategoryId, CurrencyId) WHERE IsActive = true | Filtered compound | Enforces the uniqueness constraint and speeds up dashboard lookups |
 | SavedReport | (DeletedAt) WHERE DeletedAt IS NOT NULL | Filtered | Soft-delete purge job filters on DeletedAt |
 

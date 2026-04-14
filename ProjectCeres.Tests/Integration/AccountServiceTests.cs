@@ -2,6 +2,7 @@ using FluentAssertions;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
+using Microsoft.EntityFrameworkCore;
 
 namespace ProjectCeres.Tests.Integration;
 
@@ -185,5 +186,51 @@ public class AccountServiceTests : IAsyncLifetime
 
         var ob = await _service.GetOpeningBalanceAsync(account.Id);
         ob.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task GetBalanceAsync_LiabilityPayment_ReducesAssetBalance()
+    {
+        // Asset account starts with €1000. After a €300 liability payment, balance is €700.
+        var assetAccount     = await CreateAssetAccountAsync(openingBalance: 1000m);
+        var liabilityAccount = await CreateLiabilityAccountAsync();
+
+        _fixture.Db.LiabilityPayments.Add(new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = DateOnly.FromDateTime(DateTime.Today),
+            Amount             = 300m,
+            AssetAccountId     = assetAccount.Id,
+            LiabilityAccountId = liabilityAccount.Id,
+            CreatedAt          = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var balance = await _service.GetBalanceAsync(assetAccount.Id);
+
+        balance.Should().Be(700m);
+    }
+
+    [Fact]
+    public async Task GetBalanceAsync_LiabilityPayment_ReducesLiabilityBalance()
+    {
+        // Liability account starts with €500 owed. After a €200 payment, balance is €300.
+        var assetAccount     = await CreateAssetAccountAsync();
+        var liabilityAccount = await CreateLiabilityAccountAsync(openingBalance: 500m);
+
+        _fixture.Db.LiabilityPayments.Add(new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = DateOnly.FromDateTime(DateTime.Today),
+            Amount             = 200m,
+            AssetAccountId     = assetAccount.Id,
+            LiabilityAccountId = liabilityAccount.Id,
+            CreatedAt          = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var balance = await _service.GetBalanceAsync(liabilityAccount.Id);
+
+        balance.Should().Be(300m);
     }
 }

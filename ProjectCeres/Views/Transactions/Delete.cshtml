@@ -1,8 +1,25 @@
-@model Transaction
+@model TransactionEditViewModel
 @{ ViewData["Title"] = "Delete Transaction"; }
 
-<h1>Delete this transaction?</h1>
-<p><strong>@(Model.Description ?? Model.Category.Name)</strong> — @Model.Date.ToString("dd/MM/yyyy") — @NumberFormatHelper.FormatAmount(Model.Amount, ViewData["NumberFormat"] as string)</p>
+<h1>Delete this @(Model.TransactionType == "LiabilityPayment" ? "liability payment" : "transaction")?</h1>
+
+@if (Model.TransactionType == "LiabilityPayment")
+{
+    <p>
+        <strong>@(Model.Description ?? "Liability Payment")</strong> —
+        @Model.Date.ToString("dd/MM/yyyy") —
+        @NumberFormatHelper.FormatAmount(Model.Amount, ViewData["NumberFormat"] as string)
+    </p>
+}
+else
+{
+    <p>
+        <strong>@(Model.Description ?? "Transaction")</strong> —
+        @Model.Date.ToString("dd/MM/yyyy") —
+        @NumberFormatHelper.FormatAmount(Model.Amount, ViewData["NumberFormat"] as string)
+    </p>
+}
+
 <p>This cannot be undone.</p>
 
 <form asp-action="Delete" method="post">

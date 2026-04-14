@@ -143,12 +143,28 @@ public class AccountService(AppDbContext db) : IAccountService
         // For regular transactions:
         //   Assets:      income adds, expense subtracts.
         //   Liabilities: expense adds (increases what you owe), income subtracts (e.g. refund).
-        return transactions.Sum(t =>
+        decimal balance = transactions.Sum(t =>
         {
             if (t.Category.IsSystem) return t.Amount;
             bool isIncome = t.Category.CategoryType.Name == "Income";
             bool addsToBalance = isLiability ? !isIncome : isIncome;
             return addsToBalance ? t.Amount : -t.Amount;
         });
+
+        // Liability payments reduce the balance on both sides:
+        //   Asset account:     money leaves  → subtract the payment amount
+        //   Liability account: debt reduces  → subtract the payment amount
+        var paymentsOut = await db.LiabilityPayments
+            .Where(p => p.AssetAccountId == id)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+
+        var paymentsIn = await db.LiabilityPayments
+            .Where(p => p.LiabilityAccountId == id)
+            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+
+        balance -= paymentsOut;
+        balance -= paymentsIn;
+
+        return balance;
     }
 }
