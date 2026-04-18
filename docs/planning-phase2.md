@@ -92,6 +92,8 @@ sequenceDiagram
 
 ### Budgeting (Phase 2)
 
+> **Schema note:** The `Budget`, `CategoryBudget` entities and `BudgetService` were scaffolded in Phase 1 as foundation. What Phase 2 adds is the controller, views, and dashboard integration — not the data model.
+
 **Category Budgets — monthly spending caps**
 
 - Set a monthly limit per expense category (e.g. Groceries ≤ €300/month)
@@ -158,6 +160,20 @@ Distinct from reports: reports are formal documents produced on demand; these ar
 ---
 
 ## Open Questions (Phase 2)
+
+- [ ] **Irregular income baseline budgeting** — Standard monthly budgets assume fixed income, but 68% of freelancers report struggling with variable income. Category and goal budgets could be evaluated against a rolling average income baseline (e.g. last 6 or 12 months) rather than a fixed monthly cap. This would make budgets that flex with how freelancers actually earn, instead of lying to them during lean months. No data model or UX decision made.
+
+- [ ] **"Can I afford this right now?" financial health snapshot** — The most-cited pain point in Monarch Money user research: the app shows what happened, never what to do next. A lightweight health snapshot could answer "am I okay this month?" using already-derived values: runway (months of expenses covered by current assets), whether this month's income is above or below the rolling baseline, and budget burn rate. No charts or AI required — purely arithmetic on existing data. No design decision made.
+
+- [ ] **Tax reserve envelopes** — Freelancers mentally earmark a portion of their account balance for quarterly tax obligations (IRPF, IVA), but the net worth dashboard counts that money as spendable. A tax reserve mechanism would let users mark an amount as "already spoken for," reducing the displayed spendable balance without creating a new transaction. Could be modeled as a virtual sub-account, a reserved-amount field on Account, or a special-purpose transfer to a dedicated reserve account. No data model decision made.
+
+- [ ] **Upcoming obligations view** — A forward-looking read-only list of known fixed obligations due within the next 30 days (drawn from recurring transaction templates) compared against current account balances. The goal is to surface "you have €900 in obligations due before the end of the month and €1,100 in your checking account" before the user has already spent the money. Distinct from the reminders system — this is a planning view, not a confirmation flow. No design decision made.
+
+- [ ] **Liability payoff projection** — Every tool shows a debt balance; none show "at my current payment pace, when is this paid off?" or "if I pay €X extra this month, how much interest do I save?" This could be a lightweight projection panel on the liability account view, using the average monthly payment derived from transaction history and a user-supplied interest rate. No data model decision made — interest rate would need to be an optional field on liability accounts.
+
+- [ ] **Guided onboarding for spreadsheet refugees** — A first-run experience that walks a new user through entering what they own and what they owe, producing an immediate net worth number as a payoff. The primary Phase 2 motivation is readiness for Phase 3: when the app opens to beta users, cold onboarding is the first impression. YNAB's largest churn driver is complexity before value — users abandon before they understand the product. No UX or flow decision made.
+
+---
 
 **How should recurring reminders notify the user, and how should `DayOfPeriod` be used?**
 

@@ -30,6 +30,20 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
             .AddRange(DefaultDefinitions.FileTypes.Documents.PDF())
     }.Build();
 
+    public async Task ValidateAsync(IFormFile file)
+    {
+        if (file.Length == 0)
+            throw new InvalidOperationException("Uploaded file is empty.");
+        if (file.Length > MaxFileSizeBytes)
+            throw new InvalidOperationException("File exceeds the 10 MB limit.");
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var detectedMime = DetectMime(ms.ToArray());
+        if (!AllowedMimeTypes.ContainsKey(detectedMime))
+            throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
+    }
+
     public async Task<TransactionAttachment> UploadAsync(Guid transactionId, IFormFile file)
     {
         if (file.Length == 0)
@@ -49,7 +63,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
 
         var detectedMime = DetectMime(bytes);
         if (!AllowedMimeTypes.TryGetValue(detectedMime, out var extension))
-            throw new InvalidOperationException($"File type '{detectedMime}' is not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
+            throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
 
         // Build a safe stored path — no user-supplied values touch the filesystem.
         var relativePath = Path.Combine("uploads", transactionId.ToString(), $"{Guid.NewGuid()}{extension}");

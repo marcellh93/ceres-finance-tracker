@@ -12,7 +12,7 @@ public interface ITransactionService
         int offset = 0);
     Task<int> CountAsync(Guid? accountId = null, DateOnly? from = null, DateOnly? to = null);
     Task<TransactionEditViewModel?> GetByIdForEditAsync(Guid id);
-    Task CreateAsync(TransactionCreateViewModel vm);
+    Task<Guid> CreateAsync(TransactionCreateViewModel vm);
     Task UpdateAsync(TransactionEditViewModel vm);
     /// <summary>Hard delete with no soft-delete fallback.</summary>
     Task DeleteAsync(Guid id);

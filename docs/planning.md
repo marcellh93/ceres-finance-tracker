@@ -89,6 +89,7 @@ work, the cost of fixing it here is low. That cost grows significantly once Phas
 - Investment accounts (brokerage, retirement funds, pensions) are treated as Asset accounts — balance is tracked at the account level, no individual holdings in this phase
 - Seeded with a small set of generic placeholder accounts on first run — users are expected to rename them to their actual account names or delete them if not applicable
 - **Opening balance prompt** — the account creation form includes a starting balance field (defaults to zero). On save, the app automatically creates an opening balance transaction for the entered amount, tagged to the system "Opening Balance" category. The user never has to construct this manually. The transaction is visible in history and editable if the amount was entered incorrectly.
+- **Account ledger (`/Accounts/{id}/Ledger`)** — a dedicated sub-page showing every entry that contributes to the account balance in chronological order with a running balance column. Includes: opening balance (IsSystem transaction), regular transactions, transfers in/out, and liability payments. The final row's running balance matches the balance shown on the Accounts index. This is the trust and auditability feature — the user can independently verify how the app derived any balance.
 
 **Create Account with Opening Balance — flow**
 
@@ -130,6 +131,7 @@ sequenceDiagram
 
 - Record transactions with: date, amount, description, category, account
 - Balance updates automatically per account
+- **File attachments on create** — the New Transaction form includes an optional file attachment field (regular transactions only). The file is validated (magic bytes + size) before the transaction is saved. If validation fails, the form returns with an inline error and no transaction is created. If the transaction saves but the attachment upload fails, the user is redirected to the Edit page with an error message. If no file is provided, the transaction saves and redirects to Index as normal. Attachments can also be added or removed on the Edit page.
 - **Liability payments** — a single-entry form on the Transactions page lets users record a payment from an asset account toward a liability account in one step. The form has a type toggle ("Transaction" / "Liability Payment") that conditionally shows/hides the relevant fields. Liability payments appear inline in the Transactions Index list alongside regular transactions. They are excluded from income/expense report totals. See ADR-0031.
 
 **Transaction classification logic**
@@ -159,6 +161,10 @@ flowchart TD
     D -- No --> Z3[Reject: amount must be positive]
     D -- Yes --> E[Write Transfer row]
 ```
+
+**Transfer effect on account balance**
+
+Transfers are included in `GetBalanceAsync`. The source account balance decreases by the transfer amount and the destination account balance increases by the same amount. This is calculated from the `Transfers` table directly — there are no `Transaction` rows created for a transfer.
 
 **Account deletion rule**
 
@@ -295,48 +301,11 @@ Always live — no generation required. Updates automatically as transactions ar
 
 ## Testing Strategy
 
-### Stack
-
-- **xUnit** — standard testing framework for .NET (used by ASP.NET Core itself)
-- **Moq** — mocking library for isolating dependencies in unit tests
-- **FluentAssertions** — makes test assertions read as plain English, cleaner than default xUnit assertions
-
-### Types of Tests
-
-| Type        | What it tests                                                | Database? | Introduced          |
-| ----------- | ------------------------------------------------------------ | --------- | ------------------- |
-| Unit        | Individual calculation or business logic method in isolation | No        | Phase 1             |
-| Integration | EF Core queries and controllers against a real test database | Yes       | Phase 1 (as needed) |
-| E2E         | Full browser-driven flows                                    | Yes       | Out of scope        |
-
-E2E tests (Playwright, Selenium) are explicitly out of scope.
-
-### What Gets Unit Tested (Priority Order)
-
-1. **Financial calculations** — net worth, cash flow, account balance, currency-scoped totals.
-2. **Business rules** — e.g. transfer source and destination must share the same currency, amount must be positive.
-3. **Report query logic** — filters, date ranges, category/account scoping.
-
-### What Gets Integration Tested
-
-- EF Core queries that involve joins or aggregations (balance calculation, report queries)
-- Multi-user data scoping in Phase 3 — tests that confirm one user cannot access another user's data
-
-### Integration Test Database Strategy
-
-- Dedicated local database: `project_ceres_test`
-- EF Core applies migrations at the start of each test run via `_db.Database.Migrate()`
-- Each test class wraps each test in a transaction that is rolled back after the test completes
-- Connection string stored in `appsettings.Test.json` (gitignored) or via `dotnet user-secrets`
-
-> **Testcontainers** deferred to Phase 3 when CI/CD pipelines are introduced.
+See [docs/testing.md](testing.md) for the full testing strategy — stack, TDD workflow, what gets unit vs. integration tested, and CI/CD scope.
 
 ---
 
 ## Open Questions / Decisions
-
-### Unresolved — Phase 1
-
 
 ### Unresolved — blocks Phase 2
 
@@ -356,7 +325,8 @@ E2E tests (Playwright, Selenium) are explicitly out of scope.
 - [ ] **MVC → Web API decoupling (Phase 3)** — no migration plan exists. Must be designed before Phase 3 frontend work begins.
 - [ ] **Concurrency handling (Phase 3)** — last-write-wins accepted for Phase 1/2. Before Phase 3, decide whether to add EF Core optimistic concurrency tokens (`RowVersion`) to mutable entities.
 - [ ] **Production migration strategy (Phase 3)** — `dotnet ef database update` vs. pre-deploy CI/CD step vs. reviewed SQL scripts. Option 2 or 3 recommended.
-- [ ] **CI service for Phase 3** — no CI provider chosen. Required for automated vulnerability scanning and build verification before hosting.
+- [ ] **CI service for Phase 3** — no CI provider chosen. GitHub Actions is the leading candidate. Required for automated build verification and vulnerability scanning before hosting.
+- [ ] **CD strategy for Phase 3** — no deployment pipeline designed. Must define: what triggers a deploy (merge to main, tag, manual), whether a staging environment exists, how database migrations run in the pipeline, and whether rollback is supported.
 - [ ] **Mobile app (Phase 3+)** — React Native is the leading candidate. No scope, timeline, or platform targets defined.
 
 ### Resolved (archived)

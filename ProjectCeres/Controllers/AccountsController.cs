@@ -116,6 +116,13 @@ public class AccountsController(IAccountService accountService, AppDbContext db)
         return RedirectToAction(nameof(Index));
     }
 
+    public async Task<IActionResult> Ledger(Guid id)
+    {
+        var vm = await accountService.GetLedgerAsync(id);
+        if (vm is null) return NotFound();
+        return View(vm);
+    }
+
     private async Task PopulateViewBagAsync()
     {
         ViewBag.AccountTypes = new SelectList(

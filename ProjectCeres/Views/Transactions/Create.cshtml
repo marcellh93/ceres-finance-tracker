@@ -3,7 +3,7 @@
 
 <h1>New Transaction</h1>
 
-<form asp-action="Create" method="post">
+<form asp-action="Create" method="post" enctype="multipart/form-data">
     <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
 
     <div class="form-group">
@@ -51,6 +51,14 @@
             <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
                 <option value="">— None —</option>
             </select>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="Attachment"></label>
+            <input asp-for="Attachment" type="file" class="form-control"
+                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
+            <small>Optional. Max 10 MB. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
+            <span asp-validation-for="Attachment" class="field-error"></span>
         </div>
     </div>
 

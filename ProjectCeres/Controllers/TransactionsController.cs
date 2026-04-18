@@ -7,7 +7,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Controllers;
 
-public class TransactionsController(ITransactionService transactionService, AppDbContext db) : Controller
+public class TransactionsController(ITransactionService transactionService, IFileAttachmentService attachmentService, AppDbContext db) : Controller
 {
     private const int PageSize = 50;
 
@@ -58,13 +58,22 @@ public class TransactionsController(ITransactionService transactionService, AppD
             return View(vm);
         }
 
+        // Validate attachment before saving anything
+        if (vm.Attachment is not null)
+        {
+            try { await attachmentService.ValidateAsync(vm.Attachment); }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(nameof(vm.Attachment), ex.Message);
+                await PopulateViewBagAsync();
+                return View(vm);
+            }
+        }
+
+        Guid newId;
         try
         {
-            await transactionService.CreateAsync(vm);
-            TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
-                ? "Liability payment recorded."
-                : "Transaction recorded.";
-            return RedirectToAction(nameof(Index));
+            newId = await transactionService.CreateAsync(vm);
         }
         catch (InvalidOperationException ex)
         {
@@ -72,6 +81,21 @@ public class TransactionsController(ITransactionService transactionService, AppD
             await PopulateViewBagAsync();
             return View(vm);
         }
+
+        if (vm.Attachment is not null)
+        {
+            try { await attachmentService.UploadAsync(newId, vm.Attachment); }
+            catch (InvalidOperationException ex)
+            {
+                TempData["ErrorMessage"] = $"Transaction saved, but the attachment could not be uploaded: {ex.Message}";
+                return RedirectToAction(nameof(Edit), new { id = newId });
+            }
+        }
+
+        TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
+            ? "Liability payment recorded."
+            : "Transaction recorded.";
+        return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Edit(Guid id)

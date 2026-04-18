@@ -1,0 +1,45 @@
+@model AccountLedgerViewModel
+@using ProjectCeres.Helpers
+@{ ViewData["Title"] = $"{Model.AccountName} — Ledger"; }
+
+<h1>@Model.AccountName — Ledger</h1>
+<p>Every entry that contributes to this account's balance, in chronological order. The final running balance should match the balance shown on the Accounts page.</p>
+
+@if (!Model.Entries.Any())
+{
+    <p>No entries found for this account.</p>
+}
+else
+{
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th class="text-right">Amount</th>
+                <th class="text-right">Running Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in Model.Entries)
+            {
+                <tr>
+                    <td>@entry.Date.ToString("dd/MM/yyyy")</td>
+                    <td>@entry.Description</td>
+                    <td>@(entry.CategoryName ?? "—")</td>
+                    <td>@entry.EntryType</td>
+                    <td class="text-right @(entry.SignedAmount >= 0 ? "amount-income" : "amount-expense")">
+                        @(entry.SignedAmount >= 0 ? "+" : "")@Model.CurrencySymbol @NumberFormatHelper.FormatAmount(Math.Abs(entry.SignedAmount), ViewData["NumberFormat"] as string)
+                    </td>
+                    <td class="text-right @(entry.RunningBalance >= 0 ? "amount-income" : "amount-expense")">
+                        @Model.CurrencySymbol @NumberFormatHelper.FormatAmount(entry.RunningBalance, ViewData["NumberFormat"] as string)
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<a asp-action="Index" class="btn btn-secondary">← Accounts</a>

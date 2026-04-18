@@ -37,6 +37,7 @@ public class TransactionService(
         {
             Id               = t.Id,
             Date             = t.Date,
+            CreatedAt        = t.CreatedAt,
             Amount           = t.Amount,
             Description      = t.Description,
             TransactionType  = "Regular",
@@ -64,6 +65,7 @@ public class TransactionService(
         {
             Id                   = p.Id,
             Date                 = p.Date,
+            CreatedAt            = p.CreatedAt,
             Amount               = p.Amount,
             Description          = p.Description,
             TransactionType      = "LiabilityPayment",
@@ -75,7 +77,7 @@ public class TransactionService(
         return txItems
             .Concat(lpItems)
             .OrderByDescending(i => i.Date)
-            .ThenByDescending(i => i.Id)   // stable secondary sort
+            .ThenByDescending(i => i.CreatedAt)
             .Skip(offset)
             .Take(limit)
             .ToList();
@@ -152,12 +154,12 @@ public class TransactionService(
         return null;
     }
 
-    public async Task CreateAsync(TransactionCreateViewModel vm)
+    public async Task<Guid> CreateAsync(TransactionCreateViewModel vm)
     {
         if (vm.TransactionType == "LiabilityPayment")
         {
-            await liabilityPaymentService.CreateAsync(vm);
-            return;
+            var payment = await liabilityPaymentService.CreateAsync(vm);
+            return payment.Id;
         }
 
         if (vm.CategoryId is null)
@@ -179,6 +181,7 @@ public class TransactionService(
 
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync();
+        return transaction.Id;
     }
 
     public async Task UpdateAsync(TransactionEditViewModel vm)

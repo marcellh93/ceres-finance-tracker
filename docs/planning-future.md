@@ -21,6 +21,39 @@ Goal: extend the app to serve freelancers and autónomos specifically.
 
 ---
 
+## Open Questions (Phase 4)
+
+- [ ] **Business vs. personal tagging — schema and UX design** — The feature table lists "Personal vs. Business flag on Accounts and Categories" but no design decisions have been made. Key open questions: (1) Is it a binary flag or a multi-value tag (e.g. personal / business / mixed)? (2) Does it apply only to Accounts and Categories, or also to individual Transactions? (3) How does the income/expense report present mixed-use accounts — split proportionally, show both, or require explicit per-transaction tagging? Autónomos in Spain who use the same bank account for personal and professional activity will need a clear answer to (3) before this feature is useful. No decisions made.
+
+---
+
+## Maybe / Future Consideration
+
+These ideas have merit but are not assigned to a phase yet. Revisit when the app is in daily use.
+
+### Receipt scanning and line-item tracking
+
+Upload a receipt image (or scan via phone) → an LLM parses it → the transaction total is auto-filled and line items are stored as structured metadata linked to the transaction.
+
+**Data model sketch:**
+- `Transaction` → many `ReceiptLineItems`: `StoreName`, `ProductName`, `Quantity`, `UnitPrice`, `LineTotal`, `ParsedAt`
+- Receipt image lives in `TransactionAttachment` (already planned)
+
+**What it enables (personal history only, no cross-user data):**
+- Itemized breakdown per shopping trip
+- Your own price trend on a given product over time (e.g. olive oil cost history across receipts)
+- Budget breakdown by item if line items are tagged
+
+**Known limitations / open questions:**
+- Product name normalization is hard — same item prints differently across stores and receipts
+- Value only materializes after months of consistent use
+- LLM parsing adds cost and a network dependency — conflicts with the local-first Phase 1 ethos
+- Without cross-user data, market comparison ("Mercadona vs. Carrefour for this basket") is not possible
+
+**Gate:** Only worth considering after Phase 3 (auth + multi-user) is stable, and only if the app is in consistent daily use.
+
+---
+
 ## Phase 5 — Business Model
 
 **Gate: Phase 4 must be stable. See [`business-model.md`](business-model.md) for full detail.**

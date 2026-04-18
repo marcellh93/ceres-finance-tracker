@@ -25,14 +25,15 @@ public class SettingsService(AppDbContext db) : ISettingsService
 
     public async Task UpdateAsync(SettingsEditViewModel vm)
     {
-        var settings = await db.Settings.FirstOrDefaultAsync()
-            ?? CreateDefaults();
+        var existing = await db.Settings.FirstOrDefaultAsync();
+        var isNew    = existing is null;
+        var settings = existing ?? CreateDefaults();
 
         settings.NumberFormat      = vm.NumberFormat;
         settings.DateFormat        = vm.DateFormat;
         settings.DefaultCurrencyId = vm.DefaultCurrencyId!.Value;
 
-        if (settings.Id == 0)
+        if (isNew)
             db.Settings.Add(settings);
 
         await db.SaveChangesAsync();

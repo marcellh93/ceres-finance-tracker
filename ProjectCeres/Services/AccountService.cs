@@ -165,6 +165,141 @@ public class AccountService(AppDbContext db) : IAccountService
         balance -= paymentsOut;
         balance -= paymentsIn;
 
+        var transfersOut = await db.Transfers
+            .Where(t => t.SourceAccountId == id)
+            .SumAsync(t => (decimal?)t.Amount) ?? 0;
+
+        var transfersIn = await db.Transfers
+            .Where(t => t.DestAccountId == id)
+            .SumAsync(t => (decimal?)t.Amount) ?? 0;
+
+        balance += transfersIn;
+        balance -= transfersOut;
+
         return balance;
+    }
+
+    public async Task<AccountLedgerViewModel?> GetLedgerAsync(Guid id)
+    {
+        var account = await db.Accounts
+            .Include(a => a.AccountType)
+            .Include(a => a.Currency)
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (account is null) return null;
+
+        bool isLiability = account.AccountType.Name == "Liability";
+
+        // --- Transactions (including Opening Balance) ---
+        var transactions = await db.Transactions
+            .Where(t => t.AccountId == id)
+            .Include(t => t.Category).ThenInclude(c => c.CategoryType)
+            .ToListAsync();
+
+        var txEntries = transactions.Select(t =>
+        {
+            decimal signed;
+            string entryType;
+
+            if (t.Category.IsSystem)
+            {
+                signed    = t.Amount;
+                entryType = "Opening Balance";
+            }
+            else
+            {
+                bool isIncome      = t.Category.CategoryType.Name == "Income";
+                bool addsToBalance = isLiability ? !isIncome : isIncome;
+                signed    = addsToBalance ? t.Amount : -t.Amount;
+                entryType = "Transaction";
+            }
+
+            return new LedgerEntryViewModel
+            {
+                Date         = t.Date,
+                CreatedAt    = t.CreatedAt,
+                Description  = t.Description ?? t.Category.Name,
+                EntryType    = entryType,
+                CategoryName = t.Category.IsSystem ? null : t.Category.Name,
+                SignedAmount = signed
+            };
+        });
+
+        // --- Transfers ---
+        var transfersOut = await db.Transfers
+            .Where(t => t.SourceAccountId == id)
+            .Include(t => t.DestAccount)
+            .ToListAsync();
+
+        var transfersIn = await db.Transfers
+            .Where(t => t.DestAccountId == id)
+            .Include(t => t.SourceAccount)
+            .ToListAsync();
+
+        var transferEntries = transfersOut.Select(t => new LedgerEntryViewModel
+        {
+            Date         = t.Date,
+            CreatedAt    = t.CreatedAt,
+            Description  = t.Description ?? $"Transfer to {t.DestAccount.Name}",
+            EntryType    = "Transfer",
+            SignedAmount = -t.Amount
+        }).Concat(transfersIn.Select(t => new LedgerEntryViewModel
+        {
+            Date         = t.Date,
+            CreatedAt    = t.CreatedAt,
+            Description  = t.Description ?? $"Transfer from {t.SourceAccount.Name}",
+            EntryType    = "Transfer",
+            SignedAmount = t.Amount
+        }));
+
+        // --- Liability payments ---
+        var paymentsOut = await db.LiabilityPayments
+            .Where(p => p.AssetAccountId == id)
+            .Include(p => p.LiabilityAccount)
+            .ToListAsync();
+
+        var paymentsIn = await db.LiabilityPayments
+            .Where(p => p.LiabilityAccountId == id)
+            .Include(p => p.AssetAccount)
+            .ToListAsync();
+
+        var paymentEntries = paymentsOut.Select(p => new LedgerEntryViewModel
+        {
+            Date         = p.Date,
+            CreatedAt    = p.CreatedAt,
+            Description  = p.Description ?? $"Payment to {p.LiabilityAccount.Name}",
+            EntryType    = "Liability Payment",
+            SignedAmount = -p.Amount
+        }).Concat(paymentsIn.Select(p => new LedgerEntryViewModel
+        {
+            Date         = p.Date,
+            CreatedAt    = p.CreatedAt,
+            Description  = p.Description ?? $"Payment from {p.AssetAccount.Name}",
+            EntryType    = "Liability Payment",
+            SignedAmount = -p.Amount
+        }));
+
+        // --- Merge, sort, compute running balance ---
+        var allEntries = txEntries
+            .Concat(transferEntries)
+            .Concat(paymentEntries)
+            .OrderBy(e => e.Date)
+            .ThenBy(e => e.CreatedAt)
+            .ToList();
+
+        decimal running = 0;
+        foreach (var entry in allEntries)
+        {
+            running             += entry.SignedAmount;
+            entry.RunningBalance = running;
+        }
+
+        return new AccountLedgerViewModel
+        {
+            AccountId      = account.Id,
+            AccountName    = account.Name,
+            CurrencySymbol = account.Currency.Symbol,
+            Entries        = allEntries
+        };
     }
 }

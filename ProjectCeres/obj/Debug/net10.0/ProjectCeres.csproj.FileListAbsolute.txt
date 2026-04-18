@@ -122,4 +122,4 @@
 <repo>/ProjectCeres/obj/Debug/net10.0/ProjectCeres.genruntimeconfig.cache
 <repo>/ProjectCeres/obj/Debug/net10.0/ref/ProjectCeres.dll
 <repo>/ProjectCeres/bin/Debug/net10.0/package.json
-<repo>/ProjectCeres/obj/Debug/net10.0/compressed/0djvs58ynv-{0}-fxwzl3fk28-fxwzl3fk28.gz
+<repo>/ProjectCeres/obj/Debug/net10.0/compressed/0djvs58ynv-{0}-dwoevwd53d-dwoevwd53d.gz

@@ -3,7 +3,7 @@
 
 <h1>Edit Transaction</h1>
 
-<form asp-action="Edit" method="post">
+<form asp-action="Edit" method="post" id="edit-transaction-form">
     <input asp-for="Id" type="hidden" />
     <input asp-for="TransactionType" type="hidden" />
     <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
@@ -80,14 +80,9 @@
         <input asp-for="Description" class="form-control" />
         <span asp-validation-for="Description" class="field-error"></span>
     </div>
-
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
-    </div>
 </form>
 
-@* Attachments section — only shown for regular transactions *@
+@* Attachments section — only shown for regular transactions, placed before form actions *@
 @if (Model.TransactionType == "Regular" &&
      ViewBag.Attachments is IEnumerable<ProjectCeres.Models.TransactionAttachment> attachments)
 {
@@ -128,6 +123,11 @@
         </form>
     </section>
 }
+
+    <div class="form-actions">
+        <button type="submit" form="edit-transaction-form" class="btn btn-primary">Save Changes</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </div>
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")

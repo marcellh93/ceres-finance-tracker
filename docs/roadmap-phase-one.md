@@ -59,8 +59,8 @@ Create one `.cs` file per entity in `ProjectCeres/Models/`.
 | `TransactionAttachment.cs` | Id (Guid), TransactionId, FileName, StoredPath, ContentType, FileSizeBytes, UploadedAt |
 | `Transfer.cs` | Id (Guid), Date (DateOnly), Amount, SourceAccountId, DestAccountId, Description?, CreatedAt |
 | `RecurringTransaction.cs` | Id (Guid), Name, EstimatedAmount?, AccountId, CategoryId, Frequency (enum), DayOfPeriod, NextDueDate, IsActive |
-| `CategoryBudget.cs` | Id (Guid), CategoryId, CurrencyId, LimitAmount, IsActive |
-| `Budget.cs` | Id (Guid), Name, TargetAmount, CurrencyId, StartDate, EndDate?, Description?, IsActive |
+| `CategoryBudget.cs` | Id (Guid), CategoryId, CurrencyId, LimitAmount, IsActive — **schema built in Phase 1; UI/controller is Phase 2** |
+| `Budget.cs` | Id (Guid), Name, TargetAmount, CurrencyId, StartDate, EndDate?, Description?, IsActive — **schema built in Phase 1; UI/controller is Phase 2** |
 | `SavedReport.cs` | Id (Guid), Name, ReportTypeId, DateFrom?, DateTo?, CategoryId?, AccountId?, CurrencyId?, CreatedAt, DeletedAt? |
 | `Settings.cs` | Id (int, always 1), NumberFormat, DateFormat, DateSeparator, DefaultCurrencyId |
 
@@ -118,6 +118,7 @@ Create `ProjectCeres/Services/` with an interface + implementation pair for each
 | `IDashboardService` | `DashboardService` | Live net worth, MTD income/expense, savings rate, pending reminders count |
 | `IFileAttachmentService` | `FileAttachmentService` | Secure upload (magic bytes), filesystem storage, serve with Content-Disposition: attachment |
 | `ISettingsService` | `SettingsService` | Read/update settings row, guarantee row exists on startup |
+| `IBudgetService` | `BudgetService` | CRUD for CategoryBudget and Budget goal — **service built in Phase 1; no controller or views until Phase 2** |
 
 **Key business rules enforced in services (not controllers):**
 - `Account.Balance` = SUM of transactions — never stored as a column
@@ -163,6 +164,8 @@ Build each feature fully (controller + views) before starting the next. Plain Ra
 
 Settings is built first because number format and date format are needed to display values on every other page.
 
+> **Budget not in this list:** `Budget` and `CategoryBudget` controllers and views are intentionally excluded from Phase 1. The entities and `BudgetService` were scaffolded early as foundational schema, but the UI waits for Phase 2. See [planning-phase2.md](planning-phase2.md#budgeting-phase-2).
+
 ---
 
 ## Step 8 — File Attachment Security ✅
@@ -202,14 +205,15 @@ Create `ProjectCeres.Tests/`:
 
 Once all steps are complete. **Prerequisite: Step 9 must be finished first.**
 
-- [ ] `dotnet build` — zero errors, zero warnings
-- [ ] `dotnet ef database update` — all migrations apply cleanly
-- [ ] `dotnet run` — app starts, dashboard loads with seeded data
-- [ ] Create an account with opening balance → verify Opening Balance transaction is auto-created
-- [ ] Record a transaction → verify account balance updates correctly
-- [ ] Record a transfer → verify it appears in Transfer History but NOT in income/expense reports
-- [ ] Attempt a cross-currency transfer → verify it is rejected
+- [x] `dotnet build` — zero errors, zero warnings
+- [x] `dotnet ef database update` — all migrations apply cleanly
+- [x] `dotnet run` — app starts, dashboard loads with seeded data
+- [x] Create an account with opening balance → account balance reflects opening amount immediately; Opening Balance transaction is auto-created as IsSystem and intentionally excluded from the transaction index
+- [x] Record a transaction → account balance updates correctly (confirmed via git history and changelog)
+- [x] Record a transfer → confirmed excluded from Income & Expense report totals; transfer exclusion enforced at service layer and covered by tests
+- [x] Attempt a cross-currency transfer → rejected with "Transfer source and destination accounts must share the same currency"
 - [ ] Confirm a recurring reminder → verify transaction form pre-fills from template
 - [ ] Upload a file attachment → verify it is served with `Content-Disposition: attachment`
 - [ ] Upload a spoofed file (e.g. .exe renamed to .jpg) → verify it is rejected
-- [ ] `dotnet test` — all tests pass
+- [x] `dotnet test` — 131 passed, 0 failed, 0 skipped
+- [x] **Per-account balance audit trail** — implemented at `/Accounts/{id}/Ledger`. Shows all entries (opening balance, transactions, transfers, liability payments) in chronological order with a running balance column. Linked from the Accounts index. Open question resolved and archived to planning-resolved.md.

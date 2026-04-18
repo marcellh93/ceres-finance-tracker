@@ -76,6 +76,7 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild CSS on view cha
 ## Docs
 
 - `docs/planning.md` — Phase 1 features, working assumptions, open questions. Phase 2+: see `planning-phase2.md`, `planning-phase3.md`, `planning-future.md`
+- `docs/testing.md` — testing strategy, TDD workflow (required), CI/CD scope
 - `docs/models.md` — all entities, relationships, normalization, deletion rules
 - `docs/architecture.md` — layer model, request flow, how the architecture evolves across phases
 - `docs/security-model.md` — threat model, data protection rules, access control rules (unified view)

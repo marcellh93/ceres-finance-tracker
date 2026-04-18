@@ -17,4 +17,6 @@ public interface IAccountService
     Task<decimal> GetOpeningBalanceAsync(Guid id);
     /// <summary>Returns the opening balance transaction date, or null if no opening balance exists.</summary>
     Task<DateOnly?> GetOpeningBalanceDateAsync(Guid id);
+    /// <summary>Returns all ledger entries for an account in chronological order with a running balance.</summary>
+    Task<AccountLedgerViewModel?> GetLedgerAsync(Guid id);
 }

@@ -117,3 +117,5 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
 - MVC → Web API decoupling
 - Production migration strategy
 - CI service
+- CD strategy
+- E2E testing — Playwright chosen; implement after Phase 2 React migration stabilizes. See [testing.md](testing.md#e2e-tool-playwright).
