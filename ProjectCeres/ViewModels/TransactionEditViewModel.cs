@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace ProjectCeres.ViewModels;
 
@@ -33,4 +34,7 @@ public class TransactionEditViewModel
     // LiabilityPayment field
     [Display(Name = "Liability Account")]
     public Guid? LiabilityAccountId { get; set; }
+
+    [Display(Name = "Attachment")]
+    public IFormFile? Attachment { get; set; }
 }

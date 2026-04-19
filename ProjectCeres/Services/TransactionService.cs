@@ -8,7 +8,8 @@ namespace ProjectCeres.Services;
 public class TransactionService(
     AppDbContext db,
     IAccountService accountService,
-    ILiabilityPaymentService liabilityPaymentService) : ITransactionService
+    ILiabilityPaymentService liabilityPaymentService,
+    IFileAttachmentService attachmentService) : ITransactionService
 {
     public async Task<IEnumerable<TransactionListItemViewModel>> GetRecentAsync(
         Guid? accountId = null,
@@ -212,9 +213,15 @@ public class TransactionService(
     public async Task DeleteAsync(Guid id)
     {
         // Try regular transaction first
-        var transaction = await db.Transactions.FindAsync(id);
+        var transaction = await db.Transactions
+            .Include(t => t.Attachments)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
         if (transaction is not null)
         {
+            foreach (var attachment in transaction.Attachments.ToList())
+                await attachmentService.DeleteAsync(attachment.Id);
+
             db.Transactions.Remove(transaction);
             await db.SaveChangesAsync();
             return;

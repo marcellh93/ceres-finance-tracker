@@ -9,6 +9,7 @@
 
 **Transactions**
 - File attachment field on the New Transaction form — optional, regular transactions only; validates magic bytes and file size before saving the transaction record
+- File attachment upload on Edit Transaction — new attachment uploaded as part of the Save Changes submission; no separate Upload button required
 
 **Services**
 - `IFileAttachmentService.ValidateAsync` — pre-save file validation method that runs size and magic-byte checks without writing anything; used by the Create flow to fail fast before any DB write
@@ -17,19 +18,25 @@
 
 **Transactions**
 - `ITransactionService.CreateAsync` now returns `Guid` (the new record's ID) instead of `void`, enabling post-save operations like attaching a file
-- Transaction Edit view: attachments section moved above the Save/Cancel buttons for better UX; submit button linked back to form via `form=` attribute to support the layout
+- Transaction form field order unified: Attachment field moved to after Description on both Create and Edit views; on Create it was previously between Budget and Amount
+- Transaction Edit view: attachment upload merged into main form via `enctype="multipart/form-data"`; separate Upload form and button removed; Save Changes now handles both transaction edits and new attachment upload in one POST
+- Transaction Edit view: per-attachment Remove forms moved outside the main `<form>` element and linked via HTML `form=` attribute — nested forms are silently ignored by browsers
+- `TransactionService.DeleteAsync` now loads attachments and calls `FileAttachmentService.DeleteAsync` for each before removing the transaction row, ensuring disk cleanup on transaction delete
+- `TransactionEditViewModel` — added `IFormFile? Attachment` property to support upload-on-save on the Edit flow
 
 **Documentation**
-- `docs/planning.md` — added account ledger sub-page and attachment-on-create flow to Phase 1 features; balance audit trail open question removed (resolved)
+- `docs/planning.md` — added account ledger sub-page and attachment-on-create flow to Phase 1 features; balance audit trail open question removed (resolved); attachment-on-edit flow documented
 - `docs/planning-resolved.md` — balance audit trail decision archived
 - `docs/planning-phase2.md` — added schema note clarifying Budget/CategoryBudget entities were scaffolded in Phase 1
-- `docs/roadmap-phase-one.md` — Budget phase placement clarified in Steps 2, 5, and 7; verification checklist updated with session results; balance audit trail item marked complete
+- `docs/roadmap-phase-one.md` — Budget phase placement clarified in Steps 2, 5, and 7; verification checklist updated; file attachment item marked complete
 - `docs/security-model.md` — added pre-save `ValidateAsync` pattern to upload validation rules
 
 ### Fixed
 
 **Transactions**
 - Attachment upload section was absent from the New Transaction (Create) form — attachments could only be added by editing an existing transaction
+- Remove button on Edit Transaction did not delete the file from disk or the DB record — the Remove `<form>` was nested inside the main edit `<form>`, causing browsers to silently discard it and submit the edit action instead
+- Deleting a transaction did not clean up its attached files from disk — `TransactionService.DeleteAsync` now iterates attachments and calls `FileAttachmentService.DeleteAsync` before removing the transaction row
 
 ---
 

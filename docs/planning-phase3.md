@@ -22,7 +22,7 @@ changes needed for any multi-user product.
 
 ## Planned Features (Phase 3)
 
-- **Authentication** — user registration and login with username + password (hashed with Argon2, never stored in plain text)
+- **Authentication** — user registration and login with username + password (hashed with Argon2, never stored in plain text), with optional social login (Google, Facebook, Apple, Microsoft) as an alternative credential method. Social login eliminates password storage complexity but introduces an external availability dependency — if the provider is down, users can't log in. If social login is implemented, it is offered alongside email/password, not as a replacement. TOTP MFA applies regardless of login method.
 
 **Login with TOTP — happy path**
 

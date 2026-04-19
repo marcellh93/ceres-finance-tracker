@@ -52,14 +52,6 @@
                 <option value="">— None —</option>
             </select>
         </div>
-
-        <div class="form-group">
-            <label asp-for="Attachment"></label>
-            <input asp-for="Attachment" type="file" class="form-control"
-                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
-            <small>Optional. Max 10 MB. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
-            <span asp-validation-for="Attachment" class="field-error"></span>
-        </div>
     </div>
 
     @* LiabilityPayment-only fields *@
@@ -86,6 +78,17 @@
         <span asp-validation-for="Description" class="field-error"></span>
     </div>
 
+    @* Attachment only applies to regular transactions *@
+    <div id="attachment-field">
+        <div class="form-group">
+            <label asp-for="Attachment"></label>
+            <input asp-for="Attachment" type="file" class="form-control"
+                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
+            <small>Optional. Max 10 MB. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
+            <span asp-validation-for="Attachment" class="field-error"></span>
+        </div>
+    </div>
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary" id="submit-btn">Record Transaction</button>
         <a asp-action="Index" class="btn btn-secondary">Cancel</a>
@@ -96,17 +99,19 @@
     @await Html.PartialAsync("_ValidationScriptsPartial")
     <script>
         (function () {
-            const radios         = document.querySelectorAll('input[name="TransactionType"]');
-            const regularFields  = document.getElementById('regular-fields');
+            const radios          = document.querySelectorAll('input[name="TransactionType"]');
+            const regularFields   = document.getElementById('regular-fields');
             const liabilityFields = document.getElementById('liability-fields');
-            const accountLabel   = document.getElementById('account-label');
-            const amountHint     = document.getElementById('amount-hint');
-            const submitBtn      = document.getElementById('submit-btn');
+            const attachmentField = document.getElementById('attachment-field');
+            const accountLabel    = document.getElementById('account-label');
+            const amountHint      = document.getElementById('amount-hint');
+            const submitBtn       = document.getElementById('submit-btn');
 
             function applyType(type) {
                 const isLiability = type === 'LiabilityPayment';
-                regularFields.style.display  = isLiability ? 'none' : '';
+                regularFields.style.display   = isLiability ? 'none' : '';
                 liabilityFields.style.display = isLiability ? '' : 'none';
+                attachmentField.style.display = isLiability ? 'none' : '';
                 accountLabel.textContent      = isLiability ? 'Paying From (Asset Account)' : 'Account';
                 amountHint.style.display      = isLiability ? 'none' : '';
                 submitBtn.textContent         = isLiability ? 'Record Payment' : 'Record Transaction';

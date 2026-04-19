@@ -213,7 +213,7 @@ Once all steps are complete. **Prerequisite: Step 9 must be finished first.**
 - [x] Record a transfer → confirmed excluded from Income & Expense report totals; transfer exclusion enforced at service layer and covered by tests
 - [x] Attempt a cross-currency transfer → rejected with "Transfer source and destination accounts must share the same currency"
 - [ ] Confirm a recurring reminder → verify transaction form pre-fills from template
-- [ ] Upload a file attachment → verify it is served with `Content-Disposition: attachment`
+- [x] Upload a file attachment → file saved to disk, linked to the transaction, served with `Content-Disposition: attachment`; Remove on Edit view deletes both the DB record and the file on disk
 - [ ] Upload a spoofed file (e.g. .exe renamed to .jpg) → verify it is rejected
 - [x] `dotnet test` — 131 passed, 0 failed, 0 skipped
 - [x] **Per-account balance audit trail** — implemented at `/Accounts/{id}/Ledger`. Shows all entries (opening balance, transactions, transfers, liability payments) in chronological order with a running balance column. Linked from the Accounts index. Open question resolved and archived to planning-resolved.md.

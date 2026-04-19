@@ -44,8 +44,8 @@ Triggered by: "update the changelog", "log what I did", "end of session", or whe
    - Reuse existing module names already present in the file — read the CHANGELOG before deciding on names to stay consistent.
 
 5. Insert the new entries under `## [Unreleased]`, under the correct section headers. If a section header (e.g. `### Fixed`) doesn't exist yet under `[Unreleased]`, create it. Maintain this section order: Added, Changed, Deprecated, Removed, Fixed, Security.
-6. Show the user the proposed additions before writing. Ask: _"Does this look right before I write it to the file?"_
-7. Once confirmed, write the updated file.
+6. Show the user the proposed additions as a formatted list — one bullet per entry, grouped by section and module, exactly as they will appear in the file. Do NOT write to the file yet. Ask: _"Does this look right? I'll write it once you confirm."_
+7. Write to the file only after the user explicitly confirms. Never write before confirmation.
 
 ### Operation 2 — Cut a release
 

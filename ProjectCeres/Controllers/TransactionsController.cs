@@ -137,13 +137,20 @@ public class TransactionsController(ITransactionService transactionService, IFil
             return View(vm);
         }
 
+        if (vm.Attachment is not null)
+        {
+            try { await attachmentService.ValidateAsync(vm.Attachment); }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(nameof(vm.Attachment), ex.Message);
+                await PopulateViewBagAsync();
+                return View(vm);
+            }
+        }
+
         try
         {
             await transactionService.UpdateAsync(vm);
-            TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
-                ? "Liability payment updated."
-                : "Transaction updated.";
-            return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)
         {
@@ -151,6 +158,21 @@ public class TransactionsController(ITransactionService transactionService, IFil
             await PopulateViewBagAsync();
             return View(vm);
         }
+
+        if (vm.Attachment is not null)
+        {
+            try { await attachmentService.UploadAsync(vm.Id, vm.Attachment); }
+            catch (InvalidOperationException ex)
+            {
+                TempData["ErrorMessage"] = $"Transaction saved, but the attachment could not be uploaded: {ex.Message}";
+                return RedirectToAction(nameof(Edit), new { id = vm.Id });
+            }
+        }
+
+        TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
+            ? "Liability payment updated."
+            : "Transaction updated.";
+        return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Delete(Guid id)
