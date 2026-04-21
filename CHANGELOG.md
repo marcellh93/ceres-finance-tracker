@@ -25,6 +25,12 @@
 - `TransactionEditViewModel` — added `IFormFile? Attachment` property to support upload-on-save on the Edit flow
 
 **Documentation**
+- `docs/roadmap-phase-one.md` — spoofed file upload and recurring reminder confirmation items marked complete; Phase 1 verification checklist now fully checked
+- `docs/guide/03-aspnetcore-mvc/model-binding-and-validation.md` — added `ModelState` concept definition with dry run tracing both the valid and missing-field paths
+- `docs/guide/03-aspnetcore-mvc/controllers-and-actions.md` — added `ViewBag` concept with definition, dry run, when-to-use, and project example
+- `docs/guide/03-aspnetcore-mvc/tag-helpers.md` — added hidden inputs / round-tripping concept explaining why missing fields cause silent `IsValid` failures
+- `docs/models.md` — Transaction deletion rule updated to document attachment cascade; TransactionAttachment deletion rule section added clarifying service-layer cascade
+- `docs/planning.md` — "File attachments on edit" expanded with validation-fail/upload-fail error paths and note that attachments are suppressed for liability payment transactions
 - `docs/planning.md` — added account ledger sub-page and attachment-on-create flow to Phase 1 features; balance audit trail open question removed (resolved); attachment-on-edit flow documented
 - `docs/planning-resolved.md` — balance audit trail decision archived
 - `docs/planning-phase2.md` — added schema note clarifying Budget/CategoryBudget entities were scaffolded in Phase 1
@@ -32,6 +38,9 @@
 - `docs/security-model.md` — added pre-save `ValidateAsync` pattern to upload validation rules
 
 ### Fixed
+
+**Recurring Transactions**
+- Confirming a recurring reminder always reloaded the form without recording — `AccountId`, `CategoryId`, and `TransactionType` were missing from the Confirm view as hidden inputs, causing `ModelState.IsValid` to silently fail on every POST
 
 **Transactions**
 - Attachment upload section was absent from the New Transaction (Create) form — attachments could only be added by editing an existing transaction

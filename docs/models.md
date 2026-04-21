@@ -386,6 +386,8 @@ The actual file is saved to the filesystem — only the reference lives in the d
 | FileSizeBytes | bigint   | NOT NULL     | Size of the file in bytes                                  |
 | UploadedAt    | datetime | NOT NULL     | When the file was attached                                 |
 
+**Deletion rule:** hard delete. Both the DB row and the file on disk are deleted together by `FileAttachmentService.DeleteAsync`. This is called explicitly in two places: (1) the user clicks Remove on the Edit view, and (2) `TransactionService.DeleteAsync` cascades deletion to all attachments before removing the transaction row. EF Core cascade delete is not used — deletion is handled in the service layer to ensure the filesystem file is also removed.
+
 **Why not store the file in the database?**
 Storing binary file data (BLOBs) in the database bloats it, slows down every backup,
 and makes queries against other columns slower. The filesystem is purpose-built for files.
@@ -732,7 +734,7 @@ feature if there is clear demand for it.
 |--------|------|--------|
 | Account | Deactivate (`IsActive = false`) — never hard delete | Has transactions linked to it. Hard delete would orphan financial history. |
 | Category | Deactivate (`IsActive = false`) — never hard delete. System categories (`IsSystem = true`) cannot be deactivated either. | Has transactions linked to it. Hard delete would orphan financial history. System categories are required for app logic. |
-| Transaction | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. Removes its contribution from any linked Budget's actual spend. |
+| Transaction | Hard delete allowed — requires confirmation prompt | Cascades to all linked `TransactionAttachment` records — both the DB rows and the files on disk are deleted atomically by the service layer before the transaction row is removed. Removes its contribution from any linked Budget's actual spend. |
 | Transfer | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. |
 | LiabilityPayment | Hard delete allowed — requires confirmation prompt | No downstream records depend on it. User-initiated correction. |
 | CategoryBudget | Deactivate (`IsActive = false`) — never hard delete | Historical dashboard and report data depends on it. |
