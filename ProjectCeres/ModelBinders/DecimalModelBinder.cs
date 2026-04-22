@@ -31,17 +31,8 @@ public class DecimalModelBinder(ISettingsService settingsService) : IModelBinder
         }
 
         var settings = await settingsService.GetAsync();
-        var culture  = NumberFormatHelper.GetCulture(settings.NumberFormat);
 
-        // Try the configured format first.
-        if (decimal.TryParse(rawValue, NumberStyles.Number, culture, out var result))
-        {
-            bindingContext.Result = ModelBindingResult.Success(result);
-            return;
-        }
-
-        // Tolerant fallback: invariant culture (handles copy-paste from external sources).
-        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out result))
+        if (NumberFormatHelper.TryParseDecimal(rawValue!, settings.NumberFormat, out var result))
         {
             bindingContext.Result = ModelBindingResult.Success(result);
             return;

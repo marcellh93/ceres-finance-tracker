@@ -42,3 +42,12 @@ The column definitions remain unchanged — only the scope changes.
   user has configured comma decimals
 - The Phase 3 Settings migration requires a database migration and changes to how the
   settings are resolved (from a global singleton to a per-request user lookup)
+
+## Implementation note: tolerant decimal parsing
+
+`NumberFormatHelper.TryParseDecimal` handles a silent data-corruption case: in `comma_decimal`
+mode, a user typing `100.00` (invariant format) instead of `100,00` would previously be parsed
+as `10000` because es-ES treats the period as a thousands separator. The fix detects inputs
+that contain a period but no comma while in `comma_decimal` mode, and routes them through
+invariant-culture parsing first. This applies at the model binder layer (`DecimalModelBinder`)
+for all form submissions. CSV/OFX import in Phase 2 must apply the same logic.

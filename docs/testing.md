@@ -6,11 +6,28 @@
 
 ## Stack
 
+### Backend (.NET)
+
 | Library | Role |
 |---------|------|
 | **xUnit** | Test framework — standard for .NET, used by ASP.NET Core itself |
 | **Moq** | Mocking library — isolates dependencies in unit tests |
 | **FluentAssertions** | Readable assertions — `result.Should().Be(100m)` over default xUnit assertions |
+| **WebApplicationFactory** | Integration test host for API controllers — boots full app in memory (Phase 2+) |
+
+### Frontend (ProjectCeres.Client — Phase 2+)
+
+| Library | Role |
+|---------|------|
+| **Vitest** | Test runner — shares Vite config, no separate setup. See ADR-0032. |
+| **React Testing Library** | Component-level tests — renders components and asserts on user-visible output |
+
+Frontend tests live in `ProjectCeres.Client/src/__tests__/`. What gets tested:
+- React components with non-trivial rendering logic (conditional display, derived state)
+- Chart data transformation functions
+- Import profile mapping logic (client-side validation)
+
+Simple presentational components with no logic are not tested — the value is too low relative to the maintenance cost.
 
 ---
 
@@ -78,8 +95,19 @@ Priority order:
 1. **Financial calculations** — net worth, account balance, savings rate, currency-scoped totals
 2. **Business rules** — transfer currency match, amount positivity, deletion guards, category type enforcement
 3. **Report query logic** — filters, date ranges, category and account scoping
+4. **Formatting and parsing helpers** — `NumberFormatHelper` formatting and `TryParseDecimal` parsing logic
 
 Unit tests use Moq to mock `DbContext` dependencies where needed. See [xunit-basics.md](guide/07-testing/xunit-basics.md) and [test-structure-and-patterns.md](guide/07-testing/test-structure-and-patterns.md).
+
+### Phase 1 Unit Test Coverage (as of 2026-04-21)
+
+| Class | Test file | What it covers |
+|-------|-----------|----------------|
+| `BalanceCalculationTests` | `Unit/BalanceCalculationTests.cs` | Asset and liability balance derivation formula |
+| `CategoryBudgetGuardTests` | `Unit/CategoryBudgetGuardTests.cs` | CategoryBudget expense-only enforcement |
+| `SavingsRateTests` | `Unit/SavingsRateTests.cs` | Savings rate calculation |
+| `NumberFormatHelper` | `Unit/NumberFormatHelperTests.cs` | `FormatAmount`, `FormatInputValue`, `TryParseDecimal`, and round-trip correctness |
+| `DecimalModelBinder` (via helper) | `Unit/DecimalParsingTests.cs` | Parsing in both number format modes including invariant-input tolerance |
 
 ---
 
@@ -108,7 +136,7 @@ All Phase 1 services now have integration test coverage:
 | `SettingsService` | `SettingsServiceTests.cs` |
 | `FileAttachmentService` | `FileAttachmentServiceTests.cs` |
 
-Controller actions remain untested — they are thin HTTP handlers delegating entirely to services. The conditional `ModelState` manipulation in `TransactionsController` (branching by `TransactionType`) is a known gap deferred to Phase 2 when controller test infrastructure is added.
+Razor controller actions remain untested — they are thin HTTP handlers with a defined end-of-life in Phase 3; testing them is not worth the investment. API controllers in `Controllers/Api/` are integration tested using `WebApplicationFactory<Program>` (see ADR-0037).
 
 ### Integration Test Database
 

@@ -358,16 +358,15 @@ still contributed to that budget's actual spend while it was active. Transaction
 views should display the budget name even when the budget is deactivated, so the link
 remains interpretable.
 
-**Flagged — split transactions (Phase 2):**
-Currently one Transaction links to exactly one Category. Users who want to split a single
-payment across multiple categories (e.g. one supermarket receipt split between Groceries
-and Household Supplies) cannot do so. This will require a `TransactionLine` junction table
-(TransactionId, CategoryId, Amount) replacing the direct CategoryId FK. Splitting is
-opt-in — the current single-category flow remains the default. See Phase 2 in planning.md.
+**Split transactions — deferred, not Phase 2:**
+One Transaction links to exactly one Category. Split transactions (one payment across
+multiple categories) are not supported in Phase 1 or Phase 2. Revisit at Phase 3 scope
+definition — outcome may be implement, defer again, or discard. See ADR-0041.
 
-**Flagged — cleared / reconciliation status (Phase 2):**
-There is no field to mark a transaction as verified against a bank statement. Adding this
-requires a `ClearedAt date` (or `IsCleared bit`) column on this table. See Phase 2 in planning.md.
+**Cleared / reconciliation status (Phase 2):**
+`IsCleared bool NOT NULL DEFAULT false` — added in Phase 2. Marks a transaction as
+verified against a bank statement. Set automatically on clean CSV imports; held false
+for potential duplicates pending reconciliation review. See ADR-0039.
 
 ---
 
@@ -465,14 +464,13 @@ from all income/expense report calculations. Both accounts must share the same c
 **Constraint:** SourceAccountId and DestAccountId must reference accounts with the same currency.
 Cross-currency transfers are not supported — they would require a conversion rate, which is out of scope.
 
-**Flagged — cleared / reconciliation status (Phase 2):**
-Same as Transaction — no field exists to mark a transfer as verified against a bank statement.
-Requires a `ClearedAt date` (or `IsCleared bit`) column on this table. See Phase 2 in planning.md.
+**Cleared / reconciliation status (Phase 2):**
+`IsCleared bool NOT NULL DEFAULT false` — added in Phase 2. Same semantics as Transaction.
+Transfers are internal movements and are not reconciled against CSV imports. See ADR-0039.
 
-**Flagged — file attachments on transfers (Phase 2):**
-There is currently no way to attach a file (e.g. a bank wire confirmation PDF) to a transfer.
-Requires a `TransferAttachment` entity mirroring the structure of `TransactionAttachment`,
-with a `TransferId` FK instead of `TransactionId`. See Phase 2 in planning.md.
+**File attachments on transfers (Phase 2):**
+`TransferAttachment` entity added in Phase 2 — mirrors `TransactionAttachment` with a
+`TransferId` FK. Hard delete with confirmation. See ADR-0042.
 
 ---
 
@@ -774,13 +772,66 @@ These must be created via Fluent API in `OnModelCreating` or via explicit migrat
 
 ---
 
-## Phase 2 — Entities To Be Defined
+## Phase 2 — Schema Additions
 
-### InvestmentHolding (Phase 2)
+The following fields and entities are added in Phase 2. Full column definitions are added
+to entity sections above when implemented.
 
-To be defined when Phase 2 begins. Will link to Account and track individual positions within
-an investment account: ticker or name, number of units, purchase price, current price (updated
-manually), unrealized gain/loss (derived). See planning.md Phase 2 section for full context.
+### Account — new Phase 2 fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `ExcludeFromSpendable` | bool NOT NULL DEFAULT false | Excludes account from spendable balance display. Net worth unaffected. See ADR-0050. |
+| `LiabilityRepaymentType` | varchar NULL | `FullMonthly` or `Amortising`. Null for asset accounts. See ADR-0043. |
+| `InterestRate` | decimal NULL | Optional. Only meaningful for `Amortising` liability accounts. See ADR-0043. |
+
+### Transaction — new Phase 2 fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `IsCleared` | bool NOT NULL DEFAULT false | Verified against bank statement. See ADR-0039. |
+
+### Transfer — new Phase 2 fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `IsCleared` | bool NOT NULL DEFAULT false | Verified against bank statement. See ADR-0039. |
+
+### Budget — new Phase 2 fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `GoalType` | varchar NOT NULL | `Spending` or `Savings`. See ADR-0040. |
+| `LinkedAccountId` | uuid FK NULL | → Account. Required when `GoalType = Savings`. See ADR-0040. |
+
+### RecurringTransaction — new Phase 2 fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `ReminderBehaviour` | varchar NOT NULL DEFAULT 'SnapToCalendarDay' | `SnapToCalendarDay`, `RelativeToLastConfirmation`, or `ManualDate`. See ADR-0045, ADR-0051. |
+| `EstimatedAmount` | decimal NULL | Optional estimated amount for variable-amount recurring transactions. |
+
+### TransferAttachment (new entity — Phase 2)
+
+Mirrors `TransactionAttachment` with `TransferId` FK instead of `TransactionId`.
+Hard delete with confirmation. See ADR-0042.
+
+### CsvImportProfile (new entity — Phase 2)
+
+Stores named column mapping profiles for CSV import. See ADR-0047.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| Id | uuid | PK | |
+| Name | varchar | NOT NULL | User-given name e.g. "BBVA" |
+| Mappings | jsonb | NOT NULL | `{ "date": "Fecha", "amount": "Importe", ... }` |
+| CreatedAt | datetime | NOT NULL | |
+| DeletedAt | datetime | NULL | Soft delete — 90-day recovery window shown to user |
+
+### InvestmentHolding — deferred to Phase 3 or Phase 4
+
+Investment tracking is not in Phase 2 scope. Revisit at Phase 3 or Phase 4 scope
+definition based on whether the user actively uses investment accounts.
 
 ---
 

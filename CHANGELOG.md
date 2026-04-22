@@ -2,54 +2,13 @@
 
 ## [Unreleased]
 
-### Added
-
-**Accounts**
-- Per-account balance ledger view at `/Accounts/{id}/Ledger` — shows every entry contributing to the account balance (opening balance, transactions, transfers, liability payments) in chronological order with a running balance column; linked from the Accounts index
-
-**Transactions**
-- File attachment field on the New Transaction form — optional, regular transactions only; validates magic bytes and file size before saving the transaction record
-- File attachment upload on Edit Transaction — new attachment uploaded as part of the Save Changes submission; no separate Upload button required
-
-**Services**
-- `IFileAttachmentService.ValidateAsync` — pre-save file validation method that runs size and magic-byte checks without writing anything; used by the Create flow to fail fast before any DB write
-
-### Changed
-
-**Transactions**
-- `ITransactionService.CreateAsync` now returns `Guid` (the new record's ID) instead of `void`, enabling post-save operations like attaching a file
-- Transaction form field order unified: Attachment field moved to after Description on both Create and Edit views; on Create it was previously between Budget and Amount
-- Transaction Edit view: attachment upload merged into main form via `enctype="multipart/form-data"`; separate Upload form and button removed; Save Changes now handles both transaction edits and new attachment upload in one POST
-- Transaction Edit view: per-attachment Remove forms moved outside the main `<form>` element and linked via HTML `form=` attribute — nested forms are silently ignored by browsers
-- `TransactionService.DeleteAsync` now loads attachments and calls `FileAttachmentService.DeleteAsync` for each before removing the transaction row, ensuring disk cleanup on transaction delete
-- `TransactionEditViewModel` — added `IFormFile? Attachment` property to support upload-on-save on the Edit flow
-
-**Documentation**
-- `docs/roadmap-phase-one.md` — spoofed file upload and recurring reminder confirmation items marked complete; Phase 1 verification checklist now fully checked
-- `docs/guide/03-aspnetcore-mvc/model-binding-and-validation.md` — added `ModelState` concept definition with dry run tracing both the valid and missing-field paths
-- `docs/guide/03-aspnetcore-mvc/controllers-and-actions.md` — added `ViewBag` concept with definition, dry run, when-to-use, and project example
-- `docs/guide/03-aspnetcore-mvc/tag-helpers.md` — added hidden inputs / round-tripping concept explaining why missing fields cause silent `IsValid` failures
-- `docs/models.md` — Transaction deletion rule updated to document attachment cascade; TransactionAttachment deletion rule section added clarifying service-layer cascade
-- `docs/planning.md` — "File attachments on edit" expanded with validation-fail/upload-fail error paths and note that attachments are suppressed for liability payment transactions
-- `docs/planning.md` — added account ledger sub-page and attachment-on-create flow to Phase 1 features; balance audit trail open question removed (resolved); attachment-on-edit flow documented
-- `docs/planning-resolved.md` — balance audit trail decision archived
-- `docs/planning-phase2.md` — added schema note clarifying Budget/CategoryBudget entities were scaffolded in Phase 1
-- `docs/roadmap-phase-one.md` — Budget phase placement clarified in Steps 2, 5, and 7; verification checklist updated; file attachment item marked complete
-- `docs/security-model.md` — added pre-save `ValidateAsync` pattern to upload validation rules
-
-### Fixed
-
-**Recurring Transactions**
-- Confirming a recurring reminder always reloaded the form without recording — `AccountId`, `CategoryId`, and `TransactionType` were missing from the Confirm view as hidden inputs, causing `ModelState.IsValid` to silently fail on every POST
-
-**Transactions**
-- Attachment upload section was absent from the New Transaction (Create) form — attachments could only be added by editing an existing transaction
-- Remove button on Edit Transaction did not delete the file from disk or the DB record — the Remove `<form>` was nested inside the main edit `<form>`, causing browsers to silently discard it and submit the edit action instead
-- Deleting a transaction did not clean up its attached files from disk — `TransactionService.DeleteAsync` now iterates attachments and calls `FileAttachmentService.DeleteAsync` before removing the transaction row
-
 ---
 
-### Added
+## [0.2.0] — 2026-04-21
+
+### Phase 1
+
+#### Added
 
 **Project scaffold**
 - ASP.NET Core MVC project scaffold (`ProjectCeres/`) with Controllers, Models, Views, Data, Services, ViewModels, Helpers, Filters, ModelBinders layers
@@ -74,6 +33,13 @@
 - Opening balance management on Account Create and Edit — stored as a system-managed `Transaction` with `Category.IsSystem = true`, excluded from all reports
 - File attachment upload, serve, and delete for transactions (`FileAttachmentService`) — magic-byte MIME validation via Mime-Detective, filesystem storage outside `wwwroot/`, system-generated storage paths, re-verification at serve time
 
+**Accounts**
+- Per-account balance ledger view at `/Accounts/{id}/Ledger` — shows every entry contributing to the account balance (opening balance, transactions, transfers, liability payments) in chronological order with a running balance column; linked from the Accounts index
+
+**Transactions**
+- File attachment field on the New Transaction form — optional, regular transactions only; validates magic bytes and file size before saving the transaction record
+- File attachment upload on Edit Transaction — new attachment uploaded as part of the Save Changes submission; no separate Upload button required
+
 **Liability payments**
 - `ILiabilityPaymentService` / `LiabilityPaymentService` — full CRUD for liability payments with validation (currency match, account type guards, date-before-opening-balance guard)
 - `TransactionListItemViewModel` — unified read model for the Transactions Index list that represents either a regular `Transaction` or a `LiabilityPayment` row via a `TransactionType` discriminator field
@@ -85,84 +51,86 @@
 - `NumberFormatActionFilter` — global `IAsyncActionFilter` that injects `ViewData["NumberFormat"]` before every controller action
 - `DecimalModelBinder` / `DecimalModelBinderProvider` — parses all `decimal` and `decimal?` form fields using the user's configured culture, with invariant-culture fallback for copy-pasted values
 
+**Services**
+- `IFileAttachmentService.ValidateAsync` — pre-save file validation method that runs size and magic-byte checks without writing anything; used by the Create flow to fail fast before any DB write
+
 **Tests**
-- Unit tests: `BalanceCalculationTests` (6 tests), `SavingsRateTests` (7 tests)
+- Unit tests: `BalanceCalculationTests` (6 tests), `SavingsRateTests` (7 tests), `CategoryBudgetGuardTests`
+- Unit tests for `NumberFormatHelper` — `FormatAmount`, `FormatInputValue`, and `TryParseDecimal` including round-trip correctness (12 tests in `NumberFormatHelperTests.cs`)
+- Unit tests for decimal parsing — both number format modes, invariant-input tolerance, thousands separators, and invalid input (12 tests in `DecimalParsingTests.cs`)
 - Integration tests: `TransferValidationTests` (3 tests) — real PostgreSQL database with per-test transaction rollback isolation via `TestDbFixture`
-- Integration tests for `BudgetService` — `GetAllAsync`, `GetByIdAsync`, `CreateAsync`, `UpdateAsync`, `DeactivateAsync`, and `GetActualSpendAsync` (including isolation between budgets)
-- Integration tests for `RecurringTransactionService` — all 7 methods including `ConfirmAsync` (transaction creation + `NextDueDate` advancement for all four frequencies) and `DismissAsync` (date advancement with no transaction created)
-- Integration tests for `ReportService` — `GetNetWorthAsync`, `GetIncomeExpenseSummaryAsync`, `GetExpenseBreakdownAsync`, and `GetTransactionHistoryAsync` with date range, account, category, and pagination filters
+- Integration tests for `AccountService`, `CategoryService`, `TransactionService`, `TransferService`
+- Integration tests for `BudgetService` — `GetAllAsync`, `GetByIdAsync`, `CreateAsync`, `UpdateAsync`, `DeactivateAsync`, and `GetActualSpendAsync`
+- Integration tests for `RecurringTransactionService` — all 7 methods including `ConfirmAsync` and `DismissAsync`
+- Integration tests for `ReportService` — all 4 report types with date range, account, category, and pagination filters
 - Integration tests for `DashboardService` — MTD income/expense sums, savings rate, pending reminder count
 - Integration tests for `SettingsService` — `GetAsync`, `UpdateAsync`, `EnsureExistsAsync` including create-from-scratch paths
-- Integration tests for `FileAttachmentService` — `UploadAsync` (happy path + all validation guards), `GetAsync`, `DeleteAsync` using a per-test temp directory and a `Mock<IWebHostEnvironment>`
-
-**Documentation**
-- `docs/guide/07-testing/mocking-with-moq.md` — new guide file covering `Mock<T>`, `.Setup()`, `.Returns()`, `It.IsAny<T>()`, mocking `IWebHostEnvironment`, constructing fake `IFormFile`, and magic-byte patterns for MIME detection tests
-- `docs/guide/02-dotnet-platform/logging-with-ilogger.md` — new guide file covering `ILogger<T>` injection, log level table, structured `{Property}` placeholders vs. string interpolation, and `appsettings.json` log-level filtering
+- Integration tests for `FileAttachmentService` — `UploadAsync` (happy path + all validation guards), `GetAsync`, `DeleteAsync` using a per-test temp directory and `Mock<IWebHostEnvironment>`
 
 **Frontend build**
 - Tailwind CSS v3 build pipeline — pnpm + Tailwind CLI, input at `ProjectCeres/Styles/app.css`, output to `ProjectCeres/wwwroot/css/site.css`, wired into MSBuild pre-build target so `dotnet build` / `dotnet run` automatically regenerates CSS
 
 **Documentation**
-- Architecture Decision Records 0012–0030 (see previous entry)
+- Architecture Decision Records 0012–0031
 - `docs/architecture.md` — layer model, request flow, phase evolution, frontend build pipeline section
 - `docs/security-model.md` — threat model, data protection, access control
 - `docs/api-contract.md` — API conventions, response shapes, versioning strategy
 - `docs/multi-tenancy-strategy.md` — Phase 3 migration plan
-- `docs/guide/` — structured developer guide organized by stack topic (replaced learning-journal.md); 23 topic files across 7 modules
-- `docs/roadmap-phase-one.md` — Phase 1 feature roadmap
-- `.claude/skills/sync-docs/doc-agent-instructions.md` — documentation routing rules and ADR numbering guide
-- `dev-teacher` Claude Code skill for post-session learning journals
-- `sync-docs` Claude Code skill for keeping docs in sync with code changes
+- `docs/decisions/ADR-0004` — implementation note added documenting the tolerant decimal parsing fix and its implication for Phase 2 CSV/OFX import
+- `docs/testing.md` — unit test priority list updated; Phase 1 unit and integration test coverage tables added
+- `docs/guide/` — structured developer guide organized by stack topic; 23+ topic files across 7 modules
+- `docs/roadmap-phase-one.md` — Phase 1 feature roadmap and verification checklist (fully checked)
+- `docs/guide/07-testing/mocking-with-moq.md` — new guide file covering `Mock<T>`, `.Setup()`, `.Returns()`, and MIME detection test patterns
+- `docs/guide/02-dotnet-platform/logging-with-ilogger.md` — new guide file covering `ILogger<T>` injection, log levels, structured placeholders
+- `docs/guide/03-aspnetcore-mvc/model-binding-and-validation.md` — `DecimalModelBinder` section updated with tolerant parsing explanation and dry run of the corruption case
+- `docs/guide/07-testing/test-structure-and-patterns.md` — new pattern added: extracting logic out of framework types for unit testability
+- `dev-teacher` and `sync-docs` Claude Code skills added
 
-### Changed
+#### Changed
 
-**Liability payments**
+**Transactions**
+- `ITransactionService.CreateAsync` now returns `Guid` (the new record's ID) instead of `void`, enabling post-save operations like attaching a file
+- Transaction form field order unified: Attachment field moved to after Description on both Create and Edit views
+- Transaction Edit view: attachment upload merged into main form via `enctype="multipart/form-data"`; separate Upload form and button removed
+- Transaction Edit view: per-attachment Remove forms moved outside the main `<form>` element and linked via HTML `form=` attribute — nested forms are silently ignored by browsers
+- `TransactionService.DeleteAsync` now loads attachments and calls `FileAttachmentService.DeleteAsync` for each before removing the transaction row, ensuring disk cleanup on transaction delete
+- `TransactionEditViewModel` — added `IFormFile? Attachment` property to support upload-on-save on the Edit flow
 - `TransactionsController.Index` — now returns `IEnumerable<TransactionListItemViewModel>` (merged regular transactions + liability payments) instead of raw `Transaction` entities
-- `TransactionsController.Create` POST — branches on `vm.TransactionType`; routes to `LiabilityPaymentService.CreateAsync` for `LiabilityPayment`, `TransactionService.CreateAsync` otherwise; success message distinguishes between the two types
+- `TransactionsController.Create` POST — branches on `vm.TransactionType`; routes to `LiabilityPaymentService.CreateAsync` for `LiabilityPayment`, `TransactionService.CreateAsync` otherwise
 - `TransactionCreateViewModel` / `TransactionEditViewModel` — added `TransactionType`, `LiabilityAccountId` fields to support the unified form
-- `Views/Transactions/Create.cshtml`, `Edit.cshtml`, `Index.cshtml`, `Delete.cshtml` — updated to handle both transaction types in a single form/list
 
 **Number formatting**
+- `DecimalModelBinder` parsing logic extracted into `NumberFormatHelper.TryParseDecimal` — a pure static method with no framework dependencies, making it independently unit-testable
 - All decimal display views updated to use `NumberFormatHelper.FormatAmount(...)` instead of `.ToString("N2")`
 - All decimal input views updated to `type="text"` with explicit `value` pre-fill using `NumberFormatHelper.FormatInputValue(...)`
 
-**Documentation**
-- `docs/testing.md` — added Phase 1 service coverage table listing all 11 integration-tested services
-- `docs/planning.md` — documented that transfers affect account balance (source decreases, destination increases, no `Transaction` rows created)
-- `docs/guide/07-testing/test-structure-and-patterns.md` — added temp directory cleanup pattern for file I/O integration tests
-- `docs/guide/02-dotnet-platform/dependency-injection.md` — added `AddControllersWithViews()`, action filters with the `ServiceFilter` pattern, and `IServiceProvider` manual resolution
-- `docs/guide/02-dotnet-platform/configuration-and-settings.md` — added User Secrets section with `init`, `set`, and `list` commands and storage path
-- `docs/models.md` — removed `DateSeparator` column from Settings entity; added `DateFormat` explanatory note that separator is embedded in the format string
-- `docs/planning.md` — added Tailwind CSS v3 to tech stack; added shadcn/ui and JS charting libraries to Phase 2 planned features; updated working assumptions to reflect actual implementation (Service Layer pattern, no Strategy for reports); added pointer to `docs/testing.md` in the Testing Strategy section; added open questions for Phase 1
-- `docs/architecture.md` — updated directory listing to reflect actual project structure; added Frontend Build Pipeline section
-- `CLAUDE.md` — updated tech stack with Tailwind CSS and pnpm; added `watch:css` command; added shadcn/ui deferral note under What NOT to Do
-- `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md` — open questions added to each
-- `docs/guide/` — reviewed and updated topic files across all modules
+#### Fixed
 
-### Fixed
+**Number formatting**
+- `DecimalModelBinder` silently corrupted amounts entered in invariant format (`100.00`) when the number format was set to `comma_decimal` — the period was interpreted as a thousands separator, producing `10000.00`; parsing order is now adjusted to detect and handle this case correctly
+- `[Range(typeof(decimal), ...)]` attributes on ViewModels now use `ParseLimitsInInvariantCulture = true` — previously threw `FormatException` when the system locale used comma as decimal separator
 
-**Settings**
-- `SettingsService.UpdateAsync` — fixed dead guard (`if (settings.Id == 0)`) that prevented creating a settings row when none existed; `CreateDefaults()` always sets `Id = 1` so the guard never fired; replaced with an explicit `isNew` boolean
+**Recurring Transactions**
+- Confirming a recurring reminder always reloaded the form without recording — `AccountId`, `CategoryId`, and `TransactionType` were missing from the Confirm view as hidden inputs, causing `ModelState.IsValid` to silently fail on every POST
 
 **Transactions**
-- `TransactionService.GetRecentAsync` — merged transaction list is now sorted by date descending, then by `CreatedAt` descending so same-day entries appear in insertion order
+- Attachment upload section was absent from the New Transaction (Create) form — attachments could only be added by editing an existing transaction
+- Remove button on Edit Transaction did not delete the file from disk or the DB record — the Remove `<form>` was nested inside the main edit `<form>`, causing browsers to silently discard it
+- Deleting a transaction did not clean up its attached files from disk — `TransactionService.DeleteAsync` now iterates attachments and calls `FileAttachmentService.DeleteAsync` before removing the transaction row
 
-**Liability Payments**
-- `TransactionListItemViewModel` — added `CreatedAt` field so liability payment rows carry their creation timestamp for correct sort ordering alongside regular transactions
+**Settings**
+- `SettingsService.UpdateAsync` — fixed dead guard (`if (settings.Id == 0)`) that prevented creating a settings row when none existed; replaced with an explicit `isNew` boolean
 
 **Accounts**
 - `AccountService.GetBalanceAsync` — transfer amounts are now correctly added/subtracted from account balances (`transfersIn` increases balance, `transfersOut` decreases it)
+- `AccountService.GetBalanceAsync` — system (opening balance) transactions now always add to balance regardless of account type; regular transactions on liability accounts correctly apply inverted polarity
 
 **Liability account balance**
-- `AccountService.GetBalanceAsync` — system (opening balance) transactions now always add to balance regardless of account type; regular transactions on liability accounts correctly apply inverted polarity (expense adds, income subtracts)
 - `ReportService` — liability account balances in Net Worth and Income & Expense reports now use the same polarity logic as `AccountService`, ensuring consistent figures across views
 - Opening balance transactions on liability accounts were incorrectly being subtracted from the balance instead of added
 
 **Reports**
 - `GetTransactionHistoryAsync` was missing `!t.Category.IsSystem` filter — opening balance transactions were appearing in the Transaction History report
-
-**Number formatting**
-- `[Range(typeof(decimal), ...)]` attributes on ViewModels now use `ParseLimitsInInvariantCulture = true` — previously threw `FormatException` when the system locale used comma as decimal separator
 
 **Categories**
 - Category Edit GET action was missing `PopulateViewBagAsync()` call — Lifestyle Tag dropdown rendered empty on the edit page

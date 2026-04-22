@@ -13,6 +13,11 @@
    - [Financial Health Metrics](#financial-health-metrics-phase-2)
    - [Opening Balance Cutover UX](#opening-balance-cutover-ux-phase-2)
 3. [Open Questions (Phase 2)](#open-questions-phase-2)
+   - [Architecture & Frontend](#architecture--frontend)
+   - [Testing / TDD](#testing--tdd)
+   - [Data & Schema](#data--schema)
+   - [Features with Unresolved Design](#features-with-unresolved-design)
+   - [Reports](#reports)
 
 ---
 
@@ -56,10 +61,10 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 ## Planned Features (Phase 2)
 
 - Account Balances Summary report
-- Nice-to-have reports (Net Worth Over Time, Monthly Cash Flow Trend, etc.)
-- **UI component library — shadcn/ui:** Migrate views from Tailwind `@apply`-based classes to shadcn/ui React components. Requires the Phase 2 React introduction. Inline Tailwind utilities replace `@apply` patterns.
-- **JavaScript / charting libraries:** Interactive dashboard charts — requires React. **Chart.js** is the leading candidate (decision deferred until Phase 2 begins).
-- CSV and OFX file import — note: bank exports represent debits as negative numbers; the import logic must flip signs and infer income/expense direction from the mapped category.
+- Confirmed nice-to-have reports: Budget vs. Actual, Largest Expenses, Monthly Cash Flow Trend, Net Worth Over Time (see ADR-0054)
+- **UI component library — shadcn/ui:** Migrate views from Tailwind `@apply`-based classes to shadcn/ui React components. Inline Tailwind utilities replace `@apply` patterns.
+- **Charting library — Chart.js** via `react-chartjs-2` wrapper. Covers all seven dashboard chart types. See ADR-0033.
+- **CSV import only** — OFX deferred to Phase 3/4 (see ADR-0046). Bank exports represent debits as negative numbers — import logic flips signs and infers direction from mapped category. Column mapping via saved `CsvImportProfile` (see ADR-0047).
 
 **CSV Import flow**
 
@@ -68,27 +73,35 @@ sequenceDiagram
     participant User
     participant Controller
     participant ImportService
+    participant ProfileService
     participant TransactionService
     participant DbContext
 
-    User->>Controller: Upload CSV file
-    Controller->>ImportService: ParseAsync(file)
-    ImportService->>ImportService: Map columns to fields
+    User->>Controller: Upload CSV file + select profile
+    Controller->>ProfileService: GetProfile(profileId)
+    ProfileService-->>Controller: CsvImportProfile (column mappings)
+    Controller->>ImportService: ParseAsync(file, profile)
+    ImportService->>ImportService: Map columns using profile
     ImportService->>ImportService: Flip sign on negative debits → positive amount
     ImportService->>ImportService: Infer income/expense from mapped category
-    loop Each valid row
-        ImportService->>TransactionService: CreateAsync(rowViewModel)
+    ImportService->>ImportService: Fingerprint match against existing transactions
+    loop Each valid row (no duplicate candidate)
+        ImportService->>TransactionService: CreateAsync(rowViewModel, isCleared: true)
         TransactionService->>DbContext: Insert Transaction
     end
-    ImportService-->>Controller: ImportResult (rows saved, rows failed + reasons)
-    Controller->>User: Summary (n imported, n errors with row detail)
+    loop Each flagged row (potential duplicate)
+        ImportService->>TransactionService: CreateAsync(rowViewModel, isCleared: false)
+        TransactionService->>DbContext: Insert Transaction (held for reconciliation)
+    end
+    ImportService-->>Controller: ImportResult (rows saved, rows flagged, rows failed)
+    Controller->>User: Summary (n imported, n flagged for review, n errors)
 ```
 - **CSV export** — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix any such cell value with a single quote (`'`) to neutralize CSV injection.
-- File attachments on transactions (receipts, invoices)
-- Saved report configurations
-- **Split transactions (optional)** — allow a single transaction to be split across multiple categories. Requires schema change: 1:1 Transaction→Category becomes a 1:many `TransactionLine` table.
-- **Cleared / reconciliation status** — mark a transaction or transfer as "cleared" once verified against a bank statement. Manual checkbox or automatic CSV match. Requires `ClearedAt` (or `IsCleared`) on both Transaction and Transfer.
-- **File attachments on transfers** — mirror the transaction attachment feature. Requires a `TransferAttachment` entity.
+- File attachments on transactions (receipts, invoices) — built in Phase 1, carried forward
+- **File attachments on transfers** — `TransferAttachment` entity mirroring `TransactionAttachment`. See ADR-0042.
+- **Cleared / reconciliation status** — `IsCleared bool` on Transaction and Transfer. Merge-not-delete reconciliation flow. See ADR-0039.
+- **Split transactions** — not in Phase 2. Revisit at Phase 3 scope definition. See ADR-0041.
+- **Saved report configurations** — not in Phase 2. Revisit after Phase 2 daily use. See ADR-0055.
 
 ### Budgeting (Phase 2)
 
@@ -161,26 +174,4 @@ Distinct from reports: reports are formal documents produced on demand; these ar
 
 ## Open Questions (Phase 2)
 
-- [ ] **Irregular income baseline budgeting** — Standard monthly budgets assume fixed income, but 68% of freelancers report struggling with variable income. Category and goal budgets could be evaluated against a rolling average income baseline (e.g. last 6 or 12 months) rather than a fixed monthly cap. This would make budgets that flex with how freelancers actually earn, instead of lying to them during lean months. No data model or UX decision made.
-
-- [ ] **"Can I afford this right now?" financial health snapshot** — The most-cited pain point in Monarch Money user research: the app shows what happened, never what to do next. A lightweight health snapshot could answer "am I okay this month?" using already-derived values: runway (months of expenses covered by current assets), whether this month's income is above or below the rolling baseline, and budget burn rate. No charts or AI required — purely arithmetic on existing data. No design decision made.
-
-- [ ] **Tax reserve envelopes** — Freelancers mentally earmark a portion of their account balance for quarterly tax obligations (IRPF, IVA), but the net worth dashboard counts that money as spendable. A tax reserve mechanism would let users mark an amount as "already spoken for," reducing the displayed spendable balance without creating a new transaction. Could be modeled as a virtual sub-account, a reserved-amount field on Account, or a special-purpose transfer to a dedicated reserve account. No data model decision made.
-
-- [ ] **Upcoming obligations view** — A forward-looking read-only list of known fixed obligations due within the next 30 days (drawn from recurring transaction templates) compared against current account balances. The goal is to surface "you have €900 in obligations due before the end of the month and €1,100 in your checking account" before the user has already spent the money. Distinct from the reminders system — this is a planning view, not a confirmation flow. No design decision made.
-
-- [ ] **Liability payoff projection** — Every tool shows a debt balance; none show "at my current payment pace, when is this paid off?" or "if I pay €X extra this month, how much interest do I save?" This could be a lightweight projection panel on the liability account view, using the average monthly payment derived from transaction history and a user-supplied interest rate. No data model decision made — interest rate would need to be an optional field on liability accounts.
-
-- [ ] **Guided onboarding for spreadsheet refugees** — A first-run experience that walks a new user through entering what they own and what they owe, producing an immediate net worth number as a payoff. The primary Phase 2 motivation is readiness for Phase 3: when the app opens to beta users, cold onboarding is the first impression. YNAB's largest churn driver is complexity before value — users abandon before they understand the product. No UX or flow decision made.
-
----
-
-**How should recurring reminders notify the user, and how should `DayOfPeriod` be used?**
-
-In Phase 1, reminders are entirely pull-based — the user has to open the app and check whether anything is due. There is no automatic notification of any kind. The `DayOfPeriod` field is stored on each reminder but is currently ignored when calculating the next due date; the app simply adds a fixed interval (7 days, 1 month, etc.) from the last confirmed or dismissed date regardless of what day it lands on.
-
-Two questions need to be answered before Phase 2 implementation begins:
-
-1. **Notification delivery** — Should the app push a notification to the user (e.g. email, macOS desktop notification) when a reminder becomes due, or is an improved in-app indicator (e.g. a badge, a dedicated reminders view, or a daily summary screen) sufficient? Push notifications require a background process and, in Phase 3, a hosted environment. An enhanced in-app experience requires only UI work.
-
-2. **`DayOfPeriod` behaviour** — Once the next due date is advanced, should it snap to the configured day of the period (e.g. always land on the 15th for monthly reminders, or always on Monday for weekly ones), or should the interval always be relative to the last confirmed date regardless of calendar position? Snapping to a fixed day is more predictable for bills with a fixed calendar date; relative intervals are better for habits with flexible timing. The field supports both approaches — the decision determines how `AdvanceDueDate` should use it.
+All Phase 2 open questions resolved. See [planning-resolved.md](planning-resolved.md) for the full decision log and ADRs 0034–0055.

@@ -84,4 +84,4 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild CSS on view cha
 - `docs/multi-tenancy-strategy.md` — Phase 3 migration plan for scoping all data to users
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
-- When an open question in `docs/planning.md` is resolved, remove it from Open Questions and append it to `docs/planning-resolved.md`
+- When an open question in any planning doc (`docs/planning.md`, `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md`) is resolved, remove it from Open Questions, mark it `[x]`, and append it to `docs/planning-resolved.md`. If the decision is architectural, execute the sync-docs skill.
