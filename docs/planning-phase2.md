@@ -1,6 +1,8 @@
 # Project Ceres — Phase 2 Planning (Local Extended)
 
 > **Diataxis type:** Reference — defines Phase 2 scope, planned features, and open decisions for the local extended phase.
+>
+> **This is the active phase.** Phase 1 is complete as of 2026-04-22.
 
 ## Index
 

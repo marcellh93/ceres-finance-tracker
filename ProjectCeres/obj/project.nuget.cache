@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "yH0jYqrqa5Y=",
+  "dgSpecHash": "RuzGyHwdHC0=",
   "success": true,
   "projectFilePath": "<repo>/ProjectCeres/ProjectCeres.csproj",
   "expectedPackageFiles": [
@@ -30,7 +30,8 @@
     "~/.nuget/packages/system.composition.convention/9.0.0/system.composition.convention.9.0.0.nupkg.sha512",
     "~/.nuget/packages/system.composition.hosting/9.0.0/system.composition.hosting.9.0.0.nupkg.sha512",
     "~/.nuget/packages/system.composition.runtime/9.0.0/system.composition.runtime.9.0.0.nupkg.sha512",
-    "~/.nuget/packages/system.composition.typedparts/9.0.0/system.composition.typedparts.9.0.0.nupkg.sha512"
+    "~/.nuget/packages/system.composition.typedparts/9.0.0/system.composition.typedparts.9.0.0.nupkg.sha512",
+    "~/.nuget/packages/vite.aspnetcore/2.4.1/vite.aspnetcore.2.4.1.nupkg.sha512"
   ],
   "logs": []
 }

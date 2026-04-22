@@ -10,7 +10,8 @@
         "dependencies": {
           "Microsoft.EntityFrameworkCore.Design": "10.0.5",
           "Mime-Detective": "25.8.1",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.1"
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.1",
+          "Vite.AspNetCore": "2.4.1"
         },
         "runtime": {
           "ProjectCeres.dll": {}
@@ -484,6 +485,14 @@
             "fileVersion": "9.0.24.52809"
           }
         }
+      },
+      "Vite.AspNetCore/2.4.1": {
+        "runtime": {
+          "lib/net8.0/Vite.AspNetCore.dll": {
+            "assemblyVersion": "2.4.1.0",
+            "fileVersion": "2.4.1.0"
+          }
+        }
       }
     }
   },
@@ -667,6 +676,13 @@
       "sha512": "sha512-aRZlojCCGEHDKqh43jaDgaVpYETsgd7Nx4g1zwLKMtv4iTo0627715ajEFNpEEBTgLmvZuv8K0EVxc3sM4NWJA==",
       "path": "system.composition.typedparts/9.0.0",
       "hashPath": "system.composition.typedparts.9.0.0.nupkg.sha512"
+    },
+    "Vite.AspNetCore/2.4.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-B9U05pIVSXdU1aXVt4SPyBuxwqkntUNb5xErY/j76cJmKy7eKO5FViBSofQhIfRYIProMlPbO88jNQiSDJXGAA==",
+      "path": "vite.aspnetcore/2.4.1",
+      "hashPath": "vite.aspnetcore.2.4.1.nupkg.sha512"
     }
   }
 }

@@ -13,7 +13,10 @@ public class Budget
     public DateOnly? EndDate { get; set; }
     public string? Description { get; set; }
     public bool IsActive { get; set; }
+    public string GoalType { get; set; } = "Spending";
+    public Guid? LinkedAccountId { get; set; }
 
     public Currency Currency { get; set; } = null!;
+    public Account? LinkedAccount { get; set; }
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 }

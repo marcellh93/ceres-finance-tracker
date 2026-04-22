@@ -37,8 +37,17 @@ namespace ProjectCeres.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<bool>("ExcludeFromSpendable")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("InterestRate")
+                        .HasColumnType("decimal(5,4)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("LiabilityRepaymentType")
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -58,6 +67,7 @@ namespace ProjectCeres.Migrations
                             Id = new Guid("10000000-0000-0000-0000-000000000001"),
                             AccountTypeId = 1,
                             CurrencyId = 1,
+                            ExcludeFromSpendable = false,
                             IsActive = true,
                             Name = "Cash"
                         },
@@ -66,6 +76,7 @@ namespace ProjectCeres.Migrations
                             Id = new Guid("10000000-0000-0000-0000-000000000002"),
                             AccountTypeId = 1,
                             CurrencyId = 1,
+                            ExcludeFromSpendable = false,
                             IsActive = true,
                             Name = "Checking Account"
                         },
@@ -74,6 +85,7 @@ namespace ProjectCeres.Migrations
                             Id = new Guid("10000000-0000-0000-0000-000000000003"),
                             AccountTypeId = 1,
                             CurrencyId = 1,
+                            ExcludeFromSpendable = false,
                             IsActive = true,
                             Name = "Savings Account"
                         },
@@ -82,6 +94,7 @@ namespace ProjectCeres.Migrations
                             Id = new Guid("10000000-0000-0000-0000-000000000004"),
                             AccountTypeId = 2,
                             CurrencyId = 1,
+                            ExcludeFromSpendable = false,
                             IsActive = true,
                             Name = "Credit Card"
                         });
@@ -131,8 +144,15 @@ namespace ProjectCeres.Migrations
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("GoalType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("LinkedAccountId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -147,6 +167,8 @@ namespace ProjectCeres.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CurrencyId");
+
+                    b.HasIndex("LinkedAccountId");
 
                     b.ToTable("Budgets");
                 });
@@ -446,6 +468,31 @@ namespace ProjectCeres.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ProjectCeres.Models.CsvImportProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ColumnMappings")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CsvImportProfiles");
+                });
+
             modelBuilder.Entity("ProjectCeres.Models.Currency", b =>
                 {
                     b.Property<int>("Id")
@@ -563,7 +610,7 @@ namespace ProjectCeres.Migrations
                     b.Property<int?>("DayOfPeriod")
                         .HasColumnType("integer");
 
-                    b.Property<decimal>("EstimatedAmount")
+                    b.Property<decimal?>("EstimatedAmount")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Frequency")
@@ -579,6 +626,10 @@ namespace ProjectCeres.Migrations
 
                     b.Property<DateOnly>("NextDueDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("ReminderBehaviour")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -737,6 +788,9 @@ namespace ProjectCeres.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsCleared")
+                        .HasColumnType("boolean");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
@@ -803,6 +857,9 @@ namespace ProjectCeres.Migrations
                     b.Property<Guid>("DestAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsCleared")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("SourceAccountId")
                         .HasColumnType("uuid");
 
@@ -813,6 +870,40 @@ namespace ProjectCeres.Migrations
                     b.HasIndex("SourceAccountId");
 
                     b.ToTable("Transfers");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.TransferAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredPath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TransferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransferId");
+
+                    b.ToTable("TransferAttachments");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Account", b =>
@@ -842,7 +933,14 @@ namespace ProjectCeres.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ProjectCeres.Models.Account", "LinkedAccount")
+                        .WithMany()
+                        .HasForeignKey("LinkedAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Currency");
+
+                    b.Navigation("LinkedAccount");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Category", b =>
@@ -1011,6 +1109,17 @@ namespace ProjectCeres.Migrations
                     b.Navigation("SourceAccount");
                 });
 
+            modelBuilder.Entity("ProjectCeres.Models.TransferAttachment", b =>
+                {
+                    b.HasOne("ProjectCeres.Models.Transfer", "Transfer")
+                        .WithMany("Attachments")
+                        .HasForeignKey("TransferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Transfer");
+                });
+
             modelBuilder.Entity("ProjectCeres.Models.Account", b =>
                 {
                     b.Navigation("Transactions");
@@ -1027,6 +1136,11 @@ namespace ProjectCeres.Migrations
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Transaction", b =>
+                {
+                    b.Navigation("Attachments");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.Transfer", b =>
                 {
                     b.Navigation("Attachments");
                 });

@@ -1,6 +1,8 @@
 # Project Ceres — Planning
 
 > **Diataxis type:** Reference — defines Phase 1 scope, working assumptions, business rules, and open decisions.
+>
+> **Phase 1 is complete.** Active development is now in Phase 2 — see `planning-phase2.md`.
 
 ## Index
 

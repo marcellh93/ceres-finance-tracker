@@ -58,7 +58,7 @@ public class RecurringTransactionsController(
         {
             Id              = reminder.Id,
             Name            = reminder.Name,
-            EstimatedAmount = reminder.EstimatedAmount,
+            EstimatedAmount = reminder.EstimatedAmount ?? 0,
             AccountId       = reminder.AccountId,
             CategoryId      = reminder.CategoryId,
             Frequency       = reminder.Frequency,
@@ -105,7 +105,7 @@ public class RecurringTransactionsController(
         var vm = new TransactionCreateViewModel
         {
             Date       = reminder.NextDueDate,
-            Amount     = reminder.EstimatedAmount,
+            Amount     = reminder.EstimatedAmount ?? 0,
             AccountId  = reminder.AccountId,
             CategoryId = reminder.CategoryId
         };

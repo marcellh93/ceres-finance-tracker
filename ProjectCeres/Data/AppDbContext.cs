@@ -22,6 +22,8 @@ public class AppDbContext : DbContext
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<SavedReport> SavedReports => Set<SavedReport>();
     public DbSet<Settings> Settings => Set<Settings>();
+    public DbSet<TransferAttachment> TransferAttachments => Set<TransferAttachment>();
+    public DbSet<CsvImportProfile> CsvImportProfiles => Set<CsvImportProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -124,6 +126,25 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(sr => sr.AccountId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // TransferAttachment → Transfer: cascade delete (attachment has no life outside transfer).
+        modelBuilder.Entity<TransferAttachment>()
+            .HasOne(a => a.Transfer)
+            .WithMany(t => t.Attachments)
+            .HasForeignKey(a => a.TransferId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Budget.LinkedAccount: optional FK for Savings goal type — no cascade (Account soft-deletes).
+        modelBuilder.Entity<Budget>()
+            .HasOne(b => b.LinkedAccount)
+            .WithMany()
+            .HasForeignKey(b => b.LinkedAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // CsvImportProfile.ColumnMappings stored as jsonb.
+        modelBuilder.Entity<CsvImportProfile>()
+            .Property(p => p.ColumnMappings)
+            .HasColumnType("jsonb");
     }
 
     // -------------------------------------------------------------------------

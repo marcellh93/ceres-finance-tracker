@@ -123,3 +123,5 @@
 <repo>/ProjectCeres/obj/Debug/net10.0/ref/ProjectCeres.dll
 <repo>/ProjectCeres/bin/Debug/net10.0/package.json
 <repo>/ProjectCeres/obj/Debug/net10.0/compressed/0djvs58ynv-{0}-pv117inpx8-pv117inpx8.gz
+<repo>/ProjectCeres/obj/Debug/net10.0/ProjectCeres.MvcApplicationPartsAssemblyInfo.cs
+<repo>/ProjectCeres/bin/Debug/net10.0/Vite.AspNetCore.dll

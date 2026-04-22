@@ -642,6 +642,18 @@
         "build": {
           "buildTransitive/net8.0/_._": {}
         }
+      },
+      "Vite.AspNetCore/2.4.1": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/Vite.AspNetCore.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0/Vite.AspNetCore.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.AspNetCore.App"
+        ]
       }
     }
   },
@@ -2151,13 +2163,29 @@
         "system.composition.typedparts.nuspec",
         "useSharedDesignerContext.txt"
       ]
+    },
+    "Vite.AspNetCore/2.4.1": {
+      "sha512": "B9U05pIVSXdU1aXVt4SPyBuxwqkntUNb5xErY/j76cJmKy7eKO5FViBSofQhIfRYIProMlPbO88jNQiSDJXGAA==",
+      "type": "package",
+      "path": "vite.aspnetcore/2.4.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "README.md",
+        "lib/net8.0/Vite.AspNetCore.dll",
+        "vite.aspnetcore.2.4.1.nupkg.sha512",
+        "vite.aspnetcore.nuspec",
+        "vite.png"
+      ]
     }
   },
   "projectFileDependencyGroups": {
     "net10.0": [
       "Microsoft.EntityFrameworkCore.Design >= 10.0.5",
       "Mime-Detective >= 25.8.1",
-      "Npgsql.EntityFrameworkCore.PostgreSQL >= 10.0.1"
+      "Npgsql.EntityFrameworkCore.PostgreSQL >= 10.0.1",
+      "Vite.AspNetCore >= 2.4.1"
     ]
   },
   "packageFolders": {
@@ -2217,6 +2245,10 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": {
             "target": "Package",
             "version": "[10.0.1, )"
+          },
+          "Vite.AspNetCore": {
+            "target": "Package",
+            "version": "[2.4.1, )"
           }
         },
         "imports": [

@@ -18,7 +18,7 @@
                 <td>@r.Name</td>
                 <td>@r.Account.Name</td>
                 <td>@r.Category.Name</td>
-                <td>@NumberFormatHelper.FormatAmount(r.EstimatedAmount, ViewData["NumberFormat"] as string)</td>
+                <td>@NumberFormatHelper.FormatAmount(r.EstimatedAmount ?? 0, ViewData["NumberFormat"] as string)</td>
                 <td>@r.Frequency</td>
                 <td>@r.NextDueDate.ToString("dd/MM/yyyy")</td>
                 <td class="actions">

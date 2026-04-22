@@ -511,15 +511,15 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### Foundation
 
-- [ ] `dotnet build` — zero errors, zero warnings
-- [ ] `dotnet ef database update` — Phase 2 baseline migration applies cleanly to a fresh database
-- [ ] `dotnet test` — 0 failed (all Phase 1 tests still passing after refactors)
-- [ ] `GET /api/health` → 200 OK with `{ "status": "ok" }`
-- [ ] Malformed POST to any API endpoint → 422 with `error.code = "VALIDATION_ERROR"` matching `api-contract.md` shape
-- [ ] Vite dev server starts (`cd ProjectCeres.Client && pnpm dev`) — no errors
-- [ ] `pnpm test` in `ProjectCeres.Client/` — Vitest runs, 0 failed
-- [ ] Hello-world React component renders on the test Razor page in the browser
-- [ ] Navbar updated with shadcn/ui styling and Lucide icons on all action buttons
+- [x] `dotnet build` — zero errors, zero warnings
+- [x] `dotnet ef database update` — Phase 2 baseline migration applies cleanly to a fresh database
+- [x] `dotnet test` — 0 failed (all Phase 1 tests still passing after refactors)
+- [x] `GET /api/health` → 200 OK with `{ "status": "ok" }`
+- [x] Malformed POST to any API endpoint → 422 with `error.code = "VALIDATION_ERROR"` matching `api-contract.md` shape
+- [x] Vite dev server starts (`cd ProjectCeres.Client && pnpm dev`) — no errors
+- [x] `pnpm test` in `ProjectCeres.Client/` — Vitest runs, 0 failed
+- [x] Hello-world React component renders on the test Razor page in the browser
+- [x] Navbar updated with shadcn/ui styling and Lucide icons on all action buttons
 
 ### Budgeting
 

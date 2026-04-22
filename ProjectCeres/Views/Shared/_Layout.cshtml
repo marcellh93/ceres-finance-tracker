@@ -8,19 +8,7 @@
 </head>
 <body>
     <header>
-        <nav class="navbar">
-            <a class="nav-brand" asp-controller="Dashboard" asp-action="Index">Project Ceres</a>
-            <ul class="nav-links list-none m-0 p-0">
-                <li><a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
-                <li><a class="nav-link" asp-controller="Accounts" asp-action="Index">Accounts</a></li>
-                <li><a class="nav-link" asp-controller="Transactions" asp-action="Index">Transactions</a></li>
-                <li><a class="nav-link" asp-controller="Transfers" asp-action="Index">Transfers</a></li>
-                <li><a class="nav-link" asp-controller="RecurringTransactions" asp-action="Index">Reminders</a></li>
-                <li><a class="nav-link" asp-controller="Categories" asp-action="Index">Categories</a></li>
-                <li><a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a></li>
-                <li><a class="nav-link" asp-controller="Settings" asp-action="Edit">Settings</a></li>
-            </ul>
-        </nav>
+        <div id="navbar-root"></div>
     </header>
 
     <main>
@@ -43,5 +31,6 @@
     </footer>
 
     @await RenderSectionAsync("Scripts", required: false)
+    <script type="module" vite-src="~/src/main.tsx"></script>
 </body>
 </html>

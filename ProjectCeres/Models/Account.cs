@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace ProjectCeres.Models;
 
 public class Account
@@ -8,6 +10,10 @@ public class Account
     public int CurrencyId { get; set; }
     public string? Description { get; set; }
     public bool IsActive { get; set; }
+    public bool ExcludeFromSpendable { get; set; }
+    public string? LiabilityRepaymentType { get; set; }
+    [Column(TypeName = "decimal(5,4)")]
+    public decimal? InterestRate { get; set; }
 
     public AccountType AccountType { get; set; } = null!;
     public Currency Currency { get; set; } = null!;

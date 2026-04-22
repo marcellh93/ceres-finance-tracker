@@ -8,8 +8,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 
 ## Current Phase
 
-**Phase 1 — Local MVP.** Single user, no auth, runs locally only.
-Do not build Phase 2+ features until Phase 1 is complete and in daily use.
+**Phase 2 — Local Extended.** Phase 1 (Local MVP) is complete. Building on top of the local foundation with budgeting UI, charts, React components, CSV import, and enhanced reports.
 
 ## Tech Stack
 
@@ -64,8 +63,6 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild CSS on view cha
 ## What NOT to Do
 
 - Do not add authentication — Phase 3 only
-- Do not add JavaScript or charting libraries — Phase 2 only
-- Do not add shadcn/ui — Phase 2 only (requires React, which is a Phase 2 introduction)
 - Do not implement currency conversion — explicitly out of scope
 - Do not support cross-currency transfers — out of scope
 - Do not store derived values (net worth, account balance, budget actual spend) as columns
