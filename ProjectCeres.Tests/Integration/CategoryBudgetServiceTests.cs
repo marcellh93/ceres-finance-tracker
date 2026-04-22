@@ -1,0 +1,273 @@
+using FluentAssertions;
+using ProjectCeres.Models;
+using ProjectCeres.Services;
+using ProjectCeres.ViewModels;
+
+namespace ProjectCeres.Tests.Integration;
+
+/// <summary>
+/// Integration tests for CategoryBudgetService against the real project_ceres_test database.
+/// Each test rolls back its transaction — no test data persists between tests.
+///
+/// Seed data IDs used:
+///   CurrencyId    1 = EUR
+///   CurrencyId    2 = USD
+///   CategoryId 20000000-0000-0000-0000-000000000002 = Salary     (Income, non-system)
+///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing    (Expense, non-system)
+///   CategoryId 20000000-0000-0000-0000-000000000009 = Groceries  (Expense, non-system)
+///   AccountTypeId 1 = Asset
+/// </summary>
+public class CategoryBudgetServiceTests : IAsyncLifetime
+{
+    private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
+    private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
+    private static readonly Guid GroceriesCategoryId = new("20000000-0000-0000-0000-000000000009");
+
+    private readonly TestDbFixture _fixture = new();
+    private CategoryBudgetService _service = null!;
+    private AccountService _accountService = null!;
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.InitAsync();
+        _accountService = new AccountService(_fixture.Db);
+        _service = new CategoryBudgetService(_fixture.Db);
+    }
+
+    public async Task DisposeAsync() => await _fixture.DisposeAsync();
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private Task<CategoryBudget> CreateBudgetAsync(
+        Guid? categoryId = null,
+        int currencyId = 1,
+        decimal limitAmount = 300m) =>
+        _service.CreateAsync(new CategoryBudgetCreateViewModel
+        {
+            CategoryId  = categoryId ?? HousingCategoryId,
+            CurrencyId  = currencyId,
+            LimitAmount = limitAmount
+        });
+
+    private async Task<Guid> CreateAssetAccountAsync(int currencyId = 1) =>
+        (await _accountService.CreateAsync(new AccountCreateViewModel
+        {
+            Name               = $"Asset {Guid.NewGuid():N}",
+            AccountTypeId      = 1,
+            CurrencyId         = currencyId,
+            OpeningBalance     = 0m,
+            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
+        })).Id;
+
+    // -------------------------------------------------------------------------
+    // CreateAsync — expense-only guard
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateAsync_OnIncomeCategory_Throws()
+    {
+        var act = async () => await CreateBudgetAsync(categoryId: SalaryCategoryId);
+
+        await act.Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Expense*");
+    }
+
+    // -------------------------------------------------------------------------
+    // CreateAsync — duplicate active guard
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateAsync_WhenActiveBudgetAlreadyExistsForSameCategoryAndCurrency_Throws()
+    {
+        await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+
+        var act = async () => await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+
+        await act.Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("*active*");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenActiveBudgetExistsForSameCategoryDifferentCurrency_Succeeds()
+    {
+        await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+
+        var act = async () => await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 2);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidCategoryBudget_Persists()
+    {
+        var budget = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1, limitAmount: 500m);
+
+        var reloaded = await _fixture.Db.CategoryBudgets.FindAsync(budget.Id);
+        reloaded.Should().NotBeNull();
+        reloaded!.CategoryId.Should().Be(HousingCategoryId);
+        reloaded.CurrencyId.Should().Be(1);
+        reloaded.LimitAmount.Should().Be(500m);
+        reloaded.IsActive.Should().BeTrue();
+    }
+
+    // -------------------------------------------------------------------------
+    // GetActualSpendAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetActualSpendAsync_ReturnsZero_WhenNoTransactionsInMonth()
+    {
+        var budget    = await CreateBudgetAsync();
+        var accountId = await CreateAssetAccountAsync();
+
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = Guid.NewGuid(),
+            Date       = new DateOnly(2025, 1, 15),
+            Amount     = 200m,
+            AccountId  = accountId,
+            CategoryId = HousingCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var actual = await _service.GetActualSpendAsync(budget.Id, 2026, 1);
+
+        actual.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task GetActualSpendAsync_SumsTransactionsInSpecifiedMonth()
+    {
+        var budget    = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        var accountId = await CreateAssetAccountAsync(currencyId: 1);
+
+        _fixture.Db.Transactions.AddRange(
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = new DateOnly(2026, 3, 5),
+                Amount     = 400m,
+                AccountId  = accountId,
+                CategoryId = HousingCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            },
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = new DateOnly(2026, 3, 20),
+                Amount     = 150m,
+                AccountId  = accountId,
+                CategoryId = HousingCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            },
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = new DateOnly(2026, 4, 1),
+                Amount     = 999m,
+                AccountId  = accountId,
+                CategoryId = HousingCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            }
+        );
+        await _fixture.Db.SaveChangesAsync();
+
+        var actual = await _service.GetActualSpendAsync(budget.Id, 2026, 3);
+
+        actual.Should().Be(550m);
+    }
+
+    [Fact]
+    public async Task GetActualSpendAsync_OnlySumsMatchingCategoryAndCurrency()
+    {
+        var housingBudget  = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        var groceriesBudget = await CreateBudgetAsync(categoryId: GroceriesCategoryId, currencyId: 1);
+        var accountId      = await CreateAssetAccountAsync(currencyId: 1);
+
+        _fixture.Db.Transactions.AddRange(
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = new DateOnly(2026, 3, 10),
+                Amount     = 300m,
+                AccountId  = accountId,
+                CategoryId = HousingCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            },
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = new DateOnly(2026, 3, 15),
+                Amount     = 120m,
+                AccountId  = accountId,
+                CategoryId = GroceriesCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            }
+        );
+        await _fixture.Db.SaveChangesAsync();
+
+        var housingActual  = await _service.GetActualSpendAsync(housingBudget.Id, 2026, 3);
+        var groceriesActual = await _service.GetActualSpendAsync(groceriesBudget.Id, 2026, 3);
+
+        housingActual.Should().Be(300m);
+        groceriesActual.Should().Be(120m);
+    }
+
+    // -------------------------------------------------------------------------
+    // DeactivateAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task DeactivateAsync_SetsIsActiveFalse()
+    {
+        var budget = await CreateBudgetAsync();
+
+        await _service.DeactivateAsync(budget.Id);
+
+        var reloaded = await _fixture.Db.CategoryBudgets.FindAsync(budget.Id);
+        reloaded!.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeactivateAsync_ThrowsWhenNotFound()
+    {
+        var act = async () => await _service.DeactivateAsync(Guid.NewGuid());
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    // -------------------------------------------------------------------------
+    // GetAllAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAllAsync_ReturnsOnlyActiveBudgets_ByDefault()
+    {
+        var active   = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        var inactive = await CreateBudgetAsync(categoryId: GroceriesCategoryId, currencyId: 1);
+        await _service.DeactivateAsync(inactive.Id);
+
+        var results = (await _service.GetAllAsync()).ToList();
+
+        results.Should().Contain(b => b.Id == active.Id);
+        results.Should().NotContain(b => b.Id == inactive.Id);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_IncludeInactive_ReturnsBoth()
+    {
+        var active   = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        var inactive = await CreateBudgetAsync(categoryId: GroceriesCategoryId, currencyId: 1);
+        await _service.DeactivateAsync(inactive.Id);
+
+        var results = (await _service.GetAllAsync(includeInactive: true)).ToList();
+
+        results.Should().Contain(b => b.Id == active.Id);
+        results.Should().Contain(b => b.Id == inactive.Id);
+    }
+}

@@ -50,6 +50,38 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQWNjb3VudHMvTGVkZ2VyLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
+[<repo>/ProjectCeres/Views/Budgets/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9DcmVhdGUuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/CreateGoal.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9DcmVhdGVHb2FsLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/Deactivate.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9EZWFjdGl2YXRlLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/DeactivateGoal.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9EZWFjdGl2YXRlR29hbC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/Edit.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9FZGl0LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/EditGoal.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9FZGl0R29hbC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/Goals.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9Hb2Fscy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[<repo>/ProjectCeres/Views/Budgets/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQnVkZ2V0cy9JbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [<repo>/ProjectCeres/Views/Categories/Create.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3MvQ2F0ZWdvcmllcy9DcmVhdGUuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 

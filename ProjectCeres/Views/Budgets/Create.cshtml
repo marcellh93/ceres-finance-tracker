@@ -1,0 +1,40 @@
+@model CategoryBudgetCreateViewModel
+@{ ViewData["Title"] = "New Category Budget"; }
+
+<h1>New Category Budget</h1>
+
+<form asp-action="Create" method="post">
+    <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
+
+    <div class="form-group">
+        <label asp-for="CategoryId"></label>
+        <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control">
+            <option value="">— Select expense category —</option>
+        </select>
+        <span asp-validation-for="CategoryId" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="CurrencyId"></label>
+        <select asp-for="CurrencyId" asp-items="ViewBag.Currencies" class="form-control">
+            <option value="">— Select currency —</option>
+        </select>
+        <span asp-validation-for="CurrencyId" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="LimitAmount"></label>
+        <input asp-for="LimitAmount" class="form-control" />
+        <small>Maximum amount you want to spend in this category each month.</small>
+        <span asp-validation-for="LimitAmount" class="field-error"></span>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Budget</button>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

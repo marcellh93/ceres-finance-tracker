@@ -12,4 +12,7 @@ public interface IBudgetService
     Task DeactivateAsync(Guid id);
     /// <summary>Derived actual spend: SUM of transaction amounts linked to this budget.</summary>
     Task<decimal> GetActualSpendAsync(Guid id);
+    /// <summary>Progress toward goal target. Spending goals sum tagged transactions;
+    /// Savings goals read the linked account balance.</summary>
+    Task<BudgetProgressResult> GetProgressAsync(Guid id);
 }

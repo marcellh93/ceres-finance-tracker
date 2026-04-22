@@ -219,6 +219,9 @@ public class TransactionsController(ITransactionService transactionService, IFil
                 .ToListAsync(), "Id", "Name");
 
         ViewBag.Budgets = new SelectList(
-            await db.Budgets.Where(b => b.IsActive).OrderBy(b => b.Name).ToListAsync(), "Id", "Name");
+            await db.Budgets
+                .Where(b => b.IsActive && b.GoalType == "Spending")
+                .OrderBy(b => b.Name)
+                .ToListAsync(), "Id", "Name");
     }
 }

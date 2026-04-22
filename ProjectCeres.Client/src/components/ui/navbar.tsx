@@ -16,6 +16,8 @@ export function Navbar({ upcomingPaymentsCount = 0 }: NavbarProps) {
           <a href="/Transactions" className="!text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline">Transactions</a>
           <a href="/Transfers" className="!text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline">Transfers</a>
           <a href="/Categories" className="!text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline">Categories</a>
+          <a href="/Budgets" className="!text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline">Budgets</a>
+          <a href="/Import" className="!text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline">Import</a>
           <a href="/RecurringTransactions" className="relative !text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline inline-flex items-center gap-1.5">
             <Bell className="h-4 w-4" />
             Reminders

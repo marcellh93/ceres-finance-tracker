@@ -29,4 +29,11 @@ public class BudgetEditViewModel
 
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
     public string? Description { get; set; }
+
+    [Required(ErrorMessage = "Please select a goal type.")]
+    [Display(Name = "Goal Type")]
+    public string GoalType { get; set; } = "Spending";
+
+    [Display(Name = "Linked Account")]
+    public Guid? LinkedAccountId { get; set; }
 }

@@ -13,21 +13,29 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 ## Tech Stack
 
 - **Runtime:** .NET 10 on macOS
-- **Framework:** ASP.NET Core MVC — server-side rendering via Razor (`.cshtml`). No separate API.
+- **Framework:** ASP.NET Core MVC — server-side rendering via Razor (`.cshtml`). No separate API for the Razor layer.
 - **ORM:** Entity Framework Core with PostgreSQL provider (Npgsql)
 - **Database:** PostgreSQL — install locally via Homebrew (`brew install postgresql@16`) or Postgres.app. No Docker required for local development.
-- **CSS:** Tailwind CSS v3 — utility-first CSS, built via pnpm + Tailwind CLI. Input: `ProjectCeres/Styles/app.css`. Output: `ProjectCeres/wwwroot/css/site.css`. Build is triggered automatically by `dotnet build` via an MSBuild pre-build target.
+- **CSS (Razor layer):** Tailwind CSS v3 — utility-first CSS, built via pnpm + Tailwind CLI. Input: `ProjectCeres/Styles/app.css`. Output: `ProjectCeres/wwwroot/css/site.css`. Build is triggered automatically by `dotnet build` via an MSBuild pre-build target.
+- **React client (`ProjectCeres.Client/`):** React 19 + Vite + TypeScript. Tailwind CSS v4 (via `@tailwindcss/vite`). shadcn/ui with `base-nova` style, Lucide icons, CSS variables enabled. Component aliases: `@/components`, `@/lib/utils`, `@/components/ui`, `@/lib`, `@/hooks`. Tests: Vitest + React Testing Library.
 - **Package manager (frontend):** pnpm
-- **Tests:** xUnit + Moq + FluentAssertions
+- **Tests:** xUnit + Moq + FluentAssertions (server); Vitest + React Testing Library (client)
 
 ## Key Commands
 
 ```bash
-dotnet run --project ProjectCeres          # start the app (also builds CSS)
+# React client (run from ProjectCeres.Client/)
+pnpm dev                                     # start Vite dev server
+pnpm build                                   # type-check + production build
+pnpm test                                    # run Vitest tests
+pnpm dlx shadcn add <component>              # add a shadcn/ui component
+
+# .NET / Razor
+dotnet run --project ProjectCeres            # start the app (also builds CSS)
 dotnet ef migrations add <Name>              # create a migration
 dotnet ef database update                    # apply migrations
-dotnet test                                  # run all tests
-pnpm --dir ProjectCeres run watch:css        # watch and rebuild CSS on view changes
+dotnet test                                  # run all server tests
+pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on view changes
 ```
 
 ## Architecture Rules (Non-Obvious)

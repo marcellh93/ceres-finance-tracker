@@ -543,30 +543,42 @@ dashboard progress bars. Enforce via unique index on (CategoryId, CurrencyId) wh
 
 **Currency matching for actual spend:** When calculating how much has been spent against a CategoryBudget, only transactions from accounts whose `CurrencyId` matches the budget's `CurrencyId` are included. An expense recorded from a USD account does not count toward a EUR budget for the same category — they are tracked independently.
 
+**Actual spend method signature:** `GetActualSpendAsync(id, year, month)` — the caller always specifies the calendar month. The dashboard passes the current month; the Budget vs. Actual report (Stage 7) passes historical months. No default overload exists — call sites must be explicit. See ADR-0056.
+
 ---
 
 ### Budget
 
-A named, purpose-driven financial target. Used to track planned vs. actual spend
-for a specific goal such as a trip, renovation, or investment.
-Transactions are optionally tagged to a budget to count toward its actual amount.
+A named, purpose-driven financial target. Two archetypes exist, distinguished by `GoalType`. See ADR-0040.
 
-| Column       | Type     | Constraints  | Notes                                              |
-|--------------|----------|--------------|----------------------------------------------------|
-| Id           | uuid     | PK           |                                                    |
-| Name         | varchar  | NOT NULL     | e.g. "Trip to Japan", "Kitchen Renovation"         |
-| TargetAmount | decimal(18,2) | NOT NULL | The planned total for this goal                    |
-| CurrencyId   | int      | FK, NOT NULL | → Currency                                         |
-| StartDate    | date     | NOT NULL     | When tracking begins                               |
-| EndDate      | date     | nullable     | Null = open-ended goal                             |
-| Description  | varchar  | nullable     | Optional notes about the goal                      |
-| IsActive     | bit      | NOT NULL     | False = completed or paused, hidden from active list |
+| Column          | Type          | Constraints  | Notes                                                        |
+|-----------------|---------------|--------------|--------------------------------------------------------------|
+| Id              | uuid          | PK           |                                                              |
+| Name            | varchar       | NOT NULL     | e.g. "Trip to Japan", "Kitchen Renovation"                   |
+| TargetAmount    | decimal(18,2) | NOT NULL     | The planned total for this goal                              |
+| CurrencyId      | int           | FK, NOT NULL | → Currency                                                   |
+| StartDate       | date          | NOT NULL     | When tracking begins                                         |
+| EndDate         | date          | nullable     | Null = open-ended goal                                       |
+| Description     | varchar       | nullable     | Optional notes about the goal                                |
+| IsActive        | bit           | NOT NULL     | False = completed or paused, hidden from active list         |
+| GoalType        | varchar(20)   | NOT NULL     | `Spending` or `Savings` — determines progress source        |
+| LinkedAccountId | uuid          | FK, nullable | → Account. Required when `GoalType = Savings`, null otherwise |
 
-**Actual spend** is derived — never stored. It is always calculated as the SUM of amounts
-of all transactions tagged to this budget. Remaining = TargetAmount − actual spend.
+**Spending goal** — tracks money spent toward a target. Progress = SUM of tagged expense transactions.
+One transaction can be tagged to at most one goal budget via the optional `BudgetId` FK on Transaction.
+
+**Savings goal** — tracks money accumulated in a designated account. Progress = balance of `LinkedAccountId`.
+No transaction tagging — progress is always derived from the account balance. See ADR-0040.
+
+**GoalType validation rules (enforced at application level):**
+- `GoalType = Savings` → `LinkedAccountId` is required
+- `GoalType = Spending` → `LinkedAccountId` must be null
+
+**Progress** is always derived via `GetProgressAsync(id)` — never stored. Remaining = TargetAmount − progress.
 
 **Transaction link:** The Transaction entity has an optional `BudgetId` FK.
 One transaction can be linked to at most one goal budget. Not all transactions need a budget.
+Savings goals do not use transaction tagging — their progress comes from the linked account balance.
 
 ---
 

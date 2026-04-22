@@ -59,6 +59,7 @@ builder.Services.AddScoped<ReportGeneratorFactory>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();
 builder.Services.AddViteServices();
 
 var app = builder.Build();

@@ -107,6 +107,8 @@ sequenceDiagram
 
 ### Budgeting (Phase 2)
 
+> **Status: Implemented in Stage 1.** `CategoryBudgetService`, `BudgetsController`, all views, `DashboardApiController` endpoints, and React `CategoryBudgetBars` / `GoalBudgetBars` components are complete. 180 dotnet tests + 4 Vitest tests passing.
+
 > **Schema note:** The `Budget`, `CategoryBudget` entities and `BudgetService` were scaffolded in Phase 1 as foundation. What Phase 2 adds is the controller, views, and dashboard integration — not the data model.
 
 **Category Budgets — monthly spending caps**

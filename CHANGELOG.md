@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### Added
+
+**Budgets**
+- `ICategoryBudgetService` / `CategoryBudgetService` — monthly spend caps for expense categories; guards against non-expense categories and duplicate active budgets
+- `CategoryBudgetService.GetActualSpendAsync(id, year, month)` — caller-specified period for current dashboard use and future Budget vs. Actual reports
+- `BudgetsController` — single controller covering Category Budgets (Index, Create, Edit, Deactivate) and Goal Budgets (Goals, CreateGoal, EditGoal, DeactivateGoal)
+- `BudgetProgressResult` model — computed `Remaining` and `PercentUsed` properties; never stored as columns
+- Goal Budget `GoalType` and `LinkedAccountId` — two archetypes: Spending (sums tagged transactions) and Savings (reads linked account balance)
+- `BudgetService.GetProgressAsync` — returns `BudgetProgressResult` for a goal budget; routes to transaction-sum or account-balance query based on `GoalType`
+- `DashboardApiController` at `/api/dashboard/category-budgets` and `/api/dashboard/goal-budgets` — JSON endpoints for React components
+- React `CategoryBudgetBars` component — fetches category budgets, renders progress bars colored green/amber/red by percent used
+- React `GoalBudgetBars` component — fetches goal budgets, renders progress bars in blue/green
+
+**Views**
+- Category Budgets CRUD views: Index, Create (expense categories only), Edit, Deactivate confirmation
+- Goal Budgets CRUD views: Goals index, CreateGoal, EditGoal (with inline JS show/hide for LinkedAccount field), DeactivateGoal confirmation
+
+**Architecture Decision Records**
+- ADR-0056 — `GetActualSpendAsync` caller-specified year/month signature
+- ADR-0057 — single `BudgetsController` with documented refactor trigger conditions
+
+**Tests**
+- 11 integration tests for `CategoryBudgetService` (all guards, actual spend calculation, deactivate, getAll)
+- 8 integration tests for `GoalBudgetService` (GoalType validation, GetProgressAsync for both archetypes)
+- 2 `WebApplicationFactory` tests for `DashboardApiController` verifying JSON shape
+- 4 Vitest component tests for `CategoryBudgetBars` and `GoalBudgetBars` (mocked fetch, async DOM assertions)
+
+### Changed
+
+**Transactions**
+- Goal Budget dropdown on Transaction Create/Edit now filters to `GoalType == "Spending"` only — Savings goals track progress via account balance, not transaction tagging
+
+**Navbar**
+- Added Budgets and Import links between Categories and Reminders
+
+**Data Models**
+- `Budget` entity extended with `GoalType` (required) and `LinkedAccountId` (nullable FK to Account)
+
+### Removed
+
+**Frontend**
+- `HelloWorld` component and its test removed — React pipeline verification complete, component no longer needed
+
 ---
 
 ## [0.2.0] — 2026-04-21

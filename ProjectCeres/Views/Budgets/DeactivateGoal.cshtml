@@ -1,0 +1,11 @@
+@model Budget
+@{ ViewData["Title"] = "Deactivate Goal Budget"; }
+
+<h1>Deactivate "@Model.Name"?</h1>
+<p>The goal budget will be marked inactive. Existing tagged transactions will not be affected.</p>
+
+<form asp-action="DeactivateGoal" method="post">
+    <input type="hidden" name="id" value="@Model.Id" />
+    <button type="submit" class="btn btn-danger">Yes, Deactivate</button>
+    <a asp-action="Goals" class="btn btn-secondary">Cancel</a>
+</form>
