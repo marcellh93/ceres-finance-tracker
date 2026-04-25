@@ -220,6 +220,24 @@ All state-changing forms must include CSRF anti-forgery tokens. ASP.NET Core's b
 3. **Content-Disposition header:** always set `Content-Disposition: attachment; filename*=UTF-8''...` (RFC 5987). This forces the browser to download the file rather than render it inline, mitigating stored XSS via uploaded HTML files.
 4. **MIME re-verification:** use the stored MIME type from the database when setting the response `Content-Type` — do not re-derive it from the filename extension at serve time.
 
+### Import files (upload-only, not stored)
+
+Import files (CSV, XLSX) are parsed in memory and discarded. They are never written to
+`uploads/` or any other filesystem path.
+
+1. **File size limit:** enforce a maximum of 10 MB at the controller level before any
+   parsing begins. Return 400 if exceeded. Prevents ClosedXML from loading an
+   unbounded workbook into memory.
+
+2. **XLSX magic bytes check:** XLSX files are ZIP archives with magic bytes `PK\x03\x04`
+   (bytes 0–3). `ExcelImportParser` verifies this before opening with ClosedXML. A file
+   with a `.xlsx` extension that fails the check throws `InvalidOperationException` with
+   a user-facing message. This check runs before any library code processes the bytes.
+
+3. **No filesystem persistence:** parsed `ParsedImportRow` objects are the only output
+   that persists beyond the request — as `Transaction` rows in the database. The original
+   file is never saved.
+
 ---
 
 ## Email Security Rules

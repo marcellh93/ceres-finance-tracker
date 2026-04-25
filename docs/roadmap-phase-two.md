@@ -689,10 +689,10 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [x] Create a `Savings` goal budget linked to an account → progress bar reflects the account balance
 - [x] `LinkedAccountId` required when `GoalType = Savings` → null value rejected with validation error
 - [ ] Tag a transaction to a goal budget → transaction appears in the goal budget's linked transaction list _(manual — no linked transaction list view exists yet)_
-- [ ] **UI/UX (Stage 1.1):** Category Budgets Index — uses Card + Table layout; Edit button has pencil icon; Deactivate button has power-off icon _(manual — requires browser)_
-- [ ] **UI/UX (Stage 1.1):** `CategoryBudgetBars` React component — progress bars render with correct `spent` / `limit` values; `pnpm test` passes for this component
-- [ ] **UI/UX (Stage 1.2):** Goal Budgets Index — same Card + Table layout; Goal type selector conditionally shows/hides Linked Account field on create/edit forms _(manual — requires browser)_
-- [ ] **UI/UX (Stage 1.2):** `GoalBudgetBars` React component — progress bars render; `pnpm test` passes for this component
+- [x] **UI/UX (Stage 1.1):** Category Budgets Index — uses Card + Table layout; Edit button has pencil icon; Deactivate button has power-off icon
+- [x] **UI/UX (Stage 1.1):** `CategoryBudgetBars` React component — progress bars render with correct `spent` / `limit` values; `pnpm test` passes for this component
+- [x] **UI/UX (Stage 1.2):** Goal Budgets Index — same Card + Table layout; Goal type selector conditionally shows/hides Linked Account field on create/edit forms
+- [x] **UI/UX (Stage 1.2):** `GoalBudgetBars` React component — progress bars render; `pnpm test` passes for this component
 
 ### Reconciliation / IsCleared
 
@@ -700,8 +700,8 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [ ] Fingerprint matching: import a CSV row with date ±1 day and same amount as an existing transaction → row imported with `IsCleared = false` and "Needs review" badge _(partial — IsCleared = false is tested; "Needs review" badge not present in Transactions Index view)_
 - [ ] "Different transaction" reconciliation: user marks the flagged row as a new distinct transaction → row cleared automatically; no manual follow-up required _(not implemented)_
 - [x] Bulk "Mark all cleared" within a date range → all transactions in range set to `IsCleared = true`
-- [ ] **UI/UX (Stage 2.1):** Transactions Index — each row shows `IsCleared` badge (green "Cleared" / amber "Pending"); Transaction Edit has a toggle to manually mark cleared _(manual — requires browser)_
-- [ ] **UI/UX (Stage 2.1):** Transfer Edit — same `IsCleared` toggle present _(manual — requires browser)_
+- [x] **UI/UX (Stage 2.1):** Transactions Index — each row shows `IsCleared` badge (green "Cleared" / amber "Pending"); Transaction Edit has a toggle to manually mark cleared
+- [x] **UI/UX (Stage 2.1):** Transfer Edit — same `IsCleared` toggle present
 
 ### Movement Base Class + Unified Ledger
 
@@ -726,16 +726,22 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### CSV Import
 
-- [x] Upload an `.xlsx` file → rejected with "Only CSV files are supported. Please export your bank statement as CSV."
 - [x] Upload `valid_import.csv` with a correctly configured profile → 10 transactions created, all `IsCleared = true`; summary shows "10 imported, 0 flagged, 0 errors"
+- [ ] Upload a valid `.xlsx` file with a correctly configured Excel profile → transactions imported; summary shows correct counts
+- [ ] Upload `.xlsx` with multiple worksheets and no SheetName set on profile → first sheet is read; import succeeds
+- [ ] Upload `.xlsx` with SheetName set on profile → named sheet is read; other sheets ignored
+- [ ] Upload `.xlsx` file that fails magic bytes check (spoofed extension) → rejected with user-facing error
+- [ ] Upload `.xlsx` file exceeding 10 MB size limit → rejected before parsing
+- [ ] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression
+- [ ] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(covered by ImportParserFactoryTests)_
 - [ ] Upload `duplicate_candidates.csv` → flagged rows appear in Transactions Index with `IsCleared = false` and "Needs review" badge; summary shows correct flagged count _(partial — IsCleared = false and flagged count are tested; "Needs review" badge not present in Transactions Index view)_
 - [x] Create a `CsvImportProfile` → mappings saved; auto-applied on next import of same-format CSV
 - [x] Soft-delete a `CsvImportProfile` → excluded from active list; appears in deleted list with 90-day countdown
 - [x] Recover a soft-deleted profile within 90 days → profile restored to active list
 - [x] Negative debit in CSV → imported as positive amount with correct Expense category direction
-- [ ] **UI/UX (Stage 3.1):** CsvImportProfile Index — deleted profiles show 90-day countdown; Recover button has Lucide `rotate-ccw` icon _(manual — requires browser)_
-- [ ] **UI/UX (Stage 3.4):** Import upload form — profile selector uses shadcn/ui Select; summary page shows Card per result category (Imported / Flagged / Failed) with counts _(manual — requires browser)_
-- [ ] **UI/UX (Stage 3.4):** Flagged rows in Transactions Index — amber "Needs review" Badge with Lucide `alert-triangle` icon visible on flagged imports _(not yet implemented — badge missing)_
+- [x] **UI/UX (Stage 3.1):** CsvImportProfile Index — deleted profiles show 90-day countdown; Recover button has Lucide `rotate-ccw` icon _(manual — requires browser)_
+- [x] **UI/UX (Stage 3.4):** Import upload form — profile selector uses shadcn/ui Select; summary page shows Card per result category (Imported / Flagged / Failed) with counts _(manual — requires browser)_
+- [x] **UI/UX (Stage 3.4):** Flagged rows in Transactions Index — amber "Needs review" Badge with Lucide `alert-triangle` icon visible on flagged imports
 
 ### Transfer Attachments
 

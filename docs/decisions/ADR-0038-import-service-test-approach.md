@@ -1,6 +1,6 @@
 # ADR 0038: ImportService Test Approach
 
-## Status: Accepted
+## Status: Superseded by ADR-0059
 
 ## Context
 
@@ -83,3 +83,9 @@ ProjectCeres.Tests/
   tests may need updating
 - Fixture files must be kept in sync with the CSV column mapping UX decision (open question)
   — if column mapping changes, fixtures change too
+
+## Superseded By
+
+ADR-0059 (Import Parser Abstraction and Multi-Format Support) supersedes the file format
+enforcement section of this ADR. The "XLSX and other formats are rejected" decision has
+been reversed — XLSX is now supported. The test approach (unit + integration) is unchanged.

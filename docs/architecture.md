@@ -178,6 +178,11 @@ ProjectCeres/
     IDashboardService.cs / DashboardService.cs       ← MTD totals, savings rate, pending reminders count
     ILiabilityProjectionService.cs / LiabilityProjectionService.cs  ← amortisation schedule calculation; no DB access; pure math
     IFileAttachmentService.cs / FileAttachmentService.cs  ← magic-byte upload, safe path, serve, delete (transactions + transfers)
+    IImportParser.cs                              ← parser abstraction — Format + ParseAsync
+    CsvImportParser.cs                            ← CSV parsing via CsvHelper
+    ExcelImportParser.cs                          ← XLSX parsing via ClosedXML; magic bytes check; sheet selection
+    ImportParserFactory.cs                        ← routes ImportFormat → IImportParser; one line per format
+    IImportProfileService.cs / ImportProfileService.cs  ← CRUD + soft delete for ImportProfile
   Models/              ← EF Core entity classes (Account.cs, Transaction.cs, etc.)
   ViewModels/          ← one Create + one Edit ViewModel per write operation
   Helpers/

@@ -49,3 +49,10 @@ from ADR-0039.
 **Negative:**
 - Users whose banks export only OFX cannot import in Phase 2 — they must manually enter
   transactions or export CSV if their bank supports it
+
+## Update (2026-04-25)
+
+The `IImportParser` abstraction introduced in ADR-0059 makes OFX a straightforward
+addition when the time comes: implement `OFXImportParser : IImportParser`, add one
+line to `ImportParserFactory`, register in DI. No changes to `ImportService` or the
+DB schema are required.

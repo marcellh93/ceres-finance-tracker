@@ -48,13 +48,15 @@ be left unmapped. Once mapped, the user names the profile (e.g. "BBVA") and save
 On subsequent imports, if the uploaded CSV headers match a saved profile, it is
 auto-applied — no re-mapping needed.
 
-### `CsvImportProfile` schema
+### `ImportProfile` schema
 
 ```
-CsvImportProfile
+ImportProfile
   Id          uuid NOT NULL
   Name        varchar NOT NULL
   Mappings    jsonb NOT NULL   ← { "date": "Fecha", "amount": "Importe", ... }
+  Format      varchar NOT NULL DEFAULT 'Csv'   ← 'Csv' or 'Excel'
+  SheetName   varchar NULL     ← Excel only; null = read first worksheet
   CreatedAt   datetime NOT NULL
   DeletedAt   datetime NULL
 ```
