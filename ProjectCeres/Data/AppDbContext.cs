@@ -24,7 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<SavedReport> SavedReports => Set<SavedReport>();
     public DbSet<Settings> Settings => Set<Settings>();
     public DbSet<TransferAttachment> TransferAttachments => Set<TransferAttachment>();
-    public DbSet<CsvImportProfile> CsvImportProfiles => Set<CsvImportProfile>();
+    public DbSet<ImportProfile> ImportProfiles => Set<ImportProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -150,10 +150,15 @@ public class AppDbContext : DbContext
             .HasForeignKey(b => b.LinkedAccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // CsvImportProfile.ColumnMappings stored as jsonb.
-        modelBuilder.Entity<CsvImportProfile>()
-            .Property(p => p.ColumnMappings)
-            .HasColumnType("jsonb");
+        modelBuilder.Entity<ImportProfile>(entity =>
+        {
+            entity.ToTable("ImportProfiles");
+            entity.Property(p => p.ColumnMappings).HasColumnType("jsonb");
+            entity.Property(p => p.Format)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(ImportFormat.Csv);
+        });
     }
 
     // -------------------------------------------------------------------------
