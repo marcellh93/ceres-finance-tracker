@@ -9,7 +9,7 @@ namespace ProjectCeres.Controllers;
 
 public class ImportController(
     IImportService importService,
-    ICsvImportProfileService profileService,
+    IImportProfileService profileService,
     AppDbContext db) : Controller
 {
     public async Task<IActionResult> Index()
@@ -29,7 +29,7 @@ public class ImportController(
         }
 
         // If a profile was selected, override individual column fields with profile mappings.
-        CsvColumnMappings mappings;
+        ImportColumnMappings mappings;
         if (vm.ProfileId.HasValue)
         {
             var profile = await profileService.GetByIdAsync(vm.ProfileId.Value);
@@ -43,7 +43,7 @@ public class ImportController(
         }
         else
         {
-            mappings = new CsvColumnMappings
+            mappings = new ImportColumnMappings
             {
                 DateColumn        = vm.DateColumn ?? "Date",
                 AmountColumn      = vm.AmountColumn ?? "Amount",

@@ -14,7 +14,7 @@ public class ImportService(AppDbContext? db = null, ITransactionService? transac
 {
     private static readonly string[] AllowedExtensions = [".csv"];
 
-    public async Task<IReadOnlyList<ParsedImportRow>> ParseAsync(IFormFile file, CsvColumnMappings mappings)
+    public async Task<IReadOnlyList<ParsedImportRow>> ParseAsync(IFormFile file, ImportColumnMappings mappings)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
@@ -76,7 +76,7 @@ public class ImportService(AppDbContext? db = null, ITransactionService? transac
     }
 
     public async Task<ImportResult> ImportAsync(
-        IFormFile file, Guid accountId, Guid categoryId, CsvColumnMappings mappings)
+        IFormFile file, Guid accountId, Guid categoryId, ImportColumnMappings mappings)
     {
         if (db is null || transactionService is null)
             throw new InvalidOperationException("ImportService requires db and transactionService for ImportAsync.");
@@ -114,10 +114,9 @@ public class ImportService(AppDbContext? db = null, ITransactionService? transac
 
                 var txId = await transactionService.CreateAsync(vm);
 
-                // Mark cleared status after creation via the MarkClearedAsync method.
                 if (isDuplicate)
                 {
-                    // Leave IsCleared = false (default) — needs manual review.
+                    await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
                     result.RowsFlagged++;
                 }
                 else

@@ -65,7 +65,7 @@ builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();
 builder.Services.AddScoped<IMovementService, MovementService>();
-builder.Services.AddScoped<ICsvImportProfileService, CsvImportProfileService>();
+builder.Services.AddScoped<IImportProfileService, ImportProfileService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<ILiabilityProjectionService, LiabilityProjectionService>();
 builder.Services.AddViteServices();

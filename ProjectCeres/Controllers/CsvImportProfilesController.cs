@@ -1,10 +1,12 @@
+// ProjectCeres/Controllers/CsvImportProfilesController.cs
 using Microsoft.AspNetCore.Mvc;
+using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Controllers;
 
-public class CsvImportProfilesController(ICsvImportProfileService profileService) : Controller
+public class ImportProfilesController(IImportProfileService profileService) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -14,17 +16,17 @@ public class CsvImportProfilesController(ICsvImportProfileService profileService
         return View(active);
     }
 
-    public IActionResult Create() => View(new CsvImportProfileCreateViewModel());
+    public IActionResult Create() => View(new ImportProfileCreateViewModel());
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(CsvImportProfileCreateViewModel vm)
+    public async Task<IActionResult> Create(ImportProfileCreateViewModel vm)
     {
         if (!ModelState.IsValid) return View(vm);
 
         try
         {
-            await profileService.CreateAsync(vm.Name, vm.Mappings);
+            await profileService.CreateAsync(vm.Name, vm.Format, vm.Mappings);
             TempData["SuccessMessage"] = $"Import profile \"{vm.Name}\" created.";
             return RedirectToAction(nameof(Index));
         }
@@ -40,10 +42,11 @@ public class CsvImportProfilesController(ICsvImportProfileService profileService
         var profile = await profileService.GetByIdAsync(id);
         if (profile is null) return NotFound();
 
-        var vm = new CsvImportProfileEditViewModel
+        var vm = new ImportProfileEditViewModel
         {
-            Id      = profile.Id,
-            Name    = profile.Name,
+            Id       = profile.Id,
+            Name     = profile.Name,
+            Format   = profile.Format,
             Mappings = profile.Mappings
         };
         return View(vm);
@@ -51,7 +54,7 @@ public class CsvImportProfilesController(ICsvImportProfileService profileService
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(CsvImportProfileEditViewModel vm)
+    public async Task<IActionResult> Edit(ImportProfileEditViewModel vm)
     {
         if (!ModelState.IsValid) return View(vm);
 

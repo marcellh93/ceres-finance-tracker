@@ -1,3 +1,4 @@
+// ProjectCeres/Controllers/Api/ImportApiController.cs
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -15,7 +16,7 @@ public class ImportApiController(IImportService importService) : ControllerBase
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
-        var mappings = new CsvColumnMappings
+        var mappings = new ImportColumnMappings
         {
             DateColumn        = vm.DateColumn!,
             AmountColumn      = vm.AmountColumn!,
