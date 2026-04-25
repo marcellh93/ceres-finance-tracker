@@ -1,77 +1,37 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Data;
+using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class ImportService(AppDbContext? db = null, ITransactionService? transactionService = null) : IImportService
+public class ImportService(
+    ImportParserFactory parserFactory,
+    AppDbContext? db = null,
+    ITransactionService? transactionService = null) : IImportService
 {
-    private static readonly string[] AllowedExtensions = [".csv"];
-
     public async Task<IReadOnlyList<ParsedImportRow>> ParseAsync(IFormFile file, ImportColumnMappings mappings)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(extension))
-            throw new InvalidOperationException(
-                "Only CSV files are supported. Please export your bank statement as CSV.");
-
-        var rows = new List<ParsedImportRow>();
-
-        using var memStream = new MemoryStream();
-        await file.CopyToAsync(memStream);
-        memStream.Position = 0;
-
-        using var reader = new StreamReader(memStream);
-        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        var format    = extension switch
         {
-            MissingFieldFound = null,
-            HeaderValidated   = null
-        });
+            ".csv"  => ImportFormat.Csv,
+            ".xlsx" => ImportFormat.Excel,
+            _       => throw new InvalidOperationException(
+                           $"Unsupported file format '{extension}'. Please upload a CSV or Excel (.xlsx) file.")
+        };
 
-        await csv.ReadAsync();
-        csv.ReadHeader();
-
-        while (await csv.ReadAsync())
-        {
-            var dateStr   = csv.GetField(mappings.DateColumn) ?? string.Empty;
-            var amountStr = csv.GetField(mappings.AmountColumn) ?? string.Empty;
-            var desc      = csv.GetField(mappings.DescriptionColumn);
-            var category  = mappings.CategoryColumn is not null
-                ? csv.GetField(mappings.CategoryColumn)
-                : null;
-
-            if (!DateOnly.TryParseExact(dateStr, ["yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy"], null,
-                    DateTimeStyles.None, out var date))
-                continue;
-
-            if (!decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
-                continue;
-
-            if (mappings.FlipDebitSign && amount < 0)
-                amount = -amount;
-
-            rows.Add(new ParsedImportRow
-            {
-                Date         = date,
-                Amount       = amount,
-                Description  = desc,
-                CategoryName = category
-            });
-        }
-
-        return rows;
+        var parser = parserFactory.GetParser(format);
+        return await parser.ParseAsync(file, mappings);
     }
 
     public string GenerateFingerprint(DateOnly date, decimal amount, string? description, Guid accountId)
     {
-        var raw   = $"{date:yyyy-MM-dd}|{amount:F2}|{description ?? ""}|{accountId}";
-        var hash  = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+        var raw  = $"{date:yyyy-MM-dd}|{amount:F2}|{description ?? ""}|{accountId}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
@@ -84,8 +44,6 @@ public class ImportService(AppDbContext? db = null, ITransactionService? transac
         var rows   = await ParseAsync(file, mappings);
         var result = new ImportResult();
 
-        // Build set of existing fingerprints for duplicate detection.
-        // A row is a duplicate candidate when date ±1 day and same amount exist in the account.
         var existingTxns = await db.Transactions
             .Where(t => t.AccountId == accountId)
             .Select(t => new { t.Date, t.Amount, t.Description })
@@ -95,9 +53,6 @@ public class ImportService(AppDbContext? db = null, ITransactionService? transac
         {
             try
             {
-                var fingerprint = GenerateFingerprint(row.Date, row.Amount, row.Description, accountId);
-
-                // Duplicate candidate: same amount, description, and date within ±1 day.
                 var isDuplicate = existingTxns.Any(e =>
                     e.Amount == row.Amount &&
                     e.Description == row.Description &&

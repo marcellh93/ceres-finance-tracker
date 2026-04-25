@@ -15,6 +15,9 @@ public class ImportServiceTests
     private static readonly string FixturesDir =
         Path.Combine(AppContext.BaseDirectory, "Fixtures");
 
+    private static ImportParserFactory BuildFactory() =>
+        new(new CsvImportParser(), new ExcelImportParser());
+
     private static ImportColumnMappings StandardMappings() => new()
     {
         DateColumn        = "Date",
@@ -48,7 +51,7 @@ public class ImportServiceTests
     [Fact]
     public async Task ParseAsync_ValidCsv_Returns10RowsWithCorrectFields()
     {
-        var service = new ImportService();
+        var service = new ImportService(BuildFactory());
         var file    = FileFromFixture("valid_import.csv");
         var mappings = StandardMappings();
 
@@ -63,7 +66,7 @@ public class ImportServiceTests
     [Fact]
     public async Task ParseAsync_NegativeDebitAmount_IsFlippedToPositive()
     {
-        var service  = new ImportService();
+        var service  = new ImportService(BuildFactory());
         var mappings = new ImportColumnMappings
         {
             DateColumn        = "Date",
@@ -94,7 +97,7 @@ public class ImportServiceTests
     [Fact]
     public async Task ParseAsync_ColumnMappingApplied_MapsFromCorrectColumns()
     {
-        var service  = new ImportService();
+        var service  = new ImportService(BuildFactory());
         var mappings = new ImportColumnMappings
         {
             DateColumn        = "Txn Date",
@@ -124,22 +127,27 @@ public class ImportServiceTests
     }
 
     [Fact]
-    public async Task ParseAsync_XlsxFile_ReturnsErrorResult()
+    public async Task ParseAsync_XlsxFile_IsRoutedToExcelParser()
     {
-        var service  = new ImportService();
+        // xlsx_attempt.xlsx is a valid ZIP but has no worksheets — ClosedXML will throw.
+        // The important thing is that it is no longer rejected as "unsupported format";
+        // it is handed off to ExcelImportParser.
+        var service  = new ImportService(BuildFactory());
         var file     = FileFromFixture("xlsx_attempt.xlsx");
         var mappings = StandardMappings();
 
         var act = async () => await service.ParseAsync(file, mappings);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Only CSV files are supported*");
+        // Should NOT throw the old "Only CSV files are supported" error.
+        // Any exception thrown will come from ClosedXML, not from format rejection.
+        await act.Should().ThrowAsync<Exception>()
+            .Where(ex => !ex.Message.Contains("Only CSV files are supported"));
     }
 
     [Fact]
     public void GenerateFingerprint_SameInputs_ReturnsSameDeterministicHash()
     {
-        var service = new ImportService();
+        var service = new ImportService(BuildFactory());
         var accountId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
         var date = new DateOnly(2024, 1, 1);
 
@@ -153,7 +161,7 @@ public class ImportServiceTests
     [Fact]
     public void GenerateFingerprint_DifferentAmount_ReturnsDifferentHash()
     {
-        var service = new ImportService();
+        var service = new ImportService(BuildFactory());
         var accountId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
         var date = new DateOnly(2024, 1, 1);
 

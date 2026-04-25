@@ -38,7 +38,8 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         var transactionService     = new TransactionService(
             _fixture.Db, accountService, liabilityPaymentService, attachmentService);
 
-        _service = new ImportService(_fixture.Db, transactionService);
+        var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
+        _service = new ImportService(parserFactory, _fixture.Db, transactionService);
 
         var account = new Account
         {

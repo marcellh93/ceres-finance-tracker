@@ -77,6 +77,9 @@ public class ImportApiTests(TestWebApplicationFactory factory)
     [Fact]
     public async Task PostImport_XlsxFile_Returns400WithMessage()
     {
+        // xlsx_attempt.xlsx is a structurally broken XLSX (valid magic bytes, no worksheets).
+        // ExcelImportParser wraps the ClosedXML error as InvalidOperationException,
+        // which the controller catches and returns as 400.
         var xlsxPath = Path.Combine(FixturesDir, "xlsx_attempt.xlsx");
         using var xlsxContent = new StreamContent(File.OpenRead(xlsxPath));
         xlsxContent.Headers.ContentType =
@@ -95,6 +98,6 @@ public class ImportApiTests(TestWebApplicationFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadAsStringAsync();
-        body.Should().Contain("Only CSV files are supported");
+        body.Should().NotContain("Only CSV files are supported");
     }
 }
