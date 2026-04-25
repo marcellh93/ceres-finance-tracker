@@ -11,7 +11,7 @@ namespace ProjectCeres.Tests.Integration;
 /// Each test rolls back its transaction — no test data persists between tests.
 /// </summary>
 [Collection("IntegrationTests")]
-public class CsvImportProfileServiceTests : IAsyncLifetime
+public class ImportProfileServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();
     private ImportProfileService _service = null!;

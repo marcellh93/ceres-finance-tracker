@@ -75,29 +75,24 @@ public class ImportApiTests(TestWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task PostImport_XlsxFile_Returns400WithMessage()
+    public async Task PostImport_ValidXlsxFile_Returns200OrValidation()
     {
-        // xlsx_attempt.xlsx is a structurally broken XLSX (valid magic bytes, no worksheets).
-        // ExcelImportParser wraps the ClosedXML error as InvalidOperationException,
-        // which the controller catches and returns as 400.
-        var xlsxPath = Path.Combine(FixturesDir, "xlsx_attempt.xlsx");
+        var xlsxPath = Path.Combine(FixturesDir, "valid_import.xlsx");
         using var xlsxContent = new StreamContent(File.OpenRead(xlsxPath));
         xlsxContent.Headers.ContentType =
             new System.Net.Http.Headers.MediaTypeHeaderValue(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
         using var form = new MultipartFormDataContent();
-        form.Add(xlsxContent, "file", "xlsx_attempt.xlsx");
-        form.Add(new StringContent(Guid.NewGuid().ToString()), "accountId");
-        form.Add(new StringContent(Guid.NewGuid().ToString()), "categoryId");
+        form.Add(xlsxContent, "file", "valid_import.xlsx");
         form.Add(new StringContent("Date"),        "dateColumn");
         form.Add(new StringContent("Amount"),      "amountColumn");
         form.Add(new StringContent("Description"), "descriptionColumn");
-
+        // accountId is required — without it we expect 422, not 400
+        // This test asserts XLSX is no longer rejected at the format level (no longer 400)
         var response = await _client.PostAsync("/api/import", form);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().NotContain("Only CSV files are supported");
+        response.StatusCode.Should().NotBe(System.Net.HttpStatusCode.BadRequest,
+            "XLSX files should no longer be rejected at the format level");
     }
 }

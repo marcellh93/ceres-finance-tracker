@@ -151,4 +151,24 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         var totalProcessed = result.RowsImported + result.RowsFlagged + result.RowsFailed;
         totalProcessed.Should().Be(10);
     }
+
+    [Fact]
+    public async Task ImportAsync_ValidXlsx_Inserts10TransactionsAllCleared()
+    {
+        var file   = FileFromFixture("valid_import.xlsx");
+        var result = await _service.ImportAsync(file, _accountId, HousingCategoryId, StandardMappings());
+
+        result.RowsImported.Should().Be(10);
+        result.RowsFlagged.Should().Be(0);
+        result.RowsFailed.Should().Be(0);
+
+        var dbCount = await _fixture.Db.Transactions
+            .CountAsync(t => t.AccountId == _accountId);
+        dbCount.Should().Be(10);
+
+        var allCleared = await _fixture.Db.Transactions
+            .Where(t => t.AccountId == _accountId)
+            .AllAsync(t => t.IsCleared);
+        allCleared.Should().BeTrue();
+    }
 }
