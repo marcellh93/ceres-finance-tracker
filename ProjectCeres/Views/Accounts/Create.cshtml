@@ -28,6 +28,25 @@
         <span asp-validation-for="CurrencyId" class="field-error"></span>
     </div>
 
+    <div class="form-group" id="liability-fields" style="display:none;">
+        <label asp-for="LiabilityRepaymentType"></label>
+        <select asp-for="LiabilityRepaymentType" class="form-control" id="LiabilityRepaymentType">
+            <option value="">— None —</option>
+            <option value="FullMonthly">Full Monthly (pay in full each month)</option>
+            <option value="Amortising">Amortising (fixed monthly payment + interest)</option>
+        </select>
+        <span asp-validation-for="LiabilityRepaymentType" class="field-error"></span>
+    </div>
+
+    <div class="form-group" id="interest-rate-field" style="display:none;">
+        <label asp-for="InterestRate"></label>
+        <input type="text" id="InterestRate" name="InterestRate"
+               value="@NumberFormatHelper.FormatRatioInputValue(Model.InterestRate, ViewData["NumberFormat"] as string)"
+               class="form-control" placeholder="e.g. 0.035 for 3.5%" />
+        <small>Annual interest rate as a decimal. Required for Amortising accounts.</small>
+        <span asp-validation-for="InterestRate" class="field-error"></span>
+    </div>
+
     <div class="form-group">
         <label asp-for="Description"></label>
         <input asp-for="Description" class="form-control" />
@@ -58,4 +77,25 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        (function () {
+            var accountTypeSelect     = document.getElementById('AccountTypeId');
+            var repaymentTypeSelect   = document.getElementById('LiabilityRepaymentType');
+            var liabilityFields       = document.getElementById('liability-fields');
+            var interestRateField     = document.getElementById('interest-rate-field');
+
+            // AccountType seed: 2 = Liability
+            function isLiability() { return accountTypeSelect.value === '2'; }
+            function isAmortising() { return repaymentTypeSelect.value === 'Amortising'; }
+
+            function updateVisibility() {
+                liabilityFields.style.display   = isLiability() ? '' : 'none';
+                interestRateField.style.display  = isLiability() && isAmortising() ? '' : 'none';
+            }
+
+            accountTypeSelect.addEventListener('change', updateVisibility);
+            repaymentTypeSelect.addEventListener('change', updateVisibility);
+            updateVisibility();
+        })();
+    </script>
 }

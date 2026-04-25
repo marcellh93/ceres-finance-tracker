@@ -37,4 +37,6 @@ public class TransactionEditViewModel
 
     [Display(Name = "Attachment")]
     public IFormFile? Attachment { get; set; }
+
+    public bool IsCleared { get; set; }
 }

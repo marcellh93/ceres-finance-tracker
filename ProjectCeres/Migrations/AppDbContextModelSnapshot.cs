@@ -562,7 +562,7 @@ namespace ProjectCeres.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ProjectCeres.Models.LiabilityPayment", b =>
+            modelBuilder.Entity("ProjectCeres.Models.Movement", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -570,9 +570,6 @@ namespace ProjectCeres.Migrations
 
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<Guid>("AssetAccountId")
-                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -583,16 +580,14 @@ namespace ProjectCeres.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("LiabilityAccountId")
-                        .HasColumnType("uuid");
+                    b.Property<bool>("IsCleared")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssetAccountId");
+                    b.ToTable((string)null);
 
-                    b.HasIndex("LiabilityAccountId");
-
-                    b.ToTable("LiabilityPayments");
+                    b.UseTpcMappingStrategy();
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.RecurringTransaction", b =>
@@ -676,6 +671,26 @@ namespace ProjectCeres.Migrations
                         {
                             Id = 4,
                             Name = "Transaction History"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Budget vs. Actual"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Largest Expenses"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "Monthly Cash Flow Trend"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Name = "Net Worth Over Time"
                         });
                 });
 
@@ -761,47 +776,6 @@ namespace ProjectCeres.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ProjectCeres.Models.Transaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<Guid?>("BudgetId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsCleared")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId");
-
-                    b.HasIndex("BudgetId");
-
-                    b.HasIndex("CategoryId");
-
-                    b.ToTable("Transactions");
-                });
-
             modelBuilder.Entity("ProjectCeres.Models.TransactionAttachment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -836,42 +810,6 @@ namespace ProjectCeres.Migrations
                     b.ToTable("TransactionAttachments");
                 });
 
-            modelBuilder.Entity("ProjectCeres.Models.Transfer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("Date")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("DestAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsCleared")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("SourceAccountId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DestAccountId");
-
-                    b.HasIndex("SourceAccountId");
-
-                    b.ToTable("Transfers");
-                });
-
             modelBuilder.Entity("ProjectCeres.Models.TransferAttachment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -904,6 +842,62 @@ namespace ProjectCeres.Migrations
                     b.HasIndex("TransferId");
 
                     b.ToTable("TransferAttachments");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.LiabilityPayment", b =>
+                {
+                    b.HasBaseType("ProjectCeres.Models.Movement");
+
+                    b.Property<Guid>("AssetAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LiabilityAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasIndex("AssetAccountId");
+
+                    b.HasIndex("LiabilityAccountId");
+
+                    b.ToTable("LiabilityPayments");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.Transaction", b =>
+                {
+                    b.HasBaseType("ProjectCeres.Models.Movement");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BudgetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("BudgetId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.ToTable("Transactions");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.Transfer", b =>
+                {
+                    b.HasBaseType("ProjectCeres.Models.Movement");
+
+                    b.Property<Guid>("DestAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasIndex("DestAccountId");
+
+                    b.HasIndex("SourceAccountId");
+
+                    b.ToTable("Transfers");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Account", b =>
@@ -973,25 +967,6 @@ namespace ProjectCeres.Migrations
                     b.Navigation("Currency");
                 });
 
-            modelBuilder.Entity("ProjectCeres.Models.LiabilityPayment", b =>
-                {
-                    b.HasOne("ProjectCeres.Models.Account", "AssetAccount")
-                        .WithMany()
-                        .HasForeignKey("AssetAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ProjectCeres.Models.Account", "LiabilityAccount")
-                        .WithMany()
-                        .HasForeignKey("LiabilityAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("AssetAccount");
-
-                    b.Navigation("LiabilityAccount");
-                });
-
             modelBuilder.Entity("ProjectCeres.Models.RecurringTransaction", b =>
                 {
                     b.HasOne("ProjectCeres.Models.Account", "Account")
@@ -1053,6 +1028,47 @@ namespace ProjectCeres.Migrations
                     b.Navigation("DefaultCurrency");
                 });
 
+            modelBuilder.Entity("ProjectCeres.Models.TransactionAttachment", b =>
+                {
+                    b.HasOne("ProjectCeres.Models.Transaction", "Transaction")
+                        .WithMany("Attachments")
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Transaction");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.TransferAttachment", b =>
+                {
+                    b.HasOne("ProjectCeres.Models.Transfer", "Transfer")
+                        .WithMany("Attachments")
+                        .HasForeignKey("TransferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Transfer");
+                });
+
+            modelBuilder.Entity("ProjectCeres.Models.LiabilityPayment", b =>
+                {
+                    b.HasOne("ProjectCeres.Models.Account", "AssetAccount")
+                        .WithMany()
+                        .HasForeignKey("AssetAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ProjectCeres.Models.Account", "LiabilityAccount")
+                        .WithMany()
+                        .HasForeignKey("LiabilityAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AssetAccount");
+
+                    b.Navigation("LiabilityAccount");
+                });
+
             modelBuilder.Entity("ProjectCeres.Models.Transaction", b =>
                 {
                     b.HasOne("ProjectCeres.Models.Account", "Account")
@@ -1079,17 +1095,6 @@ namespace ProjectCeres.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("ProjectCeres.Models.TransactionAttachment", b =>
-                {
-                    b.HasOne("ProjectCeres.Models.Transaction", "Transaction")
-                        .WithMany("Attachments")
-                        .HasForeignKey("TransactionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Transaction");
-                });
-
             modelBuilder.Entity("ProjectCeres.Models.Transfer", b =>
                 {
                     b.HasOne("ProjectCeres.Models.Account", "DestAccount")
@@ -1107,17 +1112,6 @@ namespace ProjectCeres.Migrations
                     b.Navigation("DestAccount");
 
                     b.Navigation("SourceAccount");
-                });
-
-            modelBuilder.Entity("ProjectCeres.Models.TransferAttachment", b =>
-                {
-                    b.HasOne("ProjectCeres.Models.Transfer", "Transfer")
-                        .WithMany("Attachments")
-                        .HasForeignKey("TransferId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Transfer");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Account", b =>

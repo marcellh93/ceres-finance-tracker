@@ -1,0 +1,77 @@
+@model List<NetWorthSnapshotRow>
+@{ ViewData["Title"] = "Net Worth Over Time"; }
+
+<div class="page-header">
+    <h1>Net Worth Over Time</h1>
+    <a asp-action="ExportNetWorthOverTime"
+       asp-route-currencyId="@ViewBag.SelectedCurrencyId"
+       asp-route-from="@ViewBag.From"
+       asp-route-to="@ViewBag.To"
+       class="btn btn-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="inline-icon" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export CSV
+    </a>
+</div>
+
+<form asp-action="NetWorthOverTime" method="get" class="filter-bar">
+    <div class="form-group mb-0">
+        <label for="currencyId">Currency</label>
+        <select id="currencyId" name="currencyId" asp-items="ViewBag.Currencies" class="form-control w-auto"></select>
+    </div>
+    <div class="form-group mb-0">
+        <label for="from">From</label>
+        <input id="from" type="date" name="from" value="@ViewBag.From" class="form-control w-auto" />
+    </div>
+    <div class="form-group mb-0">
+        <label for="to">To</label>
+        <input id="to" type="date" name="to" value="@ViewBag.To" class="form-control w-auto" />
+    </div>
+    <div class="form-group mb-0 self-end">
+        <button type="submit" class="btn btn-secondary">Apply</button>
+    </div>
+</form>
+
+@if (!Model.Any())
+{
+    <div class="dashboard-card text-center py-12">
+        <p class="text-gray-400 text-sm">No data in this period.</p>
+    </div>
+}
+else
+{
+    var fmt = ViewData["NumberFormat"] as string;
+    var sym = Model.First().CurrencySymbol;
+    <div class="dashboard-card p-0 overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th class="text-right">Assets</th>
+                    <th class="text-right">Liabilities</th>
+                    <th class="text-right">Net Worth</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model)
+                {
+                    <tr>
+                        <td class="font-medium">@(new DateTime(row.Year, row.Month, 1).ToString("MMM yyyy"))</td>
+                        <td class="text-right amount-income tabular-nums">@sym @NumberFormatHelper.FormatAmount(row.Assets, fmt)</td>
+                        <td class="text-right amount-expense tabular-nums">@sym @NumberFormatHelper.FormatAmount(row.Liabilities, fmt)</td>
+                        <td class="text-right tabular-nums @(row.NetWorth >= 0 ? "amount-income" : "amount-expense")">@sym @NumberFormatHelper.FormatAmount(row.NetWorth, fmt)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<div class="mt-6">
+    <a asp-action="Index" class="btn btn-secondary">← Reports</a>
+</div>

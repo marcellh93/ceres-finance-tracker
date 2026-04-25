@@ -27,9 +27,47 @@ Goal: extend the app to serve freelancers and autónomos specifically.
 
 ---
 
+## Phase 4 additions
+
+### Net worth milestones
+
+A `NetWorthMilestone` entity: name, target amount, currency, target date (optional), notes (optional). Displayed on the dashboard as a progress bar comparing current derived net worth against the target. Distinct from Goal Budgets — a Goal Budget tracks spending toward a purpose; a net worth milestone tracks overall financial position against a long-term target (e.g. "reach €50k net worth by December 2027"). No new movement types or category tagging required — reads the same derived net worth calculation already used in reports.
+
+Gate: only meaningful after several months of net worth history exist. Do not introduce at Phase 3 launch.
+
+### Spending velocity alerts
+
+A mid-month proactive notification: "You've spent 90% of your [Category] budget with 15 days remaining." Triggered by the existing `CategoryBudget` data. Threshold and delivery channel (email, push) are user-configurable. Opt-in — disabled by default.
+
+Implementation note: shares a background job (`FinancialNotificationJob`) with the weekly digest email introduced in Phase 3. The same scheduled pass that assembles the digest evaluates CategoryBudget thresholds and queues alerts for any user who has both opted in and crossed the threshold since the last check. Building both features on a single job runner avoids setting up the scheduler twice.
+
+Gate: requires the Phase 3 email service and background job infrastructure to be stable first.
+
+---
+
 ## Maybe / Future Consideration
 
 These ideas have merit but are not assigned to a phase yet. Revisit when the app is in daily use.
+
+### Native mobile apps (iOS and Android)
+
+**Goal:** full native mobile experience — not just a mobile-optimised website.
+
+Two separate client projects:
+- **iOS** — Swift + SwiftUI (or UIKit where needed). Submitted to the App Store.
+- **Android** — Flutter or Java/Kotlin. Submitted to Google Play. Flutter is worth evaluating as a shared codebase option between iOS and Android, which would reduce maintenance burden significantly at the cost of some platform-native feel.
+
+**Backend impact:** the Phase 3 Web API (ASP.NET Core, pure JSON) is already the correct architecture for mobile clients. No additional backend work is required beyond ensuring the API surface is complete and versioned. JWT authentication (already planned for Phase 3) is the right credential mechanism for mobile — cookies are browser-only.
+
+**PWA as a stepping stone:** a Progressive Web App (manifest + service worker on top of the React SPA) can be installed to the home screen and offers limited offline read access. It is not a replacement for native apps — it has no access to native device features (biometrics, push notifications, widget API, system keychain) and is not distributed via the App Store or Google Play. A PWA can be shipped earlier as an interim solution while native apps are in development, but it does not remove the need for them.
+
+**Open questions — resolve before committing to native:**
+- [ ] Flutter vs. separate Swift + Android native: Flutter reduces codebase surface but introduces a Dart dependency and a framework layer. Separate native apps give full platform fidelity but double the client maintenance cost. Decision depends on available development capacity.
+- [ ] Which Phase 3 features ship in v1 of the mobile app vs. which are web-only initially? A scoped mobile v1 (dashboard, transactions, transfers, account balances) is faster to ship than a full feature-parity client.
+- [ ] Push notification infrastructure: APNs for iOS, FCM for Android. This is separate from the email service and requires additional setup. Spending velocity alerts and session notifications are the first candidates for push delivery.
+- [ ] Biometric authentication: Face ID / Touch ID on iOS, fingerprint on Android. Users expect this from a financial app. Requires the platform keychain — not available in a PWA.
+
+**Gate:** Phase 3 Web API must be stable and versioned before mobile development begins. Do not start mobile clients against a moving API target.
 
 ### Receipt scanning and line-item tracking
 

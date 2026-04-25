@@ -14,7 +14,7 @@ public class RecurringTransaction
     public int? DayOfPeriod { get; set; }
     public DateOnly NextDueDate { get; set; }
     public bool IsActive { get; set; }
-    public string ReminderBehaviour { get; set; } = "SnapToCalendarDay";
+    public ReminderBehaviour ReminderBehaviour { get; set; } = ReminderBehaviour.SnapToCalendarDay;
 
     public Account Account { get; set; } = null!;
     public Category Category { get; set; } = null!;

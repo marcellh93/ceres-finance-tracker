@@ -1,0 +1,5 @@
+Date,Amount,Description,Category
+not-a-date,50.00,Grocery store,Food
+2024-01-02,,Electric bill,Utilities
+2024-01-03,abc,Coffee shop,Food
+,200.00,Missing date row,Salary

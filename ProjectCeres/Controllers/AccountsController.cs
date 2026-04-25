@@ -4,10 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
+using System.Globalization;
 
 namespace ProjectCeres.Controllers;
 
-public class AccountsController(IAccountService accountService, AppDbContext db) : Controller
+public class AccountsController(IAccountService accountService, AppDbContext db, ILiabilityProjectionService projectionService) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -60,13 +61,16 @@ public class AccountsController(IAccountService accountService, AppDbContext db)
         var openingDate = await accountService.GetOpeningBalanceDateAsync(account.Id);
         var vm = new AccountEditViewModel
         {
-            Id                  = account.Id,
-            Name                = account.Name,
-            Description         = account.Description,
-            OpeningBalance      = await accountService.GetOpeningBalanceAsync(account.Id),
-            OpeningBalanceDate  = openingDate ?? DateOnly.FromDateTime(DateTime.Today)
+            Id                     = account.Id,
+            Name                   = account.Name,
+            Description            = account.Description,
+            OpeningBalance         = await accountService.GetOpeningBalanceAsync(account.Id),
+            OpeningBalanceDate     = openingDate ?? DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType = account.LiabilityRepaymentType,
+            InterestRate           = account.InterestRate
         };
 
+        ViewBag.IsLiability = account.AccountType.Name == "Liability";
         return View(vm);
     }
 
@@ -74,7 +78,12 @@ public class AccountsController(IAccountService accountService, AppDbContext db)
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(AccountEditViewModel vm)
     {
-        if (!ModelState.IsValid) return View(vm);
+        if (!ModelState.IsValid)
+        {
+            var acc = await accountService.GetByIdAsync(vm.Id);
+            ViewBag.IsLiability = acc?.AccountType.Name == "Liability";
+            return View(vm);
+        }
 
         try
         {
@@ -84,6 +93,8 @@ public class AccountsController(IAccountService accountService, AppDbContext db)
         }
         catch (InvalidOperationException ex)
         {
+            var acc = await accountService.GetByIdAsync(vm.Id);
+            ViewBag.IsLiability = acc?.AccountType.Name == "Liability";
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(vm);
         }
@@ -120,6 +131,52 @@ public class AccountsController(IAccountService accountService, AppDbContext db)
     {
         var vm = await accountService.GetLedgerAsync(id);
         if (vm is null) return NotFound();
+
+        var account = await accountService.GetByIdAsync(id);
+        if (account?.LiabilityRepaymentType == "Amortising" && account.InterestRate.HasValue)
+        {
+            var balance = await accountService.GetBalanceAsync(id);
+            if (balance > 0)
+            {
+                ViewBag.MonthlyPaymentPrompt = true;
+                ViewBag.Balance              = balance;
+                ViewBag.AnnualRate           = account.InterestRate.Value;
+            }
+        }
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Ledger(Guid id, decimal monthlyPayment)
+    {
+        var vm = await accountService.GetLedgerAsync(id);
+        if (vm is null) return NotFound();
+
+        var account = await accountService.GetByIdAsync(id);
+        if (account?.LiabilityRepaymentType == "Amortising" && account.InterestRate.HasValue)
+        {
+            var balance = await accountService.GetBalanceAsync(id);
+            if (balance > 0 && monthlyPayment > 0)
+            {
+                try
+                {
+                    var projection = projectionService.Project(balance, account.InterestRate.Value, monthlyPayment);
+                    ViewBag.Projection = projection;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    ViewBag.ProjectionError = ex.Message;
+                }
+
+                ViewBag.MonthlyPaymentPrompt = true;
+                ViewBag.Balance              = balance;
+                ViewBag.AnnualRate           = account.InterestRate.Value;
+                ViewBag.MonthlyPayment       = monthlyPayment;
+            }
+        }
+
         return View(vm);
     }
 

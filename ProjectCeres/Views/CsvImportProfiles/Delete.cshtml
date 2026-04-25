@@ -1,0 +1,28 @@
+@model CsvImportProfileViewModel
+@{ ViewData["Title"] = "Delete Import Profile"; }
+
+<div class="page-header">
+    <h1>Delete Import Profile</h1>
+</div>
+
+<div class="card">
+    <p>Are you sure you want to delete the import profile <strong>@Model.Name</strong>?</p>
+    <p class="form-hint">The profile will be recoverable for 90 days from deletion.</p>
+    <dl class="detail-list">
+        <dt>Date Column</dt><dd>@Model.Mappings.DateColumn</dd>
+        <dt>Amount Column</dt><dd>@Model.Mappings.AmountColumn</dd>
+        <dt>Description Column</dt><dd>@Model.Mappings.DescriptionColumn</dd>
+        <dt>Category Column</dt><dd>@(Model.Mappings.CategoryColumn ?? "—")</dd>
+    </dl>
+
+    <div class="form-actions">
+        <form asp-action="Delete" asp-route-id="@Model.Id" method="post" style="display:inline">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                Confirm Delete
+            </button>
+        </form>
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    </div>
+</div>

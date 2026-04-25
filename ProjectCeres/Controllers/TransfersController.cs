@@ -4,10 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
+using ProjectCeres.Models;
 
 namespace ProjectCeres.Controllers;
 
-public class TransfersController(ITransferService transferService, AppDbContext db) : Controller
+public class TransfersController(ITransferService transferService, AppDbContext db, IFileAttachmentService attachmentService) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -46,7 +47,7 @@ public class TransfersController(ITransferService transferService, AppDbContext 
         }
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(Guid id, string? returnUrl = null)
     {
         var transfer = await transferService.GetByIdAsync(id);
         if (transfer is null) return NotFound();
@@ -58,19 +59,30 @@ public class TransfersController(ITransferService transferService, AppDbContext 
             Amount          = transfer.Amount,
             SourceAccountId = transfer.SourceAccountId,
             DestAccountId   = transfer.DestAccountId,
-            Description     = transfer.Description
+            Description     = transfer.Description,
+            IsCleared       = transfer.IsCleared
         };
 
+        ViewBag.ReturnUrl   = returnUrl;
+        ViewBag.Attachments = await db.TransferAttachments
+            .Where(a => a.TransferId == id)
+            .OrderBy(a => a.UploadedAt)
+            .ToListAsync();
         await PopulateViewBagAsync();
         return View(vm);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(TransferEditViewModel vm)
+    public async Task<IActionResult> Edit(TransferEditViewModel vm, string? returnUrl = null)
     {
         if (!ModelState.IsValid)
         {
+            ViewBag.ReturnUrl   = returnUrl;
+            ViewBag.Attachments = await db.TransferAttachments
+                .Where(a => a.TransferId == vm.Id)
+                .OrderBy(a => a.UploadedAt)
+                .ToListAsync();
             await PopulateViewBagAsync();
             return View(vm);
         }
@@ -79,27 +91,40 @@ public class TransfersController(ITransferService transferService, AppDbContext 
         {
             await transferService.UpdateAsync(vm);
 
+            if (vm.Attachment is { Length: > 0 })
+                await attachmentService.UploadForTransferAsync(vm.Id, vm.Attachment);
+
             TempData["SuccessMessage"] = "Transfer updated.";
+
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return Redirect(returnUrl);
+
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
+            ViewBag.ReturnUrl   = returnUrl;
+            ViewBag.Attachments = await db.TransferAttachments
+                .Where(a => a.TransferId == vm.Id)
+                .OrderBy(a => a.UploadedAt)
+                .ToListAsync();
             await PopulateViewBagAsync();
             return View(vm);
         }
     }
 
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null)
     {
         var transfer = await transferService.GetByIdAsync(id);
         if (transfer is null) return NotFound();
+        ViewBag.ReturnUrl = returnUrl;
         return View(transfer);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id, string _ = "")
+    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null, string _ = "")
     {
         try
         {
@@ -111,6 +136,18 @@ public class TransfersController(ITransferService transferService, AppDbContext 
             TempData["ErrorMessage"] = ex.Message;
         }
 
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return Redirect(returnUrl);
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleCleared(Guid id, bool cleared)
+    {
+        try { await transferService.MarkClearedAsync(id, cleared); }
+        catch (InvalidOperationException ex) { TempData["ErrorMessage"] = ex.Message; }
         return RedirectToAction(nameof(Index));
     }
 

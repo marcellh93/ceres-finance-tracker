@@ -1,9 +1,47 @@
 @model AccountLedgerViewModel
 @using ProjectCeres.Helpers
+@using ProjectCeres.ViewModels
 @{ ViewData["Title"] = $"{Model.AccountName} — Ledger"; }
 
 <h1>@Model.AccountName — Ledger</h1>
 <p>Every entry that contributes to this account's balance, in chronological order. The final running balance should match the balance shown on the Accounts page.</p>
+
+@if (ViewBag.MonthlyPaymentPrompt == true)
+{
+    <div class="card" style="margin-bottom:1.5rem;">
+        <h2>Payoff Projection</h2>
+
+        @if (ViewBag.ProjectionError != null)
+        {
+            <div class="alert alert-error">@ViewBag.ProjectionError</div>
+        }
+
+        @if (ViewBag.Projection is LiabilityProjectionViewModel proj)
+        {
+            <dl class="stat-list">
+                <div><dt>Outstanding balance</dt><dd>@Model.CurrencySymbol @NumberFormatHelper.FormatAmount((decimal)ViewBag.Balance, ViewData["NumberFormat"] as string)</dd></div>
+                <div><dt>Annual interest rate</dt><dd>@(((decimal)ViewBag.AnnualRate * 100m).ToString("0.##"))%</dd></div>
+                <div><dt>Monthly payment</dt><dd>@Model.CurrencySymbol @NumberFormatHelper.FormatAmount(proj.MonthlyPayment, ViewData["NumberFormat"] as string)</dd></div>
+                <div><dt>Estimated payoff</dt><dd>@proj.PayoffDate.ToString("MMMM yyyy") (@proj.MonthsToPayoff months)</dd></div>
+                <div><dt>Total interest cost</dt><dd>@Model.CurrencySymbol @NumberFormatHelper.FormatAmount(proj.TotalInterest, ViewData["NumberFormat"] as string)</dd></div>
+                <div><dt>Total paid</dt><dd>@Model.CurrencySymbol @NumberFormatHelper.FormatAmount(proj.TotalPaid, ViewData["NumberFormat"] as string)</dd></div>
+            </dl>
+        }
+
+        <form asp-action="Ledger" asp-route-id="@Model.AccountId" method="post" style="margin-top:1rem;">
+            @Html.AntiForgeryToken()
+            <div class="form-group" style="display:flex;gap:.5rem;align-items:flex-end;">
+                <div>
+                    <label for="monthlyPayment">Monthly payment amount</label>
+                    <input type="number" id="monthlyPayment" name="monthlyPayment" step="0.01" min="0"
+                           value="@(ViewBag.MonthlyPayment?.ToString("F2"))"
+                           class="form-control" style="width:180px;" />
+                </div>
+                <button type="submit" class="btn btn-primary">Calculate</button>
+            </div>
+        </form>
+    </div>
+}
 
 @if (!Model.Entries.Any())
 {

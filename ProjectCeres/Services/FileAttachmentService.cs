@@ -120,6 +120,74 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
         await db.SaveChangesAsync();
     }
 
+    public async Task<TransferAttachment> UploadForTransferAsync(Guid transferId, IFormFile file)
+    {
+        if (file.Length == 0)
+            throw new InvalidOperationException("Uploaded file is empty.");
+        if (file.Length > MaxFileSizeBytes)
+            throw new InvalidOperationException("File exceeds the 10 MB limit.");
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+
+        var detectedMime = DetectMime(bytes);
+        if (!AllowedMimeTypes.TryGetValue(detectedMime, out var extension))
+            throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
+
+        var relativePath = Path.Combine("uploads", "transfers", transferId.ToString(), $"{Guid.NewGuid()}{extension}");
+        var fullPath     = Path.Combine(env.ContentRootPath, relativePath);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        await File.WriteAllBytesAsync(fullPath, bytes);
+
+        var attachment = new TransferAttachment
+        {
+            Id            = Guid.NewGuid(),
+            TransferId    = transferId,
+            FileName      = file.FileName,
+            StoredPath    = relativePath,
+            ContentType   = detectedMime,
+            FileSizeBytes = bytes.Length,
+            UploadedAt    = DateTime.UtcNow
+        };
+
+        db.TransferAttachments.Add(attachment);
+        await db.SaveChangesAsync();
+        return attachment;
+    }
+
+    public async Task<(byte[] Data, string ContentType, string FileName)> GetTransferAttachmentAsync(Guid attachmentId)
+    {
+        var attachment = await db.TransferAttachments.FindAsync(attachmentId)
+            ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
+
+        var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
+        if (!File.Exists(fullPath))
+            throw new InvalidOperationException("Attachment file not found on disk.");
+
+        var bytes = await File.ReadAllBytesAsync(fullPath);
+
+        var detectedMime = DetectMime(bytes);
+        if (!AllowedMimeTypes.ContainsKey(detectedMime))
+            throw new InvalidOperationException("Attachment failed MIME verification at serve time.");
+
+        return (bytes, attachment.ContentType, attachment.FileName);
+    }
+
+    public async Task DeleteTransferAttachmentAsync(Guid attachmentId)
+    {
+        var attachment = await db.TransferAttachments.FindAsync(attachmentId)
+            ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
+
+        var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
+        if (File.Exists(fullPath))
+            File.Delete(fullPath);
+
+        db.TransferAttachments.Remove(attachment);
+        await db.SaveChangesAsync();
+    }
+
     private static string DetectMime(byte[] bytes)
     {
         var results = Inspector.Inspect(bytes);

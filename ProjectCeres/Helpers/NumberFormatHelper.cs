@@ -23,6 +23,13 @@ public static class NumberFormatHelper
         => value.ToString("F2", GetCulture(numberFormat));
 
     /// <summary>
+    /// Formats a ratio/rate (e.g. interest rate) for a text input using the correct
+    /// decimal character and preserving all significant digits (no fixed decimal places).
+    /// </summary>
+    public static string FormatRatioInputValue(decimal? value, string? numberFormat)
+        => value is null ? string.Empty : value.Value.ToString("G", GetCulture(numberFormat));
+
+    /// <summary>
     /// Parses a decimal string using the user's number format setting.
     /// In comma_decimal mode, a value with a period but no comma is treated as
     /// invariant format (e.g. "100.00" typed instead of "100,00") to prevent

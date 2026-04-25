@@ -5,6 +5,169 @@
 ### Added
 
 **Budgets**
+- `CategoryBudgetBars` component upgraded to use shadcn `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Progress`, and `Badge` — progress bars now colour-coded green/amber/red by percent used
+- `GoalBudgetBars` component upgraded to use shadcn `Card`, `CardHeader`, `CardTitle`, `CardContent`, and `Progress` — goal type shown as a blue pill badge matching the Goals index table
+- Dashboard layout updated with two side-by-side mount points (`data-react="category-budget-bars"` and `data-react="goal-budget-bars"`) wired in `main.tsx`
+
+**Movements**
+- Type column in Movements table now renders colour-coded pill badges — blue for Transaction, purple for Transfer, orange for Liability Payment
+- `CategoryTypeName` field added to `MovementListItemViewModel`; projected from `t.Category.CategoryType.Name` in `MovementService.QueryTransactions` via `ThenInclude`
+- Amount column in Movements table now colour-coded — green for Income, red for Expense (matching the Transactions table), neutral for Transfers and Liability Payments
+
+**Reports**
+- `BudgetVsActualReportGenerator` — compares active category budget limits against actual spend for a given currency and date range; returns per-category rows with limit, actual, variance, and percent used
+- `LargestExpensesReportGenerator` — returns top N expense transactions ordered by amount descending for a given currency and date range; respects `Limit` parameter (default 50)
+- `MonthlyCashFlowReportGenerator` — returns income, expenses, and net grouped by calendar month for a given currency and date range; defaults to last 6 months when no range supplied
+- `NetWorthOverTimeReportGenerator` — returns cumulative asset, liability, and net worth snapshots at the end of each month for a given currency and date range; defaults to last 12 months
+- `ReportsController` actions: `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime` — each reads from the corresponding generator with currency/date defaults from Settings
+- `Views/Reports/BudgetVsActual.cshtml` — filter bar + table with limit/actual/variance/% used columns; over-budget rows highlighted in red
+- `Views/Reports/LargestExpenses.cshtml` — filter bar with Top N selector (10/25/50/100) + table with date, description, category, account, amount
+- `Views/Reports/MonthlyCashFlow.cshtml` — filter bar + month-by-month table with income, expenses, net columns; period totals in tfoot
+- `Views/Reports/NetWorthOverTime.cshtml` — filter bar + monthly snapshot table with assets, liabilities, net worth columns
+- Reports Index updated with links to all four new reports
+- `ReportTypeKey` enum extended with `BudgetVsActual = 5`, `LargestExpenses = 6`, `MonthlyCashFlow = 7`, `NetWorthOverTime = 8`
+- `_ViewImports.cshtml` — `@using ProjectCeres.Services.Reports` added so report row record types are available in all views
+
+**Migrations**
+- `Stage7ReportTypeSeed` migration — inserts `ReportType` rows for the four new report types (IDs 5–8); `Up()` contains only `InsertData` operations, no schema changes
+
+**Docs**
+- Developer guide updated: `GroupBy` with anonymous object key and `GroupBy` + `Select` summary pattern in LINQ file; cumulative snapshot pattern (one-query-then-filter-in-memory) in EF Core querying file; extending the factory checklist and enum–DB alignment rule in factory pattern file; seeding lookup table rows pattern with four-step workflow in migrations file
+
+**Tests**
+- 16 integration tests for the four Stage 7 generators: `BudgetVsActual` (returns correct plan vs. actual, excludes out-of-range transactions, excludes inactive budgets, shows zero actual when no spend), `LargestExpenses` (orders by amount desc, respects limit, excludes income, excludes out-of-range), `MonthlyCashFlow` (groups by month, excludes system transactions, filters by currency, omits months with no activity), `NetWorthOverTime` (monthly snapshots, includes liabilities, filters by currency, snapshots are cumulative)
+- 4 factory dispatch unit tests added to `ReportGeneratorFactoryTests` — one per new generator
+
+### Changed
+
+**Reports**
+- `ReportGeneratorFactory` constructor extended with four new generator parameters; switch extended with four new cases
+- `ReportsController` — injects the four new generators directly as constructor parameters (not via factory) since each has a dedicated action
+- `AppDbContext.HasData` — `ReportType` seed extended from 4 rows to 8 rows
+- `Program.cs` — four new `AddScoped` registrations for Stage 7 generators
+
+**Budgets**
+- `BudgetService` constructor updated to accept `IAccountService`; `GetAccountBalanceAsync` now delegates to `AccountService.GetBalanceAsync` — fixes Savings goal progress showing incorrect balance (transfers were excluded)
+- `Budgets/Index.cshtml` — Card + Table layout, status as coloured pill badge, Edit button has pencil icon, Deactivate button has power-off icon, New button has plus icon
+- `Budgets/Goals.cshtml` — same Card + Table upgrade; GoalType shown as blue pill badge; Edit/Deactivate icons
+- `Budgets/Create.cshtml` and `Edit.cshtml` — wrapped in `dashboard-card`, form labels styled, Save/Cancel buttons have check/x icons
+- `Budgets/CreateGoal.cshtml` and `EditGoal.cshtml` — same form styling upgrade; conditional Linked Account field preserved
+- `Budgets/Deactivate.cshtml` and `DeactivateGoal.cshtml` — descriptive confirmation card with power-off icon on the confirm button
+
+**Transactions**
+- `Transactions/Index.cshtml` — Edit/Delete row buttons upgraded to `btn-sm` with pencil/trash-2 icons; New Transaction button has plus icon
+- `Transactions/Edit.cshtml` — wrapped in `dashboard-card`, form labels styled, attachment list has download/trash icons, Save/Cancel buttons have check/x icons
+
+**Transfers**
+- `Transfers/Index.cshtml` — Edit/Delete row buttons upgraded with pencil/trash-2 icons; New Transfer button has plus icon
+- `Transfers/Edit.cshtml` — wrapped in `dashboard-card`, form labels styled, attachment list has download/trash icons, Save/Cancel buttons have check/x icons
+
+**Movements**
+- `Movements/Index.cshtml` — Edit/Delete row action buttons upgraded with pencil/trash-2 icons; static cleared/pending spans for Liability Payments converted to pill badge style
+
+**Frontend**
+- File input (`input[type="file"].form-control`) globally styled in `app.css` using Tailwind `file:` pseudo-element utilities — picker button now shows as a styled pill with a right-border divider, matching the rest of the form controls
+
+**Docs**
+- Developer guide updated: `file:` pseudo-element utilities for styling native file inputs (Tailwind guide); `Progress` + `Card` data-display panel pattern (shadcn/ui guide); `ThenInclude` formal definition for multi-level eager loading (EF Core querying guide)
+
+---
+
+### Added
+
+**Recurring Reminders**
+- `ReminderBehaviour` dispatch in `RecurringTransactionService` — `ConfirmAsync` and `DismissAsync` now route date advancement through three strategies: `SnapToCalendarDay` (advances to `DayOfPeriod` in the next calendar month, skips an extra month if confirmed on or after that day), `RelativeToLastConfirmation` (advances from the actual confirm date rather than the scheduled due date), `ManualDate` (throws `InvalidOperationException` unless a `nextDueDate` is supplied)
+- `IRecurringTransactionService.GetUpcomingAsync(int withinDays)` — returns active reminders with `NextDueDate` between today and today + N days, ordered by due date
+- `RecurringTransactionsController.Upcoming` action — serves the Upcoming Payments view at `/RecurringTransactions/Upcoming`
+- `Views/RecurringTransactions/Upcoming.cshtml` — table of reminders due within 30 days; rows due today highlighted with an amber "Due today" badge
+- Navbar upcoming-payments badge — server-rendered count of reminders due within 30 days passed to the React `Navbar` component via a `data-upcoming-count` attribute on `#navbar-root`
+
+**Docs**
+- Developer guide updated: string-based switch expression dispatch, `@inject` in `_Layout.cshtml` for layout-level service calls, `data-*` attribute bridge for passing server values to React components, `DateOnly` range filter pattern in EF Core queries
+
+**Tests**
+- 5 integration tests for `ReminderBehaviour` advancement: `SnapToCalendarDay` on-time → correct next month snap, `SnapToCalendarDay` confirmed late → skips forward an extra month, `RelativeToLastConfirmation` monthly → advances from confirm date, `ManualDate` without `nextDueDate` → throws, `ManualDate` with `nextDueDate` → sets exact date
+- 1 integration test for `GetUpcomingAsync` — reminders due today and in 5 days included; reminder due in 35 days excluded
+
+### Changed
+
+**Recurring Reminders**
+- `IRecurringTransactionService.ConfirmAsync` — signature extended with optional `DateOnly? nextDueDate` parameter (backward-compatible default `null`)
+- `RecurringTransactionCreateViewModel` / `RecurringTransactionEditViewModel` — `ReminderBehaviour` field added (defaults to `"SnapToCalendarDay"`)
+- `RecurringTransactionService.CreateAsync` / `UpdateAsync` — `ReminderBehaviour` now persisted from ViewModel
+- `Views/RecurringTransactions/Create.cshtml` and `Edit.cshtml` — `ReminderBehaviour` selector added; inline JavaScript hides `DayOfPeriod` field when `ManualDate` is selected
+- `Views/RecurringTransactions/Confirm.cshtml` — `nextDueDate` date picker rendered when reminder's behaviour is `ManualDate`
+- `RecurringTransactionsController.Confirm` POST — accepts optional `nextDueDate` parameter and forwards it to `ConfirmAsync`
+- `_Layout.cshtml` — injects `IRecurringTransactionService` to compute upcoming count server-side; count embedded as `data-upcoming-count` on `#navbar-root`
+- `main.tsx` — reads `data-upcoming-count` from `#navbar-root` and passes it as `upcomingPaymentsCount` prop to `<Navbar>`
+
+---
+
+**Accounts**
+- `ILiabilityProjectionService` / `LiabilityProjectionService` — pure calculation service for amortising loan payoff projection; computes months to payoff, payoff date, total interest, and total paid given balance, annual rate, and monthly payment; throws when payment does not cover first month's interest
+- Payoff projection panel on the Account Ledger view for Amortising accounts — form accepts a monthly payment amount and returns projection stats (payoff date, months, total interest, total paid); only rendered when account is Amortising with a non-zero balance
+- `LiabilityProjectionViewModel` — read model carrying `MonthsToPayoff`, `PayoffDate`, `TotalInterest`, `TotalPaid`, `MonthlyPayment`
+
+**Docs**
+- Developer guide updated: pure calculation service pattern (no `DbContext` dependency, directly unit-testable), service-layer business rule validation via `InvalidOperationException`, conditional field visibility via inline JavaScript in Razor views
+
+**Tests**
+- 5 integration tests for `AccountService` — Amortising with null interest rate rejected, FullMonthly with interest rate rejected, Amortising with valid rate succeeds, `UpdateAsync` variants for both failure cases
+- 5 unit tests for `LiabilityProjectionService` — known inputs verify payoff and interest range, extra payment yields earlier payoff and less interest, zero interest rate pays off in balance ÷ payment months, very small balance pays off in 1 month, payment too small to cover interest throws
+
+### Changed
+
+**Accounts**
+- `AccountCreateViewModel` — added `LiabilityRepaymentType` and `InterestRate` fields
+- `AccountEditViewModel` — added `LiabilityRepaymentType` and `InterestRate` fields
+- `AccountService.CreateAsync` — validates repayment type / interest rate rules for Liability accounts before saving; maps `LiabilityRepaymentType` and `InterestRate` onto the new entity
+- `AccountService.UpdateAsync` — same validation and mapping on edit; loads `AccountType` via `Include` to access the type name
+- `AccountsController` — injects `ILiabilityProjectionService`; `Edit` GET passes `ViewBag.IsLiability`; `Ledger` GET and POST compute and pass projection via ViewBag when account is Amortising with a positive balance
+- `Views/Accounts/Create.cshtml` — liability repayment type selector and interest rate field added; JavaScript show/hide driven by account type and repayment type selectors
+- `Views/Accounts/Edit.cshtml` — liability repayment type selector and interest rate field added (server-side conditional on `ViewBag.IsLiability`); JavaScript toggles interest rate field based on repayment type
+- `Views/Accounts/Ledger.cshtml` — payoff projection panel added; rendered only for Amortising accounts with a positive balance
+- `Program.cs` — `ILiabilityProjectionService` registered as scoped
+
+---
+
+**CSV Import**
+- `ICsvImportProfileService` / `CsvImportProfileService` — full CRUD for import profiles with soft-delete and 90-day recovery window; column mappings stored as `jsonb` and deserialized to `CsvColumnMappings`
+- `CsvImportProfilesController` — Index, Create, Edit, Delete (soft-delete), Recover; Razor views with Lucide icons
+- `IImportService` / `ImportService` — CSV parsing via CsvHelper with user-configured column mappings, optional debit sign flip, and SHA-256 fingerprinting for duplicate detection
+- `ImportApiController` at `POST /api/import` — accepts multipart form with CSV file and column mapping parameters; returns `ImportResult` JSON
+- `ImportController` — Razor upload form with profile selector and manual column mapping fields; Summary page showing imported/flagged/failed counts
+- `Views/Import/Index.cshtml` and `Summary.cshtml` — upload form and per-category result summary
+- `CsvColumnMappings` ViewModel — carries user-configured column names and flip-debit-sign flag
+- `ImportResult` ViewModel — carries `RowsImported`, `RowsFlagged`, `RowsFailed`, and a list of row-level error messages
+- `ParsedImportRow` ViewModel — intermediate row produced by `ParseAsync` before persistence
+- `ImportRequestViewModel` — model-bound from the multipart form for `ImportApiController`
+- `ImportUploadViewModel` / `ImportSummaryViewModel` — ViewModels for the Razor upload and summary pages
+- Fixture files: `valid_import.csv`, `duplicate_candidates.csv`, `invalid_rows.csv`, `xlsx_attempt.xlsx` — used by unit and integration tests; registered with `CopyToOutputDirectory: PreserveNewest`
+
+**Docs**
+- Developer guide updated: CSV parsing with CsvHelper, SHA-256 fingerprinting, soft-delete with time-bounded recovery, `jsonb` column mapping in EF Core, `Mock<IFormFile>` with `CopyToAsync` setup, fixture files via `CopyToOutputDirectory`, optional constructor parameters for partial unit testability
+
+**Tests**
+- 5 integration tests for `CsvImportProfileService` — create/retrieve, soft-delete exclusion from active list, 90-day purge window, update mappings, recover within window
+- 6 unit tests for `ImportService` — `ParseAsync` with valid CSV, debit sign flip, custom column mapping, XLSX rejection, `GenerateFingerprint` determinism, fingerprint sensitivity to amount change
+- 3 integration tests for `ImportService.ImportAsync` — 10 rows all cleared, duplicate flagged as `IsCleared = false`, result count correctness
+- 3 `WebApplicationFactory` tests for `ImportApiController` — shape test, missing `accountId` → 422 with `VALIDATION_ERROR`, `.xlsx` file → 400 with message
+
+**Movements**
+- `MovementsApiController` at `PATCH /api/movements/{id}/cleared` — routes to `ITransactionService` or `ITransferService` based on `type` field in request body; returns 404 for unknown id, 400 for unknown type
+- React `ClearedBadge` component — clickable badge that calls `PATCH /api/movements/{id}/cleared`, flips state optimistically on click, and reverts to original state on API error or network failure
+- `MovementsApiTests` — 5 `WebApplicationFactory` integration tests covering transaction clear, toggle back to false, transfer clear, unknown id → 404, and unknown type → 400
+- `ClearedBadge.test.tsx` — 5 Vitest tests covering static rendering (Cleared/Pending), PATCH call correctness, optimistic flip, revert on HTTP error, and revert on network error
+- `ClearedBadge` mount point in `main.tsx` — mounts from `[data-react="cleared-badge"]` elements; reads `data-id`, `data-movement-type`, and `data-cleared` dataset attributes
+- `MovementsController` with `Index` action — unified ledger showing all three movement types (Transaction, Transfer, LiabilityPayment) interleaved, with account/date filters and pagination
+- `Views/Movements/Index.cshtml` — unified table rendering all three row types with type-specific column display, cleared badge, and Edit/Delete links that pass `returnUrl=/Movements`
+- `MovementsControllerTests` — 10 `WebApplicationFactory` tests covering: `GET /Movements` returns 200, Transaction/Transfer Edit and Delete redirect to `returnUrl` when present and local, fall back to own Index when absent, and open redirect safety (external URL rejected)
+- `WafCollection.cs` — `[CollectionDefinition("IntegrationTests")]` grouping all 19 integration test classes into one xUnit collection to prevent parallel races on `project_ceres_test`
+
+**Security**
+- Open redirect rule added to `docs/security-model.md` under Input Validation Rules and the phase table — `Url.IsLocalUrl(returnUrl)` required on every action that accepts a `returnUrl` parameter
+
+**Budgets**
 - `ICategoryBudgetService` / `CategoryBudgetService` — monthly spend caps for expense categories; guards against non-expense categories and duplicate active budgets
 - `CategoryBudgetService.GetActualSpendAsync(id, year, month)` — caller-specified period for current dashboard use and future Budget vs. Actual reports
 - `BudgetsController` — single controller covering Category Budgets (Index, Create, Edit, Deactivate) and Goal Budgets (Goals, CreateGoal, EditGoal, DeactivateGoal)
@@ -24,21 +187,67 @@
 - ADR-0057 — single `BudgetsController` with documented refactor trigger conditions
 
 **Tests**
+- `TestWebApplicationFactory` — custom `WebApplicationFactory<Program>` subclass that overrides `ConnectionStrings:DefaultConnection` to `project_ceres_test` in `ConfigureWebHost`; replaces bare `WebApplicationFactory<Program>` as the shared collection fixture, making test database isolation structural rather than per-class
 - 11 integration tests for `CategoryBudgetService` (all guards, actual spend calculation, deactivate, getAll)
 - 8 integration tests for `GoalBudgetService` (GoalType validation, GetProgressAsync for both archetypes)
 - 2 `WebApplicationFactory` tests for `DashboardApiController` verifying JSON shape
 - 4 Vitest component tests for `CategoryBudgetBars` and `GoalBudgetBars` (mocked fetch, async DOM assertions)
 
+**Transfer Attachments**
+- `IFileAttachmentService` extended with three new methods: `UploadForTransferAsync`, `GetTransferAttachmentAsync`, `DeleteTransferAttachmentAsync` — same MIME whitelist and size limit as transaction attachments; transfer files stored under `uploads/transfers/{transferId}/`
+- `AttachmentsController` — three new actions: `UploadForTransfer` (POST), `DownloadTransfer` (GET), `DeleteTransfer` (POST)
+- Attachment section added to `Views/Transfers/Edit.cshtml` — file list with download links and per-attachment Remove button; file input with accepted type hint; out-of-form delete forms linked via HTML `form=` attribute
+
+**Docs**
+- Developer guide updated: extending a service interface to support a second entity type (reuse vs. split decision), subdirectory isolation for multi-entity file storage
+
+**Tests**
+- `TransferAttachmentServiceTests` — 4 integration tests: upload persists DB record and writes file to disk, serve returns correct data and metadata, delete removes DB record and file from disk, spoofed file type rejected with "not allowed" message
+
 ### Changed
 
+**Transfer Attachments**
+- `TransferEditViewModel` — added `IFormFile? Attachment` property
+- `TransfersController` — injects `IFileAttachmentService`; Edit GET loads existing attachments into `ViewBag`; Edit POST handles optional file upload after record save; `enctype="multipart/form-data"` added to the Edit form
+
+**CSV Import**
+- `ProjectCeres.csproj` — CsvHelper 33.0.1 added
+
+**Movements**
+- `Movements/Index.cshtml` — static cleared/pending badge replaced with `ClearedBadge` React mount point for Transaction and Transfer rows; LiabilityPayment rows retain a static read-only badge
+- `Transfers/Index.cshtml` — Status column added with `ClearedBadge` React mount point per row
+- `Transactions/Index.cshtml` — Status column replaced with `ClearedBadge` React mount point; inline form toggle (ToggleCleared POST) removed from the Actions column
+- Navbar updated: "Movements" added as a primary nav link between Dashboard and Accounts
+
 **Transactions**
+- `TransactionsController` Edit and Delete (GET + POST) accept optional `returnUrl` — redirects to it after success if local, falls back to `/Transactions` otherwise
+- `Views/Transactions/Edit.cshtml` and `Delete.cshtml` — hidden `returnUrl` field added; Cancel link respects `returnUrl`
 - Goal Budget dropdown on Transaction Create/Edit now filters to `GoalType == "Spending"` only — Savings goals track progress via account balance, not transaction tagging
+
+**Transfers**
+- `TransfersController` Edit and Delete (GET + POST) accept optional `returnUrl` — same pattern as Transactions
+- `Views/Transfers/Edit.cshtml` and `Delete.cshtml` — hidden `returnUrl` field added; Cancel link respects `returnUrl`
 
 **Navbar**
 - Added Budgets and Import links between Categories and Reminders
 
 **Data Models**
 - `Budget` entity extended with `GoalType` (required) and `LinkedAccountId` (nullable FK to Account)
+
+**Tests**
+- `ApiInfrastructureTests`, `DashboardApiTests`, `MovementsApiTests`, `MovementsControllerTests` — updated to accept `TestWebApplicationFactory` instead of `WebApplicationFactory<Program>`; per-class `WithWebHostBuilder`/`UseSetting` overrides removed as redundant
+- All 19 integration test classes annotated with `[Collection("IntegrationTests")]` — eliminates parallel races between `WebApplicationFactory` tests and `TestDbFixture` tests on `project_ceres_test`
+- `MovementsControllerTests` WAF now overrides `ConnectionStrings:DefaultConnection` to target `project_ceres_test` instead of the dev database; seeded rows deleted via `ExecuteDeleteAsync` in `DisposeAsync`
+
+### Fixed
+
+**Tests**
+- WAF tests were seeding data into the dev database (`project_ceres`) because individual test classes forgot to call `WithWebHostBuilder`; structural fix via `TestWebApplicationFactory` subclass makes this impossible going forward; orphaned rows cleaned from dev database (6 transactions, 3 transfers, 12 accounts removed)
+- `ReportServiceTests` and `MovementServiceTests` were flakily failing when run in parallel with WAF tests — WAF tests were writing to `project_ceres_test` concurrently with `TestDbFixture` rollback transactions; resolved by the `[Collection("IntegrationTests")]` grouping
+- WAF tests were seeding data into the dev database (`project_ceres`) because no connection string override was in place; dev database cleaned (39 accounts, 6 transfers, 9 transactions removed)
+
+**Movements**
+- `ClearedBadge` was rendering with identical gray styling for both Cleared and Pending states because `badge-success` and `badge-warning` CSS classes were not defined; replaced with Tailwind utility classes (`bg-green-100 text-green-700` for Cleared, `bg-yellow-100 text-yellow-700` for Pending)
 
 ### Removed
 

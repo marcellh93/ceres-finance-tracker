@@ -431,3 +431,8 @@
 <repo>/ProjectCeres.Tests/bin/Debug/net10.0/runtimes/win/lib/net10.0/System.Diagnostics.EventLog.Messages.dll
 <repo>/ProjectCeres.Tests/bin/Debug/net10.0/runtimes/win/lib/net10.0/System.Diagnostics.EventLog.dll
 <repo>/ProjectCeres.Tests/bin/Debug/net10.0/Vite.AspNetCore.dll
+<repo>/ProjectCeres.Tests/bin/Debug/net10.0/Fixtures/duplicate_candidates.csv
+<repo>/ProjectCeres.Tests/bin/Debug/net10.0/Fixtures/invalid_rows.csv
+<repo>/ProjectCeres.Tests/bin/Debug/net10.0/Fixtures/valid_import.csv
+<repo>/ProjectCeres.Tests/bin/Debug/net10.0/Fixtures/xlsx_attempt.xlsx
+<repo>/ProjectCeres.Tests/bin/Debug/net10.0/CsvHelper.dll

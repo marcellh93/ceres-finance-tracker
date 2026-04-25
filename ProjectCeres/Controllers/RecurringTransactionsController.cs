@@ -56,14 +56,15 @@ public class RecurringTransactionsController(
 
         var vm = new RecurringTransactionEditViewModel
         {
-            Id              = reminder.Id,
-            Name            = reminder.Name,
-            EstimatedAmount = reminder.EstimatedAmount ?? 0,
-            AccountId       = reminder.AccountId,
-            CategoryId      = reminder.CategoryId,
-            Frequency       = reminder.Frequency,
-            DayOfPeriod     = reminder.DayOfPeriod,
-            NextDueDate     = reminder.NextDueDate
+            Id                = reminder.Id,
+            Name              = reminder.Name,
+            EstimatedAmount   = reminder.EstimatedAmount ?? 0,
+            AccountId         = reminder.AccountId,
+            CategoryId        = reminder.CategoryId,
+            Frequency         = reminder.Frequency,
+            DayOfPeriod       = reminder.DayOfPeriod,
+            NextDueDate       = reminder.NextDueDate,
+            ReminderBehaviour = reminder.ReminderBehaviour
         };
 
         await PopulateViewBagAsync();
@@ -116,7 +117,7 @@ public class RecurringTransactionsController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Confirm(Guid id, TransactionCreateViewModel vm)
+    public async Task<IActionResult> Confirm(Guid id, TransactionCreateViewModel vm, DateOnly? nextDueDate)
     {
         if (!ModelState.IsValid)
         {
@@ -128,7 +129,7 @@ public class RecurringTransactionsController(
 
         try
         {
-            await reminderService.ConfirmAsync(id, vm.Date, vm.Amount, vm.Description);
+            await reminderService.ConfirmAsync(id, vm.Date, vm.Amount, vm.Description, nextDueDate);
             TempData["SuccessMessage"] = "Reminder confirmed and transaction recorded.";
         }
         catch (InvalidOperationException ex)
@@ -189,6 +190,12 @@ public class RecurringTransactionsController(
         return RedirectToAction(nameof(Index));
     }
 
+    public async Task<IActionResult> Upcoming()
+    {
+        var reminders = await reminderService.GetUpcomingAsync(withinDays: 5);
+        return View(reminders);
+    }
+
     private async Task PopulateViewBagAsync()
     {
         ViewBag.Accounts = new SelectList(
@@ -200,6 +207,12 @@ public class RecurringTransactionsController(
                 .ToListAsync(), "Id", "Name");
         ViewBag.Frequencies = new SelectList(Enum.GetValues<Frequency>()
             .Select(f => new { Value = f.ToString(), Text = f.ToString() }), "Value", "Text");
+        ViewBag.ReminderBehaviours = new SelectList(new[]
+        {
+            new { Value = ReminderBehaviour.SnapToCalendarDay.ToString(),          Text = "Snap to Calendar Day" },
+            new { Value = ReminderBehaviour.RelativeToLastConfirmation.ToString(), Text = "Relative to Last Confirmation" },
+            new { Value = ReminderBehaviour.ManualDate.ToString(),                 Text = "Manual Date" }
+        }, "Value", "Text");
     }
 
     private async Task PopulateTransactionViewBagAsync()

@@ -12,6 +12,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CurrencyId 1 = EUR
 ///   CurrencyId 2 = USD
 /// </summary>
+[Collection("IntegrationTests")]
 public class SettingsServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

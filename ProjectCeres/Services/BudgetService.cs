@@ -5,7 +5,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class BudgetService(AppDbContext db) : IBudgetService
+public class BudgetService(AppDbContext db, IAccountService accountService) : IBudgetService
 {
     public async Task<IEnumerable<Budget>> GetAllAsync(bool includeInactive = false)
     {
@@ -99,10 +99,8 @@ public class BudgetService(AppDbContext db) : IBudgetService
         };
     }
 
-    private async Task<decimal> GetAccountBalanceAsync(Guid accountId) =>
-        await db.Transactions
-            .Where(t => t.AccountId == accountId)
-            .SumAsync(t => (decimal?)t.Amount) ?? 0m;
+    private Task<decimal> GetAccountBalanceAsync(Guid accountId) =>
+        accountService.GetBalanceAsync(accountId);
 
     private static void ValidateGoalTypeRules(string goalType, Guid? linkedAccountId)
     {

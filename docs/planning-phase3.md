@@ -8,7 +8,10 @@
    - [Login with TOTP — happy path](#login-with-totp--happy-path)
    - [Session token lifecycle](#session-token-lifecycle)
    - [IDOR enforcement](#idor-enforcement)
-2. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
+2. [Design System & Visual Overhaul](#design-system--visual-overhaul)
+3. [MVC → SPA Migration Plan](#mvc--spa-migration-plan)
+4. [Deferred from Phase 2](#deferred-from-phase-2)
+5. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
 
 ---
 
@@ -103,6 +106,207 @@ flowchart TD
 - **Audit logging** — required for GDPR. Minimal audit record for: login/logout, account creation, data export, right-to-erasure requests. Schema: `(Id, UserId, Action, EntityType, EntityId, OccurredAt, IpAddress)`. Auto-purged after 6 months per `legal.md`. Do not log financial amounts in audit entries.
 - **Support ticket system** — users submit support requests (subject + message). Stored in `SupportTicket` table. Email notification to configurable admin address. Status: `Open`, `InProgress`, `Resolved`, `Closed`. Priority: `Low`, `Normal`, `High`, `Urgent`.
 - **GDPR & legal compliance** — required before any user outside yourself can access the app. See [`legal.md`](legal.md). Minimum before Phase 3 launch: privacy policy, legal basis for each data type, data retention policy enforced, data breach notification procedure, right to erasure flow.
+- **Full data export (GDPR portability)** — a structured ZIP download containing all data held for the authenticated user: one CSV per entity type (accounts, transactions, transfers, budgets, categories, recurring transactions), plus all attachment files in their original format. Required to satisfy GDPR Art. 15 (right of access) and Art. 20 (right to portability) — the Phase 2 transaction-only CSV export does not cover this. Must be available before any external user accesses the app. The export link lives in user Settings and produces an audit log entry. Each export is rate-limited (maximum one per 24 hours per user) to prevent abuse.
+- **Account-level notes** — a free-text `Notes` field (`text`, nullable) on the `Account` entity. Displayed on the account detail view. Allows users to annotate accounts with intent or constraints (e.g. "emergency fund — minimum €5,000", "joint account, do not use for autónomo expenses"). Trivial schema change; bundled with Phase 3 account UI work.
+- **Weekly financial digest email** — a scheduled email (every Monday morning) summarising the previous week: net worth delta, income vs. expenses, any CategoryBudget over 80% of limit. Delivered by the same email service used for auth. **Opt-in only** — disabled by default, enabled from notification preferences in Settings. Users who enable it can disable it at any time from the same settings page or via a one-click unsubscribe link in every digest email. Never sent to users who have not explicitly opted in.
+- **New session alert email** — when a new `UserSession` is created from an IP address not seen before for that user, an email notification is sent: "A new sign-in was detected from IP x.x.x.x at [time]. If this was you, no action is needed. If not, revoke this session here: [link]." **Opt-in only** — disabled by default, enabled from notification preferences in Settings. The active sessions list and per-session revocation are always available regardless of this setting — the email is a convenience layer on top, not the primary security control.
+- **API authentication and identity masking** — two layers required for Phase 3, one deferred to Phase 4. (1) **JWT access tokens:** all API requests are authenticated via short-lived JWTs (15-minute expiry) carrying `sub` (user UUID) and `tid` (tenant UUID) claims, signed with a secret held in the hosting secrets store — never stored in the database. Refresh tokens rotate on each use and are stored as hashes only in `UserSession`. (2) **HMAC pseudonymisation:** every data row stores `UserRef = HMAC-SHA256(USER_REF_SECRET, userId)` instead of the raw UUID — a DB dump cannot link financial records to real user identities without the server secret. `USER_REF_SECRET` lives in the secrets store; a rotation procedure must be documented before Phase 3 launch. (3) **Per-tenant payload encryption** (Phase 4+): encrypt financial payload columns (amount, description, merchant) under per-tenant keys derived from a master key via HKDF — deferred until Phase 4 when investment and tax data raises the sensitivity of individual records. See [`security-model.md — API Authentication and Identity Masking`](security-model.md#api-authentication-and-identity-masking).
+- **Email security** — three layers required before Phase 3 launch. (1) **DNS authentication:** configure SPF, DKIM, and DMARC on the sending domain once the email provider is chosen. SPF and DKIM must be active and passing; DMARC at minimum `p=none` at launch, advancing to `p=reject` after aggregate reports confirm clean sending. (2) **Application controls:** lock all outgoing email `To:` addresses to the authenticated user's own verified address (never from a request parameter); sanitize any user-controlled strings rendered into email subject or body; apply a tight per-user rate limit on all email-triggering endpoints. (3) **API key hygiene:** store the provider API key in environment variables or the hosting secret store — never in source control; use a send-only scoped key where supported; document the rotation procedure before launch. See [`security-model.md — Email Security Rules`](security-model.md#email-security-rules).
+
+## Design System & Visual Overhaul
+
+> **Status: Base plan only.** This section is a planning foundation to be refined at Phase 3 kickoff, after Phase 2 daily use has revealed which surfaces need the most design attention. Do not begin implementation until the SPA migration is underway.
+
+The full SPA migration (Razor deleted, ASP.NET Core becomes a pure Web API, React Router handles all routing) is the architectural prerequisite for this work. That decision is already committed — see [architecture.md](architecture.md#phase-3--full-spa-evaluation-point). No design system work begins until the SPA migration is complete or happening in parallel.
+
+---
+
+### 1. Brand foundation
+
+Resolve all of these as design decisions before writing any component. Write the outcomes into `docs/design-system.md` at Phase 3 kickoff.
+
+- **Color palette** — primary brand color, surface colors (background, card, muted), semantic colors (success, warning, destructive, info). All defined as CSS custom properties (`--color-primary`, `--color-surface`, etc.) — not hardcoded Tailwind classes.
+- **Typography** — typeface (system font stack vs. a single web font such as Inter or Geist), size scale (xs → 4xl), weight scale, line heights. One typeface only.
+- **Spacing scale** — confirm Tailwind's default scale is sufficient or define a custom one. No magic numbers anywhere in the codebase.
+- **Border radius scale** — sm / md / lg / full. One value per level, used consistently.
+- **Shadow scale** — subtle / default / elevated. Communicates depth hierarchy (cards vs. modals vs. dropdowns).
+- **Chart color palette** — separate from the brand palette. 6–8 distinct, accessible colors that work on both light and dark backgrounds. Chart components never pull from brand tokens directly.
+- **Motion tokens** — transition duration and easing for hover states, modal open/close, badge flips. Defined once, not duplicated across components.
+- **shadcn/ui token override strategy** — shadcn/ui uses CSS variables (`--background`, `--foreground`, `--primary`, etc.). Override those variables with Ceres brand values; do not fight the system. Document which variables are overridden and which are left at shadcn defaults.
+
+---
+
+### 2. Dark mode
+
+Commit to the token structure that supports dark mode — no hardcoded color values anywhere. Ship light-only at Phase 3 launch. Enable dark mode as a fast follow once the token layer is verified. This avoids a full audit pass later while keeping Phase 3 scope contained.
+
+---
+
+### 3. Page and surface inventory
+
+Every screen grouped by migration burden. Use this list at kickoff to scope design effort per surface.
+
+**New in Phase 3 — design from scratch, no legacy debt:**
+- Login, TOTP verification, registration, password reset flow
+- Guided onboarding wizard (first-run setup)
+- Active sessions list (security settings)
+- Support ticket form and list
+
+**Ported from Razor — existing functionality, new rendering layer:**
+- Dashboard
+- Transactions list + create/edit forms
+- Transfers list + create/edit forms
+- Movements unified ledger
+- Accounts list + create/edit forms
+- Categories list + create/edit forms
+- Category Budgets + Goal Budgets
+- Recurring Transactions list + create/edit forms
+- CSV Import (upload + summary) + CSV Export
+- Reports (Budget vs. Actual, Largest Expenses, Cash Flow, Net Worth Over Time)
+- Settings / user preferences
+
+**React components already built in Phase 2 — visual audit only, not rebuild:**
+- `CategoryBudgetBars`, `GoalBudgetBars`, `ClearedBadge`
+- `NetWorthChart`, `IncomeExpenseChart`, `SpendingDonutChart`, `AccountBalancesChart`, `CashFlowChart`
+
+---
+
+### 4. Layout system
+
+- **App shell** — sidebar vs. top nav decision. Phase 2 uses a top navbar; a persistent sidebar is more conventional for a dense data app. Decide once at kickoff, implement once.
+- **Responsive breakpoints** — desktop-primary app. Define a readable mobile baseline (not optimized) and an optimized desktop target. Tablet is secondary.
+- **Content width zones** — full-width (tables, charts), constrained (forms), narrow (modals, dialogs). Define each as a layout primitive, not ad-hoc per page.
+- **Grid system** — dashboard card grid and single-column form layout defined as reusable primitives.
+
+---
+
+### 5. Component library audit and extension
+
+shadcn/ui covers the Phase 2 baseline. Phase 3 will need these additional components — confirm availability and integrate before building any screen that needs them:
+
+| Component | Where needed |
+|---|---|
+| `Tabs` | Settings page, report filter panels |
+| `Tooltip` | Contextual help on financial terms (runway, LifestyleTag, etc.) |
+| `Sheet` (slide-over) | Mobile-friendly edit forms |
+| `Breadcrumb` | Deep navigation (Account → filtered Transactions) |
+| `Avatar` | User menu, session list |
+| `Skeleton` | Loading states for async chart and table data |
+| `Toast` / `Sonner` | Success/error feedback after create/edit/delete — replaces full-page redirects |
+| `Command` / `Combobox` | Searchable dropdowns for category and account selection on large datasets |
+| `DataTable` | Transactions and Movements lists require sorting, filtering, and pagination beyond `Table` |
+
+---
+
+### 6. Form pattern standardization
+
+Standardize once, apply everywhere:
+- Label position: above the field, not inline
+- Validation errors: below the field inline, not a top-of-form summary
+- Required field indicator: `*` with a legend
+- Disabled state appearance consistent across all inputs
+- Submit button: spinner + disabled during loading
+- Unsaved changes: browser `beforeunload` warning + in-app confirmation dialog
+
+---
+
+### 7. Data table pattern
+
+Every list view uses a table. Decide once, apply everywhere:
+- Column sorting: which columns are sortable, consistent sort indicator icon
+- Pagination vs. infinite scroll: pick one model across all tables
+- Empty state: distinguish "no data yet" from "no results for current filter"
+- Row actions: inline buttons vs. hover reveal vs. context menu — pick one
+- Bulk actions: checkbox selection + action bar pattern
+- Filter bar: above the table, not in a sidebar
+
+---
+
+### 8. Accessibility baseline
+
+Non-negotiable before any beta user accesses the app:
+- WCAG AA color contrast on all text/background pairs — verify at token definition time, not after
+- Visible focus ring on all interactive elements
+- `aria-label` on all icon-only buttons (carried forward from Phase 2 Lucide standard)
+- Screen reader labels on all charts (`aria-label` on canvas, `role="img"`)
+- All form fields have associated `<label>` elements — no placeholder-as-label
+- Error messages programmatically associated with their fields (`aria-describedby`)
+- Modal focus trap — shadcn/ui Dialog handles this; verify it is not overridden anywhere
+
+---
+
+### 9. Toast and feedback system
+
+The SPA model eliminates Razor redirect-with-flash-message. Replace with:
+- Toast notifications for non-critical success (transaction saved, attachment uploaded)
+- Field-level inline errors for form validation
+- Full error state for failed page loads (error boundary with retry, not a blank screen)
+- Optimistic UI where appropriate — `ClearedBadge` already does this; extend the pattern to other fast-feedback interactions
+
+---
+
+### 10. Auth screen design
+
+Login, TOTP, register, and password reset are the first thing beta users see — design to a higher bar than internal screens:
+- Ceres logo / wordmark placement
+- Minimal layout: centered card, no sidebar or app shell
+- Clear error states: wrong password, expired TOTP, locked account
+- TOTP setup flow: QR code display, manual entry fallback, backup codes download
+
+---
+
+### 11. Onboarding flow design
+
+Multi-step wizard for first-run users (deferred from Phase 2 — see ADR-0053):
+1. Create first asset account (checking, savings)
+2. Create first liability (optional)
+3. Record opening balance
+4. Immediate net worth display
+
+Needs its own layout treatment — full-screen stepper with progress indicator, distinct from the standard app shell.
+
+---
+
+### 12. `docs/design-system.md`
+
+Create this document at Phase 3 kickoff, not before. It is the source of truth for all visual decisions. Contents:
+- Token definitions: CSS variable name → purpose → light value → dark value
+- shadcn/ui override list
+- Color palette with hex values and contrast ratios
+- Typography scale table
+- Spacing scale table
+- Chart color palette with accessibility notes
+- Component usage guidelines (when Card vs. Sheet vs. Dialog)
+- Icon usage rules (Lucide — carried forward from Phase 2 standard)
+- Motion tokens
+
+---
+
+### 13. Implementation order within Phase 3
+
+Design and implement surface by surface — do not design everything before building:
+
+1. Token layer + `docs/design-system.md` — zero visible change; everything downstream depends on it
+2. App shell (sidebar/nav, layout zones) — everything mounts inside it
+3. Auth screens (login, TOTP, register, password reset) — first impression for beta users
+4. Onboarding flow — second impression for beta users
+5. Dashboard — highest-visibility internal screen
+6. Transactions + Transfers + Movements — highest daily usage
+7. Budgets + Reports — complex, less frequent
+8. Accounts + Categories + Recurring Transactions — management screens
+9. Settings + Session management + Support tickets — lowest frequency
+
+---
+
+## MVC → SPA Migration Plan
+
+The execution plan for migrating from ASP.NET Core MVC + Razor Views to a pure Web API + React SPA is maintained in a dedicated document to keep this file readable.
+
+See [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md).
+
+> **Status: Base plan only.** Finalize at Phase 3 kickoff after Phase 2 is fully complete. Nothing in that document is locked.
+
+---
 
 ## Deferred from Phase 2
 
@@ -115,6 +319,7 @@ flowchart TD
 - **Year-over-Year Comparison** — income, expenses, and net worth between two calendar years. Deferred from Phase 2 — requires at least two years of data to be meaningful. Reassess at Phase 3 scope definition. See ADR-0054.
 - **Saved report configurations** — named snapshots of report parameters for quick re-use. Deferred from Phase 2 — insufficient usage experience to design correctly. Reassess after Phase 2 daily use reveals which parameters are worth saving and whether a full report builder is warranted. See ADR-0055.
 - **Goal budget milestones** — allow users to define intermediate milestones within a goal budget (e.g. "Trip to Japan — €3,000" with milestones at €1,000 flights, €2,000 hotel). Each milestone displayed as a progress bar segment. Requires a `BudgetMilestone` table. Deferred from Phase 2 — validate basic goal tracking in daily use first.
+- **Recurring transfers — revisit at end of Phase 2.** Not planned for Phase 2. A `RecurringTransfer` entity would mirror `RecurringTransaction` for transfers that repeat on a schedule (mortgage payments, monthly savings sweeps, loan repayments). Structural shape is identical to `RecurringTransaction`. Decision at Phase 2 completion: implement in Phase 3, defer to Phase 4, or discard based on whether recurring transactions prove useful in daily use.
 - **Split transactions — revisit at Phase 3 scope definition.** Not committed for Phase 3 — decision is: implement, defer again, or discard based on Phase 2 daily use. Would require a `TransactionLine` table touching reports, import, views, and budget eligibility. Workaround in Phase 2: record multiple transactions. See ADR-0041.
 
 ## Open Questions (blocks Phase 3)
@@ -127,7 +332,7 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
 - Invite mechanism
 - Multi-tenancy implementation
 - Settings migration
-- MVC → Web API decoupling
+- MVC → Web API decoupling — base migration plan documented in [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md); finalize at Phase 3 kickoff
 - Production migration strategy
 - CI service
 - CD strategy

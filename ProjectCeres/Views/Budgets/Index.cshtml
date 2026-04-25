@@ -3,44 +3,66 @@
 
 <div class="page-header">
     <h1>Category Budgets</h1>
-    <a asp-action="Create" class="btn btn-primary">+ New Category Budget</a>
+    <a asp-action="Create" class="btn btn-primary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Category Budget
+    </a>
 </div>
 
 @if (!Model.Any())
 {
-    <p class="empty-state">No category budgets defined.</p>
+    <div class="dashboard-card">
+        <p class="empty-state">No category budgets defined.</p>
+    </div>
 }
 else
 {
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Category</th>
-                <th>Currency</th>
-                <th>Monthly Limit</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var budget in Model.OrderBy(b => b.Category.Name))
-            {
-                <tr class="@(budget.IsActive ? "" : "row-inactive")">
-                    <td>@budget.Category.Name</td>
-                    <td>@budget.Currency.Code</td>
-                    <td>@budget.LimitAmount.ToString("N2")</td>
-                    <td>@(budget.IsActive ? "Active" : "Inactive")</td>
-                    <td class="actions">
-                        @if (budget.IsActive)
-                        {
-                            <a asp-action="Edit" asp-route-id="@budget.Id">Edit</a>
-                            <a asp-action="Deactivate" asp-route-id="@budget.Id">Deactivate</a>
-                        }
-                    </td>
+    <div class="dashboard-card p-0 overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Currency</th>
+                    <th>Monthly Limit</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var budget in Model.OrderBy(b => b.Category.Name))
+                {
+                    <tr class="@(budget.IsActive ? "" : "row-inactive")">
+                        <td>@budget.Category.Name</td>
+                        <td>@budget.Currency.Code</td>
+                        <td>@budget.LimitAmount.ToString("N2")</td>
+                        <td>
+                            @if (budget.IsActive)
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">Active</span>
+                            }
+                            else
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
+                            }
+                        </td>
+                        <td class="actions">
+                            @if (budget.IsActive)
+                            {
+                                <a asp-action="Edit" asp-route-id="@budget.Id" class="btn btn-sm btn-secondary inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                                    Edit
+                                </a>
+                                <a asp-action="Deactivate" asp-route-id="@budget.Id" class="btn btn-sm btn-danger inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                                    Deactivate
+                                </a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 <div class="page-section-link">

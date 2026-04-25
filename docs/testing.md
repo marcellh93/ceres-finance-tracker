@@ -147,6 +147,23 @@ Razor controller actions remain untested — they are thin HTTP handlers with a 
 
 > **Testcontainers** deferred to Phase 3 when CI/CD pipelines are introduced.
 
+### Test Collection Serialization (Phase 2)
+
+All integration test classes carry `[Collection("IntegrationTests")]`. The collection is defined in `WafCollection.cs`:
+
+```csharp
+[CollectionDefinition("IntegrationTests")]
+public class IntegrationCollection : ICollectionFixture<TestWebApplicationFactory> { }
+```
+
+**Why this matters:**
+
+- xUnit runs all classes in a shared collection **sequentially on one thread**. Without this, concurrent writes from two test classes in the same test run race on `project_ceres_test` and produce non-deterministic failures.
+- `TestWebApplicationFactory` overrides the connection string in `ConfigureWebHost`, pinning every WAF-based test to `project_ceres_test` regardless of what `appsettings.json` says. This prevents any integration test from accidentally hitting the dev database.
+- Both `TestDbFixture`-based tests and `WebApplicationFactory`-based tests join the same collection, so the entire suite is serialized.
+
+Add `[Collection("IntegrationTests")]` to every new integration test class. Do not create a second collection — a second collection runs in parallel with the first and reintroduces the race condition.
+
 ---
 
 ## CI/CD — Phase 3 Scope

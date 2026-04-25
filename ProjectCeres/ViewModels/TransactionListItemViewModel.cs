@@ -20,6 +20,8 @@ public class TransactionListItemViewModel
     public string? CategoryName { get; set; }
     public string? CategoryTypeName { get; set; }
 
+    public bool IsCleared { get; set; }
+
     // LiabilityPayment fields
     public string? AssetAccountName { get; set; }
     public string? LiabilityAccountName { get; set; }

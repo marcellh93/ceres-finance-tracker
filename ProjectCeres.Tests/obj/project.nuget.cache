@@ -1,11 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "eC2u+mG/zKA=",
+  "dgSpecHash": "PExb4S3zCa0=",
   "success": true,
   "projectFilePath": "<repo>/ProjectCeres.Tests/ProjectCeres.Tests.csproj",
   "expectedPackageFiles": [
     "~/.nuget/packages/castle.core/5.1.1/castle.core.5.1.1.nupkg.sha512",
     "~/.nuget/packages/coverlet.collector/6.0.0/coverlet.collector.6.0.0.nupkg.sha512",
+    "~/.nuget/packages/csvhelper/33.0.1/csvhelper.33.0.1.nupkg.sha512",
     "~/.nuget/packages/fluentassertions/8.9.0/fluentassertions.8.9.0.nupkg.sha512",
     "~/.nuget/packages/microsoft.aspnetcore.mvc.testing/10.0.7/microsoft.aspnetcore.mvc.testing.10.0.7.nupkg.sha512",
     "~/.nuget/packages/microsoft.aspnetcore.testhost/10.0.7/microsoft.aspnetcore.testhost.10.0.7.nupkg.sha512",

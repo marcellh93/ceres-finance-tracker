@@ -1,0 +1,57 @@
+@model IEnumerable<RecurringTransaction>
+@{
+    ViewData["Title"] = "Upcoming Payments";
+    var today = DateOnly.FromDateTime(DateTime.Today);
+}
+
+<div class="page-header">
+    <h1>Upcoming Payments</h1>
+    <a asp-action="Index" class="btn btn-secondary">All Reminders</a>
+</div>
+
+<p class="form-hint">Reminders due within the next 5 days.</p>
+
+@if (!Model.Any())
+{
+    <p class="empty-state">No payments due in the next 5 days.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Account</th>
+                <th>Estimated Amount</th>
+                <th>Due Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model)
+            {
+                var isDueToday = r.NextDueDate == today;
+                <tr class="@(isDueToday ? "row-warning" : "")">
+                    <td>
+                        @r.Name
+                        @if (isDueToday)
+                        {
+                            <span class="badge badge-warning">Due today</span>
+                        }
+                        @if (r.ReminderBehaviour == ProjectCeres.Models.ReminderBehaviour.ManualDate)
+                        {
+                            <span class="badge badge-info">Manual</span>
+                        }
+                    </td>
+                    <td>@r.Account.Name</td>
+                    <td>@NumberFormatHelper.FormatAmount(r.EstimatedAmount ?? 0, ViewData["NumberFormat"] as string)</td>
+                    <td>@r.NextDueDate.ToString("dd/MM/yyyy")</td>
+                    <td class="actions">
+                        <a asp-action="Confirm" asp-route-id="@r.Id">Confirm</a>
+                        <a asp-action="Dismiss" asp-route-id="@r.Id">Dismiss</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

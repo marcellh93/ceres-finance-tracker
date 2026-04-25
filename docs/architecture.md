@@ -171,11 +171,13 @@ ProjectCeres/
     ITransactionService.cs / TransactionService.cs               ← CRUD (hard delete), paginated unified history (routes to ILiabilityPaymentService for LiabilityPayment type)
     ILiabilityPaymentService.cs / LiabilityPaymentService.cs    ← CRUD (hard delete), type/currency/date validation; called by TransactionService
     ITransferService.cs / TransferService.cs                    ← CRUD (hard delete), same-currency enforcement
+    IMovementService.cs / MovementService.cs                   ← unified ledger query across Transaction, Transfer, LiabilityPayment (TPC UNION ALL); no write operations
     IBudgetService.cs / BudgetService.cs             ← CRUD, deactivate, derived actual spend
     IRecurringTransactionService.cs / RecurringTransactionService.cs  ← Confirm + Dismiss (advances NextDueDate)
     IReportService.cs / ReportService.cs             ← net worth, income/expense summary, breakdown, history
     IDashboardService.cs / DashboardService.cs       ← MTD totals, savings rate, pending reminders count
-    IFileAttachmentService.cs / FileAttachmentService.cs  ← magic-byte upload, safe path, serve, delete
+    ILiabilityProjectionService.cs / LiabilityProjectionService.cs  ← amortisation schedule calculation; no DB access; pure math
+    IFileAttachmentService.cs / FileAttachmentService.cs  ← magic-byte upload, safe path, serve, delete (transactions + transfers)
   Models/              ← EF Core entity classes (Account.cs, Transaction.cs, etc.)
   ViewModels/          ← one Create + one Edit ViewModel per write operation
   Helpers/

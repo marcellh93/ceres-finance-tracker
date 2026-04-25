@@ -367,6 +367,11 @@ definition — outcome may be implement, defer again, or discard. See ADR-0041.
 `IsCleared bool NOT NULL DEFAULT false` — added in Phase 2. Marks a transaction as
 verified against a bank statement. Set automatically on clean CSV imports; held false
 for potential duplicates pending reconciliation review. See ADR-0039.
+Can be toggled from three surfaces: (1) the `ToggleCleared` POST action on the Transactions
+Index view (inline, preserves filter state); (2) the `BulkMarkCleared` POST action that sets
+all transactions in a date range to cleared; (3) the `IsClearedSwitch` React component
+embedded in the Transaction Edit form, which writes to a hidden field submitted with the
+standard form POST.
 
 ---
 
@@ -467,6 +472,8 @@ Cross-currency transfers are not supported — they would require a conversion r
 **Cleared / reconciliation status (Phase 2):**
 `IsCleared bool NOT NULL DEFAULT false` — added in Phase 2. Same semantics as Transaction.
 Transfers are internal movements and are not reconciled against CSV imports. See ADR-0039.
+Can be toggled from two surfaces: (1) the `ToggleCleared` POST action on the Transfers Index
+view; (2) the `IsClearedSwitch` React component embedded in the Transfer Edit form.
 
 **File attachments on transfers (Phase 2):**
 `TransferAttachment` entity added in Phase 2 — mirrors `TransactionAttachment` with a
@@ -496,6 +503,7 @@ exactly offset by the liability decrease).
 | AssetAccountId     | uuid          | FK, NOT NULL | → Account (money leaves here — must be Asset type) |
 | LiabilityAccountId | uuid          | FK, NOT NULL | → Account (debt reduced here — must be Liability type) |
 | Description        | varchar       | nullable     | e.g. "Credit card payment March"            |
+| IsCleared          | bool          | NOT NULL DEFAULT false | Added Phase 2. Reconciliation status — same semantics as Transaction. See ADR-0039. |
 | CreatedAt          | datetime      | NOT NULL     | Set by the application on insert. Tiebreaker for same-date ordering. |
 
 **Constraint:** `AssetAccountId` must reference an account with `AccountType.Name == "Asset"`. Enforced at the service layer.
@@ -590,6 +598,26 @@ Lookup table. Defines the available report types in the system.
 |--------|---------|-------------|-----------------------------------------------------------------------|
 | Id     | int     | PK          |                                                                       |
 | Name   | varchar | NOT NULL    | e.g. "Net Worth Statement", "Income & Expense Summary"               |
+
+**Phase 1 report types (seed data):**
+
+| Id | `ReportTypeKey` enum | Name |
+|----|----------------------|------|
+| 1  | `NetWorth`           | Net Worth Statement |
+| 2  | `IncomeExpense`      | Income & Expense Summary |
+| 3  | `ExpenseBreakdown`   | Expense Breakdown |
+| 4  | `TransactionHistory` | Transaction History |
+
+**Phase 2 report types (added in Phase 2 — see ADR-0054 for prioritisation rationale):**
+
+| Id | `ReportTypeKey` enum | Name |
+|----|----------------------|------|
+| 5  | `BudgetVsActual`     | Budget vs. Actual |
+| 6  | `LargestExpenses`    | Largest Expenses |
+| 7  | `MonthlyCashFlow`    | Monthly Cash Flow Trend |
+| 8  | `NetWorthOverTime`   | Net Worth Over Time |
+
+Each report type is handled by a dedicated `IReportGenerator` implementation registered in `ReportGeneratorFactory`. See [architecture.md](architecture.md) for the Strategy pattern details.
 
 ---
 
@@ -808,6 +836,18 @@ to entity sections above when implemented.
 | Field | Type | Notes |
 |---|---|---|
 | `IsCleared` | bool NOT NULL DEFAULT false | Verified against bank statement. See ADR-0039. |
+
+### LiabilityPayment — new Phase 2 fields
+
+| Field | Type | Notes |
+|---|---|---|
+| `IsCleared` | bool NOT NULL DEFAULT false | Reconciliation status — same semantics as Transaction. See ADR-0039. Added outside the Phase 2 baseline migration as part of Stage 2.5 (required for the Movement base class). |
+
+### Movement — abstract base class (Phase 2, Stage 2.5)
+
+`Movement` is an abstract C# class, not a DB table. It captures the six columns shared by `Transaction`, `Transfer`, and `LiabilityPayment`: `Id`, `Date`, `Amount`, `Description`, `IsCleared`, `CreatedAt`. EF Core is configured with **Table Per Concrete type (TPC)**: each concrete subtype maps to its own existing DB table — no base table, no schema change. The generated `TpcMovementHierarchy` migration has an empty `Up()` and `Down()`. See ADR-0058.
+
+`IMovementService.GetRecentAsync` and `CountAsync` query all three concrete tables and merge/sort the results in memory. The `/Movements` controller is the primary consumer.
 
 ### Budget — new Phase 2 fields
 

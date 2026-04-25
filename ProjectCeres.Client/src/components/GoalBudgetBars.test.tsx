@@ -7,7 +7,7 @@ const mockData = [
 ]
 
 beforeEach(() => {
-  global.fetch = vi.fn().mockResolvedValue({
+  globalThis.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => mockData,
   } as Response)

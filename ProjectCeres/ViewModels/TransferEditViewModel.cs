@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace ProjectCeres.ViewModels;
 
@@ -23,4 +24,9 @@ public class TransferEditViewModel
 
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
     public string? Description { get; set; }
+
+    public bool IsCleared { get; set; }
+
+    [Display(Name = "Attach file")]
+    public IFormFile? Attachment { get; set; }
 }

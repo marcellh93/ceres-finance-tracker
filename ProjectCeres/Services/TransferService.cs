@@ -55,6 +55,7 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
         transfer.SourceAccountId = vm.SourceAccountId!.Value;
         transfer.DestAccountId   = vm.DestAccountId!.Value;
         transfer.Description     = vm.Description;
+        transfer.IsCleared       = vm.IsCleared;
         await db.SaveChangesAsync();
     }
 
@@ -64,6 +65,14 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
             ?? throw new InvalidOperationException($"Transfer {id} not found.");
 
         db.Transfers.Remove(transfer);
+        await db.SaveChangesAsync();
+    }
+
+    public async Task MarkClearedAsync(Guid id, bool cleared)
+    {
+        var transfer = await db.Transfers.FindAsync(id)
+            ?? throw new InvalidOperationException($"Transfer {id} not found.");
+        transfer.IsCleared = cleared;
         await db.SaveChangesAsync();
     }
 

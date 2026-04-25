@@ -18,6 +18,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing     (Expense, non-system)
 ///   CategoryId 20000000-0000-0000-0000-000000000009 = Utilities   (Expense, non-system)
 /// </summary>
+[Collection("IntegrationTests")]
 public class ReportServiceTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId    = new("20000000-0000-0000-0000-000000000002");

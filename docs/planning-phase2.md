@@ -11,6 +11,7 @@
    - [CSV Import flow](#csv-import-flow)
    - [Budgeting](#budgeting-phase-2)
      - [CategoryBudget applicability](#categorybudget-applicability)
+   - [Unified Movements Ledger](#unified-movements-ledger-phase-2)
    - [Visual Dashboard](#visual-dashboard-phase-2)
    - [Financial Health Metrics](#financial-health-metrics-phase-2)
    - [Opening Balance Cutover UX](#opening-balance-cutover-ux-phase-2)
@@ -101,7 +102,9 @@ sequenceDiagram
 - **CSV export** — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix any such cell value with a single quote (`'`) to neutralize CSV injection.
 - File attachments on transactions (receipts, invoices) — built in Phase 1, carried forward
 - **File attachments on transfers** — `TransferAttachment` entity mirroring `TransactionAttachment`. See ADR-0042.
-- **Cleared / reconciliation status** — `IsCleared bool` on Transaction and Transfer. Merge-not-delete reconciliation flow. See ADR-0039.
+- **Cleared / reconciliation status** — `IsCleared bool` on Transaction and Transfer. Merge-not-delete reconciliation flow. See ADR-0039. **Stage 2 server-side work complete:** `MarkClearedAsync` and `BulkMarkClearedAsync` on `ITransactionService`; `MarkClearedAsync` on `ITransferService`; `ToggleCleared` and `BulkMarkCleared` POST actions on `TransactionsController`; `ToggleCleared` on `TransfersController`; `IsClearedSwitch` React component on Transaction and Transfer Edit forms (writes to hidden field, no API call). `ClearedBadge` async list toggle (Stage 2.5.3) is still planned.
+- **Unified Movements ledger** — `Movement` abstract base class (TPC, no schema change). `/Movements` view merges all three movement types in one sorted ledger. `ClearedBadge` React component for inline async toggle. `returnUrl` routing preserves navigation context. See ADR-0058.
+- **Liability account repayment type + payoff projection** — `LiabilityRepaymentType` (`FullMonthly` | `Amortising`) and `InterestRate` fields on `Account`. `AccountService` validates repayment type/interest rate consistency. `ILiabilityProjectionService` / `LiabilityProjectionService` compute the amortisation schedule (no DB access, pure math). `AccountsController.Ledger` (GET + POST) shows the projection panel on Amortising liability account ledger pages. See ADR-0043, ADR-0052.
 - **Split transactions** — not in Phase 2. Revisit at Phase 3 scope definition. See ADR-0041.
 - **Saved report configurations** — not in Phase 2. Revisit after Phase 2 daily use. See ADR-0055.
 
@@ -136,6 +139,40 @@ flowchart TD
 - Examples: "Trip to Japan — €3,000", "Kitchen Renovation — €8,000", "Emergency Fund — €5,000"
 - A goal budget can be marked complete or left open-ended
 - One transaction can be linked to one goal budget (optional — not all transactions need one)
+
+### Unified Movements Ledger (Phase 2)
+
+> **Status: Planned — Stage 2.5.** Follows Stage 2 (Cleared / Reconciliation Status).
+
+`Transaction`, `Transfer`, and `LiabilityPayment` are all financial movements — they share `Id`, `Date`, `Amount`, `Description`, `IsCleared`, and `CreatedAt`. Stage 2.5 formalises this at the model layer and exposes it as a single `/Movements` ledger view, making reconciliation easier by putting every financial event in one place.
+
+**Model layer — Movement base class (TPC)**
+
+An abstract `Movement` class is introduced as the base for all three concrete types. EF Core's Table Per Concrete type (TPC) strategy is used: each type still maps to its own existing DB table (`Transactions`, `Transfers`, `LiabilityPayments`) — no migration, no schema change. A `db.Set<Movement>()` query resolves as a SQL `UNION ALL` across all three tables.
+
+```
+Movement (abstract)
+├── Transaction       → Transactions table (unchanged)
+├── Transfer          → Transfers table (unchanged)
+└── LiabilityPayment  → LiabilityPayments table (unchanged)
+```
+
+**Unified Movements view**
+
+- `/Movements` is the primary ledger — all three movement types interleaved, sorted `Date DESC`, `CreatedAt DESC`
+- Each row shows movement type, date, amount, account(s), description, and an inline `IsCleared` badge
+- Edit and Delete buttons route to the correct existing controller (`/Transactions` or `/Transfers`)
+- After saving or deleting from `/Movements`, the user is returned to `/Movements` via `returnUrl`
+- Navigating directly to `/Transactions` or `/Transfers` and editing/deleting there still returns to that page (no `returnUrl` set)
+- `/Transactions` and `/Transfers` pages remain fully functional as secondary views
+
+**ClearedBadge React component**
+
+The inline "Clear / Unmark" form-submit toggle is replaced by a `ClearedBadge` React component on all three list views (`/Movements`, `/Transactions`, `/Transfers`). It calls `PATCH /api/movements/{id}/cleared` and flips the badge state optimistically — no page reload. A dedicated `MovementsApiController` handles this endpoint, routing to `ITransactionService.MarkClearedAsync` or `ITransferService.MarkClearedAsync` based on the `type` field in the request body.
+
+See ADR-0058 for the full decision rationale (TPC strategy, alternatives rejected, zero-migration guarantee).
+
+---
 
 ### Visual Dashboard (Phase 2)
 

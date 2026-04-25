@@ -44,9 +44,15 @@
     </div>
 
     <div class="form-group">
+        <label asp-for="ReminderBehaviour"></label>
+        <select asp-for="ReminderBehaviour" asp-items="ViewBag.ReminderBehaviours" class="form-control" id="ReminderBehaviour"></select>
+        <span asp-validation-for="ReminderBehaviour" class="field-error"></span>
+    </div>
+
+    <div class="form-group" id="DayOfPeriodGroup">
         <label asp-for="DayOfPeriod"></label>
         <input asp-for="DayOfPeriod" type="number" min="1" max="31" class="form-control" />
-        <small>Optional. Day of the month (1–31) or week (1–7) this is due.</small>
+        <small>Day of the month (1–31) for Snap to Calendar Day. Optional for other behaviours.</small>
         <span asp-validation-for="DayOfPeriod" class="field-error"></span>
     </div>
 
@@ -64,4 +70,13 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        (function () {
+            var sel = document.getElementById('ReminderBehaviour');
+            var grp = document.getElementById('DayOfPeriodGroup');
+            function toggle() { grp.style.display = sel.value === 'ManualDate' ? 'none' : ''; }
+            sel.addEventListener('change', toggle);
+            toggle();
+        })();
+    </script>
 }

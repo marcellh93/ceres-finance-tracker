@@ -7,8 +7,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace ProjectCeres.Tests.Integration;
 
-public class ApiInfrastructureTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+[Collection("IntegrationTests")]
+public class ApiInfrastructureTests(TestWebApplicationFactory factory)
+    : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client = factory.CreateClient();
 

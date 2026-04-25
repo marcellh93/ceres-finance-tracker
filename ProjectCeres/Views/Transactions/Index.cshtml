@@ -3,7 +3,10 @@
 
 <div class="page-header">
     <h1>Transactions</h1>
-    <a asp-action="Create" class="btn btn-primary">+ New Transaction</a>
+    <a asp-action="Create" class="btn btn-primary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Transaction
+    </a>
 </div>
 
 <form asp-action="Index" method="get" class="filter-bar">
@@ -20,6 +23,30 @@
     <a asp-action="Index" class="btn btn-link">Clear</a>
 </form>
 
+@if (ViewBag.From is not null && ViewBag.To is not null)
+{
+    <form asp-action="BulkMarkCleared" method="post" class="bulk-action-bar"
+          onsubmit="return confirm('Mark all transactions in this date range as cleared?')">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="from" value="@ViewBag.From" />
+        <input type="hidden" name="to" value="@ViewBag.To" />
+        <input type="hidden" name="accountId" value="@ViewBag.AccountId" />
+        <button type="submit" class="btn btn-secondary inline-flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Mark all cleared
+        </button>
+    </form>
+}
+
+@if (TempData["SuccessMessage"] is string successMsg)
+{
+    <div class="alert alert-success">@successMsg</div>
+}
+@if (TempData["ErrorMessage"] is string errorMsg)
+{
+    <div class="alert alert-error">@errorMsg</div>
+}
+
 @if (!Model.Any())
 {
     <p class="empty-state">No transactions found.</p>
@@ -35,6 +62,7 @@ else
                 <th>Description</th>
                 <th>Type</th>
                 <th>Amount</th>
+                <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -65,9 +93,22 @@ else
                         </td>
                     }
 
+                    <td>
+                        <div data-react="cleared-badge"
+                             data-id="@item.Id"
+                             data-movement-type="transaction"
+                             data-cleared="@item.IsCleared.ToString().ToLower()"></div>
+                    </td>
+
                     <td class="actions">
-                        <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
-                        <a asp-action="Delete" asp-route-id="@item.Id" class="link-danger">Delete</a>
+                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-secondary inline-flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            Edit
+                        </a>
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger inline-flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                            Delete
+                        </a>
                     </td>
                 </tr>
             }

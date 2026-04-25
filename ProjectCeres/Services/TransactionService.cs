@@ -42,6 +42,7 @@ public class TransactionService(
             Amount           = t.Amount,
             Description      = t.Description,
             TransactionType  = "Regular",
+            IsCleared        = t.IsCleared,
             AccountName      = t.Account.Name,
             CategoryName     = t.Category.Name,
             CategoryTypeName = t.Category.CategoryType.Name
@@ -130,7 +131,8 @@ public class TransactionService(
                 Description     = t.Description,
                 AccountId       = t.AccountId,
                 CategoryId      = t.CategoryId,
-                BudgetId        = t.BudgetId
+                BudgetId        = t.BudgetId,
+                IsCleared       = t.IsCleared
             };
         }
 
@@ -207,6 +209,7 @@ public class TransactionService(
         transaction.AccountId   = vm.AccountId!.Value;
         transaction.CategoryId  = vm.CategoryId!.Value;
         transaction.BudgetId    = vm.BudgetId;
+        transaction.IsCleared   = vm.IsCleared;
         await db.SaveChangesAsync();
     }
 
@@ -229,6 +232,29 @@ public class TransactionService(
 
         // Fall back to liability payment
         await liabilityPaymentService.DeleteAsync(id);
+    }
+
+    public async Task MarkClearedAsync(Guid id, bool cleared)
+    {
+        var transaction = await db.Transactions.FindAsync(id)
+            ?? throw new InvalidOperationException($"Transaction {id} not found.");
+        transaction.IsCleared = cleared;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null)
+    {
+        var query = db.Transactions
+            .Where(t => t.Date >= from && t.Date <= to && !t.Category.IsSystem);
+
+        if (accountId.HasValue)
+            query = query.Where(t => t.AccountId == accountId.Value);
+
+        var transactions = await query.ToListAsync();
+        foreach (var t in transactions)
+            t.IsCleared = true;
+
+        await db.SaveChangesAsync();
     }
 
     private async Task ValidateNotBeforeOpeningBalanceAsync(Guid accountId, DateOnly date)

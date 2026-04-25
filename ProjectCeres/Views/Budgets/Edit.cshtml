@@ -1,28 +1,38 @@
 @model CategoryBudgetEditViewModel
 @{ ViewData["Title"] = "Edit Category Budget"; }
 
-<h1>Edit Category Budget</h1>
+<div class="page-header">
+    <h1>Edit Category Budget</h1>
+</div>
 
-<p>
-    <strong>Category:</strong> @ViewBag.CategoryName &nbsp;
-    <strong>Currency:</strong> @ViewBag.CurrencyCode
-</p>
+<div class="dashboard-card max-w-lg">
+    <p class="text-sm text-muted-foreground mb-4">
+        <strong>Category:</strong> @ViewBag.CategoryName &nbsp;·&nbsp;
+        <strong>Currency:</strong> @ViewBag.CurrencyCode
+    </p>
 
-<form asp-action="Edit" method="post">
-    <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
-    <input type="hidden" asp-for="Id" />
+    <form asp-action="Edit" method="post">
+        <div asp-validation-summary="ModelOnly" class="alert alert-error mb-4"></div>
+        <input type="hidden" asp-for="Id" />
 
-    <div class="form-group">
-        <label asp-for="LimitAmount"></label>
-        <input asp-for="LimitAmount" class="form-control" />
-        <span asp-validation-for="LimitAmount" class="field-error"></span>
-    </div>
+        <div class="form-group">
+            <label asp-for="LimitAmount" class="form-label">Monthly Limit</label>
+            <input asp-for="LimitAmount" class="form-control" />
+            <span asp-validation-for="LimitAmount" class="field-error"></span>
+        </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
-    </div>
-</form>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary inline-flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Save Changes
+            </button>
+            <a asp-action="Index" class="btn btn-secondary inline-flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")

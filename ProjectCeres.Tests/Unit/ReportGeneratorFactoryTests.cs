@@ -7,11 +7,15 @@ public class ReportGeneratorFactoryTests
 {
     private static ReportGeneratorFactory BuildFactory()
     {
-        var nw  = new NetWorthGenerator(null!);
-        var ie  = new IncomeExpenseGenerator(null!);
-        var eb  = new ExpenseBreakdownGenerator(null!);
-        var th  = new TransactionHistoryGenerator(null!);
-        return new ReportGeneratorFactory(nw, ie, eb, th);
+        var nw   = new NetWorthGenerator(null!);
+        var ie   = new IncomeExpenseGenerator(null!);
+        var eb   = new ExpenseBreakdownGenerator(null!);
+        var th   = new TransactionHistoryGenerator(null!);
+        var bva  = new BudgetVsActualReportGenerator(null!);
+        var le   = new LargestExpensesReportGenerator(null!);
+        var mcf  = new MonthlyCashFlowReportGenerator(null!);
+        var nwot = new NetWorthOverTimeReportGenerator(null!);
+        return new ReportGeneratorFactory(nw, ie, eb, th, bva, le, mcf, nwot);
     }
 
     [Fact]
@@ -29,4 +33,20 @@ public class ReportGeneratorFactoryTests
     [Fact]
     public void GetGenerator_TransactionHistory_ReturnsTransactionHistoryGenerator()
         => BuildFactory().GetGenerator(ReportTypeKey.TransactionHistory).Should().BeOfType<TransactionHistoryGenerator>();
+
+    [Fact]
+    public void GetGenerator_BudgetVsActual_ReturnsBudgetVsActualReportGenerator()
+        => BuildFactory().GetGenerator(ReportTypeKey.BudgetVsActual).Should().BeOfType<BudgetVsActualReportGenerator>();
+
+    [Fact]
+    public void GetGenerator_LargestExpenses_ReturnsLargestExpensesReportGenerator()
+        => BuildFactory().GetGenerator(ReportTypeKey.LargestExpenses).Should().BeOfType<LargestExpensesReportGenerator>();
+
+    [Fact]
+    public void GetGenerator_MonthlyCashFlow_ReturnsMonthlyCashFlowReportGenerator()
+        => BuildFactory().GetGenerator(ReportTypeKey.MonthlyCashFlow).Should().BeOfType<MonthlyCashFlowReportGenerator>();
+
+    [Fact]
+    public void GetGenerator_NetWorthOverTime_ReturnsNetWorthOverTimeReportGenerator()
+        => BuildFactory().GetGenerator(ReportTypeKey.NetWorthOverTime).Should().BeOfType<NetWorthOverTimeReportGenerator>();
 }

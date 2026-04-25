@@ -98,7 +98,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         return RedirectToAction(nameof(Index));
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(Guid id, string? returnUrl = null)
     {
         var vm = await transactionService.GetByIdForEditAsync(id);
         if (vm is null) return NotFound();
@@ -110,13 +110,14 @@ public class TransactionsController(ITransactionService transactionService, IFil
             ViewBag.Attachments = t?.Attachments;
         }
 
+        ViewBag.ReturnUrl = returnUrl;
         await PopulateViewBagAsync();
         return View(vm);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(TransactionEditViewModel vm)
+    public async Task<IActionResult> Edit(TransactionEditViewModel vm, string? returnUrl = null)
     {
         if (vm.TransactionType == "LiabilityPayment")
         {
@@ -133,6 +134,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
 
         if (!ModelState.IsValid)
         {
+            ViewBag.ReturnUrl = returnUrl;
             await PopulateViewBagAsync();
             return View(vm);
         }
@@ -143,6 +145,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
             catch (InvalidOperationException ex)
             {
                 ModelState.AddModelError(nameof(vm.Attachment), ex.Message);
+                ViewBag.ReturnUrl = returnUrl;
                 await PopulateViewBagAsync();
                 return View(vm);
             }
@@ -155,6 +158,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
+            ViewBag.ReturnUrl = returnUrl;
             await PopulateViewBagAsync();
             return View(vm);
         }
@@ -165,26 +169,31 @@ public class TransactionsController(ITransactionService transactionService, IFil
             catch (InvalidOperationException ex)
             {
                 TempData["ErrorMessage"] = $"Transaction saved, but the attachment could not be uploaded: {ex.Message}";
-                return RedirectToAction(nameof(Edit), new { id = vm.Id });
+                return RedirectToAction(nameof(Edit), new { id = vm.Id, returnUrl });
             }
         }
 
         TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
             ? "Liability payment updated."
             : "Transaction updated.";
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return Redirect(returnUrl);
+
         return RedirectToAction(nameof(Index));
     }
 
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null)
     {
         var vm = await transactionService.GetByIdForEditAsync(id);
         if (vm is null) return NotFound();
+        ViewBag.ReturnUrl = returnUrl;
         return View(vm);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id, string _ = "")
+    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null, string _ = "")
     {
         try
         {
@@ -196,7 +205,28 @@ public class TransactionsController(ITransactionService transactionService, IFil
             TempData["ErrorMessage"] = ex.Message;
         }
 
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return Redirect(returnUrl);
+
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleCleared(Guid id, bool cleared, Guid? accountId, DateOnly? from, DateOnly? to, int page = 1)
+    {
+        try { await transactionService.MarkClearedAsync(id, cleared); }
+        catch (InvalidOperationException ex) { TempData["ErrorMessage"] = ex.Message; }
+        return RedirectToAction(nameof(Index), new { accountId, from, to, page });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BulkMarkCleared(DateOnly from, DateOnly to, Guid? accountId)
+    {
+        await transactionService.BulkMarkClearedAsync(from, to, accountId);
+        TempData["SuccessMessage"] = $"All transactions between {from:dd/MM/yyyy} and {to:dd/MM/yyyy} marked as cleared.";
+        return RedirectToAction(nameof(Index), new { accountId, from, to });
     }
 
     private async Task PopulateViewBagAsync()

@@ -32,4 +32,7 @@ public class RecurringTransactionCreateViewModel
     [Required(ErrorMessage = "Next due date is required.")]
     [Display(Name = "Next Due Date")]
     public DateOnly NextDueDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+    [Display(Name = "Reminder Behaviour")]
+    public ReminderBehaviour ReminderBehaviour { get; set; } = ReminderBehaviour.SnapToCalendarDay;
 }

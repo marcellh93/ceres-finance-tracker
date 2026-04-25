@@ -3,7 +3,10 @@
 
 <div class="page-header">
     <h1>Transfers</h1>
-    <a asp-action="Create" class="btn btn-primary">+ New Transfer</a>
+    <a asp-action="Create" class="btn btn-primary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Transfer
+    </a>
 </div>
 
 @if (!Model.Any())
@@ -20,6 +23,7 @@ else
                 <th>To</th>
                 <th>Amount</th>
                 <th>Description</th>
+                <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -32,9 +36,21 @@ else
                     <td>@t.DestAccount.Name</td>
                     <td>@NumberFormatHelper.FormatAmount(t.Amount, ViewData["NumberFormat"] as string) @t.SourceAccount.Currency.Code</td>
                     <td>@(t.Description ?? "—")</td>
+                    <td>
+                        <div data-react="cleared-badge"
+                             data-id="@t.Id"
+                             data-movement-type="transfer"
+                             data-cleared="@t.IsCleared.ToString().ToLower()"></div>
+                    </td>
                     <td class="actions">
-                        <a asp-action="Edit" asp-route-id="@t.Id">Edit</a>
-                        <a asp-action="Delete" asp-route-id="@t.Id" class="link-danger">Delete</a>
+                        <a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-sm btn-secondary inline-flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            Edit
+                        </a>
+                        <a asp-action="Delete" asp-route-id="@t.Id" class="btn btn-sm btn-danger inline-flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                            Delete
+                        </a>
                     </td>
                 </tr>
             }

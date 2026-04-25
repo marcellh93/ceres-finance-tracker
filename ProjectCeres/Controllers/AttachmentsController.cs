@@ -59,4 +59,58 @@ public class AttachmentsController(IFileAttachmentService attachmentService) : C
 
         return RedirectToAction("Edit", "Transactions", new { id = transactionId });
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadForTransfer(Guid transferId, IFormFile file)
+    {
+        if (file is null || file.Length == 0)
+        {
+            TempData["ErrorMessage"] = "No file selected.";
+            return RedirectToAction("Edit", "Transfers", new { id = transferId });
+        }
+
+        try
+        {
+            await attachmentService.UploadForTransferAsync(transferId, file);
+            TempData["SuccessMessage"] = "File uploaded.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction("Edit", "Transfers", new { id = transferId });
+    }
+
+    public async Task<IActionResult> DownloadTransfer(Guid id)
+    {
+        try
+        {
+            var (data, contentType, fileName) = await attachmentService.GetTransferAttachmentAsync(id);
+            return File(data, contentType, fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction("Index", "Transfers");
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteTransfer(Guid id, Guid transferId)
+    {
+        try
+        {
+            await attachmentService.DeleteTransferAttachmentAsync(id);
+            TempData["SuccessMessage"] = "Attachment deleted.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction("Edit", "Transfers", new { id = transferId });
+    }
 }

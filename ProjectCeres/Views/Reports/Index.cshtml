@@ -1,22 +1,40 @@
 @{ ViewData["Title"] = "Reports"; }
 
-<h1>Reports</h1>
+<div class="page-header">
+    <h1>Reports</h1>
+</div>
 
-<ul class="report-list">
-    <li>
-        <a asp-action="NetWorth">Net Worth Statement</a>
-        <p>Current asset and liability balances by currency.</p>
-    </li>
-    <li>
-        <a asp-action="IncomeExpense">Income &amp; Expense Summary</a>
-        <p>Total income, expenses, and savings rate for a period.</p>
-    </li>
-    <li>
-        <a asp-action="ExpenseBreakdown">Expense Breakdown by Category</a>
-        <p>Where your money went, ranked by category spend.</p>
-    </li>
-    <li>
-        <a asp-action="TransactionHistory">Transaction History</a>
-        <p>Full filtered and paginated transaction log.</p>
-    </li>
-</ul>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <a asp-action="NetWorth" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Net Worth Statement</h3>
+        <p class="text-sm text-gray-500">Current asset and liability balances by currency.</p>
+    </a>
+    <a asp-action="IncomeExpense" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Income &amp; Expense Summary</h3>
+        <p class="text-sm text-gray-500">Total income, expenses, and savings rate for a period.</p>
+    </a>
+    <a asp-action="ExpenseBreakdown" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Expense Breakdown by Category</h3>
+        <p class="text-sm text-gray-500">Where your money went, ranked by category spend.</p>
+    </a>
+    <a asp-action="TransactionHistory" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Transaction History</h3>
+        <p class="text-sm text-gray-500">Full filtered and paginated transaction log.</p>
+    </a>
+    <a asp-action="BudgetVsActual" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Budget vs. Actual</h3>
+        <p class="text-sm text-gray-500">Planned vs. actual spend per active category budget for a period.</p>
+    </a>
+    <a asp-action="LargestExpenses" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Largest Expenses</h3>
+        <p class="text-sm text-gray-500">Top N individual expense transactions by amount, ordered highest first.</p>
+    </a>
+    <a asp-action="MonthlyCashFlow" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Monthly Cash Flow Trend</h3>
+        <p class="text-sm text-gray-500">Income vs. expenses grouped by calendar month.</p>
+    </a>
+    <a asp-action="NetWorthOverTime" class="dashboard-card hover:shadow-md transition-shadow no-underline block">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Net Worth Over Time</h3>
+        <p class="text-sm text-gray-500">Cumulative asset, liability, and equity snapshots per month.</p>
+    </a>
+</div>

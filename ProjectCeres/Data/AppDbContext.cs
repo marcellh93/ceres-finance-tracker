@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<TransactionAttachment> TransactionAttachments => Set<TransactionAttachment>();
+    public DbSet<Movement> Movements => Set<Movement>();
     public DbSet<Transfer> Transfers => Set<Transfer>();
     public DbSet<LiabilityPayment> LiabilityPayments => Set<LiabilityPayment>();
     public DbSet<RecurringTransaction> RecurringTransactions => Set<RecurringTransaction>();
@@ -38,6 +39,9 @@ public class AppDbContext : DbContext
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
     {
+        // TPC: each concrete Movement subtype maps to its own existing table — no schema change.
+        modelBuilder.Entity<Movement>().UseTpcMappingStrategy();
+
         // LiabilityPayment references Account twice — explicit config required.
         modelBuilder.Entity<LiabilityPayment>()
             .HasOne(p => p.AssetAccount)
@@ -89,6 +93,11 @@ public class AppDbContext : DbContext
         // RecurringTransaction.Frequency stored as string (varchar) for readability.
         modelBuilder.Entity<RecurringTransaction>()
             .Property(r => r.Frequency)
+            .HasConversion<string>();
+
+        // RecurringTransaction.ReminderBehaviour stored as string (varchar) — no schema change.
+        modelBuilder.Entity<RecurringTransaction>()
+            .Property(r => r.ReminderBehaviour)
             .HasConversion<string>();
 
         // RecurringTransaction → Account: no cascade.
@@ -184,7 +193,11 @@ public class AppDbContext : DbContext
             new ReportType { Id = 1, Name = "Net Worth Statement"              },
             new ReportType { Id = 2, Name = "Income & Expense Summary"         },
             new ReportType { Id = 3, Name = "Expense Breakdown by Category"    },
-            new ReportType { Id = 4, Name = "Transaction History"              }
+            new ReportType { Id = 4, Name = "Transaction History"              },
+            new ReportType { Id = 5, Name = "Budget vs. Actual"               },
+            new ReportType { Id = 6, Name = "Largest Expenses"                },
+            new ReportType { Id = 7, Name = "Monthly Cash Flow Trend"         },
+            new ReportType { Id = 8, Name = "Net Worth Over Time"             }
         );
     }
 

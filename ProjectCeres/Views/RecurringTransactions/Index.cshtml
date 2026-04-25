@@ -3,7 +3,10 @@
 
 <div class="page-header">
     <h1>Recurring Reminders</h1>
-    <a asp-action="Create" class="btn btn-primary">+ New Reminder</a>
+    <div class="flex gap-2">
+        <a asp-action="Upcoming" class="btn btn-secondary">Upcoming Payments</a>
+        <a asp-action="Create" class="btn btn-primary">+ New Reminder</a>
+    </div>
 </div>
 
 @{

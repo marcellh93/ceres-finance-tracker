@@ -124,4 +124,5 @@
 <repo>/ProjectCeres/bin/Debug/net10.0/package.json
 <repo>/ProjectCeres/obj/Debug/net10.0/ProjectCeres.MvcApplicationPartsAssemblyInfo.cs
 <repo>/ProjectCeres/bin/Debug/net10.0/Vite.AspNetCore.dll
-<repo>/ProjectCeres/obj/Debug/net10.0/compressed/0djvs58ynv-{0}-y8y04dcujg-y8y04dcujg.gz
+<repo>/ProjectCeres/bin/Debug/net10.0/CsvHelper.dll
+<repo>/ProjectCeres/obj/Debug/net10.0/compressed/0djvs58ynv-{0}-rndbwdj4rb-rndbwdj4rb.gz

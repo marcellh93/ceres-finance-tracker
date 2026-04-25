@@ -325,7 +325,7 @@ See [docs/testing.md](testing.md) for the full testing strategy — stack, TDD w
 - [ ] **Multi-tenancy implementation** — adding UserId FK to every top-level entity. No migration plan exists. Must be designed before Phase 3 code begins.
 - [ ] **Settings migration for Phase 3** — single Phase 1 Settings row becomes per-user. What do new users get as defaults?
 - [ ] **WCAG 2.1 AA compliance (Phase 3)** — full audit required before opening to other users. EU Accessibility Act obligations may also apply — see legal.md.
-- [ ] **MVC → Web API decoupling (Phase 3)** — no migration plan exists. Must be designed before Phase 3 frontend work begins.
+- [ ] **MVC → Web API decoupling (Phase 3)** — base migration plan documented in [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md). Finalize at Phase 3 kickoff before frontend work begins.
 - [ ] **Concurrency handling (Phase 3)** — last-write-wins accepted for Phase 1/2. Before Phase 3, decide whether to add EF Core optimistic concurrency tokens (`RowVersion`) to mutable entities.
 - [ ] **Production migration strategy (Phase 3)** — `dotnet ef database update` vs. pre-deploy CI/CD step vs. reviewed SQL scripts. Option 2 or 3 recommended.
 - [ ] **CI service for Phase 3** — no CI provider chosen. GitHub Actions is the leading candidate. Required for automated build verification and vulnerability scanning before hosting.

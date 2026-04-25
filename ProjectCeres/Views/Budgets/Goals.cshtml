@@ -3,50 +3,74 @@
 
 <div class="page-header">
     <h1>Goal Budgets</h1>
-    <a asp-action="CreateGoal" class="btn btn-primary">+ New Goal Budget</a>
+    <a asp-action="CreateGoal" class="btn btn-primary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Goal Budget
+    </a>
 </div>
 
 @if (!Model.Any())
 {
-    <p class="empty-state">No goal budgets defined.</p>
+    <div class="dashboard-card">
+        <p class="empty-state">No goal budgets defined.</p>
+    </div>
 }
 else
 {
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Target</th>
-                <th>Currency</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var goal in Model.OrderByDescending(g => g.StartDate))
-            {
-                <tr class="@(goal.IsActive ? "" : "row-inactive")">
-                    <td>@goal.Name</td>
-                    <td>@goal.GoalType</td>
-                    <td>@goal.TargetAmount.ToString("N2")</td>
-                    <td>@goal.Currency.Code</td>
-                    <td>@goal.StartDate.ToString("yyyy-MM-dd")</td>
-                    <td>@(goal.EndDate?.ToString("yyyy-MM-dd") ?? "—")</td>
-                    <td>@(goal.IsActive ? "Active" : "Inactive")</td>
-                    <td class="actions">
-                        @if (goal.IsActive)
-                        {
-                            <a asp-action="EditGoal" asp-route-id="@goal.Id">Edit</a>
-                            <a asp-action="DeactivateGoal" asp-route-id="@goal.Id">Deactivate</a>
-                        }
-                    </td>
+    <div class="dashboard-card p-0 overflow-hidden">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Currency</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var goal in Model.OrderByDescending(g => g.StartDate))
+                {
+                    <tr class="@(goal.IsActive ? "" : "row-inactive")">
+                        <td>@goal.Name</td>
+                        <td>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">@goal.GoalType</span>
+                        </td>
+                        <td>@goal.TargetAmount.ToString("N2")</td>
+                        <td>@goal.Currency.Code</td>
+                        <td>@goal.StartDate.ToString("yyyy-MM-dd")</td>
+                        <td>@(goal.EndDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                        <td>
+                            @if (goal.IsActive)
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">Active</span>
+                            }
+                            else
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
+                            }
+                        </td>
+                        <td class="actions">
+                            @if (goal.IsActive)
+                            {
+                                <a asp-action="EditGoal" asp-route-id="@goal.Id" class="btn btn-sm btn-secondary inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                                    Edit
+                                </a>
+                                <a asp-action="DeactivateGoal" asp-route-id="@goal.Id" class="btn btn-sm btn-danger inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                                    Deactivate
+                                </a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 <div class="page-section-link">

@@ -15,6 +15,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CategoryId 20000000-0000-0000-0000-000000000002 = Salary  (Income, non-system)
 ///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing (Expense, non-system)
 /// </summary>
+[Collection("IntegrationTests")]
 public class RecurringTransactionServiceTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
@@ -384,5 +385,155 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
         var act = async () => await _service.DismissAsync(Guid.NewGuid());
 
         await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    // -------------------------------------------------------------------------
+    // ReminderBehaviour — SnapToCalendarDay
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConfirmAsync_SnapToCalendarDay_OnTime_AdvancesToDayOfPeriodNextMonth()
+    {
+        // Confirmed on the 5th, DayOfPeriod = 15 → next due = 15th of the following month
+        var dueDate  = new DateOnly(2026, 5, 5);
+        var reminder = await _service.CreateAsync(new RecurringTransactionCreateViewModel
+        {
+            Name              = "Snap On Time",
+            EstimatedAmount   = 100m,
+            AccountId         = _accountId,
+            CategoryId        = SalaryCategoryId,
+            Frequency         = Frequency.Monthly,
+            DayOfPeriod       = 15,
+            NextDueDate       = dueDate,
+            ReminderBehaviour = ReminderBehaviour.SnapToCalendarDay
+        });
+
+        await _service.ConfirmAsync(reminder.Id, dueDate, 100m, null);
+
+        var reloaded = await _fixture.Db.RecurringTransactions.FindAsync(reminder.Id);
+        reloaded!.NextDueDate.Should().Be(new DateOnly(2026, 6, 15));
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_SnapToCalendarDay_ConfirmedLate_SkipsForwardToFollowingMonth()
+    {
+        // Confirmed on the 20th, DayOfPeriod = 15 → skips to 15th of month after next
+        var dueDate  = new DateOnly(2026, 5, 1);
+        var reminder = await _service.CreateAsync(new RecurringTransactionCreateViewModel
+        {
+            Name              = "Snap Late",
+            EstimatedAmount   = 100m,
+            AccountId         = _accountId,
+            CategoryId        = SalaryCategoryId,
+            Frequency         = Frequency.Monthly,
+            DayOfPeriod       = 15,
+            NextDueDate       = dueDate,
+            ReminderBehaviour = ReminderBehaviour.SnapToCalendarDay
+        });
+
+        // Confirm late — on the 20th (past DayOfPeriod = 15)
+        await _service.ConfirmAsync(reminder.Id, new DateOnly(2026, 5, 20), 100m, null);
+
+        var reloaded = await _fixture.Db.RecurringTransactions.FindAsync(reminder.Id);
+        reloaded!.NextDueDate.Should().Be(new DateOnly(2026, 7, 15));
+    }
+
+    // -------------------------------------------------------------------------
+    // ReminderBehaviour — RelativeToLastConfirmation
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConfirmAsync_RelativeToLastConfirmation_Monthly_AdvancesFromConfirmDate()
+    {
+        // Confirmed on the 20th (monthly) → next due = 20th of next month
+        var dueDate  = new DateOnly(2026, 5, 1);
+        var reminder = await _service.CreateAsync(new RecurringTransactionCreateViewModel
+        {
+            Name              = "Relative Monthly",
+            EstimatedAmount   = 100m,
+            AccountId         = _accountId,
+            CategoryId        = SalaryCategoryId,
+            Frequency         = Frequency.Monthly,
+            DayOfPeriod       = null,
+            NextDueDate       = dueDate,
+            ReminderBehaviour = ReminderBehaviour.RelativeToLastConfirmation
+        });
+
+        await _service.ConfirmAsync(reminder.Id, new DateOnly(2026, 5, 20), 100m, null);
+
+        var reloaded = await _fixture.Db.RecurringTransactions.FindAsync(reminder.Id);
+        reloaded!.NextDueDate.Should().Be(new DateOnly(2026, 6, 20));
+    }
+
+    // -------------------------------------------------------------------------
+    // ReminderBehaviour — ManualDate
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConfirmAsync_ManualDate_WithoutNextDueDate_Throws()
+    {
+        var dueDate  = new DateOnly(2026, 5, 1);
+        var reminder = await _service.CreateAsync(new RecurringTransactionCreateViewModel
+        {
+            Name              = "Manual No Date",
+            EstimatedAmount   = 100m,
+            AccountId         = _accountId,
+            CategoryId        = SalaryCategoryId,
+            Frequency         = Frequency.Monthly,
+            DayOfPeriod       = null,
+            NextDueDate       = dueDate,
+            ReminderBehaviour = ReminderBehaviour.ManualDate
+        });
+
+        var act = async () => await _service.ConfirmAsync(reminder.Id, dueDate, 100m, null, nextDueDate: null);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*next due date*");
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_ManualDate_WithNextDueDate_SetsExactDate()
+    {
+        var dueDate  = new DateOnly(2026, 5, 1);
+        var reminder = await _service.CreateAsync(new RecurringTransactionCreateViewModel
+        {
+            Name              = "Manual With Date",
+            EstimatedAmount   = 100m,
+            AccountId         = _accountId,
+            CategoryId        = SalaryCategoryId,
+            Frequency         = Frequency.Monthly,
+            DayOfPeriod       = null,
+            NextDueDate       = dueDate,
+            ReminderBehaviour = ReminderBehaviour.ManualDate
+        });
+
+        var manualNext = new DateOnly(2026, 8, 10);
+        await _service.ConfirmAsync(reminder.Id, dueDate, 100m, null, nextDueDate: manualNext);
+
+        var reloaded = await _fixture.Db.RecurringTransactions.FindAsync(reminder.Id);
+        reloaded!.NextDueDate.Should().Be(manualNext);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetUpcomingAsync (6.2)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetUpcomingAsync_ReturnsRemindersWithinWindow_ExcludesOutside()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        // Due today — included
+        var dueToday = await CreateReminderAsync(name: "Due Today", nextDueDate: today);
+        // Due in 5 days — included
+        var dueSoon  = await CreateReminderAsync(name: "Due Soon", nextDueDate: today.AddDays(5));
+        // Due in 35 days — excluded
+        var dueLater = await CreateReminderAsync(name: "Due Later", nextDueDate: today.AddDays(35));
+
+        var results = (await _service.GetUpcomingAsync(withinDays: 30)).ToList();
+
+        results.Should().Contain(r => r.Id == dueToday.Id);
+        results.Should().Contain(r => r.Id == dueSoon.Id);
+        results.Should().NotContain(r => r.Id == dueLater.Id);
     }
 }

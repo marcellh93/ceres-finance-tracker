@@ -8,6 +8,7 @@
     ".NETCoreApp,Version=v10.0": {
       "ProjectCeres/1.0.0": {
         "dependencies": {
+          "CsvHelper": "33.0.1",
           "Microsoft.EntityFrameworkCore.Design": "10.0.5",
           "Mime-Detective": "25.8.1",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "10.0.1",
@@ -15,6 +16,14 @@
         },
         "runtime": {
           "ProjectCeres.dll": {}
+        }
+      },
+      "CsvHelper/33.0.1": {
+        "runtime": {
+          "lib/net8.0/CsvHelper.dll": {
+            "assemblyVersion": "33.0.0.0",
+            "fileVersion": "33.0.1.24"
+          }
         }
       },
       "Humanizer.Core/2.14.1": {
@@ -501,6 +510,13 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "CsvHelper/33.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-fev4lynklAU2A9GVMLtwarkwaanjSYB4wUqO2nOJX5hnzObORzUqVLe+bDYCUyIIRQM4o5Bsq3CcyJR89iMmEQ==",
+      "path": "csvhelper/33.0.1",
+      "hashPath": "csvhelper.33.0.1.nupkg.sha512"
     },
     "Humanizer.Core/2.14.1": {
       "type": "package",

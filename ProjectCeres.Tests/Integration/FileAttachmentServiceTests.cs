@@ -18,6 +18,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CurrencyId    1 = EUR
 ///   CategoryId 20000000-0000-0000-0000-000000000002 = Salary (Income, non-system)
 /// </summary>
+[Collection("IntegrationTests")]
 public class FileAttachmentServiceTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId = new("20000000-0000-0000-0000-000000000002");

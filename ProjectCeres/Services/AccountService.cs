@@ -31,14 +31,20 @@ public class AccountService(AppDbContext db) : IAccountService
 
     public async Task<Account> CreateAsync(AccountCreateViewModel vm)
     {
+        var accountType = await db.AccountTypes.FindAsync(vm.AccountTypeId!.Value);
+        if (accountType?.Name == "Liability")
+            ValidateLiabilityRepaymentFields(vm.LiabilityRepaymentType, vm.InterestRate);
+
         var account = new Account
         {
-            Id            = Guid.NewGuid(),
-            Name          = vm.Name,
-            AccountTypeId = vm.AccountTypeId!.Value,
-            CurrencyId    = vm.CurrencyId!.Value,
-            Description   = vm.Description,
-            IsActive      = true
+            Id                     = Guid.NewGuid(),
+            Name                   = vm.Name,
+            AccountTypeId          = vm.AccountTypeId!.Value,
+            CurrencyId             = vm.CurrencyId!.Value,
+            Description            = vm.Description,
+            LiabilityRepaymentType = vm.LiabilityRepaymentType,
+            InterestRate           = vm.InterestRate,
+            IsActive               = true
         };
 
         db.Accounts.Add(account);
@@ -63,11 +69,18 @@ public class AccountService(AppDbContext db) : IAccountService
 
     public async Task UpdateAsync(AccountEditViewModel vm)
     {
-        var account = await db.Accounts.FindAsync(vm.Id)
+        var account = await db.Accounts
+            .Include(a => a.AccountType)
+            .FirstOrDefaultAsync(a => a.Id == vm.Id)
             ?? throw new InvalidOperationException($"Account {vm.Id} not found.");
 
-        account.Name        = vm.Name;
-        account.Description = vm.Description;
+        if (account.AccountType.Name == "Liability")
+            ValidateLiabilityRepaymentFields(vm.LiabilityRepaymentType, vm.InterestRate);
+
+        account.Name                   = vm.Name;
+        account.Description            = vm.Description;
+        account.LiabilityRepaymentType = vm.LiabilityRepaymentType;
+        account.InterestRate           = vm.InterestRate;
 
         // Manage the opening balance transaction (system-managed, not user-editable directly).
         var existing = await db.Transactions
@@ -177,6 +190,15 @@ public class AccountService(AppDbContext db) : IAccountService
         balance -= transfersOut;
 
         return balance;
+    }
+
+    private static void ValidateLiabilityRepaymentFields(string? repaymentType, decimal? interestRate)
+    {
+        if (repaymentType == "Amortising" && interestRate is null)
+            throw new InvalidOperationException("An Amortising liability must have an interest rate.");
+
+        if (repaymentType == "FullMonthly" && interestRate is not null)
+            throw new InvalidOperationException("A FullMonthly liability must not have an interest rate.");
     }
 
     public async Task<AccountLedgerViewModel?> GetLedgerAsync(Guid id)

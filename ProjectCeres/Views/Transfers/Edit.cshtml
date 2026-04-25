@@ -1,49 +1,116 @@
 @model TransferEditViewModel
 @{ ViewData["Title"] = "Edit Transfer"; }
 
-<h1>Edit Transfer</h1>
+<div class="page-header">
+    <h1>Edit Transfer</h1>
+</div>
 
-<form asp-action="Edit" method="post">
-    <input asp-for="Id" type="hidden" />
-    <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
+<div class="dashboard-card max-w-lg">
+    <form asp-action="Edit" method="post" enctype="multipart/form-data">
+        <input asp-for="Id" type="hidden" />
+        <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+        <div asp-validation-summary="ModelOnly" class="alert alert-error mb-4"></div>
 
-    <div class="form-group">
-        <label asp-for="Date"></label>
-        <input asp-for="Date" type="date" class="form-control" />
-        <span asp-validation-for="Date" class="field-error"></span>
-    </div>
+        <div class="form-group">
+            <label asp-for="Date" class="form-label"></label>
+            <input asp-for="Date" type="date" class="form-control" />
+            <span asp-validation-for="Date" class="field-error"></span>
+        </div>
 
-    <div class="form-group">
-        <label asp-for="SourceAccountId"></label>
-        <select asp-for="SourceAccountId" asp-items="ViewBag.SourceAccounts" class="form-control"></select>
-        <span asp-validation-for="SourceAccountId" class="field-error"></span>
-    </div>
+        <div class="form-group">
+            <label asp-for="SourceAccountId" class="form-label"></label>
+            <select asp-for="SourceAccountId" asp-items="ViewBag.SourceAccounts" class="form-control"></select>
+            <span asp-validation-for="SourceAccountId" class="field-error"></span>
+        </div>
 
-    <div class="form-group">
-        <label asp-for="DestAccountId"></label>
-        <select asp-for="DestAccountId" asp-items="ViewBag.DestAccounts" class="form-control"></select>
-        <span asp-validation-for="DestAccountId" class="field-error"></span>
-    </div>
+        <div class="form-group">
+            <label asp-for="DestAccountId" class="form-label"></label>
+            <select asp-for="DestAccountId" asp-items="ViewBag.DestAccounts" class="form-control"></select>
+            <span asp-validation-for="DestAccountId" class="field-error"></span>
+        </div>
 
-    <div class="form-group">
-        <label asp-for="Amount"></label>
-        <input type="text" id="Amount" name="Amount"
-               value="@NumberFormatHelper.FormatInputValue(Model.Amount, ViewData["NumberFormat"] as string)"
-               class="form-control" />
-        <span asp-validation-for="Amount" class="field-error"></span>
-    </div>
+        <div class="form-group">
+            <label asp-for="Amount" class="form-label"></label>
+            <input type="text" id="Amount" name="Amount"
+                   value="@NumberFormatHelper.FormatInputValue(Model.Amount, ViewData["NumberFormat"] as string)"
+                   class="form-control" />
+            <span asp-validation-for="Amount" class="field-error"></span>
+        </div>
 
-    <div class="form-group">
-        <label asp-for="Description"></label>
-        <input asp-for="Description" class="form-control" />
-        <span asp-validation-for="Description" class="field-error"></span>
-    </div>
+        <div class="form-group">
+            <label asp-for="Description" class="form-label"></label>
+            <input asp-for="Description" class="form-control" />
+            <span asp-validation-for="Description" class="field-error"></span>
+        </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
-    </div>
-</form>
+        <div class="form-group">
+            <div data-react="is-cleared-switch"
+                 data-field-name="IsCleared"
+                 data-checked="@(Model.IsCleared ? "true" : "false")"></div>
+        </div>
+
+        <section class="attachments mt-4">
+            <h2 class="text-sm font-semibold mb-2">Attachments</h2>
+
+            @if (ViewBag.Attachments is IEnumerable<ProjectCeres.Models.TransferAttachment> attachments && attachments.Any())
+            {
+                <ul class="space-y-1 mb-3">
+                    @foreach (var a in attachments)
+                    {
+                        <li class="flex items-center gap-2 text-sm">
+                            <a asp-controller="Attachments" asp-action="DownloadTransfer" asp-route-id="@a.Id" class="inline-flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                @a.FileName
+                            </a>
+                            <small class="text-muted-foreground">(@((a.FileSizeBytes / 1024.0).ToString("N0")) KB)</small>
+                            <button type="submit" form="delete-transfer-attachment-@a.Id"
+                                    class="btn-link btn-danger inline-flex items-center gap-1"
+                                    onclick="return confirm('Delete this attachment?')">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                                Remove
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <p class="text-sm text-muted-foreground mb-3">No attachments.</p>
+            }
+
+            <div class="form-group">
+                <label asp-for="Attachment" class="form-label"></label>
+                <input asp-for="Attachment" type="file" class="form-control"
+                       accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
+                <small class="text-muted-foreground text-xs mt-1 block">Optional. Max 10 MB. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
+                <span asp-validation-for="Attachment" class="field-error"></span>
+            </div>
+        </section>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary inline-flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Save Changes
+            </button>
+            <a href="@(string.IsNullOrEmpty(ViewBag.ReturnUrl as string) ? Url.Action("Index") : ViewBag.ReturnUrl)" class="btn btn-secondary inline-flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+@if (ViewBag.Attachments is IEnumerable<ProjectCeres.Models.TransferAttachment> deleteAttachments)
+{
+    @foreach (var a in deleteAttachments)
+    {
+        <form id="delete-transfer-attachment-@a.Id"
+              asp-controller="Attachments" asp-action="DeleteTransfer"
+              asp-route-id="@a.Id" asp-route-transferId="@Model.Id"
+              method="post">
+        </form>
+    }
+}
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")

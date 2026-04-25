@@ -48,6 +48,20 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Switch thumb translate — driven by base-ui data attributes, not Tailwind variants */
+[data-slot="switch"][data-checked] .switch-thumb {
+  translate: calc(100% - 2px) 0;
+}
+[data-slot="switch"][data-unchecked] .switch-thumb {
+  translate: 0 0;
+}
+[data-slot="switch"][data-checked] {
+  background-color: var(--primary);
+}
+[data-slot="switch"][data-unchecked] {
+  background-color: var(--input);
+}
+
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);

@@ -10,4 +10,8 @@ public interface IFileAttachmentService
     Task<TransactionAttachment> UploadAsync(Guid transactionId, IFormFile file);
     Task<(byte[] Data, string ContentType, string FileName)> GetAsync(Guid attachmentId);
     Task DeleteAsync(Guid attachmentId);
+
+    Task<TransferAttachment> UploadForTransferAsync(Guid transferId, IFormFile file);
+    Task<(byte[] Data, string ContentType, string FileName)> GetTransferAttachmentAsync(Guid attachmentId);
+    Task DeleteTransferAttachmentAsync(Guid attachmentId);
 }

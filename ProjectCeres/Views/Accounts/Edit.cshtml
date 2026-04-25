@@ -42,6 +42,28 @@
 
     <small class="form-hint">Account type and currency cannot be changed after creation.</small>
 
+    @if (ViewBag.IsLiability == true)
+    {
+        <div class="form-group">
+            <label asp-for="LiabilityRepaymentType"></label>
+            <select asp-for="LiabilityRepaymentType" class="form-control" id="LiabilityRepaymentType">
+                <option value="">— None —</option>
+                <option value="FullMonthly">Full Monthly (pay in full each month)</option>
+                <option value="Amortising">Amortising (fixed monthly payment + interest)</option>
+            </select>
+            <span asp-validation-for="LiabilityRepaymentType" class="field-error"></span>
+        </div>
+
+        <div class="form-group" id="interest-rate-field">
+            <label asp-for="InterestRate"></label>
+            <input type="text" id="InterestRate" name="InterestRate"
+                   value="@NumberFormatHelper.FormatRatioInputValue(Model.InterestRate, ViewData["NumberFormat"] as string)"
+                   class="form-control" placeholder="e.g. 0.035 for 3.5%" />
+            <small>Annual interest rate as a decimal. Required for Amortising accounts.</small>
+            <span asp-validation-for="InterestRate" class="field-error"></span>
+        </div>
+    }
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Save Changes</button>
         <a asp-action="Index" class="btn btn-secondary">Cancel</a>
@@ -50,4 +72,20 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    @if (ViewBag.IsLiability == true)
+    {
+        <script>
+            (function () {
+                var repaymentTypeSelect = document.getElementById('LiabilityRepaymentType');
+                var interestRateField   = document.getElementById('interest-rate-field');
+
+                function updateVisibility() {
+                    interestRateField.style.display = repaymentTypeSelect.value === 'Amortising' ? '' : 'none';
+                }
+
+                repaymentTypeSelect.addEventListener('change', updateVisibility);
+                updateVisibility();
+            })();
+        </script>
+    }
 }

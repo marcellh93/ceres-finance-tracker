@@ -16,6 +16,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CategoryId 20000000-0000-0000-0000-000000000002 = Salary     (Income, non-system)
 ///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing     (Expense, non-system)
 /// </summary>
+[Collection("IntegrationTests")]
 public class AccountServiceTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
@@ -232,5 +233,119 @@ public class AccountServiceTests : IAsyncLifetime
         var balance = await _service.GetBalanceAsync(liabilityAccount.Id);
 
         balance.Should().Be(300m);
+    }
+
+    // -------------------------------------------------------------------------
+    // Stage 5.1 — Repayment type / interest rate validation
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateAsync_AmortisingLiability_WithNullInterestRate_Throws()
+    {
+        var act = () => _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name                   = $"Amortising {Guid.NewGuid():N}",
+            AccountTypeId          = 2,  // Liability
+            CurrencyId             = 1,  // EUR
+            LiabilityRepaymentType = "Amortising",
+            InterestRate           = null,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*interest rate*");
+    }
+
+    [Fact]
+    public async Task CreateAsync_FullMonthlyLiability_WithInterestRate_Throws()
+    {
+        var act = () => _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name                   = $"FullMonthly {Guid.NewGuid():N}",
+            AccountTypeId          = 2,  // Liability
+            CurrencyId             = 1,  // EUR
+            LiabilityRepaymentType = "FullMonthly",
+            InterestRate           = 0.15m,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*interest rate*");
+    }
+
+    [Fact]
+    public async Task CreateAsync_AmortisingLiability_WithValidInterestRate_Succeeds()
+    {
+        var account = await _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name                   = $"Mortgage {Guid.NewGuid():N}",
+            AccountTypeId          = 2,  // Liability
+            CurrencyId             = 1,  // EUR
+            LiabilityRepaymentType = "Amortising",
+            InterestRate           = 0.0350m,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        account.LiabilityRepaymentType.Should().Be("Amortising");
+        account.InterestRate.Should().Be(0.0350m);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_AmortisingLiability_WithNullInterestRate_Throws()
+    {
+        var account = await _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name                   = $"Mortgage {Guid.NewGuid():N}",
+            AccountTypeId          = 2,
+            CurrencyId             = 1,
+            LiabilityRepaymentType = "Amortising",
+            InterestRate           = 0.0350m,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        var act = () => _service.UpdateAsync(new AccountEditViewModel
+        {
+            Id                     = account.Id,
+            Name                   = account.Name,
+            LiabilityRepaymentType = "Amortising",
+            InterestRate           = null,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*interest rate*");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_FullMonthlyLiability_WithInterestRate_Throws()
+    {
+        var account = await _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name                   = $"Credit Card {Guid.NewGuid():N}",
+            AccountTypeId          = 2,
+            CurrencyId             = 1,
+            LiabilityRepaymentType = "FullMonthly",
+            InterestRate           = null,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        var act = () => _service.UpdateAsync(new AccountEditViewModel
+        {
+            Id                     = account.Id,
+            Name                   = account.Name,
+            LiabilityRepaymentType = "FullMonthly",
+            InterestRate           = 0.20m,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.Today)
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*interest rate*");
     }
 }

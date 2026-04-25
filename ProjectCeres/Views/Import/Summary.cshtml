@@ -1,0 +1,59 @@
+@model ImportSummaryViewModel
+@{ ViewData["Title"] = "Import Summary"; }
+
+<div class="page-header">
+    <h1>Import Summary</h1>
+</div>
+
+<div class="summary-cards">
+    <div class="card summary-card summary-card--success">
+        <div class="summary-card__value">@Model.RowsImported</div>
+        <div class="summary-card__label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Imported
+        </div>
+    </div>
+
+    <div class="card summary-card summary-card--warning">
+        <div class="summary-card__value">@Model.RowsFlagged</div>
+        <div class="summary-card__label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Needs Review
+        </div>
+    </div>
+
+    <div class="card summary-card @(Model.RowsFailed > 0 ? "summary-card--danger" : "summary-card--neutral")">
+        <div class="summary-card__value">@Model.RowsFailed</div>
+        <div class="summary-card__label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Failed
+        </div>
+    </div>
+</div>
+
+@if (Model.RowsFlagged > 0)
+{
+    <div class="alert alert-warning mt-4">
+        <strong>@Model.RowsFlagged row(s) flagged for review.</strong>
+        These transactions were imported with <span class="badge badge-warning">Needs Review</span> status because they closely match existing transactions. Please review them in
+        <a asp-controller="Transactions" asp-action="Index">Transactions</a>.
+    </div>
+}
+
+@if (Model.Errors.Any())
+{
+    <h2 class="mt-6">Row Errors</h2>
+    <div class="card">
+        <ul class="error-list">
+            @foreach (var error in Model.Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="form-actions mt-6">
+    <a asp-controller="Transactions" asp-action="Index" class="btn btn-primary">View Transactions</a>
+    <a asp-action="Index" class="btn btn-secondary">Import Another File</a>
+</div>

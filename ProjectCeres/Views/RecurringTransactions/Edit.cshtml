@@ -40,6 +40,12 @@
     </div>
 
     <div class="form-group">
+        <label asp-for="ReminderBehaviour"></label>
+        <select asp-for="ReminderBehaviour" asp-items="ViewBag.ReminderBehaviours" class="form-control" id="ReminderBehaviour"></select>
+        <span asp-validation-for="ReminderBehaviour" class="field-error"></span>
+    </div>
+
+    <div class="form-group" id="DayOfPeriodGroup">
         <label asp-for="DayOfPeriod"></label>
         <input asp-for="DayOfPeriod" type="number" min="1" max="31" class="form-control" />
         <span asp-validation-for="DayOfPeriod" class="field-error"></span>
@@ -59,4 +65,13 @@
 
 @section Scripts {
     @await Html.PartialAsync("_ValidationScriptsPartial")
+    <script>
+        (function () {
+            var sel = document.getElementById('ReminderBehaviour');
+            var grp = document.getElementById('DayOfPeriodGroup');
+            function toggle() { grp.style.display = sel.value === 'ManualDate' ? 'none' : ''; }
+            sel.addEventListener('change', toggle);
+            toggle();
+        })();
+    </script>
 }

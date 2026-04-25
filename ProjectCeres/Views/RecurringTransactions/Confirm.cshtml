@@ -33,6 +33,15 @@
         <input asp-for="Description" class="form-control" placeholder="@reminder?.Name" />
     </div>
 
+    @if (reminder?.ReminderBehaviour == ProjectCeres.Models.ReminderBehaviour.ManualDate)
+    {
+        <div class="form-group">
+            <label for="nextDueDate">Next Due Date</label>
+            <input type="date" id="nextDueDate" name="nextDueDate" class="form-control" required />
+            <small>Required — set the next due date for this reminder.</small>
+        </div>
+    }
+
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">Confirm &amp; Record</button>
         <a asp-action="Index" class="btn btn-secondary">Cancel</a>
