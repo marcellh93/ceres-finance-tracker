@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { CheckCircle, Clock } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
 interface ClearedBadgeProps {
   id: string
   type: 'transaction' | 'transfer'
   isCleared: boolean
+  needsReview?: boolean
 }
 
-export function ClearedBadge({ id, type, isCleared: initialCleared }: ClearedBadgeProps) {
+export function ClearedBadge({ id, type, isCleared: initialCleared, needsReview = false }: ClearedBadgeProps) {
   const [cleared, setCleared] = useState(initialCleared)
 
   async function toggle() {
@@ -40,6 +41,11 @@ export function ClearedBadge({ id, type, isCleared: initialCleared }: ClearedBad
         <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
           <CheckCircle size={12} aria-hidden="true" />
           Cleared
+        </span>
+      ) : needsReview ? (
+        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
+          <AlertTriangle size={12} aria-hidden="true" />
+          Needs review
         </span>
       ) : (
         <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700">

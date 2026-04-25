@@ -39,4 +39,5 @@ public class TransactionEditViewModel
     public IFormFile? Attachment { get; set; }
 
     public bool IsCleared { get; set; }
+    public bool NeedsReview { get; set; }
 }

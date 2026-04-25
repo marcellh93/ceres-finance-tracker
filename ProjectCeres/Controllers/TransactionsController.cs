@@ -111,7 +111,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         }
 
         ViewBag.ReturnUrl = returnUrl;
-        await PopulateViewBagAsync();
+        await PopulateViewBagAsync(currencyFilterAccountId: vm.AccountId);
         return View(vm);
     }
 
@@ -135,7 +135,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         if (!ModelState.IsValid)
         {
             ViewBag.ReturnUrl = returnUrl;
-            await PopulateViewBagAsync();
+            await PopulateViewBagAsync(currencyFilterAccountId: vm.AccountId);
             return View(vm);
         }
 
@@ -146,7 +146,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
             {
                 ModelState.AddModelError(nameof(vm.Attachment), ex.Message);
                 ViewBag.ReturnUrl = returnUrl;
-                await PopulateViewBagAsync();
+                await PopulateViewBagAsync(currencyFilterAccountId: vm.AccountId);
                 return View(vm);
             }
         }
@@ -159,7 +159,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         {
             ModelState.AddModelError(string.Empty, ex.Message);
             ViewBag.ReturnUrl = returnUrl;
-            await PopulateViewBagAsync();
+            await PopulateViewBagAsync(currencyFilterAccountId: vm.AccountId);
             return View(vm);
         }
 
@@ -229,7 +229,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         return RedirectToAction(nameof(Index), new { accountId, from, to });
     }
 
-    private async Task PopulateViewBagAsync()
+    private async Task PopulateViewBagAsync(Guid? currencyFilterAccountId = null)
     {
         var accounts = await db.Accounts
             .Where(a => a.IsActive)
@@ -248,10 +248,17 @@ public class TransactionsController(ITransactionService transactionService, IFil
                 .OrderBy(c => c.CategoryType.Name).ThenBy(c => c.Name)
                 .ToListAsync(), "Id", "Name");
 
-        ViewBag.Budgets = new SelectList(
-            await db.Budgets
-                .Where(b => b.IsActive && b.GoalType == "Spending")
-                .OrderBy(b => b.Name)
-                .ToListAsync(), "Id", "Name");
+        var budgetQuery = db.Budgets
+            .Where(b => b.IsActive && b.GoalType == "Spending");
+
+        if (currencyFilterAccountId.HasValue)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == currencyFilterAccountId.Value);
+            if (account is not null)
+                budgetQuery = budgetQuery.Where(b => b.CurrencyId == account.CurrencyId);
+        }
+
+        var budgets = await budgetQuery.OrderBy(b => b.Name).ToListAsync();
+        ViewBag.Budgets = budgets.Any() ? new SelectList(budgets, "Id", "Name") : null;
     }
 }

@@ -31,9 +31,10 @@ document.querySelectorAll<HTMLElement>('[data-react="cleared-badge"]').forEach((
   const id = el.dataset.id ?? ''
   const type = (el.dataset.movementType ?? 'transaction') as 'transaction' | 'transfer'
   const isCleared = el.dataset.cleared === 'true'
+  const needsReview = el.dataset.needsReview === 'true'
   createRoot(el).render(
     <StrictMode>
-      <ClearedBadge id={id} type={type} isCleared={isCleared} />
+      <ClearedBadge id={id} type={type} isCleared={isCleared} needsReview={needsReview} />
     </StrictMode>,
   )
 })

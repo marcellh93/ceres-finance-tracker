@@ -4,6 +4,55 @@
 
 ### Added
 
+**Transactions**
+- Goal Budget field on Transaction Create and Edit forms is now hidden when no active Spending-type goal budgets exist — avoids showing an empty, non-functional dropdown
+- Goal Budget field on Transaction Edit hidden when no Spending budgets match the transaction's account currency — prevents tagging a transaction to a mismatched budget
+- `NeedsReview bool` column on `Transaction` model — set to `true` by `ImportService` when an imported row is flagged as a duplicate candidate; defaults to `false` for all manually created transactions
+- `ITransactionService.MarkNeedsReviewAsync` — sets or clears `NeedsReview` on a transaction by ID
+- `TransactionService.MarkNeedsReviewAsync` — implementation of the above
+- `NeedsReview` field added to `TransactionListItemViewModel` and `TransactionEditViewModel`; mapped through `GetRecentAsync` and `UpdateAsync`
+
+**Typography**
+- Inter variable font self-hosted under `wwwroot/fonts/inter/` — two files cover all weights and italic variants
+- IBM Plex Mono self-hosted under `wwwroot/fonts/ibm-plex-mono/` — Regular, Italic, Medium, MediumItalic, SemiBold, SemiBoldItalic, Bold, BoldItalic weights
+- Inter set as the global body font for all UI text (labels, headings, buttons, body copy)
+- IBM Plex Mono applied to `.amount-income`, `.amount-expense`, and `.amount-neutral` CSS classes — numeric columns in transaction and movements tables now render in monospace for clean vertical digit alignment
+
+**Migrations**
+- `AddTransactionNeedsReview` — adds `NeedsReview boolean NOT NULL DEFAULT FALSE` to the `Transactions` table
+
+**Tests**
+- `ClearedBadge.test.tsx` — 2 new tests: `needsReview = true` renders "Needs review" badge; `isCleared = true` with `needsReview = true` still renders "Cleared" (cleared state takes priority)
+
+### Changed
+
+**Transactions**
+- Goal Budget label updated to "Goal Budget (must match account currency)" on both Create and Edit forms
+- `PopulateViewBagAsync` refactored to accept an optional `currencyFilterAccountId` parameter; on Edit, filters Spending budgets to those matching the selected account's currency; sets `ViewBag.Budgets = null` (hiding the field) when no qualifying budgets exist
+
+**CSV Import**
+- `ImportService.ImportAsync` — flagged duplicate rows now call `MarkNeedsReviewAsync(true)` in addition to leaving `IsCleared = false`; the `NeedsReview` flag drives the badge in the Transactions Index
+
+**Movements**
+- `ClearedBadge` component updated with a third render state: when `isCleared = false` and `needsReview = true`, renders an amber `AlertTriangle` badge labelled "Needs review" instead of the `Clock` "Pending" badge
+- `ClearedBadge` now accepts optional `needsReview` prop (defaults to `false`); existing callers (Movements, Transfers Index) are unaffected
+- `main.tsx` — `ClearedBadge` mount now reads `data-needs-review` dataset attribute and passes it as the `needsReview` prop
+- `Transactions/Index.cshtml` — cleared badge mount point now emits `data-needs-review` from `item.NeedsReview`
+
+**CsvImportProfiles**
+- `CsvImportProfiles/Index.cshtml` — deleted profile countdown wording corrected to "Recoverable for X more day(s)"; Recover button SVG updated to the correct Lucide `rotate-ccw` path
+
+### Fixed
+
+**Tests**
+- `TransactionServiceTests` — 4 new integration tests: budget currency mismatch on Create throws, budget currency match on Create succeeds, same two cases for Update
+- `BudgetServiceTests` and `GoalBudgetServiceTests` — constructor call updated to pass `IAccountService` as the second argument; pre-existing compilation error surfaced when the test project compiled after the constructor signature change
+- `GoalBudgetServiceTests.GetProgressAsync_SavingsGoal_BalanceGrowsWithTransactions` — test was seeding an Expense transaction to grow a Savings account balance; corrected to use the Salary (Income) category so the transaction correctly increases the account balance
+
+---
+
+### Added
+
 **Budgets**
 - `CategoryBudgetBars` component upgraded to use shadcn `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Progress`, and `Badge` — progress bars now colour-coded green/amber/red by percent used
 - `GoalBudgetBars` component upgraded to use shadcn `Card`, `CardHeader`, `CardTitle`, `CardContent`, and `Progress` — goal type shown as a blue pill badge matching the Goals index table

@@ -43,6 +43,7 @@ public class TransactionService(
             Description      = t.Description,
             TransactionType  = "Regular",
             IsCleared        = t.IsCleared,
+            NeedsReview      = t.NeedsReview,
             AccountName      = t.Account.Name,
             CategoryName     = t.Category.Name,
             CategoryTypeName = t.Category.CategoryType.Name
@@ -132,7 +133,8 @@ public class TransactionService(
                 AccountId       = t.AccountId,
                 CategoryId      = t.CategoryId,
                 BudgetId        = t.BudgetId,
-                IsCleared       = t.IsCleared
+                IsCleared       = t.IsCleared,
+                NeedsReview     = t.NeedsReview
             };
         }
 
@@ -169,6 +171,7 @@ public class TransactionService(
             throw new InvalidOperationException("Please select a category.");
 
         await ValidateNotBeforeOpeningBalanceAsync(vm.AccountId!.Value, vm.Date);
+        await ValidateBudgetCurrencyAsync(vm.BudgetId, vm.AccountId!.Value);
 
         var transaction = new Transaction
         {
@@ -199,6 +202,7 @@ public class TransactionService(
             throw new InvalidOperationException("Please select a category.");
 
         await ValidateNotBeforeOpeningBalanceAsync(vm.AccountId!.Value, vm.Date);
+        await ValidateBudgetCurrencyAsync(vm.BudgetId, vm.AccountId!.Value);
 
         var transaction = await db.Transactions.FindAsync(vm.Id)
             ?? throw new InvalidOperationException($"Transaction {vm.Id} not found.");
@@ -210,6 +214,7 @@ public class TransactionService(
         transaction.CategoryId  = vm.CategoryId!.Value;
         transaction.BudgetId    = vm.BudgetId;
         transaction.IsCleared   = vm.IsCleared;
+        transaction.NeedsReview = vm.NeedsReview;
         await db.SaveChangesAsync();
     }
 
@@ -242,6 +247,14 @@ public class TransactionService(
         await db.SaveChangesAsync();
     }
 
+    public async Task MarkNeedsReviewAsync(Guid id, bool needsReview)
+    {
+        var transaction = await db.Transactions.FindAsync(id)
+            ?? throw new InvalidOperationException($"Transaction {id} not found.");
+        transaction.NeedsReview = needsReview;
+        await db.SaveChangesAsync();
+    }
+
     public async Task BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null)
     {
         var query = db.Transactions
@@ -264,5 +277,19 @@ public class TransactionService(
             throw new InvalidOperationException(
                 $"This transaction cannot be dated before the opening balance date ({openingDate.Value:dd/MM/yyyy}). " +
                 $"To allow earlier dates, edit the account and move the opening balance date to {date:dd/MM/yyyy} or earlier.");
+    }
+
+    private async Task ValidateBudgetCurrencyAsync(Guid? budgetId, Guid accountId)
+    {
+        if (budgetId is null) return;
+
+        var budget  = await db.Budgets.FindAsync(budgetId.Value);
+        var account = await db.Accounts.FindAsync(accountId);
+        if (budget is null || account is null) return;
+
+        if (budget.CurrencyId != account.CurrencyId)
+            throw new InvalidOperationException(
+                "The selected goal budget uses a different currency than the transaction account. " +
+                "Select a budget that matches the account currency, or leave it blank.");
     }
 }

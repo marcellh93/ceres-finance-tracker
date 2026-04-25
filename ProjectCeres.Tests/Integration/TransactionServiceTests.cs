@@ -348,4 +348,118 @@ public class TransactionServiceTests : IAsyncLifetime
         var vm = await _service.GetByIdForEditAsync(Guid.NewGuid());
         vm.Should().BeNull();
     }
+
+    // -------------------------------------------------------------------------
+    // Goal budget currency validation
+    // -------------------------------------------------------------------------
+
+    private async Task<Guid> CreateSpendingBudgetAsync(int currencyId)
+    {
+        var budget = new ProjectCeres.Models.Budget
+        {
+            Id           = Guid.NewGuid(),
+            Name         = $"Spending Budget {Guid.NewGuid():N}",
+            TargetAmount = 500m,
+            CurrencyId   = currencyId,
+            StartDate    = DateOnly.FromDateTime(DateTime.Today),
+            GoalType     = "Spending",
+            IsActive     = true
+        };
+        _fixture.Db.Budgets.Add(budget);
+        await _fixture.Db.SaveChangesAsync();
+        return budget.Id;
+    }
+
+    [Fact]
+    public async Task CreateAsync_Throws_WhenBudgetCurrencyMismatchesAccount()
+    {
+        var usdAccountId = await CreateAssetAccountAsync(currencyId: 2); // USD
+        var eurBudgetId  = await CreateSpendingBudgetAsync(currencyId: 1); // EUR
+
+        var vm = CreateVm();
+        vm.AccountId = usdAccountId;
+        vm.BudgetId  = eurBudgetId;
+
+        var act = () => _service.CreateAsync(vm);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*different currency*");
+    }
+
+    [Fact]
+    public async Task CreateAsync_Succeeds_WhenBudgetCurrencyMatchesAccount()
+    {
+        var eurBudgetId = await CreateSpendingBudgetAsync(currencyId: 1); // EUR, same as _accountId
+
+        var vm = CreateVm();
+        vm.BudgetId = eurBudgetId;
+
+        var act = () => _service.CreateAsync(vm);
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Throws_WhenBudgetCurrencyMismatchesAccount()
+    {
+        var id = Guid.NewGuid();
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = id,
+            Date       = DateOnly.FromDateTime(DateTime.Today),
+            Amount     = 100m,
+            AccountId  = _accountId,
+            CategoryId = SalaryCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var usdAccountId = await CreateAssetAccountAsync(currencyId: 2); // USD
+        var eurBudgetId  = await CreateSpendingBudgetAsync(currencyId: 1); // EUR
+
+        var vm = new TransactionEditViewModel
+        {
+            Id              = id,
+            TransactionType = "Regular",
+            Date            = DateOnly.FromDateTime(DateTime.Today),
+            Amount          = 100m,
+            AccountId       = usdAccountId,
+            CategoryId      = SalaryCategoryId,
+            BudgetId        = eurBudgetId
+        };
+
+        var act = () => _service.UpdateAsync(vm);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*different currency*");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Succeeds_WhenBudgetCurrencyMatchesAccount()
+    {
+        var id = Guid.NewGuid();
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = id,
+            Date       = DateOnly.FromDateTime(DateTime.Today),
+            Amount     = 100m,
+            AccountId  = _accountId,
+            CategoryId = SalaryCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var eurBudgetId = await CreateSpendingBudgetAsync(currencyId: 1); // EUR, same as _accountId
+
+        var vm = new TransactionEditViewModel
+        {
+            Id              = id,
+            TransactionType = "Regular",
+            Date            = DateOnly.FromDateTime(DateTime.Today),
+            Amount          = 100m,
+            AccountId       = _accountId,
+            CategoryId      = SalaryCategoryId,
+            BudgetId        = eurBudgetId
+        };
+
+        var act = () => _service.UpdateAsync(vm);
+        await act.Should().NotThrowAsync();
+    }
 }

@@ -18,4 +18,5 @@ public interface ITransactionService
     Task DeleteAsync(Guid id);
     Task MarkClearedAsync(Guid id, bool cleared);
     Task BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null);
+    Task MarkNeedsReviewAsync(Guid id, bool needsReview);
 }

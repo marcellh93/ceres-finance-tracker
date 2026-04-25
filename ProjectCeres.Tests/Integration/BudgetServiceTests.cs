@@ -28,7 +28,7 @@ public class BudgetServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db);
-        _service = new BudgetService(_fixture.Db);
+        _service = new BudgetService(_fixture.Db, _accountService);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

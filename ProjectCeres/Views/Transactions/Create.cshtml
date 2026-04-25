@@ -46,12 +46,15 @@
             <span asp-validation-for="CategoryId" class="field-error"></span>
         </div>
 
-        <div class="form-group">
-            <label asp-for="BudgetId"></label>
-            <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
-                <option value="">— None —</option>
-            </select>
-        </div>
+        @if (ViewBag.Budgets != null)
+        {
+            <div class="form-group">
+                <label asp-for="BudgetId">Goal Budget (must match account currency)</label>
+                <select asp-for="BudgetId" asp-items="ViewBag.Budgets" class="form-control">
+                    <option value="">— None —</option>
+                </select>
+            </div>
+        }
     </div>
 
     @* LiabilityPayment-only fields *@

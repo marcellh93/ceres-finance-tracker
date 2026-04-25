@@ -21,6 +21,7 @@ public class TransactionListItemViewModel
     public string? CategoryTypeName { get; set; }
 
     public bool IsCleared { get; set; }
+    public bool NeedsReview { get; set; }
 
     // LiabilityPayment fields
     public string? AssetAccountName { get; set; }

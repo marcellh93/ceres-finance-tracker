@@ -18,6 +18,7 @@ namespace ProjectCeres.Tests.Integration;
 public class GoalBudgetServiceTests : IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
+    private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
 
     private readonly TestDbFixture _fixture = new();
     private BudgetService _service = null!;
@@ -27,7 +28,7 @@ public class GoalBudgetServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db);
-        _service = new BudgetService(_fixture.Db);
+        _service = new BudgetService(_fixture.Db, _accountService);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();
@@ -193,7 +194,7 @@ public class GoalBudgetServiceTests : IAsyncLifetime
             Date       = new DateOnly(2026, 2, 1),
             Amount     = 500m,
             AccountId  = accountId,
-            CategoryId = HousingCategoryId,
+            CategoryId = SalaryCategoryId,
             CreatedAt  = DateTime.UtcNow
         });
         await _fixture.Db.SaveChangesAsync();

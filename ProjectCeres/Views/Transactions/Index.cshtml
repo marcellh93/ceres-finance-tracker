@@ -97,7 +97,8 @@ else
                         <div data-react="cleared-badge"
                              data-id="@item.Id"
                              data-movement-type="transaction"
-                             data-cleared="@item.IsCleared.ToString().ToLower()"></div>
+                             data-cleared="@item.IsCleared.ToString().ToLower()"
+                             data-needs-review="@item.NeedsReview.ToString().ToLower()"></div>
                     </td>
 
                     <td class="actions">

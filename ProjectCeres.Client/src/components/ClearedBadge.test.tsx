@@ -28,6 +28,16 @@ describe('ClearedBadge', () => {
     expect(screen.getByText('Pending')).toBeTruthy()
   })
 
+  it('renders Needs review badge when isCleared is false and needsReview is true', () => {
+    render(<ClearedBadge id={id} type={type} isCleared={false} needsReview={true} />)
+    expect(screen.getByText('Needs review')).toBeTruthy()
+  })
+
+  it('renders Cleared badge (not Needs review) when isCleared is true and needsReview is true', () => {
+    render(<ClearedBadge id={id} type={type} isCleared={true} needsReview={true} />)
+    expect(screen.getByText('Cleared')).toBeTruthy()
+  })
+
   // -------------------------------------------------------------------------
   // Click calls PATCH with correct body
   // -------------------------------------------------------------------------
