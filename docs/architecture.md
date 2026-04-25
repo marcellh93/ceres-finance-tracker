@@ -178,6 +178,7 @@ ProjectCeres/
     IDashboardService.cs / DashboardService.cs       ← MTD totals, savings rate, pending reminders count
     ILiabilityProjectionService.cs / LiabilityProjectionService.cs  ← amortisation schedule calculation; no DB access; pure math
     IFileAttachmentService.cs / FileAttachmentService.cs  ← magic-byte upload, safe path, serve, delete (transactions + transfers)
+    IImportService.cs / ImportService.cs          ← import orchestration — format-blind; delegates parsing to ImportParserFactory
     IImportParser.cs                              ← parser abstraction — Format + ParseAsync
     CsvImportParser.cs                            ← CSV parsing via CsvHelper
     ExcelImportParser.cs                          ← XLSX parsing via ClosedXML; magic bytes check; sheet selection

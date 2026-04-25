@@ -16,6 +16,10 @@ public class ImportApiController(IImportService importService) : ControllerBase
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
+        const long MaxImportFileBytes = 10 * 1024 * 1024; // 10 MB
+        if (vm.File!.Length > MaxImportFileBytes)
+            return BadRequest(new { message = "The import file exceeds the 10 MB size limit. Please split the file and try again." });
+
         var mappings = new ImportColumnMappings
         {
             DateColumn        = vm.DateColumn!,

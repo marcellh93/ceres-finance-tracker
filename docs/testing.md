@@ -143,7 +143,7 @@ All Phase 1 services now have integration test coverage:
 | `CsvImportParser`     | `Unit/CsvImportParserTests.cs`          |
 | `ExcelImportParser`   | `Unit/ExcelImportParserTests.cs`        |
 | `ImportParserFactory` | `Unit/ImportParserFactoryTests.cs`      |
-| `ImportService`       | `Integration/ImportServiceTests.cs`     |
+| `ImportService`       | `Unit/ImportServiceTests.cs` (unit), `Integration/ImportServiceTests.cs` (integration) |
 | `ImportProfileService`| `Integration/ImportProfileServiceTests.cs` |
 
 Razor controller actions remain untested — they are thin HTTP handlers with a defined end-of-life in Phase 3; testing them is not worth the investment. API controllers in `Controllers/Api/` are integration tested using `WebApplicationFactory<Program>` (see ADR-0037).

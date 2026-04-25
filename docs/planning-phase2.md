@@ -67,9 +67,9 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 - Confirmed nice-to-have reports: Budget vs. Actual, Largest Expenses, Monthly Cash Flow Trend, Net Worth Over Time (see ADR-0054)
 - **UI component library — shadcn/ui:** Migrate views from Tailwind `@apply`-based classes to shadcn/ui React components. Inline Tailwind utilities replace `@apply` patterns.
 - **Charting library — Chart.js** via `react-chartjs-2` wrapper. Covers all seven dashboard chart types. See ADR-0033.
-- **CSV import only** — OFX deferred to Phase 3/4 (see ADR-0046). Bank exports represent debits as negative numbers — import logic flips signs and infers direction from mapped category. Column mapping via saved `CsvImportProfile` (see ADR-0047).
+- **CSV import only** — OFX deferred to Phase 3/4 (see ADR-0046). Bank exports represent debits as negative numbers — import logic flips signs and infers direction from mapped category. Column mapping via saved `ImportProfile` (see ADR-0047).
 
-**CSV Import flow**
+### **CSV Import flow**
 
 ```mermaid
 sequenceDiagram
@@ -82,7 +82,7 @@ sequenceDiagram
 
     User->>Controller: Upload CSV file + select profile
     Controller->>ProfileService: GetProfile(profileId)
-    ProfileService-->>Controller: CsvImportProfile (column mappings)
+    ProfileService-->>Controller: ImportProfile (column mappings)
     Controller->>ImportService: ParseAsync(file, profile)
     ImportService->>ImportService: Map columns using profile
     ImportService->>ImportService: Flip sign on negative debits → positive amount
@@ -99,6 +99,7 @@ sequenceDiagram
     ImportService-->>Controller: ImportResult (rows saved, rows flagged, rows failed)
     Controller->>User: Summary (n imported, n flagged for review, n errors)
 ```
+
 - **CSV export** — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix any such cell value with a single quote (`'`) to neutralize CSV injection.
 - File attachments on transactions (receipts, invoices) — built in Phase 1, carried forward
 - **File attachments on transfers** — `TransferAttachment` entity mirroring `TransactionAttachment`. See ADR-0042.

@@ -28,6 +28,14 @@ public class ImportController(
             return View(vm);
         }
 
+        const long MaxImportFileBytes = 10 * 1024 * 1024; // 10 MB
+        if (vm.File!.Length > MaxImportFileBytes)
+        {
+            ModelState.AddModelError("File", "The import file exceeds the 10 MB size limit. Please split the file and try again.");
+            await PopulateViewBagAsync();
+            return View(vm);
+        }
+
         // If a profile was selected, override individual column fields with profile mappings.
         ImportColumnMappings mappings;
         if (vm.ProfileId.HasValue)

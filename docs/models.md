@@ -868,15 +868,15 @@ to entity sections above when implemented.
 Mirrors `TransactionAttachment` with `TransferId` FK instead of `TransactionId`.
 Hard delete with confirmation. See ADR-0042.
 
-### CsvImportProfile (new entity — Phase 2)
+### ImportProfile (new entity — Phase 2)
 
-Stores named column mapping profiles for CSV import. See ADR-0047.
+Stores named column mapping profiles for CSV and Excel import. See ADR-0047.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | Id | uuid | PK | |
 | Name | varchar | NOT NULL | User-given name e.g. "BBVA" |
-| Mappings | jsonb | NOT NULL | `{ "date": "Fecha", "amount": "Importe", ... }` |
+| Mappings | jsonb | NOT NULL | Stored as `ImportColumnMappings` — `{ "date": "Fecha", "amount": "Importe", ... }` |
 | CreatedAt | datetime | NOT NULL | |
 | DeletedAt | datetime | NULL | Soft delete — 90-day recovery window shown to user |
 

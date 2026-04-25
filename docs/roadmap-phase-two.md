@@ -44,7 +44,7 @@ A single baseline migration applies all Phase 2 schema additions before any serv
 | `Budget`               | Add `GoalType varchar(20) NOT NULL DEFAULT 'Spending'`, `LinkedAccountId uuid NULL` (FK → Account)                                  |
 | `RecurringTransaction` | Add `ReminderBehaviour varchar(30) NOT NULL DEFAULT 'SnapToCalendarDay'`, `EstimatedAmount decimal(18,2) NULL`                      |
 | `TransferAttachment`   | New table — Id (Guid), TransferId FK, FileName, StoredPath, ContentType, FileSizeBytes, UploadedAt                                  |
-| `CsvImportProfile`     | New table — Id (Guid), Name, ColumnMappings (jsonb), CreatedAt, DeletedAt?                                                          |
+| `ImportProfile`        | New table — Id (Guid), Name, ColumnMappings (jsonb), CreatedAt, DeletedAt?                                                          |
 
 **TDD:** No new behavior to test-first here. Migration is verified by running the full existing test suite after applying it — all existing integration tests must pass. If any test fails, the migration broke something.
 
@@ -369,18 +369,18 @@ The inline "Clear / Unmark" form-submit buttons on the Transactions and Transfer
 
 Most complex Stage. Sub-stages ensure TDD leads every layer.
 
-### 3.1 — CsvImportProfile CRUD
+### 3.1 — ImportProfile CRUD
 
 **TDD — write tests first, then implement:**
 
 1. Write integration tests:
-   - Create profile with valid column mappings → succeeds; mappings retrievable as correct ColumnMappings object
+   - Create profile with valid column mappings → succeeds; mappings retrievable as correct ImportColumnMappings object
    - Soft-delete a profile → `DeletedAt` set; profile excluded from active list but visible in deleted list within 90-day window
    - Profile deleted > 90 days ago → excluded from deleted list
    - Update a profile's mappings → new mappings retrievable
      All four tests fail.
-2. Implement `ICsvImportProfileService` / `CsvImportProfileService`.
-3. Add CRUD controller + views for `CsvImportProfile`.
+2. Implement `IImportProfileService` / `ImportProfileService`.
+3. Add CRUD controller + views for `ImportProfile`.
 
 **UI/UX:** Column mapping form — user maps CSV column names to system fields (Date, Amount, Description, Category). Deleted profiles show a countdown ("Recoverable for 87 more days"). Recover button uses Lucide `rotate-ccw` icon.
 
@@ -735,11 +735,11 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [ ] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression
 - [ ] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(covered by ImportParserFactoryTests)_
 - [ ] Upload `duplicate_candidates.csv` → flagged rows appear in Transactions Index with `IsCleared = false` and "Needs review" badge; summary shows correct flagged count _(partial — IsCleared = false and flagged count are tested; "Needs review" badge not present in Transactions Index view)_
-- [x] Create a `CsvImportProfile` → mappings saved; auto-applied on next import of same-format CSV
-- [x] Soft-delete a `CsvImportProfile` → excluded from active list; appears in deleted list with 90-day countdown
+- [x] Create an `ImportProfile` → mappings saved; auto-applied on next import of same-format CSV
+- [x] Soft-delete an `ImportProfile` → excluded from active list; appears in deleted list with 90-day countdown
 - [x] Recover a soft-deleted profile within 90 days → profile restored to active list
 - [x] Negative debit in CSV → imported as positive amount with correct Expense category direction
-- [x] **UI/UX (Stage 3.1):** CsvImportProfile Index — deleted profiles show 90-day countdown; Recover button has Lucide `rotate-ccw` icon _(manual — requires browser)_
+- [x] **UI/UX (Stage 3.1):** ImportProfile Index — deleted profiles show 90-day countdown; Recover button has Lucide `rotate-ccw` icon _(manual — requires browser)_
 - [x] **UI/UX (Stage 3.4):** Import upload form — profile selector uses shadcn/ui Select; summary page shows Card per result category (Imported / Flagged / Failed) with counts _(manual — requires browser)_
 - [x] **UI/UX (Stage 3.4):** Flagged rows in Transactions Index — amber "Needs review" Badge with Lucide `alert-triangle` icon visible on flagged imports
 
