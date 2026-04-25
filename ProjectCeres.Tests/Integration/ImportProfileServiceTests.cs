@@ -7,7 +7,7 @@ using ProjectCeres.ViewModels;
 namespace ProjectCeres.Tests.Integration;
 
 /// <summary>
-/// Integration tests for CsvImportProfileService against the real project_ceres_test database.
+/// Integration tests for ImportProfileService against the real project_ceres_test database.
 /// Each test rolls back its transaction — no test data persists between tests.
 /// </summary>
 [Collection("IntegrationTests")]

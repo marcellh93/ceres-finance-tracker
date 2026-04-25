@@ -92,7 +92,9 @@ public class ImportApiTests(TestWebApplicationFactory factory)
         // This test asserts XLSX is no longer rejected at the format level (no longer 400)
         var response = await _client.PostAsync("/api/import", form);
 
-        response.StatusCode.Should().NotBe(System.Net.HttpStatusCode.BadRequest,
+        response.StatusCode.Should().NotBe(HttpStatusCode.BadRequest,
             "XLSX files should no longer be rejected at the format level");
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().NotContain("Only CSV files are supported");
     }
 }
