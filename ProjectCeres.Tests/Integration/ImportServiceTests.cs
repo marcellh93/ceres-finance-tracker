@@ -76,7 +76,7 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         return file.Object;
     }
 
-    private static CsvColumnMappings StandardMappings() => new()
+    private static ImportColumnMappings StandardMappings() => new()
     {
         DateColumn        = "Date",
         AmountColumn      = "Amount",

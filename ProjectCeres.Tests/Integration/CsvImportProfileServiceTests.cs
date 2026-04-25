@@ -14,12 +14,12 @@ namespace ProjectCeres.Tests.Integration;
 public class CsvImportProfileServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();
-    private CsvImportProfileService _service = null!;
+    private ImportProfileService _service = null!;
 
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _service = new CsvImportProfileService(_fixture.Db);
+        _service = new ImportProfileService(_fixture.Db);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();
@@ -28,7 +28,7 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static CsvColumnMappings ValidMappings() => new()
+    private static ImportColumnMappings ValidMappings() => new()
     {
         DateColumn        = "Date",
         AmountColumn      = "Amount",
@@ -45,7 +45,7 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
     {
         var mappings = ValidMappings();
 
-        var id = await _service.CreateAsync("Bank A", mappings);
+        var id = await _service.CreateAsync("Bank A", ImportFormat.Csv, mappings);
 
         var retrieved = await _service.GetByIdAsync(id);
         retrieved.Should().NotBeNull();
@@ -60,7 +60,7 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
     [Fact]
     public async Task SoftDeleteProfile_SetsDeletedAt_ExcludedFromActiveList()
     {
-        var id = await _service.CreateAsync("Bank B", ValidMappings());
+        var id = await _service.CreateAsync("Bank B", ImportFormat.Csv, ValidMappings());
 
         await _service.DeleteAsync(id);
 
@@ -75,7 +75,7 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
     public async Task GetRecentlyDeletedAsync_ExcludesProfilesDeletedMoreThan90DaysAgo()
     {
         // Insert a profile with DeletedAt set to 91 days ago directly via DbContext.
-        var old = new CsvImportProfile
+        var old = new ImportProfile
         {
             Id             = Guid.NewGuid(),
             Name           = "Old Bank",
@@ -83,7 +83,7 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
             CreatedAt      = DateTime.UtcNow.AddDays(-100),
             DeletedAt      = DateTime.UtcNow.AddDays(-91)
         };
-        _fixture.Db.CsvImportProfiles.Add(old);
+        _fixture.Db.ImportProfiles.Add(old);
         await _fixture.Db.SaveChangesAsync();
 
         var deletedList = await _service.GetRecentlyDeletedAsync();
@@ -94,9 +94,9 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
     [Fact]
     public async Task UpdateMappings_NewMappingsRetrievable()
     {
-        var id = await _service.CreateAsync("Bank C", ValidMappings());
+        var id = await _service.CreateAsync("Bank C", ImportFormat.Csv, ValidMappings());
 
-        var updated = new CsvColumnMappings
+        var updated = new ImportColumnMappings
         {
             DateColumn        = "Txn Date",
             AmountColumn      = "Debit",
@@ -116,7 +116,7 @@ public class CsvImportProfileServiceTests : IAsyncLifetime
     [Fact]
     public async Task RecoverDeletedProfile_WithinWindow_RestoredToActiveList()
     {
-        var id = await _service.CreateAsync("Bank D", ValidMappings());
+        var id = await _service.CreateAsync("Bank D", ImportFormat.Csv, ValidMappings());
         await _service.DeleteAsync(id);
 
         await _service.RecoverAsync(id);

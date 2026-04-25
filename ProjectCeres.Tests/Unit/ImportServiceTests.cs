@@ -15,7 +15,7 @@ public class ImportServiceTests
     private static readonly string FixturesDir =
         Path.Combine(AppContext.BaseDirectory, "Fixtures");
 
-    private static CsvColumnMappings StandardMappings() => new()
+    private static ImportColumnMappings StandardMappings() => new()
     {
         DateColumn        = "Date",
         AmountColumn      = "Amount",
@@ -64,7 +64,7 @@ public class ImportServiceTests
     public async Task ParseAsync_NegativeDebitAmount_IsFlippedToPositive()
     {
         var service  = new ImportService();
-        var mappings = new CsvColumnMappings
+        var mappings = new ImportColumnMappings
         {
             DateColumn        = "Date",
             AmountColumn      = "Amount",
@@ -95,7 +95,7 @@ public class ImportServiceTests
     public async Task ParseAsync_ColumnMappingApplied_MapsFromCorrectColumns()
     {
         var service  = new ImportService();
-        var mappings = new CsvColumnMappings
+        var mappings = new ImportColumnMappings
         {
             DateColumn        = "Txn Date",
             AmountColumn      = "Debit",
