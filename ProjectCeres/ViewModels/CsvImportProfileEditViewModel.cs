@@ -1,8 +1,10 @@
+// ProjectCeres/ViewModels/CsvImportProfileEditViewModel.cs
 using System.ComponentModel.DataAnnotations;
+using ProjectCeres.Models;
 
 namespace ProjectCeres.ViewModels;
 
-public class CsvImportProfileEditViewModel
+public class ImportProfileEditViewModel
 {
     public Guid Id { get; set; }
 
@@ -10,5 +12,6 @@ public class CsvImportProfileEditViewModel
     [StringLength(100)]
     public string Name { get; set; } = string.Empty;
 
-    public CsvColumnMappings Mappings { get; set; } = new();
+    public ImportFormat Format { get; set; }
+    public ImportColumnMappings Mappings { get; set; } = new();
 }

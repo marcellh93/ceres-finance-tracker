@@ -1,10 +1,15 @@
+// ProjectCeres/ViewModels/CsvImportProfileViewModel.cs
+using ProjectCeres.Models;
+
 namespace ProjectCeres.ViewModels;
 
-public class CsvImportProfileViewModel
+public class ImportProfileViewModel
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public CsvColumnMappings Mappings { get; set; } = new();
+    public ImportColumnMappings Mappings { get; set; } = new();
+    public ImportFormat Format { get; set; }
+    public string? SheetName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
 
