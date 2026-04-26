@@ -17,10 +17,13 @@ public class HeaderDetectionService : IHeaderDetectionService
     {
         var headers = await ReadHeadersAsync(file);
 
+        var dateMatch = BestMatch(headers, DateKeywords)
+                        ?? BestMatch(headers, ["f.valor"]);
+
         return new HeaderDetectionResult
         {
             Headers           = headers,
-            DateColumn        = BestMatch(headers, DateKeywords),
+            DateColumn        = dateMatch,
             AmountColumn      = BestMatch(headers, AmountKeywords),
             DescriptionColumn = BestMatch(headers, DescriptionKeywords),
             CategoryColumn    = BestMatch(headers, CategoryKeywords)

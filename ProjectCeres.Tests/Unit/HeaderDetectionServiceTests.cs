@@ -72,4 +72,16 @@ public class HeaderDetectionServiceTests
         result.Headers.Should().HaveCount(4);
         result.Headers.Should().Contain("Observaciones");
     }
+
+    [Fact]
+    public async Task DetectAsync_OnlyFValorDateColumn_MatchesIt()
+    {
+        var svc    = new HeaderDetectionService();
+        var file   = CsvFile("F.Valor,Importe,Concepto");
+        var result = await svc.DetectAsync(file);
+
+        result.DateColumn.Should().Be("F.Valor");
+        result.AmountColumn.Should().Be("Importe");
+        result.DescriptionColumn.Should().Be("Concepto");
+    }
 }
