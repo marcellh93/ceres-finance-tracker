@@ -455,7 +455,7 @@ Four count tiles: Imported (green) / Reconciled (blue) / Needs Review (yellow) /
 
 ### 3.5 — Transfer Detection + Staging (Plan B)
 
-> **Status:** Designed (`docs/superpowers/specs/2026-04-26-import-ux-redesign-design.md` §§ 4–6). Implementation plan not yet written. Prerequisite: 3.1–3.4 complete ✅.
+> **Status:** Complete ✅ (`docs/superpowers/plans/2026-04-26-import-transfer-staging-plan-b.md`). See ADR-0061. 309 dotnet tests + 19 Vitest tests passing.
 
 During import, rows that look like inter-account transfers are staged for manual review rather than imported as plain transactions. No config on the import form — detection is automatic.
 
@@ -799,14 +799,14 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [ ] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression
 - [ ] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(covered by ImportParserFactoryTests)_
 - [x] Upload `duplicate_candidates.csv` → matched uncleared transactions are cleared; no duplicate rows inserted; summary shows correct `RowsReconciled` count; all newly inserted rows show amber "Needs review" badge in Transactions Index _(ADR-0060)_
-- [ ] **Transfer Detection (Stage 3.5):** Two rows in same file with opposite signs and same amount → both staged; neither appears as a plain transaction in Transactions Index
-- [ ] **Transfer Detection (Stage 3.5):** Cross-account match (opposite sign, same amount, ±1 day) → staged with candidate transaction linked
-- [ ] **Transfer Detection (Stage 3.5):** Row matching an `ImportTransferExclusion` pattern → not staged; imported as plain transaction
-- [ ] **Transfer Review screen:** "Link to existing" → `Transfer` record created; staged row resolved
-- [ ] **Transfer Review screen:** "Specify other account" → `Transfer` record created with correct accounts
-- [ ] **Transfer Review screen:** "Not a transfer" → becomes plain transaction; description pattern saved to exclusion table; never staged again
-- [ ] **Summary (Stage 3.5):** When `RowsStaged > 0`, a Staged tile (purple) appears with link to Transfer Review screen
-- [ ] **Nav indicator (Stage 3.5):** Pending staged transfer count visible in nav when > 0
+- [x] **Transfer Detection (Stage 3.5):** Two rows in same file with opposite signs and same amount → both staged; neither appears as a plain transaction in Transactions Index
+- [x] **Transfer Detection (Stage 3.5):** Cross-account match (opposite sign, same amount, ±1 day) → staged with candidate transaction linked
+- [x] **Transfer Detection (Stage 3.5):** Row matching an `ImportTransferExclusion` pattern → not staged; imported as plain transaction
+- [x] **Transfer Review screen:** "Link to existing" → `Transfer` record created; staged row resolved
+- [x] **Transfer Review screen:** "Specify other account" → `Transfer` record created with correct accounts
+- [x] **Transfer Review screen:** "Not a transfer" → becomes plain transaction; description pattern saved to exclusion table; never staged again
+- [x] **Summary (Stage 3.5):** When `RowsStaged > 0`, a Staged tile appears with link to Transfer Review screen
+- [x] **Nav indicator (Stage 3.5):** Pending staged transfer count visible in nav when > 0
 - [x] Create an `ImportProfile` → mappings saved; auto-applied on next import of same-format CSV
 - [x] Soft-delete an `ImportProfile` → excluded from active list; appears in deleted list with 90-day countdown
 - [x] Recover a soft-deleted profile within 90 days → profile restored to active list

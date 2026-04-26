@@ -78,6 +78,7 @@ sequenceDiagram
     participant HeaderDetectionService
     participant ImportService
     participant IImportParser
+    participant ITransferDetectionService
     participant TransactionService
     participant DbContext
 
@@ -89,25 +90,44 @@ sequenceDiagram
     Controller->>ImportService: ImportAsync(file, accountId, mappings)
     ImportService->>IImportParser: ParseAsync(stream, mappings)
     IImportParser-->>ImportService: IReadOnlyList<ParsedImportRow>
-    loop Each parsed row
+    ImportService->>ITransferDetectionService: Detect(rows, crossAccountTxns, exclusionPatterns, accountId)
+    ITransferDetectionService-->>ImportService: TransferDetectionResult (StagedRows, RowIndicesToSkip)
+    ImportService->>DbContext: Insert ImportStagedTransfer rows
+    loop Each non-skipped parsed row
         ImportService->>ImportService: Reconciliation pass — match by amount + date ±1 day
         alt Row matches existing transaction
             ImportService->>TransactionService: MarkClearedAsync(existingId, cleared: true)
         else No match — new transaction
             ImportService->>ImportService: Sign-based category fallback (+ → Uncategorized Income, - → Uncategorized Expense)
-            ImportService->>DbContext: Insert Transaction (IsCleared=true, NeedsReview=true)
+            ImportService->>DbContext: Insert Transaction (NeedsReview=true)
         end
     end
-    ImportService-->>Controller: ImportResult (RowsImported, RowsReconciled, RowsFlagged, RowsFailed)
-    Controller->>User: Summary — 4-card result + optional save-profile prompt
+    ImportService-->>Controller: ImportResult (RowsImported, RowsReconciled, RowsFlagged, RowsStaged, RowsFailed)
+    Controller->>User: Summary — 5-card result + optional save-profile prompt
 ```
 
 **Key decisions in the import flow:**
 
 - **No default category required** — category is inferred from sign: positive amount → `Uncategorized Income`, negative → `Uncategorized Expense`. Both are seeded with fixed GUIDs and `IsSystem = false` (so they appear in transaction lists and affect balances). GUID-based guard in `CategoryService` prevents editing or deactivation. See ADR-0060.
+- **Transfer detection pass (Stage 3.5)** — runs BEFORE reconciliation. Two detection modes: (1) intra-file pairing (another row in the same file has the opposite sign and same absolute amount on the same date), (2) cross-account pairing (an existing transaction in another Ceres account has the opposite sign, same absolute amount, and date within ±1 day). Detected rows are staged to `ImportStagedTransfer` and skipped from the reconciliation/insert loop. Rows whose description matches an `ImportTransferExclusion` pattern are excluded from staging. See ADR-0061.
 - **Reconciliation pass** — before inserting, each row is matched against existing uncleared transactions by `Math.Abs(amount)` equality and date ±1 day. A match marks the existing transaction `IsCleared = true` (no new row inserted, count as `RowsReconciled`).
 - **Header auto-detection** — `IHeaderDetectionService.DetectAsync` is called on the file after Step 1. It reads the first row and keyword-matches column names (e.g. "fecha" → Date). Result pre-populates Step 2 dropdowns. Detection is best-effort; user can override any mapping.
 - **Profile save after import** — if the user mapped columns manually (no saved profile used), the Summary screen offers to save the mapping as a named profile for future imports.
+
+### **Transfer Staging (Stage 3.5)**
+
+> **Status: Implemented.** See ADR-0061.
+
+Rows that look like inter-account transfers are staged for manual review in `ImportStagedTransfer` rather than imported as plain transactions. No config on the import form — detection is automatic.
+
+**Review screen (`/TransferReview`):** Lists all `Pending` staged rows. Per-row actions:
+- **Link to existing** (shown when `CandidateTransactionId` is set) — creates a `Transfer` from the candidate transaction; status → `Linked`
+- **Create Transfer** — user picks the other account; creates a new `Transfer`; status → `CreatedAsTransfer`
+- **Not a Transfer** — imports row as a plain transaction; saves description pattern to `ImportTransferExclusion`; status → `DismissedAsTransaction`
+
+**Nav indicator:** The React navbar badge shows `pendingTransfers` count (read from `data-pending-transfers` on `#navbar-root`) when > 0. Count served by `ITransferReviewService.GetPendingCountAsync()` injected into `_Layout.cshtml`.
+
+**Summary card:** A fifth tile (`RowsStaged`) appears on the Import Summary screen when `RowsStaged > 0`, with a warning color and a link to the Transfer Review screen.
 
 - **CSV export** — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix any such cell value with a single quote (`'`) to neutralize CSV injection.
 - File attachments on transactions (receipts, invoices) — built in Phase 1, carried forward

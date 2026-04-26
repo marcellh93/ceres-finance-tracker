@@ -30,7 +30,9 @@
 6. [Multi-Currency Reporting](#multi-currency-reporting)
 7. [Deletion Rules](#deletion-rules)
 8. [Database Indexes](#database-indexes)
-9. [Phase 2 — Entities To Be Defined](#phase-2--entities-to-be-defined)
+9. [Phase 2 — Schema Additions](#phase-2--schema-additions)
+   - [ImportStagedTransfer](#importstagedtransfer-new-entity--phase-2-stage-35)
+   - [ImportTransferExclusion](#importtransferexclusion-new-entity--phase-2-stage-35)
 10. [Phase 3 — Entities To Be Defined](#phase-3--entities-to-be-defined)
 
 ---
@@ -821,7 +823,7 @@ These must be created via Fluent API in `OnModelCreating` or via explicit migrat
 ## Phase 2 — Schema Additions
 
 The following fields and entities are added in Phase 2. Full column definitions are added
-to entity sections above when implemented.
+to entity sections above when implemented or in the entity sections below for Stage 3.5 additions.
 
 ### Account — new Phase 2 fields
 
@@ -887,6 +889,56 @@ Stores named column mapping profiles for CSV and Excel import. See ADR-0047, ADR
 | SheetName | varchar | NULL | Excel only: override which worksheet to read. Null = first worksheet. |
 | CreatedAt | datetime | NOT NULL | |
 | DeletedAt | datetime | NULL | Soft delete — 90-day recovery window shown to user |
+
+### ImportStagedTransfer (new entity — Phase 2, Stage 3.5)
+
+Holds import rows that triggered transfer detection and are awaiting manual review before
+they can be imported as transactions or linked to existing transfers. One row per staged
+import row. Rows are never deleted — they transition through `Status` values instead.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| Id | uuid | PK | |
+| ImportedAt | datetime | NOT NULL | When the import ran that produced this row |
+| AccountId | uuid | FK NOT NULL → Account | The destination account from the import |
+| RawDate | date | NOT NULL | Date parsed from the CSV/XLSX row |
+| RawAmount | decimal(18,2) | NOT NULL | Signed — negative = debit/withdrawal |
+| RawDescription | varchar | NULL | Description from the import row |
+| CandidateTransactionId | uuid | FK NULL → Transaction (SetNull) | Set when cross-account pairing finds a likely counterpart transaction |
+| Status | varchar | NOT NULL DEFAULT 'Pending' | `Pending`, `Linked`, `CreatedAsTransfer`, `DismissedAsTransaction` |
+| ResolvedAt | datetime | NULL | Set when status transitions out of Pending |
+
+**FK behavior:** `AccountId` → Restrict (staged row cannot outlive its account). `CandidateTransactionId` → SetNull on delete (staged row survives if the candidate transaction is deleted). See ADR-0061.
+
+**Status lifecycle:**
+
+| Status | Meaning |
+|---|---|
+| `Pending` | Awaiting user review on the Transfer Review screen |
+| `Linked` | User confirmed the candidate match; a `Transfer` record was created using the candidate transaction |
+| `CreatedAsTransfer` | User specified the other account; a new `Transfer` record was created |
+| `DismissedAsTransaction` | User confirmed this is not a transfer; the row was imported as a plain transaction |
+
+**Deletion:** Never hard-deleted. Resolved rows remain for audit history. See ADR-0061.
+
+---
+
+### ImportTransferExclusion (new entity — Phase 2, Stage 3.5)
+
+Training store for description patterns the user has dismissed as "not a transfer". During
+detection, rows whose description contains any stored pattern (case-insensitive substring
+match) are skipped and imported directly as transactions without staging. Patterns are added
+automatically when the user dismisses a staged row with "Not a transfer". See ADR-0061.
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| Id | uuid | PK | |
+| DescriptionPattern | varchar | NOT NULL, unique index | Stored as-is; matched via case-insensitive substring |
+| CreatedAt | datetime | NOT NULL | When the pattern was first saved |
+
+**Deletion:** Hard delete. Users can manage exclusions if needed — no soft-delete required.
+
+---
 
 ### InvestmentHolding — deferred to Phase 3 or Phase 4
 
