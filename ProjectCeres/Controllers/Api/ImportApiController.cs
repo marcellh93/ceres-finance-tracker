@@ -32,7 +32,7 @@ public class ImportApiController(IImportService importService) : ControllerBase
         try
         {
             var result = await importService.ImportAsync(
-                vm.File!, vm.AccountId!.Value, vm.CategoryId!.Value, mappings);
+                vm.File!, vm.AccountId!.Value, mappings);
 
             return Ok(result);
         }

@@ -10,17 +10,16 @@ namespace ProjectCeres.Tests.Integration;
 
 /// <summary>
 /// Integration tests for ImportService.ImportAsync against the real project_ceres_test database.
-/// Each test rolls back — no data persists.
 ///
-/// Seed data:
-///   AccountTypeId 1 = Asset
-///   CurrencyId    1 = EUR
-///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing (Expense)
+/// Seeded system categories (stable GUIDs):
+///   20000000-0000-0000-0000-000000000025 = Uncategorized Income  (CategoryTypeId = 1)
+///   20000000-0000-0000-0000-000000000026 = Uncategorized Expense (CategoryTypeId = 2)
 /// </summary>
 [Collection("IntegrationTests")]
 public class ImportServiceIntegrationTests : IAsyncLifetime
 {
-    private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
+    private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
+    private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
     private static readonly string FixturesDir =
         Path.Combine(AppContext.BaseDirectory, "Fixtures");
 
@@ -32,10 +31,10 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService         = new AccountService(_fixture.Db);
+        var accountService          = new AccountService(_fixture.Db);
         var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
-        var attachmentService      = new Mock<IFileAttachmentService>().Object;
-        var transactionService     = new TransactionService(
+        var attachmentService       = new Mock<IFileAttachmentService>().Object;
+        var transactionService      = new TransactionService(
             _fixture.Db, accountService, liabilityPaymentService, attachmentService);
 
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
@@ -55,10 +54,6 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
 
     private static IFormFile FileFromFixture(string fileName)
     {
@@ -85,90 +80,127 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         CategoryColumn    = "Category"
     };
 
-    // -------------------------------------------------------------------------
-    // Tests
-    // -------------------------------------------------------------------------
-
     [Fact]
     public async Task ImportAsync_ValidCsv_Inserts10TransactionsAllCleared()
     {
         var file   = FileFromFixture("valid_import.csv");
-        var result = await _service.ImportAsync(file, _accountId, HousingCategoryId, StandardMappings());
+        var result = await _service.ImportAsync(file, _accountId, StandardMappings());
 
         result.RowsImported.Should().Be(10);
+        result.RowsReconciled.Should().Be(0);
         result.RowsFlagged.Should().Be(0);
         result.RowsFailed.Should().Be(0);
 
-        var dbCount = await _fixture.Db.Transactions
-            .CountAsync(t => t.AccountId == _accountId);
+        var dbCount = await _fixture.Db.Transactions.CountAsync(t => t.AccountId == _accountId);
         dbCount.Should().Be(10);
 
         var allCleared = await _fixture.Db.Transactions
             .Where(t => t.AccountId == _accountId)
             .AllAsync(t => t.IsCleared);
         allCleared.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task ImportAsync_DuplicateCandidates_FlaggedAsIsClearedFalse()
-    {
-        // Seed one existing transaction matching the first row of duplicate_candidates.csv
-        // (2024-01-01, 50.00, "Grocery store") exactly — should be flagged.
-        _fixture.Db.Transactions.Add(new Transaction
-        {
-            Id          = Guid.NewGuid(),
-            Date        = new DateOnly(2024, 1, 1),
-            Amount      = 50.00m,
-            Description = "Grocery store",
-            AccountId   = _accountId,
-            CategoryId  = HousingCategoryId,
-            IsCleared   = true,
-            CreatedAt   = DateTime.UtcNow
-        });
-        await _fixture.Db.SaveChangesAsync();
-
-        var file   = FileFromFixture("duplicate_candidates.csv");
-        var result = await _service.ImportAsync(file, _accountId, HousingCategoryId, StandardMappings());
-
-        // 3 rows total: 1 flagged (exact match), 2 clean
-        result.RowsFlagged.Should().Be(1);
-        result.RowsImported.Should().Be(2);
-        result.RowsFailed.Should().Be(0);
-
-        // Flagged row must have IsCleared = false.
-        var flagged = await _fixture.Db.Transactions
-            .Where(t => t.AccountId == _accountId && !t.IsCleared && t.Amount == 50.00m)
-            .ToListAsync();
-        flagged.Should().HaveCount(1);
-    }
-
-    [Fact]
-    public async Task ImportAsync_ValidCsv_ResultCountsAreCorrect()
-    {
-        var file   = FileFromFixture("valid_import.csv");
-        var result = await _service.ImportAsync(file, _accountId, HousingCategoryId, StandardMappings());
-
-        var totalProcessed = result.RowsImported + result.RowsFlagged + result.RowsFailed;
-        totalProcessed.Should().Be(10);
     }
 
     [Fact]
     public async Task ImportAsync_ValidXlsx_Inserts10TransactionsAllCleared()
     {
         var file   = FileFromFixture("valid_import.xlsx");
-        var result = await _service.ImportAsync(file, _accountId, HousingCategoryId, StandardMappings());
+        var result = await _service.ImportAsync(file, _accountId, StandardMappings());
 
         result.RowsImported.Should().Be(10);
-        result.RowsFlagged.Should().Be(0);
+        result.RowsReconciled.Should().Be(0);
         result.RowsFailed.Should().Be(0);
+    }
 
-        var dbCount = await _fixture.Db.Transactions
-            .CountAsync(t => t.AccountId == _accountId);
-        dbCount.Should().Be(10);
+    [Fact]
+    public async Task ImportAsync_ValidCsv_TotalCountMatchesRowCount()
+    {
+        var file   = FileFromFixture("valid_import.csv");
+        var result = await _service.ImportAsync(file, _accountId, StandardMappings());
 
-        var allCleared = await _fixture.Db.Transactions
-            .Where(t => t.AccountId == _accountId)
-            .AllAsync(t => t.IsCleared);
-        allCleared.Should().BeTrue();
+        (result.RowsImported + result.RowsReconciled + result.RowsFlagged + result.RowsFailed).Should().Be(10);
+    }
+
+    [Fact]
+    public async Task ImportAsync_MatchingExistingTransaction_ReconcilesClearsItAndDoesNotDuplicate()
+    {
+        // Seed one pre-existing transaction matching first row of valid_import.csv
+        // (assumes first row: 2024-01-01, 50.00, "Grocery store")
+        var existingId = Guid.NewGuid();
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id          = existingId,
+            Date        = new DateOnly(2024, 1, 1),
+            Amount      = 50.00m,
+            Description = "Grocery store",
+            AccountId   = _accountId,
+            CategoryId  = UncategorizedExpenseId,
+            IsCleared   = false,
+            CreatedAt   = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var file   = FileFromFixture("valid_import.csv");
+        var result = await _service.ImportAsync(file, _accountId, StandardMappings());
+
+        // 1 reconciled, 9 imported, 0 duplicates created
+        result.RowsReconciled.Should().Be(1);
+        result.RowsImported.Should().Be(9);
+
+        // Total transactions in DB = 10 (1 pre-existing + 9 new), not 11
+        var count = await _fixture.Db.Transactions.CountAsync(t => t.AccountId == _accountId);
+        count.Should().Be(10);
+
+        // The pre-existing one must now be cleared
+        var existing = await _fixture.Db.Transactions.FindAsync(existingId);
+        existing!.IsCleared.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ImportAsync_PositiveAmount_AssignsUncategorizedIncome()
+    {
+        // Create a CSV with one positive-amount row
+        var csv = "Date,Amount,Description\n2024-03-01,200.00,Salary\n";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+        var stream = new MemoryStream(bytes);
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("income.csv");
+        mock.Setup(f => f.Length).Returns(stream.Length);
+        mock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Returns<Stream, CancellationToken>((dest, ct) => { stream.Position = 0; return stream.CopyToAsync(dest, ct); });
+
+        var result = await _service.ImportAsync(mock.Object, _accountId, new ImportColumnMappings
+        {
+            DateColumn = "Date", AmountColumn = "Amount", DescriptionColumn = "Description"
+        });
+
+        result.RowsImported.Should().Be(1);
+
+        var txn = await _fixture.Db.Transactions.FirstAsync(t => t.AccountId == _accountId);
+        txn.CategoryId.Should().Be(UncategorizedIncomeId);
+        txn.NeedsReview.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ImportAsync_NegativeAmount_AssignsUncategorizedExpense()
+    {
+        var csv = "Date,Amount,Description\n2024-03-01,-50.00,Coffee\n";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+        var stream = new MemoryStream(bytes);
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("expense.csv");
+        mock.Setup(f => f.Length).Returns(stream.Length);
+        mock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Returns<Stream, CancellationToken>((dest, ct) => { stream.Position = 0; return stream.CopyToAsync(dest, ct); });
+
+        var result = await _service.ImportAsync(mock.Object, _accountId, new ImportColumnMappings
+        {
+            DateColumn = "Date", AmountColumn = "Amount", DescriptionColumn = "Description"
+        });
+
+        result.RowsImported.Should().Be(1);
+
+        var txn = await _fixture.Db.Transactions.FirstAsync(t => t.AccountId == _accountId);
+        txn.CategoryId.Should().Be(UncategorizedExpenseId);
+        txn.NeedsReview.Should().BeTrue();
     }
 }

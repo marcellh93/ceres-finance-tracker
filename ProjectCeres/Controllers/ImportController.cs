@@ -67,7 +67,7 @@ public class ImportController(
         try
         {
             var result = await importService.ImportAsync(
-                vm.File!, vm.AccountId!.Value, vm.CategoryId!.Value, mappings);
+                vm.File!, vm.AccountId!.Value, mappings);
 
             TempData["ImportRowsImported"] = result.RowsImported;
             TempData["ImportRowsFlagged"]  = result.RowsFlagged;

@@ -13,6 +13,9 @@ public class ImportService(
     AppDbContext? db = null,
     ITransactionService? transactionService = null) : IImportService
 {
+    private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
+    private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
+
     public async Task<IReadOnlyList<ParsedImportRow>> ParseAsync(IFormFile file, ImportColumnMappings mappings)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -23,7 +26,6 @@ public class ImportService(
             _       => throw new InvalidOperationException(
                            $"Unsupported file format '{extension}'. Please upload a CSV or Excel (.xlsx) file.")
         };
-
         var parser = parserFactory.GetParser(format);
         return await parser.ParseAsync(file, mappings);
     }
@@ -36,7 +38,7 @@ public class ImportService(
     }
 
     public async Task<ImportResult> ImportAsync(
-        IFormFile file, Guid accountId, Guid categoryId, ImportColumnMappings mappings)
+        IFormFile file, Guid accountId, ImportColumnMappings mappings)
     {
         if (db is null || transactionService is null)
             throw new InvalidOperationException("ImportService requires db and transactionService for ImportAsync.");
@@ -46,39 +48,44 @@ public class ImportService(
 
         var existingTxns = await db.Transactions
             .Where(t => t.AccountId == accountId)
-            .Select(t => new { t.Date, t.Amount, t.Description })
             .ToListAsync();
 
         foreach (var row in rows)
         {
             try
             {
-                var isDuplicate = existingTxns.Any(e =>
+                // Reconciliation pass: match by amount + date ±1 day
+                var match = existingTxns.FirstOrDefault(e =>
                     e.Amount == row.Amount &&
-                    e.Description == row.Description &&
-                    Math.Abs((e.Date.ToDateTime(TimeOnly.MinValue) - row.Date.ToDateTime(TimeOnly.MinValue)).TotalDays) <= 1);
+                    Math.Abs((e.Date.ToDateTime(TimeOnly.MinValue) -
+                              row.Date.ToDateTime(TimeOnly.MinValue)).TotalDays) <= 1);
+
+                if (match is not null)
+                {
+                    if (!match.IsCleared)
+                    {
+                        await transactionService.MarkClearedAsync(match.Id, cleared: true);
+                    }
+                    result.RowsReconciled++;
+                    continue;
+                }
+
+                // No match — create new transaction
+                var categoryId = row.Amount >= 0 ? UncategorizedIncomeId : UncategorizedExpenseId;
 
                 var vm = new TransactionCreateViewModel
                 {
                     Date        = row.Date,
-                    Amount      = row.Amount,
+                    Amount      = Math.Abs(row.Amount), // store positive; direction from category type
                     Description = row.Description,
                     AccountId   = accountId,
                     CategoryId  = categoryId
                 };
 
                 var txId = await transactionService.CreateAsync(vm);
-
-                if (isDuplicate)
-                {
-                    await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
-                    result.RowsFlagged++;
-                }
-                else
-                {
-                    await transactionService.MarkClearedAsync(txId, cleared: true);
-                    result.RowsImported++;
-                }
+                await transactionService.MarkClearedAsync(txId, cleared: true);
+                await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
+                result.RowsImported++;
             }
             catch (Exception ex)
             {
