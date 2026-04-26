@@ -10,16 +10,15 @@
     <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
 }
 
-<form asp-action="Index" method="post" enctype="multipart/form-data" class="form-standard">
+<form asp-action="Index" method="post" enctype="multipart/form-data" class="form-standard" id="import-form">
     @Html.AntiForgeryToken()
-
     <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
     <div class="form-group">
         <label asp-for="File">Bank Statement File</label>
-        <input asp-for="File" type="file" accept=".csv,.xlsx" class="form-control" />
+        <input asp-for="File" type="file" accept=".csv,.xlsx" class="form-control" id="import-file-input" />
         <span asp-validation-for="File" class="field-error"></span>
-        <p class="form-hint">CSV and Excel (.xlsx) files are supported. Export your bank statement in either format.</p>
+        <p class="form-hint">CSV and Excel (.xlsx) files are supported.</p>
     </div>
 
     <div class="form-group">
@@ -30,50 +29,136 @@
         <span asp-validation-for="AccountId" class="field-error"></span>
     </div>
 
-    <fieldset>
-        <legend>Column Mappings</legend>
+    <div id="column-mapping-section" style="display:none">
+        <hr class="my-4" />
 
-        <div class="form-group">
-            <label asp-for="ProfileId">Use Saved Profile <span class="form-optional">(optional)</span></label>
-            <select asp-for="ProfileId" asp-items="ViewBag.Profiles" class="form-control">
-                <option value="">— Manual mapping —</option>
-            </select>
-            <p class="form-hint">Selecting a profile overrides the manual fields below. <a asp-controller="CsvImportProfiles" asp-action="Index">Manage profiles</a></p>
-        </div>
+        @{
+            var profiles = ViewBag.Profiles as Microsoft.AspNetCore.Mvc.Rendering.SelectList;
+        }
+        @if (profiles != null && profiles.Any())
+        {
+            <div class="form-group">
+                <label asp-for="ProfileId">Use Saved Profile <span class="form-optional">(optional)</span></label>
+                <select asp-for="ProfileId" asp-items="ViewBag.Profiles" class="form-control" id="profile-select">
+                    <option value="">— Map columns manually —</option>
+                </select>
+            </div>
+        }
 
         <div id="manual-mapping">
+            <h3 class="form-section-title">Column Mapping</h3>
+            <p class="form-hint mb-4">Match your file's column names to the fields below. We've pre-selected the closest matches.</p>
+
             <div class="form-group">
                 <label asp-for="DateColumn">Date Column</label>
-                <input asp-for="DateColumn" class="form-control" placeholder="Date" />
+                <select asp-for="DateColumn" class="form-control" id="date-column-select">
+                    <option value="">— Select column —</option>
+                </select>
             </div>
 
             <div class="form-group">
                 <label asp-for="AmountColumn">Amount Column</label>
-                <input asp-for="AmountColumn" class="form-control" placeholder="Amount" />
+                <select asp-for="AmountColumn" class="form-control" id="amount-column-select">
+                    <option value="">— Select column —</option>
+                </select>
             </div>
 
             <div class="form-group">
                 <label asp-for="DescriptionColumn">Description Column</label>
-                <input asp-for="DescriptionColumn" class="form-control" placeholder="Description" />
+                <select asp-for="DescriptionColumn" class="form-control" id="description-column-select">
+                    <option value="">— Select column —</option>
+                </select>
             </div>
 
             <div class="form-group">
                 <label asp-for="CategoryColumn">Category Column <span class="form-optional">(optional)</span></label>
-                <input asp-for="CategoryColumn" class="form-control" placeholder="Category" />
+                <select asp-for="CategoryColumn" class="form-control" id="category-column-select">
+                    <option value="">— None —</option>
+                </select>
             </div>
 
             <div class="form-group form-check">
                 <input asp-for="FlipDebitSign" type="checkbox" class="form-check-input" />
-                <label asp-for="FlipDebitSign">Flip debit sign (negate negative debit amounts to positive)</label>
+                <label asp-for="FlipDebitSign">My bank exports debits as negative numbers</label>
+                <p class="form-hint">Check this if withdrawals appear as negative amounts in your file (e.g. -100.00).</p>
             </div>
         </div>
-    </fieldset>
+    </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" id="import-btn" disabled>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Import
         </button>
         <a asp-controller="Transactions" asp-action="Index" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
+
+<script>
+(function () {
+    const fileInput      = document.getElementById('import-file-input');
+    const mappingSection = document.getElementById('column-mapping-section');
+    const importBtn      = document.getElementById('import-btn');
+    const profileSelect  = document.getElementById('profile-select');
+    const manualMapping  = document.getElementById('manual-mapping');
+
+    const dropdownIds = {
+        date:        'date-column-select',
+        amount:      'amount-column-select',
+        description: 'description-column-select',
+        category:    'category-column-select'
+    };
+
+    fileInput.addEventListener('change', async function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        importBtn.disabled = true;
+
+        const form = new FormData();
+        form.append('file', file);
+
+        try {
+            const resp = await fetch('/api/import/headers', { method: 'POST', body: form });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                populateDropdowns(data);
+            }
+        } catch (_) {
+            // Header detection failed — still reveal the section so user can map manually
+        }
+
+        mappingSection.style.display = 'block';
+        importBtn.disabled = false;
+    });
+
+    function populateDropdowns(data) {
+        const headers = data.headers || [];
+
+        Object.values(dropdownIds).forEach(id => {
+            const sel = document.getElementById(id);
+            while (sel.options.length > 1) sel.remove(1);
+            headers.forEach(h => sel.add(new Option(h, h)));
+        });
+
+        if (data.dateColumn)        selectValue('date-column-select',        data.dateColumn);
+        if (data.amountColumn)      selectValue('amount-column-select',      data.amountColumn);
+        if (data.descriptionColumn) selectValue('description-column-select', data.descriptionColumn);
+        if (data.categoryColumn)    selectValue('category-column-select',    data.categoryColumn);
+    }
+
+    function selectValue(selectId, value) {
+        const sel = document.getElementById(selectId);
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === value) { sel.selectedIndex = i; return; }
+        }
+    }
+
+    if (profileSelect) {
+        profileSelect.addEventListener('change', function () {
+            manualMapping.style.display = profileSelect.value ? 'none' : 'block';
+        });
+    }
+})();
+</script>
