@@ -25,6 +25,8 @@ public class AppDbContext : DbContext
     public DbSet<Settings> Settings => Set<Settings>();
     public DbSet<TransferAttachment> TransferAttachments => Set<TransferAttachment>();
     public DbSet<ImportProfile> ImportProfiles => Set<ImportProfile>();
+    public DbSet<ImportStagedTransfer> ImportStagedTransfers => Set<ImportStagedTransfer>();
+    public DbSet<ImportTransferExclusion> ImportTransferExclusions => Set<ImportTransferExclusion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -158,6 +160,30 @@ public class AppDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(20)
                 .HasDefaultValue(ImportFormat.Csv);
+        });
+
+        modelBuilder.Entity<ImportStagedTransfer>(entity =>
+        {
+            entity.ToTable("ImportStagedTransfers");
+            entity.Property(e => e.Status)
+                  .HasConversion<string>()
+                  .HasMaxLength(30);
+
+            entity.HasOne(e => e.Account)
+                  .WithMany()
+                  .HasForeignKey(e => e.AccountId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.CandidateTransaction)
+                  .WithMany()
+                  .HasForeignKey(e => e.CandidateTransactionId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ImportTransferExclusion>(entity =>
+        {
+            entity.ToTable("ImportTransferExclusions");
+            entity.HasIndex(e => e.DescriptionPattern).IsUnique();
         });
     }
 
