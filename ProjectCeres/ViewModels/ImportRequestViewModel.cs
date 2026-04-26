@@ -12,9 +12,6 @@ public class ImportRequestViewModel
     public Guid? AccountId { get; set; }
 
     [Required]
-    public Guid? CategoryId { get; set; }
-
-    [Required]
     public string? DateColumn { get; set; }
 
     [Required]

@@ -56,7 +56,7 @@ public class ImportService(
             {
                 // Reconciliation pass: match by amount + date ±1 day
                 var match = existingTxns.FirstOrDefault(e =>
-                    e.Amount == row.Amount &&
+                    e.Amount == Math.Abs(row.Amount) &&
                     Math.Abs((e.Date.ToDateTime(TimeOnly.MinValue) -
                               row.Date.ToDateTime(TimeOnly.MinValue)).TotalDays) <= 1);
 

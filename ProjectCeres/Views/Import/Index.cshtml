@@ -16,10 +16,10 @@
     <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
     <div class="form-group">
-        <label asp-for="File">CSV File</label>
-        <input asp-for="File" type="file" accept=".csv" class="form-control" />
+        <label asp-for="File">Bank Statement File</label>
+        <input asp-for="File" type="file" accept=".csv,.xlsx" class="form-control" />
         <span asp-validation-for="File" class="field-error"></span>
-        <p class="form-hint">Only CSV files are supported. Export your bank statement as CSV before uploading.</p>
+        <p class="form-hint">CSV and Excel (.xlsx) files are supported. Export your bank statement in either format.</p>
     </div>
 
     <div class="form-group">
@@ -28,15 +28,6 @@
             <option value="">— Select Account —</option>
         </select>
         <span asp-validation-for="AccountId" class="field-error"></span>
-    </div>
-
-    <div class="form-group">
-        <label asp-for="CategoryId">Default Category</label>
-        <select asp-for="CategoryId" asp-items="ViewBag.Categories" class="form-control">
-            <option value="">— Select Category —</option>
-        </select>
-        <span asp-validation-for="CategoryId" class="field-error"></span>
-        <p class="form-hint">Used when the CSV row does not include a category or the category cannot be matched.</p>
     </div>
 
     <fieldset>

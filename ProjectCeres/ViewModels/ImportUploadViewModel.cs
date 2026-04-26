@@ -11,9 +11,6 @@ public class ImportUploadViewModel
     [Required(ErrorMessage = "Please select an account.")]
     public Guid? AccountId { get; set; }
 
-    [Required(ErrorMessage = "Please select a default category.")]
-    public Guid? CategoryId { get; set; }
-
     public Guid? ProfileId { get; set; }
 
     // Manual column mapping (used when no profile is selected)
