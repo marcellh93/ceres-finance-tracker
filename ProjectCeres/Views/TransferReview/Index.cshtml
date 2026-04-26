@@ -1,0 +1,91 @@
+@model IEnumerable<StagedTransferViewModel>
+@{ ViewData["Title"] = "Transfer Review"; }
+
+<div class="page-header">
+    <h1>Transfer Review</h1>
+    <p class="text-sm text-gray-500">These rows look like transfers between accounts. Resolve each one before they appear as transactions.</p>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card mt-4">
+        <p class="text-gray-500 text-sm">No pending transfers to review.</p>
+        <div class="mt-4">
+            <a asp-controller="Transactions" asp-action="Index" class="btn btn-secondary">View Transactions</a>
+        </div>
+    </div>
+}
+else
+{
+    foreach (var row in Model)
+    {
+        <div class="card mt-4 p-4">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <div class="text-sm text-gray-500 mb-1">@row.AccountName — imported @row.ImportedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                    <div class="font-semibold text-gray-800">@row.RawDate.ToString("dd/MM/yyyy") &nbsp;
+                        <span class="@(row.RawAmount < 0 ? "text-red-600" : "text-green-700")">
+                            @row.RawAmount.ToString("F2")
+                        </span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(row.RawDescription))
+                    {
+                        <div class="text-sm text-gray-600 mt-0.5">@row.RawDescription</div>
+                    }
+
+                    @if (row.CandidateTransactionId.HasValue)
+                    {
+                        <div class="mt-2 text-sm text-blue-700 bg-blue-50 rounded px-2 py-1 inline-block">
+                            Possible match: @row.CandidateTransactionDate?.ToString("dd/MM/yyyy")
+                            @row.CandidateTransactionAmount?.ToString("F2")
+                            @row.CandidateTransactionDescription
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-3 items-end">
+                @if (row.CandidateTransactionId.HasValue)
+                {
+                    <form asp-action="LinkToExisting" method="post" class="flex items-end gap-2">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="stagedId" value="@row.Id" />
+                        <div class="form-group mb-0">
+                            <label class="text-xs text-gray-600 block mb-1">Link to existing — other account</label>
+                            <select name="otherAccountId" class="form-control text-sm" required>
+                                <option value="">— Select account —</option>
+                                @foreach (var item in (ViewBag.Accounts as Microsoft.AspNetCore.Mvc.Rendering.SelectList)!)
+                                {
+                                    <option value="@item.Value">@item.Text</option>
+                                }
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary text-sm">Link Transfer</button>
+                    </form>
+                }
+
+                <form asp-action="CreateAsTransfer" method="post" class="flex items-end gap-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="stagedId" value="@row.Id" />
+                    <div class="form-group mb-0">
+                        <label class="text-xs text-gray-600 block mb-1">Specify other account</label>
+                        <select name="otherAccountId" class="form-control text-sm" required>
+                            <option value="">— Select account —</option>
+                            @foreach (var item in (ViewBag.Accounts as Microsoft.AspNetCore.Mvc.Rendering.SelectList)!)
+                            {
+                                <option value="@item.Value">@item.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary text-sm">Create Transfer</button>
+                </form>
+
+                <form asp-action="DismissAsTransaction" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="stagedId" value="@row.Id" />
+                    <button type="submit" class="btn btn-danger text-sm">Not a Transfer</button>
+                </form>
+            </div>
+        </div>
+    }
+}
