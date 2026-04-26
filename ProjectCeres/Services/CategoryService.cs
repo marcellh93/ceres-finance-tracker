@@ -7,6 +7,11 @@ namespace ProjectCeres.Services;
 
 public class CategoryService(AppDbContext db) : ICategoryService
 {
+    private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
+    private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
+
+    private static bool IsReserved(Guid id) => id == UncategorizedIncomeId || id == UncategorizedExpenseId;
+
     public async Task<IEnumerable<Category>> GetAllAsync(bool includeInactive = false)
     {
         var query = db.Categories
@@ -46,8 +51,8 @@ public class CategoryService(AppDbContext db) : ICategoryService
         var category = await db.Categories.FindAsync(vm.Id)
             ?? throw new InvalidOperationException($"Category {vm.Id} not found.");
 
-        if (category.IsSystem)
-            throw new InvalidOperationException("System categories cannot be edited.");
+        if (category.IsSystem || IsReserved(category.Id))
+            throw new InvalidOperationException("System categories cannot be modified.");
 
         category.Name         = vm.Name;
         category.LifestyleTag = vm.LifestyleTag;
@@ -59,8 +64,8 @@ public class CategoryService(AppDbContext db) : ICategoryService
         var category = await db.Categories.FindAsync(id)
             ?? throw new InvalidOperationException($"Category {id} not found.");
 
-        if (category.IsSystem)
-            throw new InvalidOperationException("System categories cannot be deactivated.");
+        if (category.IsSystem || IsReserved(category.Id))
+            throw new InvalidOperationException("System categories cannot be modified.");
 
         category.IsActive = false;
         await db.SaveChangesAsync();
