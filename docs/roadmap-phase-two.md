@@ -374,78 +374,82 @@ Most complex Stage. Sub-stages ensure TDD leads every layer.
 
 ### 3.1 — ImportProfile CRUD ✅
 
-**TDD — write tests first, then implement:**
+**What was built:**
 
-1. Write integration tests:
-   - Create profile with valid column mappings → succeeds; mappings retrievable as correct ImportColumnMappings object
-   - Soft-delete a profile → `DeletedAt` set; profile excluded from active list but visible in deleted list within 90-day window
-   - Profile deleted > 90 days ago → excluded from deleted list
-   - Update a profile's mappings → new mappings retrievable
-     All four tests fail.
-2. Implement `IImportProfileService` / `ImportProfileService`.
-3. Add CRUD controller + views for `ImportProfile`.
+- `IImportProfileService` / `ImportProfileService` — CRUD + soft delete with 90-day recovery window
+- `ImportProfile` entity: `Id`, `Name`, `Format` (`Csv` / `Excel`), `SheetName` (null = first sheet for XLSX), `ColumnMappings` (jsonb), `CreatedAt`, `DeletedAt?`
+- `ImportProfilesController` + Create / Edit / Delete / Recover views
+- Integration tests: create with valid mappings, soft-delete, 90-day expiry, recover, update
 
-**UI/UX:** Column mapping form — user maps CSV column names to system fields (Date, Amount, Description, Category). Deleted profiles show a countdown ("Recoverable for 87 more days"). Recover button uses Lucide `rotate-ccw` icon.
+**UI/UX:** Profile index shows deleted profiles with a "Recoverable for N more days" countdown. Recover button has Lucide `rotate-ccw` icon.
 
 ---
 
-### 3.2 — ImportService (unit layer) ✅
+### 3.2 — Parser abstraction + CSV/XLSX support ✅
 
-Create fixture files before writing any service code:
+The original plan assumed CSV-only. During implementation (ADR-0025 XLSX upgrade, ADR-0060 UX overhaul) the import engine was redesigned around a format-blind parser abstraction.
 
+**What was built:**
+
+- `IImportParser` — `Format` property + `ParseAsync(IFormFile, ImportColumnMappings)` → `IReadOnlyList<ParsedImportRow>`
+- `CsvImportParser` — CSV parsing via CsvHelper; handles debit-flip sign convention
+- `ExcelImportParser` — XLSX parsing via ClosedXML; magic bytes check; `SheetName`-aware (first sheet if null)
+- `ImportParserFactory` — dispatches by `ImportFormat` enum; one line per format
+- `IHeaderDetectionService` / `HeaderDetectionService` — reads first row of CSV or XLSX; keyword-matches headers to Date / Amount / Description / Category fields; returns `HeaderDetectionResult` with both the raw header list and best-match suggestions
+- Two new seeded categories with stable GUIDs:
+  - `20000000-0000-0000-0000-000000000025` — Uncategorized Income (CategoryTypeId = 1)
+  - `20000000-0000-0000-0000-000000000026` — Uncategorized Expense (CategoryTypeId = 2)
+  - Protected via GUID-based `IsReserved()` check in `CategoryService` — cannot be renamed or deactivated (not `IsSystem`)
+
+**Test coverage:** `CsvImportParserTests`, `ExcelImportParserTests`, `ImportParserFactoryTests`, `HeaderDetectionServiceTests` (all unit)
+
+**Test fixtures:**
 ```
 ProjectCeres.Tests/Fixtures/
   valid_import.csv          — 10 rows, mix of income/expense, all clean
   duplicate_candidates.csv  — rows partially matching existing test transactions (date ±1 day, same amount)
   invalid_rows.csv          — malformed dates, missing required fields
-  xlsx_valid.xlsx           — valid XLSX file, same row mix as valid_import.csv (for XLSX parser tests)
+  valid_import.xlsx         — same row mix as valid_import.csv, for XLSX parser tests
 ```
-
-> **ADR-0060:** XLSX is now a fully supported import format via `ExcelImportParser`. The fixture was updated accordingly — `xlsx_attempt.xlsx` (rejected) no longer applies.
-
-**TDD — write unit tests first, then implement:**
-
-1. Write unit tests (no database — mock profile, assert output):
-   - `ParseAsync` with `valid_import.csv` → returns 10 rows with correct fields
-   - Negative debit in CSV → amount flipped to positive in parsed row
-   - Column mapping applied → date/amount/description mapped from correct columns
-   - `GenerateFingerprint(row)` → deterministic hash of (date, amount, description, accountId)
-     All tests fail.
-2. Implement `ImportService.ParseAsync`, sign-flip logic, fingerprint generation.
-3. All unit tests pass.
 
 ---
 
 ### 3.3 — ImportService (integration layer) ✅
 
-**TDD — write integration tests first, then implement:**
+**What was built:**
 
-1. Write integration tests:
-   - Full import of `valid_import.csv` → exactly 10 transactions inserted; all new rows have `NeedsReview = true`
-   - Import of `duplicate_candidates.csv` → matching uncleared transactions are marked `IsCleared = true`; no duplicate rows inserted; `RowsReconciled` count correct
-   - `ImportResult` returns correct counts: `RowsImported`, `RowsReconciled`, `RowsFailed`
-     All tests fail.
-2. Wire `ImportService` to `TransactionService.CreateAsync`.
-3. All integration tests pass.
+`ImportService.ImportAsync` is format-blind — delegates parsing to `ImportParserFactory`, then runs:
 
-> **ADR-0060:** Reconciliation is now match-then-skip — a matched uncleared transaction is cleared and the incoming row is NOT inserted. `RowsFlagged` is replaced by `RowsReconciled`. All newly inserted rows carry `NeedsReview = true` regardless of match status.
+1. **Reconciliation pass** — for each row, search the destination account for an existing uncleared transaction where `Amount == Math.Abs(row.Amount)` and `Math.Abs(dateDiff) <= 1 day`. If matched: set `IsCleared = true` on the existing transaction, skip row insertion, increment `RowsReconciled`. This is match-then-skip — no duplicate is ever created.
+2. **Insert pass** — unmatched rows create a new transaction. Category is inferred from amount sign: positive → Uncategorized Income, negative → Uncategorized Expense. `NeedsReview = true` is set on every inserted row.
+
+`ImportResult` shape: `RowsImported`, `RowsReconciled`, `RowsFlagged` (reserved for Plan B staging), `RowsFailed`, `Errors`.
+
+**Test coverage:** `ImportServiceTests` (integration) — valid CSV, valid XLSX, reconciliation match, sign-based category assignment, `NeedsReview` flag.
 
 ---
 
-### 3.4 — Import UI ✅
+### 3.4 — Import UI + API ✅
 
-**TDD — write API test first, then implement:**
+**What was built:**
 
-1. Write `WebApplicationFactory` test: POST multipart form with `valid_import.csv` → 200 with `ImportResult` JSON matching expected shape. Test fails.
-2. Add `ImportApiController` in `Controllers/Api/`.
-3. Implement the endpoint. Test passes.
-4. Add import upload form (Razor page): profile selector dropdown + file input. Summary page shows counts and row-level errors.
+- `POST /api/import/headers` (`ImportHeadersController`) — accepts a multipart file upload; returns `HeaderDetectionResult` (header list + auto-matched field suggestions); used by the form's Continue button JS
+- `POST /api/import` (`ImportApiController`) — full import pipeline; returns `ImportResult` JSON
+- 10 MB size limit enforced at controller level before parsing
 
-**UI/UX:**
+**Import form (`Views/Import/Index.cshtml`) — three-step progressive disclosure:**
 
-- Upload form: three-step card flow (File + Account → Column mapping → Review summary) with explicit Continue buttons and per-step validation; toggle switch for flip-sign (Tailwind `peer`/`peer-checked:` pattern — must be inline in HTML, not `@apply`); see ADR-0060
-- Summary: four Card tiles — Imported (green) / Reconciled (blue) / Needs Review (yellow) / Failed (red) — with counts; save-profile prompt if no saved profile was used
-- Rows in Transactions Index with `NeedsReview = true`: amber "Needs review" Badge with Lucide `alert-triangle` icon, rendered by `ClearedBadge` React component via `data-needs-review` prop
+- **Step 1:** File picker + Account dropdown + Continue button. Continue triggers `fetch('/api/import/headers')` — user opts in, no auto-reveal on file change. Inline validation alert if either field is empty.
+- **Step 2:** Column mapping dropdowns (Date, Amount, Description, Category) pre-populated from detected headers with auto-selected best matches. Saved profile selector shown only if profiles exist. Flip-sign toggle styled as a CSS toggle switch (`peer`/`peer-checked:` Tailwind pattern — must be inline HTML, not `@apply`). Continue validates required dropdowns are set.
+- **Step 3:** Review summary `<dl>` showing file name, account, and mapped columns. Import submit button. Back button. Red Cancel button that calls `form.reset()` and returns to Step 1 (not a page navigation — restarts the flow).
+
+**Import summary (`Views/Import/Summary.cshtml`):**
+
+Four count tiles: Imported (green) / Reconciled (blue) / Needs Review (yellow) / Failed (red/gray). Save-profile prompt shown when no saved profile was used — name field + Save + Skip. If a saved profile was used, prompt is suppressed.
+
+**`ClearedBadge` React component** (built in Stage 2.5.3) extended to handle `needsReview` prop: renders amber "Needs review" badge with Lucide `alert-triangle` when `NeedsReview = true` and not yet cleared. Razor view passes `data-needs-review` attribute.
+
+**Test coverage:** `ImportApiTests` (integration via `WebApplicationFactory`) — `/api/import/headers` with valid CSV, `/api/import` with valid file.
 
 ---
 
