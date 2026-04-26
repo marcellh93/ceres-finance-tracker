@@ -395,8 +395,10 @@ ProjectCeres.Tests/Fixtures/
   valid_import.csv          — 10 rows, mix of income/expense, all clean
   duplicate_candidates.csv  — rows partially matching existing test transactions (date ±1 day, same amount)
   invalid_rows.csv          — malformed dates, missing required fields
-  xlsx_attempt.xlsx         — rejected file type
+  xlsx_valid.xlsx           — valid XLSX file, same row mix as valid_import.csv (for XLSX parser tests)
 ```
+
+> **ADR-0060:** XLSX is now a fully supported import format via `ExcelImportParser`. The fixture was updated accordingly — `xlsx_attempt.xlsx` (rejected) no longer applies.
 
 **TDD — write unit tests first, then implement:**
 
@@ -404,7 +406,6 @@ ProjectCeres.Tests/Fixtures/
    - `ParseAsync` with `valid_import.csv` → returns 10 rows with correct fields
    - Negative debit in CSV → amount flipped to positive in parsed row
    - Column mapping applied → date/amount/description mapped from correct columns
-   - XLSX file → `ImportResult` with error "Only CSV files are supported. Please export your bank statement as CSV."
    - `GenerateFingerprint(row)` → deterministic hash of (date, amount, description, accountId)
      All tests fail.
 2. Implement `ImportService.ParseAsync`, sign-flip logic, fingerprint generation.
@@ -417,12 +418,14 @@ ProjectCeres.Tests/Fixtures/
 **TDD — write integration tests first, then implement:**
 
 1. Write integration tests:
-   - Full import of `valid_import.csv` → exactly 10 transactions inserted, all `IsCleared = true`
-   - Import of `duplicate_candidates.csv` → flagged rows inserted with `IsCleared = false`, not auto-cleared
-   - `ImportResult` returns correct counts: `rowsImported`, `rowsFlagged`, `rowsFailed`
+   - Full import of `valid_import.csv` → exactly 10 transactions inserted; all new rows have `NeedsReview = true`
+   - Import of `duplicate_candidates.csv` → matching uncleared transactions are marked `IsCleared = true`; no duplicate rows inserted; `RowsReconciled` count correct
+   - `ImportResult` returns correct counts: `RowsImported`, `RowsReconciled`, `RowsFailed`
      All tests fail.
 2. Wire `ImportService` to `TransactionService.CreateAsync`.
 3. All integration tests pass.
+
+> **ADR-0060:** Reconciliation is now match-then-skip — a matched uncleared transaction is cleared and the incoming row is NOT inserted. `RowsFlagged` is replaced by `RowsReconciled`. All newly inserted rows carry `NeedsReview = true` regardless of match status.
 
 ---
 
@@ -437,9 +440,9 @@ ProjectCeres.Tests/Fixtures/
 
 **UI/UX:**
 
-- Upload form: shadcn/ui `Select` for profile, file input with drag-and-drop affordance
-- Summary: Card per result category (Imported / Flagged / Failed) with counts and expandable error list
-- Flagged rows in Transactions Index: amber "Needs review" Badge with Lucide `alert-triangle` icon
+- Upload form: three-step card flow (File + Account → Column mapping → Review summary) with explicit Continue buttons and per-step validation; toggle switch for flip-sign (Tailwind `peer`/`peer-checked:` pattern — must be inline in HTML, not `@apply`); see ADR-0060
+- Summary: four Card tiles — Imported (green) / Reconciled (blue) / Needs Review (yellow) / Failed (red) — with counts; save-profile prompt if no saved profile was used
+- Rows in Transactions Index with `NeedsReview = true`: amber "Needs review" Badge with Lucide `alert-triangle` icon, rendered by `ClearedBadge` React component via `data-needs-review` prop
 
 ---
 
@@ -697,7 +700,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 ### Reconciliation / IsCleared
 
 - [ ] Record a transaction manually → `IsCleared = false` by default; toggle to `true` via Edit view → badge updates _(manual — requires browser)_
-- [ ] Fingerprint matching: import a CSV row with date ±1 day and same amount as an existing transaction → row imported with `IsCleared = false` and "Needs review" badge _(partial — IsCleared = false is tested; "Needs review" badge not present in Transactions Index view)_
+- [x] Reconciliation: import a CSV row matching an existing uncleared transaction (date ±1 day, same amount) → existing transaction marked `IsCleared = true`; no duplicate inserted; `RowsReconciled` count correct _(ADR-0060: match-then-skip; "Needs review" badge rendered by `ClearedBadge` on all newly inserted rows)_
 - [ ] "Different transaction" reconciliation: user marks the flagged row as a new distinct transaction → row cleared automatically; no manual follow-up required _(not implemented)_
 - [x] Bulk "Mark all cleared" within a date range → all transactions in range set to `IsCleared = true`
 - [x] **UI/UX (Stage 2.1):** Transactions Index — each row shows `IsCleared` badge (green "Cleared" / amber "Pending"); Transaction Edit has a toggle to manually mark cleared
@@ -726,7 +729,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### CSV Import
 
-- [x] Upload `valid_import.csv` with a correctly configured profile → 10 transactions created, all `IsCleared = true`; summary shows "10 imported, 0 flagged, 0 errors"
+- [x] Upload `valid_import.csv` with a correctly configured profile → 10 transactions created, all `NeedsReview = true`; summary shows correct `RowsImported` count _(ADR-0060: import no longer sets `IsCleared = true`; category inferred from amount sign)_
 - [ ] Upload a valid `.xlsx` file with a correctly configured Excel profile → transactions imported; summary shows correct counts
 - [ ] Upload `.xlsx` with multiple worksheets and no SheetName set on profile → first sheet is read; import succeeds
 - [ ] Upload `.xlsx` with SheetName set on profile → named sheet is read; other sheets ignored
@@ -734,14 +737,14 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [ ] Upload `.xlsx` file exceeding 10 MB size limit → rejected before parsing
 - [ ] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression
 - [ ] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(covered by ImportParserFactoryTests)_
-- [ ] Upload `duplicate_candidates.csv` → flagged rows appear in Transactions Index with `IsCleared = false` and "Needs review" badge; summary shows correct flagged count _(partial — IsCleared = false and flagged count are tested; "Needs review" badge not present in Transactions Index view)_
+- [x] Upload `duplicate_candidates.csv` → matched uncleared transactions are cleared; no duplicate rows inserted; summary shows correct `RowsReconciled` count; all newly inserted rows show amber "Needs review" badge in Transactions Index _(ADR-0060)_
 - [x] Create an `ImportProfile` → mappings saved; auto-applied on next import of same-format CSV
 - [x] Soft-delete an `ImportProfile` → excluded from active list; appears in deleted list with 90-day countdown
 - [x] Recover a soft-deleted profile within 90 days → profile restored to active list
 - [x] Negative debit in CSV → imported as positive amount with correct Expense category direction
 - [x] **UI/UX (Stage 3.1):** ImportProfile Index — deleted profiles show 90-day countdown; Recover button has Lucide `rotate-ccw` icon _(manual — requires browser)_
-- [x] **UI/UX (Stage 3.4):** Import upload form — profile selector uses shadcn/ui Select; summary page shows Card per result category (Imported / Flagged / Failed) with counts _(manual — requires browser)_
-- [x] **UI/UX (Stage 3.4):** Flagged rows in Transactions Index — amber "Needs review" Badge with Lucide `alert-triangle` icon visible on flagged imports
+- [x] **UI/UX (Stage 3.4 / ADR-0060):** Import form is a three-step card flow with explicit Continue buttons, per-step validation alerts, and a CSS toggle switch for flip-sign; summary shows four tile cards (Imported / Reconciled / Needs Review / Failed); save-profile prompt appears when no saved profile was used _(manual — requires browser)_
+- [x] **UI/UX (Stage 3.4):** Rows with `NeedsReview = true` in Transactions Index — amber "Needs review" Badge with Lucide `alert-triangle` icon rendered by `ClearedBadge` component
 
 ### Transfer Attachments
 
