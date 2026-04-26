@@ -166,6 +166,33 @@
   .row-inactive td { @apply opacity-50 italic; }
   .actions        { @apply flex gap-3 items-center; }
 
+  /* ─── Import Summary Cards ──────────────────────────── */
+
+  .summary-cards          { @apply grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6; }
+  .summary-card           { @apply flex flex-col items-center justify-center p-4 text-center; }
+  .summary-card__value    { @apply text-3xl font-bold mb-1; }
+  .summary-card__label    { @apply flex items-center gap-1 text-sm font-medium; }
+
+  .summary-card--success  { @apply border-green-200 bg-green-50; }
+  .summary-card--success .summary-card__value  { @apply text-green-700; }
+  .summary-card--success .summary-card__label  { @apply text-green-600; }
+
+  .summary-card--info     { @apply border-blue-200 bg-blue-50; }
+  .summary-card--info .summary-card__value     { @apply text-blue-700; }
+  .summary-card--info .summary-card__label     { @apply text-blue-600; }
+
+  .summary-card--warning  { @apply border-yellow-200 bg-yellow-50; }
+  .summary-card--warning .summary-card__value  { @apply text-yellow-700; }
+  .summary-card--warning .summary-card__label  { @apply text-yellow-600; }
+
+  .summary-card--danger   { @apply border-red-200 bg-red-50; }
+  .summary-card--danger .summary-card__value   { @apply text-red-700; }
+  .summary-card--danger .summary-card__label   { @apply text-red-600; }
+
+  .summary-card--neutral  { @apply border-gray-200 bg-gray-50; }
+  .summary-card--neutral .summary-card__value  { @apply text-gray-600; }
+  .summary-card--neutral .summary-card__label  { @apply text-gray-500; }
+
   /* ─── Dashboard ─────────────────────────────────────── */
 
   .dashboard-grid    { @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8; }
@@ -186,6 +213,7 @@
   .amount-income  { @apply text-green-600 font-medium; font-family: 'IBM Plex Mono', ui-monospace, monospace; }
   .amount-expense { @apply text-red-600 font-medium; font-family: 'IBM Plex Mono', ui-monospace, monospace; }
   .amount-neutral { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  .amount-mono    { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
   .link-danger    { @apply text-red-600 hover:text-red-800 text-sm; }
   .pagination     { @apply flex gap-1 mt-4 text-sm; }
 }
