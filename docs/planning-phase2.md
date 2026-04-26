@@ -67,38 +67,47 @@ for moving to Phase 3 — not a deadline, but a quality bar.
 - Confirmed nice-to-have reports: Budget vs. Actual, Largest Expenses, Monthly Cash Flow Trend, Net Worth Over Time (see ADR-0054)
 - **UI component library — shadcn/ui:** Migrate views from Tailwind `@apply`-based classes to shadcn/ui React components. Inline Tailwind utilities replace `@apply` patterns.
 - **Charting library — Chart.js** via `react-chartjs-2` wrapper. Covers all seven dashboard chart types. See ADR-0033.
-- **CSV import only** — OFX deferred to Phase 3/4 (see ADR-0046). Bank exports represent debits as negative numbers — import logic flips signs and infers direction from mapped category. Column mapping via saved `ImportProfile` (see ADR-0047).
+- **CSV and XLSX import** — OFX deferred to Phase 3/4 (see ADR-0046). Format dispatched via `IImportParser` / `ImportParserFactory` (see ADR-0059). Column mapping via saved `ImportProfile` (see ADR-0047). Stepped 3-card import form with progressive disclosure (see ADR-0060).
 
-### **CSV Import flow**
+### **Import flow**
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Controller
+    participant HeaderDetectionService
     participant ImportService
-    participant ProfileService
+    participant IImportParser
     participant TransactionService
     participant DbContext
 
-    User->>Controller: Upload CSV file + select profile
-    Controller->>ProfileService: GetProfile(profileId)
-    ProfileService-->>Controller: ImportProfile (column mappings)
-    Controller->>ImportService: ParseAsync(file, profile)
-    ImportService->>ImportService: Map columns using profile
-    ImportService->>ImportService: Flip sign on negative debits → positive amount
-    ImportService->>ImportService: Infer income/expense from mapped category
-    ImportService->>ImportService: Fingerprint match against existing transactions
-    loop Each valid row (no duplicate candidate)
-        ImportService->>TransactionService: CreateAsync(rowViewModel, isCleared: true)
-        TransactionService->>DbContext: Insert Transaction
+    User->>Controller: Step 1 — upload file + select account
+    Controller->>HeaderDetectionService: DetectAsync(file)
+    HeaderDetectionService-->>Controller: HeaderDetectionResult (headers + auto-matched columns)
+    Controller->>User: Step 2 — column mapping pre-populated; user confirms or adjusts
+    User->>Controller: Step 3 — review summary, click Import
+    Controller->>ImportService: ImportAsync(file, accountId, mappings)
+    ImportService->>IImportParser: ParseAsync(stream, mappings)
+    IImportParser-->>ImportService: IReadOnlyList<ParsedImportRow>
+    loop Each parsed row
+        ImportService->>ImportService: Reconciliation pass — match by amount + date ±1 day
+        alt Row matches existing transaction
+            ImportService->>TransactionService: MarkClearedAsync(existingId, cleared: true)
+        else No match — new transaction
+            ImportService->>ImportService: Sign-based category fallback (+ → Uncategorized Income, - → Uncategorized Expense)
+            ImportService->>DbContext: Insert Transaction (IsCleared=true, NeedsReview=true)
+        end
     end
-    loop Each flagged row (potential duplicate)
-        ImportService->>TransactionService: CreateAsync(rowViewModel, isCleared: false)
-        TransactionService->>DbContext: Insert Transaction (held for reconciliation)
-    end
-    ImportService-->>Controller: ImportResult (rows saved, rows flagged, rows failed)
-    Controller->>User: Summary (n imported, n flagged for review, n errors)
+    ImportService-->>Controller: ImportResult (RowsImported, RowsReconciled, RowsFlagged, RowsFailed)
+    Controller->>User: Summary — 4-card result + optional save-profile prompt
 ```
+
+**Key decisions in the import flow:**
+
+- **No default category required** — category is inferred from sign: positive amount → `Uncategorized Income`, negative → `Uncategorized Expense`. Both are seeded with fixed GUIDs and `IsSystem = false` (so they appear in transaction lists and affect balances). GUID-based guard in `CategoryService` prevents editing or deactivation. See ADR-0060.
+- **Reconciliation pass** — before inserting, each row is matched against existing uncleared transactions by `Math.Abs(amount)` equality and date ±1 day. A match marks the existing transaction `IsCleared = true` (no new row inserted, count as `RowsReconciled`).
+- **Header auto-detection** — `IHeaderDetectionService.DetectAsync` is called on the file after Step 1. It reads the first row and keyword-matches column names (e.g. "fecha" → Date). Result pre-populates Step 2 dropdowns. Detection is best-effort; user can override any mapping.
+- **Profile save after import** — if the user mapped columns manually (no saved profile used), the Summary screen offers to save the mapping as a named profile for future imports.
 
 - **CSV export** — sanitize all fields before writing. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix any such cell value with a single quote (`'`) to neutralize CSV injection.
 - File attachments on transactions (receipts, invoices) — built in Phase 1, carried forward
