@@ -12,6 +12,9 @@ public class ImportController(
     IImportProfileService profileService,
     AppDbContext db) : Controller
 {
+    private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
+    private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
+
     public async Task<IActionResult> Index()
     {
         await PopulateViewBagAsync();
@@ -108,7 +111,9 @@ public class ImportController(
         ViewBag.Categories = new SelectList(
             await db.Categories
                 .Include(c => c.CategoryType)
-                .Where(c => c.IsActive && !c.IsSystem && c.CategoryType.Name == "Expense")
+                .Where(c => c.IsActive && !c.IsSystem
+                         && c.Id != UncategorizedIncomeId && c.Id != UncategorizedExpenseId
+                         && c.CategoryType.Name == "Expense")
                 .OrderBy(c => c.Name)
                 .ToListAsync(),
             "Id", "Name");

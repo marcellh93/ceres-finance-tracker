@@ -85,4 +85,25 @@ public class CategoryServiceTests : IAsyncLifetime
         var reloaded = await _fixture.Db.Categories.FindAsync(NonSystemCategoryId);
         reloaded!.IsActive.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task UpdateAsync_UncategorizedIncomeCategory_Throws()
+    {
+        var act = async () => await _service.UpdateAsync(new CategoryEditViewModel
+        {
+            Id   = new Guid("20000000-0000-0000-0000-000000000025"),
+            Name = "Renamed"
+        });
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*System categories*");
+    }
+
+    [Fact]
+    public async Task DeactivateAsync_UncategorizedExpenseCategory_Throws()
+    {
+        var act = async () => await _service.DeactivateAsync(
+            new Guid("20000000-0000-0000-0000-000000000026"));
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*System categories*");
+    }
 }
