@@ -7,6 +7,7 @@ interface CategoryBudgetItem {
   id: string
   categoryName: string
   currencyCode: string
+  currencySymbol: string
   spent: number
   limit: number
   percentUsed: number
@@ -43,8 +44,8 @@ export function CategoryBudgetBars() {
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">{item.categoryName}</span>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">
-                  {item.spent.toFixed(2)} / {item.limit.toFixed(2)} {item.currencyCode}
+                <span className="text-muted-foreground" style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>
+                  {item.currencySymbol || item.currencyCode} {item.spent.toFixed(2)} / {item.currencySymbol || item.currencyCode} {item.limit.toFixed(2)}
                 </span>
                 <Badge variant={statusVariant(item.percentUsed)} className="text-xs">
                   {item.percentUsed}%

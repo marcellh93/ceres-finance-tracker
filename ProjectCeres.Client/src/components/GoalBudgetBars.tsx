@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Badge } from '@/components/ui/badge'
 
 interface GoalBudgetItem {
   id: string
@@ -11,6 +10,7 @@ interface GoalBudgetItem {
   targetAmount: number
   percentUsed: number
   currencyCode: string
+  currencySymbol: string
 }
 
 export function GoalBudgetBars() {
@@ -40,8 +40,8 @@ export function GoalBudgetBars() {
                 <span className="font-medium">{item.name}</span>
                 <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">{item.goalType}</span>
               </div>
-              <span className="text-muted-foreground">
-                {item.amountProgress.toFixed(2)} / {item.targetAmount.toFixed(2)} {item.currencyCode}
+              <span className="text-muted-foreground" style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>
+                {item.currencySymbol || item.currencyCode} {item.amountProgress.toFixed(2)} / {item.currencySymbol || item.currencyCode} {item.targetAmount.toFixed(2)}
               </span>
             </div>
             <Progress value={Math.min(item.percentUsed, 100)} className="h-2" />
