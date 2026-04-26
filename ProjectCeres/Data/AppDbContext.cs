@@ -275,7 +275,11 @@ public class AppDbContext : DbContext
             new Category { Id = new Guid("20000000-0000-0000-0000-000000000021"), Name = "Travel",             CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
             new Category { Id = new Guid("20000000-0000-0000-0000-000000000022"), Name = "Home & Garden",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
             new Category { Id = new Guid("20000000-0000-0000-0000-000000000023"), Name = "Gifts & Donations",  CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000024"), Name = "Other Expenses",     CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = null     }
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000024"), Name = "Other Expenses",         CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = null     },
+
+            // --- System (uncategorized fallbacks) ---
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000025"), Name = "Uncategorized Income",  CategoryTypeId = 1, IsActive = true, IsSystem = true,  LifestyleTag = null },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000026"), Name = "Uncategorized Expense", CategoryTypeId = 2, IsActive = true, IsSystem = true,  LifestyleTag = null }
         );
     }
 
