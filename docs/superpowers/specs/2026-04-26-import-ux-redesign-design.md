@@ -18,6 +18,7 @@ The current import form is a wall of options with no guidance. A first-time user
 2. Repeat imports for a known bank feel like one click.
 3. Transfer detection is automatic, not manual config.
 4. The form never blocks progress — ambiguous rows are handled as a separate follow-up.
+5. Import doubles as bank reconciliation — matching rows clear existing transactions instead of creating duplicates.
 
 ---
 
@@ -93,7 +94,34 @@ Rows that land in Uncategorized Income/Expense are flagged "Needs Review" and su
 
 ---
 
-### 4. Transfer Detection — Two-Pass Staging
+### 4. Reconciliation — Match Before Creating
+
+Before creating any new transaction, the importer checks whether the row already exists in Ceres. This is the reconciliation pass.
+
+#### Matching logic
+
+For each imported row, search the destination account for an existing transaction where:
+
+- `Amount` equals the row amount (after debit-flip applied), AND
+- `Date` is within ±1 day of the row date
+
+If a match is found → set `IsCleared = true` on the existing transaction. Do not create a new record. Count this as a "reconciled" row.
+
+If no match is found → create a new transaction with `IsCleared = true` (the bank confirms it happened). Apply Uncategorized Income/Expense fallback as needed.
+
+If multiple candidates match (same amount, same date range) → stage for manual confirmation. Show the user the candidates so they can pick which one to clear, or confirm it's genuinely a new transaction.
+
+#### Date tolerance
+
+Default: ±1 day. This accounts for users who enter transactions on the day they notice them rather than the bank's value date. The tolerance will be made configurable via the Settings table in a future iteration.
+
+#### Summary page — reconciliation count
+
+The summary gains a fourth count card: **Reconciled** (rows that matched and cleared an existing transaction). This makes the import result legible: "12 new, 8 reconciled, 2 staged for review, 0 failed."
+
+---
+
+### 5. Transfer Detection — Two-Pass Staging
 
 Transfers in Ceres are movements between two accounts the user owns. Transfer detection is fully automatic — no user config required on the import form.
 
@@ -102,7 +130,7 @@ Transfers in Ceres are movements between two accounts the user owns. Transfer de
 For each row, the importer checks:
 
 1. **Intra-file pairing:** Does another row in the same file have the opposite sign and same absolute amount on the same date? If yes → stage both as a suspected transfer pair.
-2. **Cross-account pairing:** Does an existing transaction in another Ceres account have the opposite sign, same absolute amount, and same date (±1 day tolerance)? If yes → stage as a suspected transfer with a candidate match.
+2. **Cross-account pairing:** Does an existing transaction in another Ceres account have the opposite sign, same absolute amount, and same date (±1 day, same tolerance as reconciliation)? If yes → stage as a suspected transfer with a candidate match.
 3. **Keyword training:** Has the user previously dismissed a row with this description pattern as "not a transfer"? If yes → skip staging, import directly as transaction.
 
 Rows that don't trigger any of the above import immediately as transactions (with Uncategorized fallback if needed).
@@ -123,7 +151,7 @@ A lightweight table (`ImportTransferExclusion`) with columns: `DescriptionPatter
 
 ---
 
-### 5. New Database Table — `ImportStagedTransfer`
+### 6. New Database Table — `ImportStagedTransfer`
 
 Holds rows that couldn't be auto-resolved during import.
 
@@ -141,21 +169,22 @@ Holds rows that couldn't be auto-resolved during import.
 
 ---
 
-### 6. Summary Page Changes
+### 7. Summary Page Changes
 
-After import, the summary shows:
+After import, the summary shows four count cards:
 
-- Rows imported (unchanged)
-- Rows flagged for review (unchanged)
-- **Rows staged for transfer review** (new count card)
-- Rows failed (unchanged)
+- **Imported** — new transactions created (unchanged)
+- **Reconciled** — existing transactions matched and cleared (new)
+- **Needs Review** — imported with Uncategorized category, awaiting categorization (unchanged)
+- **Staged for Transfer Review** — rows held pending transfer resolution (new)
+- **Failed** — rows that could not be parsed (unchanged)
 
 If staged rows > 0: link to Transfer Review screen.
 If import succeeded: "Save these settings as a profile for next time?" prompt (name field + Save + Skip).
 
 ---
 
-### 7. Out of Scope for This Iteration
+### 8. Out of Scope for This Iteration
 
 - Auto-categorization by description keywords (Phase 3)
 - Bulk categorization UI on the transaction list (separate improvement)
