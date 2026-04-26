@@ -183,7 +183,8 @@ ProjectCeres/
     CsvImportParser.cs                            ← CSV parsing via CsvHelper
     ExcelImportParser.cs                          ← XLSX parsing via ClosedXML; magic bytes check; sheet selection
     ImportParserFactory.cs                        ← routes ImportFormat → IImportParser; one line per format
-    IImportProfileService.cs / ImportProfileService.cs  ← CRUD + soft delete for ImportProfile
+    ICsvImportProfileService.cs / CsvImportProfileService.cs  ← CRUD + soft delete for ImportProfile
+    IHeaderDetectionService.cs / HeaderDetectionService.cs    ← reads first row of CSV/XLSX; keyword-matches headers to date/amount/description/category fields; returns HeaderDetectionResult
   Models/              ← EF Core entity classes (Account.cs, Transaction.cs, etc.)
   ViewModels/          ← one Create + one Edit ViewModel per write operation
   Helpers/

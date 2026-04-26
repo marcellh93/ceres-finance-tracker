@@ -373,6 +373,12 @@ all transactions in a date range to cleared; (3) the `IsClearedSwitch` React com
 embedded in the Transaction Edit form, which writes to a hidden field submitted with the
 standard form POST.
 
+**Needs review flag (Phase 2):**
+`NeedsReview bool NOT NULL DEFAULT false` — set to `true` automatically on every transaction
+created by the import pipeline. Signals that the transaction has not been manually verified
+and may need recategorisation. The user clears this flag after reviewing the imported row.
+Not exposed as a standalone toggle yet — displayed in the Transactions list as a badge.
+
 ---
 
 ### TransactionAttachment
@@ -870,13 +876,15 @@ Hard delete with confirmation. See ADR-0042.
 
 ### ImportProfile (new entity — Phase 2)
 
-Stores named column mapping profiles for CSV and Excel import. See ADR-0047.
+Stores named column mapping profiles for CSV and Excel import. See ADR-0047, ADR-0059.
 
 | Column | Type | Constraints | Notes |
 |---|---|---|---|
 | Id | uuid | PK | |
 | Name | varchar | NOT NULL | User-given name e.g. "BBVA" |
-| Mappings | jsonb | NOT NULL | Stored as `ImportColumnMappings` — `{ "date": "Fecha", "amount": "Importe", ... }` |
+| ColumnMappings | varchar/jsonb | NOT NULL | Serialised `ImportColumnMappings` — `{ "dateColumn": "Fecha", "amountColumn": "Importe", ... }` |
+| Format | varchar | NOT NULL DEFAULT 'Csv' | `Csv` or `Excel` — stored as `ImportFormat` enum string |
+| SheetName | varchar | NULL | Excel only: override which worksheet to read. Null = first worksheet. |
 | CreatedAt | datetime | NOT NULL | |
 | DeletedAt | datetime | NULL | Soft delete — 90-day recovery window shown to user |
 
