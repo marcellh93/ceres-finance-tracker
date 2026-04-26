@@ -17,6 +17,7 @@
 3. [Stage 2 — Cleared / Reconciliation Status](#stage-2--cleared--reconciliation-status)
 4. [Stage 2.5 — Movement Base Class + Unified Ledger](#stage-25--movement-base-class--unified-ledger)
 5. [Stage 3 — CSV Import](#stage-3--csv-import)
+   - [3.5 — Transfer Detection + Staging (Plan B)](#35--transfer-detection--staging-plan-b)
 6. [Stage 4 — Transfer Attachments](#stage-4--transfer-attachments)
 7. [Stage 5 — Liability Enhancements](#stage-5--liability-enhancements)
 8. [Stage 6 — Recurring Reminder Enhancements](#stage-6--recurring-reminder-enhancements)
@@ -369,7 +370,9 @@ The inline "Clear / Unmark" form-submit buttons on the Transactions and Transfer
 
 Most complex Stage. Sub-stages ensure TDD leads every layer.
 
-### 3.1 — ImportProfile CRUD
+> **Status (as of 2026-04-26):** Sub-stages 3.1–3.4 are complete (Plan A — `2026-04-26-import-ux-redesign-plan-a.md`). Sub-stage 3.5 (Plan B — transfer detection and staging) is designed and pending implementation.
+
+### 3.1 — ImportProfile CRUD ✅
 
 **TDD — write tests first, then implement:**
 
@@ -386,7 +389,7 @@ Most complex Stage. Sub-stages ensure TDD leads every layer.
 
 ---
 
-### 3.2 — ImportService (unit layer)
+### 3.2 — ImportService (unit layer) ✅
 
 Create fixture files before writing any service code:
 
@@ -413,7 +416,7 @@ ProjectCeres.Tests/Fixtures/
 
 ---
 
-### 3.3 — ImportService (integration layer)
+### 3.3 — ImportService (integration layer) ✅
 
 **TDD — write integration tests first, then implement:**
 
@@ -429,7 +432,7 @@ ProjectCeres.Tests/Fixtures/
 
 ---
 
-### 3.4 — Import UI
+### 3.4 — Import UI ✅
 
 **TDD — write API test first, then implement:**
 
@@ -443,6 +446,60 @@ ProjectCeres.Tests/Fixtures/
 - Upload form: three-step card flow (File + Account → Column mapping → Review summary) with explicit Continue buttons and per-step validation; toggle switch for flip-sign (Tailwind `peer`/`peer-checked:` pattern — must be inline in HTML, not `@apply`); see ADR-0060
 - Summary: four Card tiles — Imported (green) / Reconciled (blue) / Needs Review (yellow) / Failed (red) — with counts; save-profile prompt if no saved profile was used
 - Rows in Transactions Index with `NeedsReview = true`: amber "Needs review" Badge with Lucide `alert-triangle` icon, rendered by `ClearedBadge` React component via `data-needs-review` prop
+
+---
+
+### 3.5 — Transfer Detection + Staging (Plan B)
+
+> **Status:** Designed (`docs/superpowers/specs/2026-04-26-import-ux-redesign-design.md` §§ 4–6). Implementation plan not yet written. Prerequisite: 3.1–3.4 complete ✅.
+
+During import, rows that look like inter-account transfers are staged for manual review rather than imported as plain transactions. No config on the import form — detection is automatic.
+
+**New schema:**
+
+| Table | Purpose |
+|---|---|
+| `ImportStagedTransfer` | Holds rows that triggered transfer detection but could not be auto-resolved — `Id`, `ImportedAt`, `AccountId`, `RawDate`, `RawAmount`, `RawDescription`, `CandidateTransactionId?`, `Status` (Pending / Linked / CreatedAsTransfer / DismissedAsTransaction), `ResolvedAt?` |
+| `ImportTransferExclusion` | Training store — description patterns the user has dismissed as "not a transfer"; checked during detection to skip re-staging |
+
+**Detection logic (two-pass, during `ImportService.ImportAsync`):**
+
+1. **Intra-file pairing** — does another row in the same file have the opposite sign and same absolute amount on the same date? Stage both as a suspected transfer pair.
+2. **Cross-account pairing** — does an existing transaction in another Ceres account have the opposite sign, same absolute amount, and date within ±1 day? Stage with the candidate match.
+3. **Exclusion check** — if the row's description matches an `ImportTransferExclusion` pattern, skip staging and import as a plain transaction.
+
+Rows that don't trigger any of the above are imported immediately as transactions (Uncategorized fallback applies as in 3.3).
+
+**Transfer Review screen:**
+
+A dedicated `/Import/TransferReview` page lists all `ImportStagedTransfer` rows with `Status = Pending`. For each row, three actions:
+
+- **Link to existing transaction** — shown when `CandidateTransactionId` is set; user confirms; pair becomes a `Transfer` record.
+- **Specify other account** — user picks the other account; system creates the full `Transfer`.
+- **Not a transfer** — dismissed; row becomes a plain transaction; description pattern saved to `ImportTransferExclusion`.
+
+A persistent nav indicator (similar to the "Needs Review" count) shows pending staged transfer count.
+
+**Summary page addition:**
+
+If `RowsStaged > 0` after import, a fifth tile — **Staged** (purple) — appears with a link to the Transfer Review screen. Existing four tiles (Imported / Reconciled / Needs Review / Failed) are unchanged.
+
+**TDD — write tests first, then implement:**
+
+1. Write integration tests for detection logic:
+   - Two rows in the same file with opposite signs and same amount on the same date → both staged, neither inserted as a transaction
+   - One imported row matching an existing transaction in a different account (opposite sign, same amount, ±1 day) → staged with `CandidateTransactionId` set
+   - Row with description matching an `ImportTransferExclusion` entry → not staged; imported as plain transaction
+   - All tests fail.
+2. Write integration tests for Transfer Review actions:
+   - "Link to existing" → `Transfer` record created; both staged row and candidate transaction marked resolved
+   - "Specify other account" → `Transfer` record created with correct accounts
+   - "Not a transfer" → staged row becomes plain transaction; `ImportTransferExclusion` entry created
+   - All tests fail.
+3. Add `ImportStagedTransfer` and `ImportTransferExclusion` models + migration.
+4. Extend `ImportService.ImportAsync` with the two-pass detection.
+5. Add `TransferReviewController` + `Views/Import/TransferReview.cshtml`.
+6. All tests pass; all existing 3.1–3.4 tests still pass.
 
 ---
 
@@ -738,6 +795,14 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [ ] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression
 - [ ] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(covered by ImportParserFactoryTests)_
 - [x] Upload `duplicate_candidates.csv` → matched uncleared transactions are cleared; no duplicate rows inserted; summary shows correct `RowsReconciled` count; all newly inserted rows show amber "Needs review" badge in Transactions Index _(ADR-0060)_
+- [ ] **Transfer Detection (Stage 3.5):** Two rows in same file with opposite signs and same amount → both staged; neither appears as a plain transaction in Transactions Index
+- [ ] **Transfer Detection (Stage 3.5):** Cross-account match (opposite sign, same amount, ±1 day) → staged with candidate transaction linked
+- [ ] **Transfer Detection (Stage 3.5):** Row matching an `ImportTransferExclusion` pattern → not staged; imported as plain transaction
+- [ ] **Transfer Review screen:** "Link to existing" → `Transfer` record created; staged row resolved
+- [ ] **Transfer Review screen:** "Specify other account" → `Transfer` record created with correct accounts
+- [ ] **Transfer Review screen:** "Not a transfer" → becomes plain transaction; description pattern saved to exclusion table; never staged again
+- [ ] **Summary (Stage 3.5):** When `RowsStaged > 0`, a Staged tile (purple) appears with link to Transfer Review screen
+- [ ] **Nav indicator (Stage 3.5):** Pending staged transfer count visible in nav when > 0
 - [x] Create an `ImportProfile` → mappings saved; auto-applied on next import of same-format CSV
 - [x] Soft-delete an `ImportProfile` → excluded from active list; appears in deleted list with 90-day countdown
 - [x] Recover a soft-deleted profile within 90 days → profile restored to active list
