@@ -5,12 +5,25 @@
     <h1>Import Summary</h1>
 </div>
 
+@if (!string.IsNullOrEmpty(TempData["SuccessMessage"]?.ToString()))
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+
 <div class="summary-cards">
     <div class="card summary-card summary-card--success">
         <div class="summary-card__value">@Model.RowsImported</div>
         <div class="summary-card__label">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             Imported
+        </div>
+    </div>
+
+    <div class="card summary-card summary-card--info">
+        <div class="summary-card__value">@Model.RowsReconciled</div>
+        <div class="summary-card__label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Reconciled
         </div>
     </div>
 
@@ -34,9 +47,9 @@
 @if (Model.RowsFlagged > 0)
 {
     <div class="alert alert-warning mt-4">
-        <strong>@Model.RowsFlagged row(s) flagged for review.</strong>
-        These transactions were imported with <span class="badge badge-warning">Needs Review</span> status because they closely match existing transactions. Please review them in
-        <a asp-controller="Transactions" asp-action="Index">Transactions</a>.
+        <strong>@Model.RowsFlagged row(s) need categorization.</strong>
+        These transactions were imported as <em>Uncategorized</em> because their category could not be determined.
+        <a asp-controller="Transactions" asp-action="Index">Review them in Transactions</a>.
     </div>
 }
 
@@ -53,7 +66,37 @@
     </div>
 }
 
-<div class="form-actions mt-6">
-    <a asp-controller="Transactions" asp-action="Index" class="btn btn-primary">View Transactions</a>
-    <a asp-action="Index" class="btn btn-secondary">Import Another File</a>
-</div>
+@if (Model.MappingsToSave is not null)
+{
+    <div class="card mt-6 p-4">
+        <h2 class="text-lg font-semibold mb-1">Save these settings for next time?</h2>
+        <p class="form-hint mb-4">Give this column mapping a name so you can reuse it on your next import.</p>
+
+        <form asp-action="SaveProfile" method="post" class="form-standard">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="dateColumn"        value="@Model.MappingsToSave.DateColumn" />
+            <input type="hidden" name="amountColumn"      value="@Model.MappingsToSave.AmountColumn" />
+            <input type="hidden" name="descriptionColumn" value="@Model.MappingsToSave.DescriptionColumn" />
+            <input type="hidden" name="categoryColumn"    value="@Model.MappingsToSave.CategoryColumn" />
+            <input type="hidden" name="flipDebitSign"     value="@Model.MappingsToSave.FlipDebitSign.ToString().ToLower()" />
+
+            <div class="form-group" style="max-width: 320px;">
+                <label for="profileName">Profile Name</label>
+                <input type="text" id="profileName" name="profileName" class="form-control"
+                       placeholder="e.g. Sabadell Checking" required />
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save Profile</button>
+                <a asp-action="Index" class="btn btn-secondary">Skip</a>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="form-actions mt-6">
+        <a asp-controller="Transactions" asp-action="Index" class="btn btn-primary">View Transactions</a>
+        <a asp-action="Index" class="btn btn-secondary">Import Another File</a>
+    </div>
+}
