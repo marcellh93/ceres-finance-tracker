@@ -70,6 +70,7 @@ builder.Services.AddSingleton<CsvImportParser>();
 builder.Services.AddSingleton<ExcelImportParser>();
 builder.Services.AddSingleton<ImportParserFactory>();
 builder.Services.AddScoped<IImportService, ImportService>();
+builder.Services.AddScoped<ITransferDetectionService, TransferDetectionService>();
 builder.Services.AddScoped<IHeaderDetectionService, HeaderDetectionService>();
 builder.Services.AddScoped<ILiabilityProjectionService, LiabilityProjectionService>();
 builder.Services.AddViteServices();

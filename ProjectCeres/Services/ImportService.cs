@@ -11,7 +11,8 @@ namespace ProjectCeres.Services;
 public class ImportService(
     ImportParserFactory parserFactory,
     AppDbContext? db = null,
-    ITransactionService? transactionService = null) : IImportService
+    ITransactionService? transactionService = null,
+    ITransferDetectionService? transferDetectionService = null) : IImportService
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
@@ -46,12 +47,44 @@ public class ImportService(
         var rows   = await ParseAsync(file, mappings);
         var result = new ImportResult();
 
+        // Load exclusion patterns for transfer detection
+        var exclusionPatterns = transferDetectionService is not null
+            ? await db.ImportTransferExclusions
+                .Select(e => e.DescriptionPattern)
+                .ToListAsync()
+            : (IReadOnlyList<string>)[];
+
+        // Load transactions from other accounts for cross-account matching
+        var crossAccountTxns = transferDetectionService is not null
+            ? await db.Transactions
+                .Where(t => t.AccountId != accountId)
+                .ToListAsync()
+            : (IReadOnlyList<Transaction>)[];
+
+        // Run transfer detection pass
+        HashSet<int> skipIndices = [];
+        if (transferDetectionService is not null)
+        {
+            var detection = transferDetectionService.Detect(rows, crossAccountTxns, exclusionPatterns, accountId);
+
+            foreach (var staged in detection.StagedRows)
+                db.ImportStagedTransfers.Add(staged);
+
+            await db.SaveChangesAsync();
+
+            skipIndices = detection.RowIndicesToSkip.ToHashSet();
+            result.RowsStaged = detection.StagedRows.Count;
+        }
+
         var existingTxns = await db.Transactions
             .Where(t => t.AccountId == accountId)
             .ToListAsync();
 
-        foreach (var row in rows)
+        for (int i = 0; i < rows.Count; i++)
         {
+            if (skipIndices.Contains(i)) continue;
+
+            var row = rows[i];
             try
             {
                 // Reconciliation pass: match by amount + date ±1 day
@@ -76,7 +109,7 @@ public class ImportService(
                 var vm = new TransactionCreateViewModel
                 {
                     Date        = row.Date,
-                    Amount      = Math.Abs(row.Amount), // store positive; direction from category type
+                    Amount      = Math.Abs(row.Amount),
                     Description = row.Description,
                     AccountId   = accountId,
                     CategoryId  = categoryId
