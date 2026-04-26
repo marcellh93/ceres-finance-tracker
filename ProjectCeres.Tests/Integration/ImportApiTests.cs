@@ -97,4 +97,22 @@ public class ImportApiTests(TestWebApplicationFactory factory)
         var body = await response.Content.ReadAsStringAsync();
         body.Should().NotContain("Only CSV files are supported");
     }
+
+    [Fact]
+    public async Task GetHeaders_ValidCsv_ReturnsDetectedHeaders()
+    {
+        var csv = "Fecha,Importe,Concepto\n17/04/2026,100.00,Test\n";
+        using var content = new MultipartFormDataContent();
+        content.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(csv)), "file", "test.csv");
+
+        var response = await _client.PostAsync("/api/import/headers", content);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ProjectCeres.ViewModels.HeaderDetectionResult>();
+        body.Should().NotBeNull();
+        body!.Headers.Should().Contain("Fecha");
+        body.DateColumn.Should().Be("Fecha");
+        body.AmountColumn.Should().Be("Importe");
+        body.DescriptionColumn.Should().Be("Concepto");
+    }
 }
