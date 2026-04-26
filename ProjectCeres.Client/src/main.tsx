@@ -10,9 +10,10 @@ import { GoalBudgetBars } from './components/GoalBudgetBars'
 const navbarEl = document.getElementById('navbar-root')
 if (navbarEl) {
   const upcomingCount = parseInt(navbarEl.dataset.upcomingCount ?? '0', 10)
+  const pendingTransfers = parseInt(navbarEl.dataset.pendingTransfers ?? '0', 10)
   createRoot(navbarEl).render(
     <StrictMode>
-      <Navbar upcomingPaymentsCount={upcomingCount} />
+      <Navbar upcomingPaymentsCount={upcomingCount} pendingTransfers={pendingTransfers} />
     </StrictMode>,
   )
 }
