@@ -7,30 +7,53 @@
 
 @if (!string.IsNullOrEmpty(TempData["ErrorMessage"]?.ToString()))
 {
-    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    <div class="alert alert-error">@TempData["ErrorMessage"]</div>
 }
 
-<form asp-action="Index" method="post" enctype="multipart/form-data" class="form-standard" id="import-form">
+<form asp-action="Index" method="post" enctype="multipart/form-data" id="import-form">
     @Html.AntiForgeryToken()
-    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+    <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
 
-    <div class="form-group">
-        <label asp-for="File">Bank Statement File</label>
-        <input asp-for="File" type="file" accept=".csv,.xlsx" class="form-control" id="import-file-input" />
-        <span asp-validation-for="File" class="field-error"></span>
-        <p class="form-hint">CSV and Excel (.xlsx) files are supported.</p>
+    @* Step 1: File + Account *@
+    <div class="import-step" id="step-1">
+        <div class="import-step-header">
+            <span class="import-step-badge">1</span>
+            <span class="import-step-title">Select file and account</span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="File">Bank Statement File</label>
+            <input asp-for="File" type="file" accept=".csv,.xlsx" class="form-control" id="import-file-input" />
+            <span asp-validation-for="File" class="field-error"></span>
+            <p class="form-hint">CSV and Excel (.xlsx) files are supported.</p>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="AccountId">Destination Account</label>
+            <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control" id="account-select">
+                <option value="">— Select Account —</option>
+            </select>
+            <span asp-validation-for="AccountId" class="field-error"></span>
+        </div>
+
+        <div id="step-1-alert" class="alert alert-warning" style="display:none">
+            Please choose a file and select an account before continuing.
+        </div>
+
+        <div>
+            <button type="button" class="btn btn-primary" id="step-1-next">
+                Continue
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-1"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
     </div>
 
-    <div class="form-group">
-        <label asp-for="AccountId">Destination Account</label>
-        <select asp-for="AccountId" asp-items="ViewBag.Accounts" class="form-control">
-            <option value="">— Select Account —</option>
-        </select>
-        <span asp-validation-for="AccountId" class="field-error"></span>
-    </div>
-
-    <div id="column-mapping-section" style="display:none">
-        <hr class="my-4" />
+    @* Step 2: Column Mapping *@
+    <div class="import-step" id="step-2" style="display:none">
+        <div class="import-step-header">
+            <span class="import-step-badge">2</span>
+            <span class="import-step-title">Map columns</span>
+        </div>
 
         @{
             var profiles = ViewBag.Profiles as Microsoft.AspNetCore.Mvc.Rendering.SelectList;
@@ -38,7 +61,7 @@
         @if (profiles != null && profiles.Any())
         {
             <div class="form-group">
-                <label asp-for="ProfileId">Use Saved Profile <span class="form-optional">(optional)</span></label>
+                <label asp-for="ProfileId">Use Saved Profile <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
                 <select asp-for="ProfileId" asp-items="ViewBag.Profiles" class="form-control" id="profile-select">
                     <option value="">— Map columns manually —</option>
                 </select>
@@ -46,7 +69,6 @@
         }
 
         <div id="manual-mapping">
-            <h3 class="form-section-title">Column Mapping</h3>
             <p class="form-hint mb-4">Match your file's column names to the fields below. We've pre-selected the closest matches.</p>
 
             <div class="form-group">
@@ -71,36 +93,81 @@
             </div>
 
             <div class="form-group">
-                <label asp-for="CategoryColumn">Category Column <span class="form-optional">(optional)</span></label>
+                <label asp-for="CategoryColumn">Category Column <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
                 <select asp-for="CategoryColumn" class="form-control" id="category-column-select">
                     <option value="">— None —</option>
                 </select>
             </div>
 
-            <div class="form-group form-check">
-                <input asp-for="FlipDebitSign" type="checkbox" class="form-check-input" />
-                <label asp-for="FlipDebitSign">My bank exports debits as negative numbers</label>
-                <p class="form-hint">Check this if withdrawals appear as negative amounts in your file (e.g. -100.00).</p>
+            <div class="form-group">
+                <label class="toggle-label">
+                    <span class="relative inline-block h-6 w-11 shrink-0">
+                        <input asp-for="FlipDebitSign" type="checkbox" class="peer absolute opacity-0 w-0 h-0" id="flip-debit-checkbox" />
+                        <span class="absolute inset-0 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-[#248e38] peer-focus:ring-2 peer-focus:ring-[#248e38] peer-focus:ring-offset-1 cursor-pointer"></span>
+                        <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5 cursor-pointer"></span>
+                    </span>
+                    <span>
+                        <span class="block text-sm font-medium text-gray-700">My bank exports debits as negative numbers</span>
+                        <span class="block mt-0.5 text-xs text-gray-500">Enable this if withdrawals appear as negative amounts in your file (e.g. −100.00).</span>
+                    </span>
+                </label>
             </div>
+        </div>
+
+        <div id="step-2-alert" class="alert alert-warning" style="display:none">
+            Please map the Date, Amount, and Description columns before continuing.
+        </div>
+
+        <div class="flex gap-3">
+            <button type="button" class="btn btn-primary" id="step-2-next">
+                Continue
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-1"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button type="button" class="btn btn-secondary" id="step-2-back">Back</button>
         </div>
     </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary" id="import-btn" disabled>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Import
-        </button>
-        <a asp-controller="Transactions" asp-action="Index" class="btn btn-secondary">Cancel</a>
+    @* Step 3: Review + Import *@
+    <div class="import-step" id="step-3" style="display:none">
+        <div class="import-step-header">
+            <span class="import-step-badge">3</span>
+            <span class="import-step-title">Review and import</span>
+        </div>
+
+        <dl class="text-sm space-y-2 mb-5" id="review-summary">
+            <div class="flex gap-2"><dt class="font-medium text-gray-600 w-32 shrink-0">File</dt><dd class="text-gray-800" id="review-file">—</dd></div>
+            <div class="flex gap-2"><dt class="font-medium text-gray-600 w-32 shrink-0">Account</dt><dd class="text-gray-800" id="review-account">—</dd></div>
+            <div class="flex gap-2"><dt class="font-medium text-gray-600 w-32 shrink-0">Date column</dt><dd class="text-gray-800" id="review-date">—</dd></div>
+            <div class="flex gap-2"><dt class="font-medium text-gray-600 w-32 shrink-0">Amount column</dt><dd class="text-gray-800" id="review-amount">—</dd></div>
+            <div class="flex gap-2"><dt class="font-medium text-gray-600 w-32 shrink-0">Description column</dt><dd class="text-gray-800" id="review-description">—</dd></div>
+            <div class="flex gap-2" id="review-category-row" style="display:none"><dt class="font-medium text-gray-600 w-32 shrink-0">Category column</dt><dd class="text-gray-800" id="review-category">—</dd></div>
+            <div class="flex gap-2" id="review-flip-row" style="display:none"><dt class="font-medium text-gray-600 w-32 shrink-0">Debit sign</dt><dd class="text-gray-800">Debits are negative (will be flipped)</dd></div>
+        </dl>
+
+        <div class="flex gap-3">
+            <button type="submit" class="btn btn-primary" id="import-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import
+            </button>
+            <button type="button" class="btn btn-secondary" id="step-3-back">Back</button>
+            <button type="button" class="btn btn-danger" id="step-3-cancel">Cancel</button>
+        </div>
     </div>
 </form>
 
 <script>
 (function () {
-    const fileInput      = document.getElementById('import-file-input');
-    const mappingSection = document.getElementById('column-mapping-section');
-    const importBtn      = document.getElementById('import-btn');
-    const profileSelect  = document.getElementById('profile-select');
-    const manualMapping  = document.getElementById('manual-mapping');
+    const fileInput     = document.getElementById('import-file-input');
+    const accountSelect = document.getElementById('account-select');
+    const profileSelect = document.getElementById('profile-select');
+    const manualMapping = document.getElementById('manual-mapping');
+
+    const step1 = document.getElementById('step-1');
+    const step2 = document.getElementById('step-2');
+    const step3 = document.getElementById('step-3');
+
+    const step1Alert = document.getElementById('step-1-alert');
+    const step2Alert = document.getElementById('step-2-alert');
 
     const dropdownIds = {
         date:        'date-column-select',
@@ -109,30 +176,81 @@
         category:    'category-column-select'
     };
 
-    fileInput.addEventListener('change', async function () {
-        const file = fileInput.files[0];
-        if (!file) return;
+    // ── Step 1 → Step 2 ──────────────────────────────────
+    document.getElementById('step-1-next').addEventListener('click', async function () {
+        const hasFile    = fileInput.files.length > 0;
+        const hasAccount = accountSelect.value !== '';
 
-        importBtn.disabled = true;
+        if (!hasFile || !hasAccount) {
+            step1Alert.style.display = 'block';
+            return;
+        }
+        step1Alert.style.display = 'none';
 
+        // Fetch headers from file
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', fileInput.files[0]);
 
         try {
             const resp = await fetch('/api/import/headers', { method: 'POST', body: form });
-
             if (resp.ok) {
                 const data = await resp.json();
                 populateDropdowns(data);
             }
         } catch (_) {
-            // Header detection failed — still reveal the section so user can map manually
+            // Header detection failed — user can map manually
         }
 
-        mappingSection.style.display = 'block';
-        importBtn.disabled = false;
+        step1.style.display = 'none';
+        step2.style.display = 'block';
     });
 
+    // ── Step 2 → Step 3 ──────────────────────────────────
+    document.getElementById('step-2-next').addEventListener('click', function () {
+        const usingProfile = profileSelect && profileSelect.value !== '';
+
+        if (!usingProfile) {
+            const dateOk   = document.getElementById('date-column-select').value !== '';
+            const amountOk = document.getElementById('amount-column-select').value !== '';
+            const descOk   = document.getElementById('description-column-select').value !== '';
+
+            if (!dateOk || !amountOk || !descOk) {
+                step2Alert.style.display = 'block';
+                return;
+            }
+        }
+        step2Alert.style.display = 'none';
+        populateReview();
+        step2.style.display = 'none';
+        step3.style.display = 'block';
+    });
+
+    // ── Back buttons ──────────────────────────────────────
+    document.getElementById('step-2-back').addEventListener('click', function () {
+        step2.style.display = 'none';
+        step1.style.display = 'block';
+    });
+
+    document.getElementById('step-3-back').addEventListener('click', function () {
+        step3.style.display = 'none';
+        step2.style.display = 'block';
+    });
+
+    document.getElementById('step-3-cancel').addEventListener('click', function () {
+        // Reset the form and return to Step 1
+        document.getElementById('import-form').reset();
+        step3.style.display = 'none';
+        step1.style.display = 'block';
+    });
+
+    // ── Profile toggle ────────────────────────────────────
+    if (profileSelect) {
+        profileSelect.addEventListener('change', function () {
+            manualMapping.style.display = profileSelect.value ? 'none' : 'block';
+        });
+    }
+
+    // ── Populate dropdowns from header detection ──────────
     function populateDropdowns(data) {
         const headers = data.headers || [];
 
@@ -155,10 +273,33 @@
         }
     }
 
-    if (profileSelect) {
-        profileSelect.addEventListener('change', function () {
-            manualMapping.style.display = profileSelect.value ? 'none' : 'block';
-        });
+    // ── Populate review summary ───────────────────────────
+    function populateReview() {
+        const file    = fileInput.files[0];
+        const account = accountSelect.options[accountSelect.selectedIndex].text;
+        const date    = document.getElementById('date-column-select').value;
+        const amount  = document.getElementById('amount-column-select').value;
+        const desc    = document.getElementById('description-column-select').value;
+        const cat     = document.getElementById('category-column-select').value;
+        const flip    = document.getElementById('flip-debit-checkbox').checked;
+
+        document.getElementById('review-file').textContent    = file ? file.name : '—';
+        document.getElementById('review-account').textContent = account;
+        document.getElementById('review-date').textContent    = date || '—';
+        document.getElementById('review-amount').textContent  = amount || '—';
+        document.getElementById('review-description').textContent = desc || '—';
+
+        const catRow  = document.getElementById('review-category-row');
+        const flipRow = document.getElementById('review-flip-row');
+
+        if (cat) {
+            document.getElementById('review-category').textContent = cat;
+            catRow.style.display = 'flex';
+        } else {
+            catRow.style.display = 'none';
+        }
+
+        flipRow.style.display = flip ? 'flex' : 'none';
     }
 })();
 </script>

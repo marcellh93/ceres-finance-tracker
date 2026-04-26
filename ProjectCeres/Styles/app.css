@@ -193,6 +193,16 @@
   .summary-card--neutral .summary-card__value  { @apply text-gray-600; }
   .summary-card--neutral .summary-card__label  { @apply text-gray-500; }
 
+  /* ─── Import Steps ──────────────────────────────────── */
+
+  .import-step        { @apply bg-white rounded-lg border border-gray-200 p-6 shadow-sm mb-4; }
+  .import-step-header { @apply flex items-center gap-3 mb-5; }
+  .import-step-badge  { @apply inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-semibold bg-gray-900 text-white shrink-0; }
+  .import-step-title  { @apply text-base font-semibold text-gray-800; }
+
+  /* Toggle switch — peer-checked variants must stay in HTML, not @apply */
+  .toggle-label       { @apply flex items-start gap-3 cursor-pointer select-none; }
+
   /* ─── Dashboard ─────────────────────────────────────── */
 
   .dashboard-grid    { @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8; }
