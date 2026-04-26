@@ -70,6 +70,7 @@ public class ImportController(
             TempData["ImportRowsImported"]   = result.RowsImported;
             TempData["ImportRowsReconciled"] = result.RowsReconciled;
             TempData["ImportRowsFlagged"]    = result.RowsFlagged;
+            TempData["ImportRowsStaged"]     = result.RowsStaged;
             TempData["ImportRowsFailed"]     = result.RowsFailed;
             TempData["ImportErrors"]         = string.Join("\n", result.Errors);
 
@@ -99,6 +100,7 @@ public class ImportController(
             RowsImported   = (int)(TempData["ImportRowsImported"]   ?? 0),
             RowsReconciled = (int)(TempData["ImportRowsReconciled"] ?? 0),
             RowsFlagged    = (int)(TempData["ImportRowsFlagged"]    ?? 0),
+            RowsStaged     = (int)(TempData["ImportRowsStaged"]     ?? 0),
             RowsFailed     = (int)(TempData["ImportRowsFailed"]     ?? 0),
             Errors         = ((string?)TempData["ImportErrors"] ?? string.Empty)
                               .Split('\n', StringSplitOptions.RemoveEmptyEntries)

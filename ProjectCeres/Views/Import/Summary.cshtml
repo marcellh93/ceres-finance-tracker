@@ -35,6 +35,14 @@
         </div>
     </div>
 
+    <div class="card summary-card @(Model.RowsStaged > 0 ? "summary-card--warning" : "summary-card--neutral")">
+        <div class="summary-card__value">@Model.RowsStaged</div>
+        <div class="summary-card__label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Staged for Transfer Review
+        </div>
+    </div>
+
     <div class="card summary-card @(Model.RowsFailed > 0 ? "summary-card--danger" : "summary-card--neutral")">
         <div class="summary-card__value">@Model.RowsFailed</div>
         <div class="summary-card__label">
@@ -50,6 +58,15 @@
         <strong>@Model.RowsFlagged row(s) need categorization.</strong>
         These transactions were imported as <em>Uncategorized</em> because their category could not be determined.
         <a asp-controller="Transactions" asp-action="Index">Review them in Transactions</a>.
+    </div>
+}
+
+@if (Model.RowsStaged > 0)
+{
+    <div class="alert alert-warning mt-4">
+        <strong>@Model.RowsStaged row(s) staged for transfer review.</strong>
+        These rows look like inter-account transfers and need your confirmation before they appear as transactions.
+        <a asp-controller="TransferReview" asp-action="Index">Review them now</a>.
     </div>
 }
 
