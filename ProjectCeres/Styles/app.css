@@ -121,6 +121,7 @@
   .btn-secondary  { @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-400; }
   .btn-danger     { @apply btn bg-red-600 text-white hover:bg-red-700 hover:text-white focus:ring-red-600; }
   .btn-link       { @apply text-sm text-gray-600 underline hover:text-gray-900; }
+  .btn-sm         { @apply px-2.5 py-1 text-xs rounded; }
 
   /* ─── Forms ────────────────────────────────────────── */
 
