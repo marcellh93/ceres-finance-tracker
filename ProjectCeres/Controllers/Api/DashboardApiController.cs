@@ -10,6 +10,7 @@ namespace ProjectCeres.Controllers.Api;
 public class DashboardApiController(
     ICategoryBudgetService categoryBudgetService,
     IBudgetService budgetService,
+    ISettingsService settingsService,
     AppDbContext db) : ControllerBase
 {
     [HttpGet("category-budgets")]
@@ -28,12 +29,13 @@ public class DashboardApiController(
 
             result.Add(new
             {
-                id           = budget.Id,
-                categoryName = budget.Category.Name,
-                currencyCode = budget.Currency.Code,
-                spent        = spent,
-                limit        = budget.LimitAmount,
-                percentUsed  = percentUsed
+                id             = budget.Id,
+                categoryName   = budget.Category.Name,
+                currencyCode   = budget.Currency.Code,
+                currencySymbol = budget.Currency.Symbol,
+                spent          = spent,
+                limit          = budget.LimitAmount,
+                percentUsed    = percentUsed
             });
         }
 
@@ -59,7 +61,223 @@ public class DashboardApiController(
                 targetAmount   = progress.TargetAmount,
                 remaining      = progress.Remaining,
                 percentUsed    = progress.PercentUsed,
-                currencyCode   = goal.Currency.Code
+                currencyCode   = goal.Currency.Code,
+                currencySymbol = goal.Currency.Symbol
+            });
+        }
+
+        return Ok(result);
+    }
+
+    [HttpGet("net-worth-trend")]
+    public async Task<IActionResult> GetNetWorthTrend()
+    {
+        var settings = await settingsService.GetAsync();
+        var currencyId = settings.DefaultCurrencyId;
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var result = new List<object>();
+
+        for (int i = 5; i >= 0; i--)
+        {
+            var monthEnd = new DateOnly(today.Year, today.Month, 1).AddMonths(-i + 1).AddDays(-1);
+            if (monthEnd > today) monthEnd = today;
+
+            var monthLabel = new DateOnly(monthEnd.Year, monthEnd.Month, 1);
+
+            var accounts = await db.Accounts
+                .Where(a => a.IsActive && a.CurrencyId == currencyId)
+                .Include(a => a.AccountType)
+                .Include(a => a.Transactions.Where(t => t.Date <= monthEnd))
+                    .ThenInclude(t => t.Category)
+                        .ThenInclude(c => c.CategoryType)
+                .ToListAsync();
+
+            var accountIds = accounts.Select(a => a.Id).ToHashSet();
+            var liabilityPayments = await db.LiabilityPayments
+                .Where(p => p.Date <= monthEnd &&
+                    (accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId)))
+                .ToListAsync();
+
+            var paymentsByAsset = liabilityPayments
+                .GroupBy(p => p.AssetAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+            var paymentsByLiability = liabilityPayments
+                .GroupBy(p => p.LiabilityAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+            decimal assets = 0;
+            decimal liabilities = 0;
+
+            foreach (var account in accounts)
+            {
+                bool isLiability = account.AccountType.Name == "Liability";
+
+                var balance = account.Transactions.Sum(t =>
+                {
+                    if (t.Category.IsSystem) return t.Amount;
+                    bool isIncome = t.Category.CategoryType.Name == "Income";
+                    bool addsToBalance = isLiability ? !isIncome : isIncome;
+                    return addsToBalance ? t.Amount : -t.Amount;
+                });
+
+                balance -= paymentsByAsset.GetValueOrDefault(account.Id);
+                balance -= paymentsByLiability.GetValueOrDefault(account.Id);
+
+                if (!isLiability) assets += balance;
+                else liabilities += balance;
+            }
+
+            result.Add(new
+            {
+                month       = monthLabel.ToString("yyyy-MM"),
+                assets      = Math.Round(assets, 2),
+                liabilities = Math.Round(liabilities, 2),
+                netWorth    = Math.Round(assets - liabilities, 2)
+            });
+        }
+
+        return Ok(result);
+    }
+
+    [HttpGet("income-expense")]
+    public async Task<IActionResult> GetIncomeExpense()
+    {
+        var settings = await settingsService.GetAsync();
+        var currencyId = settings.DefaultCurrencyId;
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var result = new List<object>();
+
+        for (int i = 5; i >= 0; i--)
+        {
+            var monthStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
+            var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
+            if (monthEnd > today) monthEnd = today;
+
+            var transactions = await db.Transactions
+                .Where(t => t.Date >= monthStart && t.Date <= monthEnd &&
+                            t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
+                .Include(t => t.Category)
+                    .ThenInclude(c => c.CategoryType)
+                .ToListAsync();
+
+            var income   = transactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
+            var expenses = transactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
+
+            result.Add(new
+            {
+                month    = monthStart.ToString("yyyy-MM"),
+                income   = Math.Round(income, 2),
+                expenses = Math.Round(expenses, 2)
+            });
+        }
+
+        return Ok(result);
+    }
+
+    [HttpGet("spending-by-category")]
+    public async Task<IActionResult> GetSpendingByCategory()
+    {
+        var settings = await settingsService.GetAsync();
+        var currencyId = settings.DefaultCurrencyId;
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+
+        var result = await db.Transactions
+            .Where(t => t.Date >= monthStart && t.Date <= today &&
+                        t.Account.CurrencyId == currencyId &&
+                        t.Category.CategoryType.Name == "Expense" &&
+                        !t.Category.IsSystem)
+            .Include(t => t.Category)
+                .ThenInclude(c => c.CategoryType)
+            .GroupBy(t => t.Category.Name)
+            .Select(g => new
+            {
+                categoryName = g.Key,
+                amount       = Math.Round(g.Sum(t => t.Amount), 2)
+            })
+            .OrderByDescending(x => x.amount)
+            .ToListAsync();
+
+        return Ok(result);
+    }
+
+    [HttpGet("account-balances")]
+    public async Task<IActionResult> GetAccountBalances()
+    {
+        var settings = await settingsService.GetAsync();
+        var currencyId = settings.DefaultCurrencyId;
+
+        var accounts = await db.Accounts
+            .Where(a => a.IsActive && a.CurrencyId == currencyId && a.AccountType.Name != "Liability")
+            .Include(a => a.AccountType)
+            .Include(a => a.Transactions)
+                .ThenInclude(t => t.Category)
+                    .ThenInclude(c => c.CategoryType)
+            .ToListAsync();
+
+        var accountIds = accounts.Select(a => a.Id).ToHashSet();
+        var liabilityPayments = await db.LiabilityPayments
+            .Where(p => accountIds.Contains(p.AssetAccountId))
+            .ToListAsync();
+
+        var paymentsByAsset = liabilityPayments
+            .GroupBy(p => p.AssetAccountId)
+            .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+        var result = accounts.Select(account =>
+        {
+            var balance = account.Transactions.Sum(t =>
+            {
+                if (t.Category.IsSystem) return t.Amount;
+                bool isIncome = t.Category.CategoryType.Name == "Income";
+                return isIncome ? t.Amount : -t.Amount;
+            });
+            balance -= paymentsByAsset.GetValueOrDefault(account.Id);
+
+            return new
+            {
+                accountName = account.Name,
+                balance     = Math.Round(balance, 2)
+            };
+        })
+        .OrderByDescending(x => x.balance)
+        .ToList();
+
+        return Ok(result);
+    }
+
+    [HttpGet("cash-flow")]
+    public async Task<IActionResult> GetCashFlow()
+    {
+        var settings = await settingsService.GetAsync();
+        var currencyId = settings.DefaultCurrencyId;
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var result = new List<object>();
+
+        for (int i = 5; i >= 0; i--)
+        {
+            var monthStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
+            var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
+            if (monthEnd > today) monthEnd = today;
+
+            var transactions = await db.Transactions
+                .Where(t => t.Date >= monthStart && t.Date <= monthEnd &&
+                            t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
+                .Include(t => t.Category)
+                    .ThenInclude(c => c.CategoryType)
+                .ToListAsync();
+
+            var income   = transactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
+            var expenses = transactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
+
+            result.Add(new
+            {
+                month   = monthStart.ToString("yyyy-MM"),
+                netFlow = Math.Round(income - expenses, 2)
             });
         }
 

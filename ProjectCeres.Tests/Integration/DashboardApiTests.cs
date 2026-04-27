@@ -52,4 +52,26 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
             item.TryGetProperty("percentUsed", out _).Should().BeTrue();
         }
     }
+
+    [Fact]
+    public async Task GetNetWorthTrend_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/net-worth-trend");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+
+        // Should return up to 6 monthly entries
+        body.GetArrayLength().Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(6);
+
+        foreach (var item in body.EnumerateArray())
+        {
+            item.TryGetProperty("month", out _).Should().BeTrue();
+            item.TryGetProperty("assets", out _).Should().BeTrue();
+            item.TryGetProperty("liabilities", out _).Should().BeTrue();
+            item.TryGetProperty("netWorth", out _).Should().BeTrue();
+        }
+    }
 }
