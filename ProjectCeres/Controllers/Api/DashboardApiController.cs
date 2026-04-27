@@ -11,6 +11,7 @@ public class DashboardApiController(
     ICategoryBudgetService categoryBudgetService,
     IBudgetService budgetService,
     ISettingsService settingsService,
+    IAccountService accountService,
     AppDbContext db) : ControllerBase
 {
     [HttpGet("category-budgets")]
@@ -227,41 +228,20 @@ public class DashboardApiController(
 
         var accounts = await db.Accounts
             .Where(a => a.IsActive && a.CurrencyId == currencyId && a.AccountType.Name != "Liability")
-            .Include(a => a.AccountType)
-            .Include(a => a.Transactions)
-                .ThenInclude(t => t.Category)
-                    .ThenInclude(c => c.CategoryType)
             .AsNoTracking()
             .ToListAsync();
 
-        var accountIds = accounts.Select(a => a.Id).ToHashSet();
-        var liabilityPayments = await db.LiabilityPayments
-            .Where(p => accountIds.Contains(p.AssetAccountId))
-            .AsNoTracking()
-            .ToListAsync();
-
-        var paymentsByAsset = liabilityPayments
-            .GroupBy(p => p.AssetAccountId)
-            .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-
-        var result = accounts.Select(account =>
+        var rows = new List<(string Name, decimal Balance)>();
+        foreach (var account in accounts)
         {
-            var balance = account.Transactions.Sum(t =>
-            {
-                if (t.Category.IsSystem) return t.Amount;
-                bool isIncome = t.Category.CategoryType.Name == "Income";
-                return isIncome ? t.Amount : -t.Amount;
-            });
-            balance -= paymentsByAsset.GetValueOrDefault(account.Id);
+            var balance = await accountService.GetBalanceAsync(account.Id);
+            rows.Add((account.Name, Math.Round(balance, 2)));
+        }
 
-            return new
-            {
-                accountName = account.Name,
-                balance     = Math.Round(balance, 2)
-            };
-        })
-        .OrderByDescending(x => x.balance)
-        .ToList<object>();
+        var result = rows
+            .OrderByDescending(r => r.Balance)
+            .Select(r => new { accountName = r.Name, balance = r.Balance })
+            .ToList<object>();
 
         return Ok(result);
     }
