@@ -45,7 +45,7 @@ export function SpendingDonutChart() {
                   <Cell key={index} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: number) => value.toFixed(2)} />
+              <Tooltip formatter={(value) => Number(value ?? 0).toFixed(2)} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>

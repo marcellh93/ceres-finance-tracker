@@ -33,7 +33,7 @@ export function CashFlowChart() {
             <BarChart data={data}>
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value: number) => value.toFixed(2)} />
+              <Tooltip formatter={(value) => Number(value ?? 0).toFixed(2)} />
               <ReferenceLine y={0} stroke="#94a3b8" />
               <Bar dataKey="netFlow" name="Net Flow" radius={[4, 4, 0, 0]}>
                 {data.map((item, index) => (

@@ -34,7 +34,7 @@ export function IncomeExpenseChart() {
             <BarChart data={data}>
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value: number) => value.toFixed(2)} />
+              <Tooltip formatter={(value) => Number(value ?? 0).toFixed(2)} />
               <Legend />
               <Bar dataKey="income" name="Income" fill="#22c55e" radius={[4, 4, 0, 0]} />
               <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />

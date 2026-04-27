@@ -35,7 +35,7 @@ export function NetWorthChart() {
             <LineChart data={data}>
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value: number) => value.toFixed(2)} />
+              <Tooltip formatter={(value) => Number(value ?? 0).toFixed(2)} />
               <Legend />
               <Line type="monotone" dataKey="assets" stroke="#3b82f6" name="Assets" dot={false} strokeWidth={2} />
               <Line type="monotone" dataKey="netWorth" stroke="#22c55e" name="Net Worth" dot={false} strokeWidth={2} />

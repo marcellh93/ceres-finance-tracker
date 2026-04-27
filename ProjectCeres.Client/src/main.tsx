@@ -6,6 +6,11 @@ import { IsClearedSwitch } from './components/IsClearedSwitch'
 import { ClearedBadge } from './components/ClearedBadge'
 import { CategoryBudgetBars } from './components/CategoryBudgetBars'
 import { GoalBudgetBars } from './components/GoalBudgetBars'
+import { NetWorthChart } from './components/NetWorthChart'
+import { IncomeExpenseChart } from './components/IncomeExpenseChart'
+import { SpendingDonutChart } from './components/SpendingDonutChart'
+import { AccountBalancesChart } from './components/AccountBalancesChart'
+import { CashFlowChart } from './components/CashFlowChart'
 
 const navbarEl = document.getElementById('navbar-root')
 if (navbarEl) {
@@ -54,6 +59,51 @@ if (goalBudgetBarsEl) {
   createRoot(goalBudgetBarsEl).render(
     <StrictMode>
       <GoalBudgetBars />
+    </StrictMode>,
+  )
+}
+
+const netWorthChartEl = document.querySelector<HTMLElement>('[data-react="net-worth-chart"]')
+if (netWorthChartEl) {
+  createRoot(netWorthChartEl).render(
+    <StrictMode>
+      <NetWorthChart />
+    </StrictMode>,
+  )
+}
+
+const incomeExpenseChartEl = document.querySelector<HTMLElement>('[data-react="income-expense-chart"]')
+if (incomeExpenseChartEl) {
+  createRoot(incomeExpenseChartEl).render(
+    <StrictMode>
+      <IncomeExpenseChart />
+    </StrictMode>,
+  )
+}
+
+const spendingDonutChartEl = document.querySelector<HTMLElement>('[data-react="spending-donut-chart"]')
+if (spendingDonutChartEl) {
+  createRoot(spendingDonutChartEl).render(
+    <StrictMode>
+      <SpendingDonutChart />
+    </StrictMode>,
+  )
+}
+
+const accountBalancesChartEl = document.querySelector<HTMLElement>('[data-react="account-balances-chart"]')
+if (accountBalancesChartEl) {
+  createRoot(accountBalancesChartEl).render(
+    <StrictMode>
+      <AccountBalancesChart />
+    </StrictMode>,
+  )
+}
+
+const cashFlowChartEl = document.querySelector<HTMLElement>('[data-react="cash-flow-chart"]')
+if (cashFlowChartEl) {
+  createRoot(cashFlowChartEl).render(
+    <StrictMode>
+      <CashFlowChart />
     </StrictMode>,
   )
 }

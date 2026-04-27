@@ -23,8 +23,8 @@
                     {
                         <tr>
                             <td>@nw.CurrencyCode</td>
-                            <td>@NumberFormatHelper.FormatAmount(nw.Assets, ViewData["NumberFormat"] as string)</td>
-                            <td>@NumberFormatHelper.FormatAmount(nw.Liabilities, ViewData["NumberFormat"] as string)</td>
+                            <td class="amount-mono">@NumberFormatHelper.FormatAmount(nw.Assets, ViewData["NumberFormat"] as string)</td>
+                            <td class="amount-mono">@NumberFormatHelper.FormatAmount(nw.Liabilities, ViewData["NumberFormat"] as string)</td>
                             <td class="@(nw.NetWorth >= 0 ? "amount-income" : "amount-expense") whitespace-nowrap">
                                 @nw.CurrencySymbol @NumberFormatHelper.FormatAmount(nw.NetWorth, ViewData["NumberFormat"] as string)
                             </td>
@@ -69,6 +69,17 @@
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
     <div data-react="category-budget-bars"></div>
     <div data-react="goal-budget-bars"></div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div data-react="net-worth-chart"></div>
+    <div data-react="income-expense-chart"></div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div data-react="spending-donut-chart"></div>
+    <div data-react="account-balances-chart"></div>
+    <div data-react="cash-flow-chart"></div>
 </div>
 
 <div class="dashboard-actions">

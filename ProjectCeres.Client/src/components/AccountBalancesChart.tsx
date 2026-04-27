@@ -33,7 +33,7 @@ export function AccountBalancesChart() {
             <BarChart data={data} layout="vertical">
               <XAxis type="number" tick={{ fontSize: 12 }} />
               <YAxis type="category" dataKey="accountName" tick={{ fontSize: 12 }} width={100} />
-              <Tooltip formatter={(value: number) => value.toFixed(2)} />
+              <Tooltip formatter={(value) => Number(value ?? 0).toFixed(2)} />
               <Bar dataKey="balance" name="Balance" radius={[0, 4, 4, 0]}>
                 {data.map((item, index) => (
                   <Cell key={index} fill={item.balance >= 0 ? '#3b82f6' : '#ef4444'} />
