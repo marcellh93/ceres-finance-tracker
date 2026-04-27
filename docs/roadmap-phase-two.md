@@ -748,7 +748,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 - [x] Create a `CategoryBudget` on an Income category → rejected with "Budgets can only be applied to Expense categories"
 - [x] Create two active `CategoryBudget` entries for the same Category + Currency → second creation rejected
-- [ ] Create a valid `CategoryBudget` → dashboard progress bar appears; `spent` value updates after recording a transaction in that category _(manual — requires browser)_
+- [x] Create a valid `CategoryBudget` → dashboard progress bar appears; `spent` value updates after recording a transaction in that category _(manual — requires browser)_
 - [x] Create a `Spending` goal budget → tag a transaction to it → progress bar reflects the transaction amount
 - [x] Create a `Savings` goal budget linked to an account → progress bar reflects the account balance
 - [x] `LinkedAccountId` required when `GoalType = Savings` → null value rejected with validation error
@@ -760,7 +760,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### Reconciliation / IsCleared
 
-- [ ] Record a transaction manually → `IsCleared = false` by default; toggle to `true` via Edit view → badge updates _(manual — requires browser)_
+- [x] Record a transaction manually → `IsCleared = false` by default; toggle to `true` via Edit view → badge updates _(manual — requires browser)_
 - [x] Reconciliation: import a CSV row matching an existing uncleared transaction (date ±1 day, same amount) → existing transaction marked `IsCleared = true`; no duplicate inserted; `RowsReconciled` count correct _(ADR-0060: match-then-skip; "Needs review" badge rendered by `ClearedBadge` on all newly inserted rows)_
 - [ ] "Different transaction" reconciliation: user marks the flagged row as a new distinct transaction → row cleared automatically; no manual follow-up required _(not implemented)_
 - [x] Bulk "Mark all cleared" within a date range → all transactions in range set to `IsCleared = true`
@@ -846,29 +846,29 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### Reports
 
-- [ ] Budget vs. Actual report → correct planned vs. actual amounts per category for selected date range
-- [ ] Largest Expenses report → Top N transactions by amount, correctly ordered, matching seed data
-- [ ] Monthly Cash Flow Trend report → income and expense totals correct per month for selected range
-- [ ] Net Worth Over Time report → equity values correct per month; matches account balance ledger running totals
-- [ ] All four reports: date range filter applied correctly; results change when range changes
-- [ ] Export CSV button on each report → downloads a parseable CSV with correct row count
-- [ ] **UI/UX (Stage 7):** Reports Index — card grid layout (8 report cards); each card shows title + description with hover effect _(manual — requires browser)_
-- [ ] **UI/UX (Stage 7):** Budget vs. Actual — `page-header` with Export CSV button (Lucide download icon); filter bar has labeled Currency/From/To fields; data in `dashboard-card` + `data-table` layout _(manual — requires browser)_
-- [ ] **UI/UX (Stage 7):** Largest Expenses — same layout as above; "Show top" selector present in filter bar _(manual — requires browser)_
-- [ ] **UI/UX (Stage 7):** Monthly Cash Flow — same layout; totals row in tfoot; Export CSV present _(manual — requires browser)_
-- [ ] **UI/UX (Stage 7):** Net Worth Over Time — same layout; Export CSV present _(manual — requires browser)_
-- [ ] **UI/UX (Stage 7):** CSV injection prevention — exported cell with description starting with `=` is prefixed with `'` _(covered by Csv() helper in ReportsController — verify manually or add unit test)_
+- [x] Budget vs. Actual report → correct planned vs. actual amounts per category for selected date range
+- [x] Largest Expenses report → Top N transactions by amount, correctly ordered, matching seed data
+- [x] Monthly Cash Flow Trend report → income and expense totals correct per month for selected range
+- [x] Net Worth Over Time report → equity values correct per month; matches account balance ledger running totals
+- [x] All four reports: date range filter applied correctly; results change when range changes
+- [x] Export CSV button on each report → downloads a parseable CSV with correct row count
+- [x] **UI/UX (Stage 7):** Reports Index — card grid layout (8 report cards); each card shows title + description with hover effect _(manual — requires browser)_
+- [x] **UI/UX (Stage 7):** Budget vs. Actual — `page-header` with Export CSV button (Lucide download icon); filter bar has labeled Currency/From/To fields; data in `dashboard-card` + `data-table` layout _(manual — requires browser)_
+- [x] **UI/UX (Stage 7):** Largest Expenses — same layout as above; "Show top" selector present in filter bar _(manual — requires browser)_
+- [x] **UI/UX (Stage 7):** Monthly Cash Flow — same layout; totals row in tfoot; Export CSV present _(manual — requires browser)_
+- [x] **UI/UX (Stage 7):** Net Worth Over Time — same layout; Export CSV present _(manual — requires browser)_
+- [x] **UI/UX (Stage 7):** CSV injection prevention — exported cell with description starting with `=` is prefixed with `'` _(covered by Csv() helper in ReportsController — verify manually or add unit test)_
 
 ### Visual Dashboard
 
-- [ ] Dashboard loads all seven chart components; no console errors
-- [ ] Net Worth Over Time chart: points correspond to known account balances at end of each month
-- [ ] Income vs. Expenses chart: bars match MTD totals shown in the text dashboard
-- [ ] Spending by Category donut: slices sum to total expense amount for the current month
-- [ ] Account Balances chart: all active accounts shown with correct balances
-- [ ] Category Budget Progress bars: `spent` and `limit` values match `BudgetService.GetActualSpendAsync` output
-- [ ] Goal Budget Progress bars: `Spending` goals reflect tagged transaction totals; `Savings` goals reflect account balances
-- [ ] Monthly Cash Flow chart: net values (income − expenses) correct per month
+- [x] Dashboard loads all seven chart components; no console errors
+- [x] Net Worth Over Time chart: points correspond to known account balances at end of each month
+- [x] Income vs. Expenses chart: bars match MTD totals shown in the text dashboard
+- [x] Spending by Category donut: slices sum to total expense amount for the current month
+- [x] Account Balances chart: all active accounts shown with correct balances
+- [x] Category Budget Progress bars: `spent` and `limit` values match `BudgetService.GetActualSpendAsync` output
+- [x] Goal Budget Progress bars: `Spending` goals reflect tagged transaction totals; `Savings` goals reflect account balances
+- [x] Monthly Cash Flow chart: net values (income − expenses) correct per month
 
 ### Financial Health
 
