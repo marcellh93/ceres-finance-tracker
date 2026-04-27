@@ -3,7 +3,10 @@
 
 <div class="page-header">
     <h1>Categories</h1>
-    <a asp-action="Create" class="btn btn-primary">+ New Category</a>
+    <a asp-action="Create" class="btn btn-primary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Category
+    </a>
 </div>
 
 @if (!Model.Any())
@@ -37,8 +40,14 @@ else
                         <td class="actions">
                             @if (!category.IsSystem && category.IsActive)
                             {
-                                <a asp-action="Edit" asp-route-id="@category.Id">Edit</a>
-                                <a asp-action="Deactivate" asp-route-id="@category.Id">Deactivate</a>
+                                <a asp-action="Edit" asp-route-id="@category.Id" class="btn btn-sm btn-secondary inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                                    Edit
+                                </a>
+                                <a asp-action="Deactivate" asp-route-id="@category.Id" class="btn btn-sm btn-danger inline-flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                                    Deactivate
+                                </a>
                             }
                         </td>
                     </tr>
