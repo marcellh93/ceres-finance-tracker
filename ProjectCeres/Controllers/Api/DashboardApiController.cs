@@ -76,6 +76,23 @@ public class DashboardApiController(
         var currencyId = settings.DefaultCurrencyId;
 
         var today = DateOnly.FromDateTime(DateTime.Today);
+
+        // Load all data once before the loop — avoids N+1 (12 queries → 2)
+        var accounts = await db.Accounts
+            .Where(a => a.IsActive && a.CurrencyId == currencyId)
+            .Include(a => a.AccountType)
+            .Include(a => a.Transactions)
+                .ThenInclude(t => t.Category)
+                    .ThenInclude(c => c.CategoryType)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var accountIds = accounts.Select(a => a.Id).ToHashSet();
+        var allLiabilityPayments = await db.LiabilityPayments
+            .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
+            .AsNoTracking()
+            .ToListAsync();
+
         var result = new List<object>();
 
         for (int i = 5; i >= 0; i--)
@@ -85,24 +102,11 @@ public class DashboardApiController(
 
             var monthLabel = new DateOnly(monthEnd.Year, monthEnd.Month, 1);
 
-            var accounts = await db.Accounts
-                .Where(a => a.IsActive && a.CurrencyId == currencyId)
-                .Include(a => a.AccountType)
-                .Include(a => a.Transactions.Where(t => t.Date <= monthEnd))
-                    .ThenInclude(t => t.Category)
-                        .ThenInclude(c => c.CategoryType)
-                .ToListAsync();
-
-            var accountIds = accounts.Select(a => a.Id).ToHashSet();
-            var liabilityPayments = await db.LiabilityPayments
-                .Where(p => p.Date <= monthEnd &&
-                    (accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId)))
-                .ToListAsync();
-
-            var paymentsByAsset = liabilityPayments
+            var paymentsUpToMonth = allLiabilityPayments.Where(p => p.Date <= monthEnd).ToList();
+            var paymentsByAsset = paymentsUpToMonth
                 .GroupBy(p => p.AssetAccountId)
                 .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-            var paymentsByLiability = liabilityPayments
+            var paymentsByLiability = paymentsUpToMonth
                 .GroupBy(p => p.LiabilityAccountId)
                 .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
 
@@ -113,13 +117,15 @@ public class DashboardApiController(
             {
                 bool isLiability = account.AccountType.Name == "Liability";
 
-                var balance = account.Transactions.Sum(t =>
-                {
-                    if (t.Category.IsSystem) return t.Amount;
-                    bool isIncome = t.Category.CategoryType.Name == "Income";
-                    bool addsToBalance = isLiability ? !isIncome : isIncome;
-                    return addsToBalance ? t.Amount : -t.Amount;
-                });
+                var balance = account.Transactions
+                    .Where(t => t.Date <= monthEnd)
+                    .Sum(t =>
+                    {
+                        if (t.Category.IsSystem) return t.Amount;
+                        bool isIncome = t.Category.CategoryType.Name == "Income";
+                        bool addsToBalance = isLiability ? !isIncome : isIncome;
+                        return addsToBalance ? t.Amount : -t.Amount;
+                    });
 
                 balance -= paymentsByAsset.GetValueOrDefault(account.Id);
                 balance -= paymentsByLiability.GetValueOrDefault(account.Id);
@@ -147,6 +153,17 @@ public class DashboardApiController(
         var currencyId = settings.DefaultCurrencyId;
 
         var today = DateOnly.FromDateTime(DateTime.Today);
+        var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-5);
+
+        // Load all transactions for the 6-month window once — avoids N+1
+        var allTransactions = await db.Transactions
+            .Where(t => t.Date >= windowStart && t.Date <= today &&
+                        t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
+            .Include(t => t.Category)
+                .ThenInclude(c => c.CategoryType)
+            .AsNoTracking()
+            .ToListAsync();
+
         var result = new List<object>();
 
         for (int i = 5; i >= 0; i--)
@@ -155,15 +172,9 @@ public class DashboardApiController(
             var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
             if (monthEnd > today) monthEnd = today;
 
-            var transactions = await db.Transactions
-                .Where(t => t.Date >= monthStart && t.Date <= monthEnd &&
-                            t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
-                .Include(t => t.Category)
-                    .ThenInclude(c => c.CategoryType)
-                .ToListAsync();
-
-            var income   = transactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
-            var expenses = transactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
+            var monthTx = allTransactions.Where(t => t.Date >= monthStart && t.Date <= monthEnd).ToList();
+            var income   = monthTx.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
+            var expenses = monthTx.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
 
             result.Add(new
             {
@@ -185,13 +196,17 @@ public class DashboardApiController(
         var today = DateOnly.FromDateTime(DateTime.Today);
         var monthStart = new DateOnly(today.Year, today.Month, 1);
 
-        var result = await db.Transactions
+        var transactions = await db.Transactions
             .Where(t => t.Date >= monthStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId &&
                         t.Category.CategoryType.Name == "Expense" &&
                         !t.Category.IsSystem)
             .Include(t => t.Category)
                 .ThenInclude(c => c.CategoryType)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var result = transactions
             .GroupBy(t => t.Category.Name)
             .Select(g => new
             {
@@ -199,7 +214,7 @@ public class DashboardApiController(
                 amount       = Math.Round(g.Sum(t => t.Amount), 2)
             })
             .OrderByDescending(x => x.amount)
-            .ToListAsync();
+            .ToList<object>();
 
         return Ok(result);
     }
@@ -216,11 +231,13 @@ public class DashboardApiController(
             .Include(a => a.Transactions)
                 .ThenInclude(t => t.Category)
                     .ThenInclude(c => c.CategoryType)
+            .AsNoTracking()
             .ToListAsync();
 
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
         var liabilityPayments = await db.LiabilityPayments
             .Where(p => accountIds.Contains(p.AssetAccountId))
+            .AsNoTracking()
             .ToListAsync();
 
         var paymentsByAsset = liabilityPayments
@@ -244,7 +261,7 @@ public class DashboardApiController(
             };
         })
         .OrderByDescending(x => x.balance)
-        .ToList();
+        .ToList<object>();
 
         return Ok(result);
     }
@@ -256,6 +273,17 @@ public class DashboardApiController(
         var currencyId = settings.DefaultCurrencyId;
 
         var today = DateOnly.FromDateTime(DateTime.Today);
+        var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-5);
+
+        // Load all transactions for the 6-month window once — avoids N+1
+        var allTransactions = await db.Transactions
+            .Where(t => t.Date >= windowStart && t.Date <= today &&
+                        t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
+            .Include(t => t.Category)
+                .ThenInclude(c => c.CategoryType)
+            .AsNoTracking()
+            .ToListAsync();
+
         var result = new List<object>();
 
         for (int i = 5; i >= 0; i--)
@@ -264,15 +292,9 @@ public class DashboardApiController(
             var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
             if (monthEnd > today) monthEnd = today;
 
-            var transactions = await db.Transactions
-                .Where(t => t.Date >= monthStart && t.Date <= monthEnd &&
-                            t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
-                .Include(t => t.Category)
-                    .ThenInclude(c => c.CategoryType)
-                .ToListAsync();
-
-            var income   = transactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
-            var expenses = transactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
+            var monthTx  = allTransactions.Where(t => t.Date >= monthStart && t.Date <= monthEnd).ToList();
+            var income   = monthTx.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
+            var expenses = monthTx.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
 
             result.Add(new
             {
