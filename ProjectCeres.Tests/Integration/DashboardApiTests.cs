@@ -74,4 +74,75 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
             item.TryGetProperty("netWorth", out _).Should().BeTrue();
         }
     }
+
+    [Fact]
+    public async Task GetIncomeExpense_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/income-expense");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+        body.GetArrayLength().Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(6);
+
+        foreach (var item in body.EnumerateArray())
+        {
+            item.TryGetProperty("month", out _).Should().BeTrue();
+            item.TryGetProperty("income", out _).Should().BeTrue();
+            item.TryGetProperty("expenses", out _).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task GetSpendingByCategory_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/spending-by-category");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+
+        foreach (var item in body.EnumerateArray())
+        {
+            item.TryGetProperty("categoryName", out _).Should().BeTrue();
+            item.TryGetProperty("amount", out _).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task GetAccountBalances_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/account-balances");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+
+        foreach (var item in body.EnumerateArray())
+        {
+            item.TryGetProperty("accountName", out _).Should().BeTrue();
+            item.TryGetProperty("balance", out _).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task GetCashFlow_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/cash-flow");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+        body.GetArrayLength().Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(6);
+
+        foreach (var item in body.EnumerateArray())
+        {
+            item.TryGetProperty("month", out _).Should().BeTrue();
+            item.TryGetProperty("netFlow", out _).Should().BeTrue();
+        }
+    }
 }
