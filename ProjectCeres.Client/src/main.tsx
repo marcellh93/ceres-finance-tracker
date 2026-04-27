@@ -8,7 +8,7 @@ import { CategoryBudgetBars } from './components/CategoryBudgetBars'
 import { GoalBudgetBars } from './components/GoalBudgetBars'
 import { NetWorthChart } from './components/NetWorthChart'
 import { IncomeExpenseChart } from './components/IncomeExpenseChart'
-import { SpendingDonutChart } from './components/SpendingDonutChart'
+import { SpendingByCategoryChart } from './components/SpendingByCategoryChart'
 import { AccountBalancesChart } from './components/AccountBalancesChart'
 import { CashFlowChart } from './components/CashFlowChart'
 
@@ -81,11 +81,11 @@ if (incomeExpenseChartEl) {
   )
 }
 
-const spendingDonutChartEl = document.querySelector<HTMLElement>('[data-react="spending-donut-chart"]')
-if (spendingDonutChartEl) {
-  createRoot(spendingDonutChartEl).render(
+const spendingByCategoryChartEl = document.querySelector<HTMLElement>('[data-react="spending-by-category-chart"]')
+if (spendingByCategoryChartEl) {
+  createRoot(spendingByCategoryChartEl).render(
     <StrictMode>
-      <SpendingDonutChart />
+      <SpendingByCategoryChart />
     </StrictMode>,
   )
 }

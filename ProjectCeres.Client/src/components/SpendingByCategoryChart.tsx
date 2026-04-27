@@ -21,7 +21,7 @@ export function buildDisplayData(data: SpendingSlice[]) {
   ]
 }
 
-export function SpendingDonutChart() {
+export function SpendingByCategoryChart() {
   const [data, setData] = useState<SpendingSlice[]>([])
   const [loading, setLoading] = useState(true)
 

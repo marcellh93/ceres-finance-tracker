@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, afterEach } from 'vitest'
-import { SpendingDonutChart, buildDisplayData } from './SpendingDonutChart'
+import { SpendingByCategoryChart, buildDisplayData } from './SpendingByCategoryChart'
 
-describe('SpendingDonutChart', () => {
+describe('SpendingByCategoryChart', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
@@ -14,7 +14,7 @@ describe('SpendingDonutChart', () => {
         { categoryName: 'Housing', amount: 850 },
       ])
     }))
-    render(<SpendingDonutChart />)
+    render(<SpendingByCategoryChart />)
     await waitFor(() => {
       expect(document.querySelector('.recharts-wrapper')).toBeTruthy()
     })
@@ -24,7 +24,7 @@ describe('SpendingDonutChart', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       json: () => new Promise(() => {})
     }))
-    render(<SpendingDonutChart />)
+    render(<SpendingByCategoryChart />)
     expect(screen.getByText(/loading/i)).toBeTruthy()
   })
 
