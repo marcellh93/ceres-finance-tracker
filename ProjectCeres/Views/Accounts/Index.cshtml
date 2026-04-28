@@ -34,7 +34,7 @@ else
                     <td>@account.AccountType.Name</td>
                     <td>@account.Currency.Code</td>
                     @{ var bal = ((Dictionary<Guid,decimal>)ViewBag.Balances)[account.Id]; }
-                    <td class="@(bal >= 0 ? "amount-income" : "amount-expense")">
+                    <td class="@(bal >= 0 ? "amount-income" : "amount-expense") whitespace-nowrap">
                         @NumberFormatHelper.FormatAmount(bal, ViewData["NumberFormat"] as string)
                     </td>
                     <td>@(account.IsActive ? "Active" : "Inactive")</td>
