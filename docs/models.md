@@ -34,6 +34,12 @@
    - [ImportStagedTransfer](#importstagedtransfer-new-entity--phase-2-stage-35)
    - [ImportTransferExclusion](#importtransferexclusion-new-entity--phase-2-stage-35)
 10. [Phase 3 — Entities To Be Defined](#phase-3--entities-to-be-defined)
+    - [SavedSearch](#savedsearch-phase-3)
+    - [SupportTicket](#supportticket-phase-3)
+    - [UserSession](#usersession-phase-3)
+    - [UserBlockedIp](#userblockedip-phase-3)
+    - [CustomerArchive](#customerarchive-phase-3)
+    - [AdminAuditLog](#adminauditlog-phase-3)
 
 ---
 
@@ -265,6 +271,7 @@ Represents a financial account the user owns or owes on.
 | CurrencyId    | int     | FK, NOT NULL   | → Currency                             |
 | Description   | varchar | nullable       | e.g. "Main checking account"           |
 | IsActive      | bit     | NOT NULL       | False = deactivated, hidden from UI but history preserved |
+| Notes         | text    | nullable       | Phase 3. Free-text annotation for the account (e.g. "emergency fund — minimum €5,000"). Displayed on the account detail view. |
 
 **Deactivated accounts in calculations:**
 A deactivated account still counts toward net worth and account balance reports. Deactivation
@@ -547,8 +554,9 @@ Feeds the Category Budget Progress bars on the dashboard.
 | Id         | uuid    | PK           |                                                  |
 | CategoryId | uuid    | FK, NOT NULL | → Category (must be an Expense category)         |
 | CurrencyId | int     | FK, NOT NULL | → Currency                                       |
-| LimitAmount| decimal(18,2) | NOT NULL  | Maximum amount to spend in this category per month |
-| IsActive   | bit           | NOT NULL  | False = deactivated, hidden from dashboard       |
+| LimitAmount    | decimal(18,2) | NOT NULL  | Maximum amount to spend in this category per month |
+| IsActive       | bit           | NOT NULL  | False = deactivated, hidden from dashboard       |
+| PeriodStartDay | int           | nullable  | Phase 3. Day of month this budget period starts (1–28). Overrides the global `Settings.BudgetPeriodStartDay` for this budget only. Null = use global default. Days 29–31 excluded to avoid month-length edge cases. |
 
 **Note:** CategoryBudget only applies to Expense categories — setting a cap on an Income
 category is not meaningful. This constraint should be enforced at the application level.
@@ -668,7 +676,10 @@ only the scope changes.
 | Id                | int     | PK           |                                                                   |
 | NumberFormat      | varchar | NOT NULL     | `"period_decimal"` (1,234.56) or `"comma_decimal"` (1.234,56)   |
 | DateFormat        | varchar | NOT NULL     | `"DD/MM/YYYY"`, `"MM/DD/YYYY"`, or `"YYYY-MM-DD"`. The separator is embedded in the format string — no separate separator field is needed. |
-| DefaultCurrencyId | int     | FK, NOT NULL | → Currency. Pre-selected in the account creation form. Seeds to EUR on first run. Editable via the Settings page. |
+| DefaultCurrencyId    | int     | FK, NOT NULL | → Currency. Pre-selected in the account creation form. Seeds to EUR on first run. Editable via the Settings page. |
+| BudgetPeriodStartDay | int     | NOT NULL DEFAULT 1 | Phase 3. Day of month all budget periods start by default (1–28). Applies to all `CategoryBudget` rows that have no `PeriodStartDay` override. Days 29–31 excluded to avoid month-length edge cases. |
+| Language             | varchar(5) | NOT NULL DEFAULT `'en'` | Phase 3. BCP 47 language tag. Supported values: `en`, `es`. Validated at service layer — reject unsupported codes. Determines language for UI, transactional emails, and generated reports. |
+| Country              | varchar(2) | nullable | Phase 3. ISO 3166-1 alpha-2 country code (e.g. `ES`, `US`, `GB`, `CO`, `AR`, `VE`). Nullable — users who select "Other" or skip without specifying are stored as null. Used for legal/compliance scoping. No lookup table — country is a preference label until it drives data logic. |
 
 **Note:** Settings has one foreign key — `DefaultCurrencyId → Currency`. The per-user
 migration in Phase 3 will add a UserId column and remove the single-row constraint.
@@ -1010,6 +1021,46 @@ Created when a user account is closed. Records the closure type and manages the 
 **Critical constraint:** `ClosureType = GdprErasure` rows must never have an `ArchiveFilePath` set. Enforced at the service layer, not just the UI.
 
 **Deletion rule:** `CustomerArchive` rows are never hard deleted — they are the audit trail of the closure itself. Only the `ArchiveFilePath` file is deleted at `PermanentDeletionScheduledAt`.
+
+### SavedSearch (Phase 3)
+
+Stores a named set of filter parameters for a specific table, so users can re-apply frequently used filter combinations without re-entering them. One row per saved search, scoped to the authenticated user and a specific table name (e.g. "transactions", "movements").
+
+| Column        | Type     | Constraints  | Notes                                                                           |
+|---------------|----------|--------------|---------------------------------------------------------------------------------|
+| Id            | uuid     | PK           |                                                                                 |
+| UserId        | uuid     | FK, NOT NULL | → User                                                                          |
+| TableName     | varchar  | NOT NULL     | The table this search applies to — e.g. `"transactions"`, `"movements"`, `"transfers"` |
+| Name          | varchar  | NOT NULL     | User-given name, e.g. "This month groceries"                                   |
+| FilterSetJson | jsonb    | NOT NULL     | Serialised filter state — shape varies by table; parsed by the relevant list component |
+| CreatedAt     | datetime | NOT NULL     | When the saved search was created                                               |
+
+**Deletion rule:** hard delete with confirmation. No soft delete — no financial history is attached to a saved search.
+
+**Uniqueness:** no uniqueness constraint on `(UserId, TableName, Name)` — the user may create duplicates if they choose.
+
+---
+
+### SupportTicket (Phase 3)
+
+Stores user-submitted support requests. Admin management is handled via a separate admin surface.
+
+| Column    | Type     | Constraints  | Notes                                                               |
+|-----------|----------|--------------|---------------------------------------------------------------------|
+| Id        | uuid     | PK           |                                                                     |
+| UserId    | uuid     | FK, NOT NULL | → User (the submitting user)                                        |
+| Subject   | varchar  | NOT NULL     |                                                                     |
+| Message   | text     | NOT NULL     |                                                                     |
+| Status    | varchar  | NOT NULL     | `Open`, `InProgress`, `Resolved`, `Closed`                         |
+| Priority  | varchar  | NOT NULL     | `Low`, `Normal`, `High`, `Urgent`                                   |
+| CreatedAt | datetime | NOT NULL     |                                                                     |
+| UpdatedAt | datetime | NOT NULL     | Stamped on every status or priority change                          |
+
+**Email notification:** on creation, an email is sent to the configurable admin address.
+
+**Deletion rule:** no deletion — tickets are the audit trail of user contact. Status transitions to `Closed` when resolved.
+
+---
 
 ### AdminAuditLog (Phase 3)
 

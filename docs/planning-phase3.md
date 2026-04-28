@@ -116,6 +116,15 @@ flowchart TD
 - **API authentication** — Phase 3 uses **cookie-based auth** (HttpOnly session cookie). JWT access token issuance is deferred to Phase 4 when a mobile client requires bearer token authentication. See `api-contract.md → Authentication` and `security-model.md → Authentication Model` for the resolved decision.
 - **Identity masking (HMAC pseudonymisation)** — every data row stores `UserRef = HMAC-SHA256(USER_REF_SECRET, userId)` instead of the raw UUID, so a database dump cannot link financial records to real user identities without the server secret. `USER_REF_SECRET` lives in the secrets store; a rotation procedure must be documented before Phase 3 launch. **Per-tenant payload encryption** (Phase 4+): encrypt financial payload columns (amount, description, merchant) under per-tenant keys derived from a master key via HKDF — deferred until Phase 4. See [`security-model.md — API Authentication and Identity Masking`](security-model.md#api-authentication-and-identity-masking).
 - **Email security** — three layers required before Phase 3 launch. (1) **DNS authentication:** configure SPF, DKIM, and DMARC on the sending domain once the email provider is chosen. SPF and DKIM must be active and passing; DMARC at minimum `p=none` at launch, advancing to `p=reject` after aggregate reports confirm clean sending. (2) **Application controls:** lock all outgoing email `To:` addresses to the authenticated user's own verified address (never from a request parameter); sanitize any user-controlled strings rendered into email subject or body; apply a tight per-user rate limit on all email-triggering endpoints. (3) **API key hygiene:** store the provider API key in environment variables or the hosting secret store — never in source control; use a send-only scoped key where supported; document the rotation procedure before launch. See [`security-model.md — Email Security Rules`](security-model.md#email-security-rules).
+- **Localization (EN / ES)** — the app ships in English and Spanish. See [`docs/superpowers/specs/2026-04-28-localization-design.md`](superpowers/specs/2026-04-28-localization-design.md) for the full design. Key decisions:
+  - **Scope:** all static UI strings, system-seeded category names, transactional emails, and generated report content. User-entered strings (transaction descriptions, account names) are never translated.
+  - **Two translation layers:** React SPA uses `react-i18next` + JSON files (`en.json`, `es.json`). Server-side emails and reports use `.resx` files (`Emails.en.resx`, `Emails.es.resx`, `Reports.en.resx`, `Reports.es.resx`) via `IStringLocalizer`.
+  - **Pre-auth language detection:** `Accept-Language` header → best match (`en`/`es`) → write `lang` cookie (non-HttpOnly, `SameSite=Lax`). Cookie persists for the session and is overwritten on login with `Settings.Language`.
+  - **Auth screen toggle:** a globe icon toggle at the bottom of every auth card (login, register, password reset, TOTP) lets users switch language before they have an account. Instant in-place swap via `i18n.changeLanguage()` — no reload.
+  - **Onboarding Preferences step:** the first wizard step groups five locale fields (language, country, default currency, number format, date format), all pre-filled from detected locale, all independently overridable. No cascade between fields — changing country does not change currency, because Latin American users commonly operate in USD regardless of their country.
+  - **Post-auth switcher:** `EN / ES` pill toggle inline in the user avatar dropdown. Instant in-place swap, no reload, no confirmation dialog. Also accessible from Settings → Preferences.
+  - **Data model:** `Settings` gains two new columns: `Language varchar(5) NOT NULL DEFAULT 'en'` and `Country varchar(2) nullable` (ISO 3166-1 alpha-2). No `Country` lookup table — country is a preference label until it drives data logic. Both columns land in the Phase 3 per-user preferences migration.
+  - **Supported countries at launch (short list):** ES, US, GB, CO, AR, VE, plus Other (stored as user-entered ISO code or null).
 
 ## Design System & Visual Overhaul
 
@@ -308,10 +317,11 @@ Login, TOTP, register, and password reset are the first thing beta users see —
 ### 11. Onboarding flow design
 
 Multi-step wizard for first-run users (deferred from Phase 2 — see ADR-0053):
-1. Create first asset account (checking, savings)
-2. Create first liability (optional)
-3. Record opening balance
-4. Immediate net worth display
+1. **Preferences** — language, country, default currency, number format, date format. Pre-filled from locale detection; all fields independently overridable. Live format preview (e.g. `€1.234,56 · 28/04/2026`). Saving this step applies the language immediately so all subsequent steps render in the user's chosen language.
+2. Create first asset account (checking, savings)
+3. Create first liability (optional)
+4. Record opening balance
+5. Immediate net worth display
 
 Full-screen stepper with progress indicator, distinct from the standard app shell.
 
