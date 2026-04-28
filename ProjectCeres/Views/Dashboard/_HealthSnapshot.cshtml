@@ -9,7 +9,7 @@
         <h2>Financial Health</h2>
         <div class="border border-gray-200 rounded-lg overflow-hidden grid grid-cols-4">
 
-            @* — Spendable Balance — *@
+            @* — Available Today / Safe to Spend — *@
             <div class="p-[14px_18px] border-r border-gray-200 @(snapshot.AvailableToday == null ? "bg-gray-50" : "")">
                 <div class="text-[10.5px] uppercase tracking-widest text-gray-400 font-medium mb-2">Spendable Balance</div>
                 @if (snapshot.AvailableToday == null)
@@ -18,10 +18,57 @@
                 }
                 else
                 {
-                    <div class="text-lg font-bold @(snapshot.AvailableToday >= 0 ? "text-green-600" : "text-red-600")"
+                    @* Available Today — headline number *@
+                    <div class="text-lg font-bold @(snapshot.AvailableToday >= 0 ? "text-green-600" : "text-red-600") leading-tight"
                          style="font-family:'IBM Plex Mono',ui-monospace,monospace">
                         @snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.AvailableToday.Value, ViewData["NumberFormat"] as string)
                     </div>
+                    <div class="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5 mb-3">Available today</div>
+
+                    @* Safe to Spend — subdued secondary number *@
+                    @if (snapshot.SafeToSpend != null)
+                    {
+                        var safeClass = snapshot.SafeToSpend >= 0 ? "text-gray-700" : "text-amber-600";
+                        <div class="text-sm font-semibold @safeClass leading-tight"
+                             style="font-family:'IBM Plex Mono',ui-monospace,monospace">
+                            @snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.SafeToSpend.Value, ViewData["NumberFormat"] as string)
+                        </div>
+                        <div class="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Safe to spend</div>
+                    }
+
+                    @* Breakdown — only shown when at least one deduction is non-zero *@
+                    @if ((snapshot.ImminentBills ?? 0m) != 0m || (snapshot.LaterBills ?? 0m) != 0m || (snapshot.BudgetReserve ?? 0m) != 0m)
+                    {
+                        <div class="mt-3 pt-2 border-t border-gray-100 space-y-0.5">
+                            @if ((snapshot.ImminentBills ?? 0m) != 0m)
+                            {
+                                <div class="flex justify-between text-[10.5px] text-gray-500">
+                                    <span>Bills due (7 days)</span>
+                                    <span class="font-medium" style="font-family:'IBM Plex Mono',ui-monospace,monospace">
+                                        −@snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.ImminentBills!.Value, ViewData["NumberFormat"] as string)
+                                    </span>
+                                </div>
+                            }
+                            @if ((snapshot.LaterBills ?? 0m) != 0m)
+                            {
+                                <div class="flex justify-between text-[10.5px] text-gray-500">
+                                    <span>Bills later this month</span>
+                                    <span class="font-medium" style="font-family:'IBM Plex Mono',ui-monospace,monospace">
+                                        −@snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.LaterBills!.Value, ViewData["NumberFormat"] as string)
+                                    </span>
+                                </div>
+                            }
+                            @if ((snapshot.BudgetReserve ?? 0m) != 0m)
+                            {
+                                <div class="flex justify-between text-[10.5px] text-gray-500">
+                                    <span>Budget remaining</span>
+                                    <span class="font-medium" style="font-family:'IBM Plex Mono',ui-monospace,monospace">
+                                        −@snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.BudgetReserve!.Value, ViewData["NumberFormat"] as string)
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
                 }
             </div>
 
