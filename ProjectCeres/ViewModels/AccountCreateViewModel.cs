@@ -36,4 +36,7 @@ public class AccountCreateViewModel
     [Display(Name = "Interest Rate")]
     [Range(0.0, 1.0, ErrorMessage = "Interest rate must be between 0 and 1 (e.g. 0.035 for 3.5%).")]
     public decimal? InterestRate { get; set; }
+
+    [Display(Name = "Exclude from spendable balance")]
+    public bool ExcludeFromSpendable { get; set; }
 }

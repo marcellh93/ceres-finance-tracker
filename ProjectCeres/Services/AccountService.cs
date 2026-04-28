@@ -44,7 +44,8 @@ public class AccountService(AppDbContext db) : IAccountService
             Description            = vm.Description,
             LiabilityRepaymentType = vm.LiabilityRepaymentType,
             InterestRate           = vm.InterestRate,
-            IsActive               = true
+            IsActive               = true,
+            ExcludeFromSpendable   = accountType?.Name == "Liability" ? false : vm.ExcludeFromSpendable,
         };
 
         db.Accounts.Add(account);
@@ -81,6 +82,7 @@ public class AccountService(AppDbContext db) : IAccountService
         account.Description            = vm.Description;
         account.LiabilityRepaymentType = vm.LiabilityRepaymentType;
         account.InterestRate           = vm.InterestRate;
+        account.ExcludeFromSpendable   = account.AccountType.Name == "Liability" ? false : vm.ExcludeFromSpendable;
 
         // Manage the opening balance transaction (system-managed, not user-editable directly).
         var existing = await db.Transactions

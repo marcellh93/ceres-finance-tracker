@@ -67,7 +67,8 @@ public class AccountsController(IAccountService accountService, AppDbContext db,
             OpeningBalance         = await accountService.GetOpeningBalanceAsync(account.Id),
             OpeningBalanceDate     = openingDate ?? DateOnly.FromDateTime(DateTime.Today),
             LiabilityRepaymentType = account.LiabilityRepaymentType,
-            InterestRate           = account.InterestRate
+            InterestRate           = account.InterestRate,
+            ExcludeFromSpendable   = account.ExcludeFromSpendable
         };
 
         ViewBag.IsLiability = account.AccountType.Name == "Liability";
