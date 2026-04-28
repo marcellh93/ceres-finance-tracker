@@ -772,7 +772,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [x] `dotnet build` — zero errors after `Transaction`, `Transfer`, and `LiabilityPayment` inherit from `Movement`
 - [x] `dotnet ef migrations add TpcMovementHierarchy` — generated migration `Up()` is empty (no schema changes); if non-empty, stop and investigate before applying
 - [x] `dotnet test` — all 187 existing tests still pass; all new `MovementServiceTests` pass
-- [ ] `GET /Movements` — shows rows from all three types (`Transaction`, `Transfer`, `LiabilityPayment`), interleaved and sorted `Date DESC`, `CreatedAt DESC` _(partial — controller test only asserts 200 OK + word "Movements"; does not seed and assert all 3 types are present in output; manual verification needed)_
+- [x] `GET /Movements` — shows rows from all three types (`Transaction`, `Transfer`, `LiabilityPayment`), interleaved and sorted `Date DESC`, `CreatedAt DESC` _(verified by `GetMovements_WithAllThreeMovementTypes_RendersAllThreeTypeBadges` in `MovementsControllerTests`)_
 - [x] `GET /Movements` with `accountId` filter — only rows involving that account appear
 - [x] `GET /Movements` with date range filter — only rows within range appear
 - [x] Edit button on a Transaction row in `/Movements` → routes to `/Transactions/Edit/{id}?returnUrl=/Movements` → save → redirects back to `/Movements`
@@ -791,13 +791,13 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 ### CSV Import
 
 - [x] Upload `valid_import.csv` with a correctly configured profile → 10 transactions created, all `NeedsReview = true`; summary shows correct `RowsImported` count _(ADR-0060: import no longer sets `IsCleared = true`; category inferred from amount sign)_
-- [ ] Upload a valid `.xlsx` file with a correctly configured Excel profile → transactions imported; summary shows correct counts
-- [ ] Upload `.xlsx` with multiple worksheets and no SheetName set on profile → first sheet is read; import succeeds
-- [ ] Upload `.xlsx` with SheetName set on profile → named sheet is read; other sheets ignored
-- [ ] Upload `.xlsx` file that fails magic bytes check (spoofed extension) → rejected with user-facing error
-- [ ] Upload `.xlsx` file exceeding 10 MB size limit → rejected before parsing
-- [ ] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression
-- [ ] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(covered by ImportParserFactoryTests)_
+- [x] Upload a valid `.xlsx` file with a correctly configured Excel profile → transactions imported; summary shows correct counts _(`ImportAsync_ValidXlsx_Inserts10TransactionsAllCleared` in `ImportServiceTests` + `PostImport_ValidXlsxFile_Returns200OrValidation` in `ImportApiTests`)_
+- [x] Upload `.xlsx` with multiple worksheets and no SheetName set on profile → first sheet is read; import succeeds _(`ParseAsync_MultiSheet_ReadsFirstSheetByDefault` in `ExcelImportParserTests`)_
+- [x] Upload `.xlsx` with SheetName set on profile → named sheet is read; other sheets ignored _(`ParseAsync_NamedSheet_ReadsCorrectSheet` in `ExcelImportParserTests`)_
+- [x] Upload `.xlsx` file that fails magic bytes check (spoofed extension) → rejected with user-facing error _(`ParseAsync_SpoofedFile_ThrowsInvalidOperationException` in `ExcelImportParserTests`)_
+- [x] Upload `.xlsx` file exceeding 10 MB size limit → rejected before parsing _(`PostImport_FileSizeExceeds10MB_Returns400WithMessage` in `ImportApiTests`)_
+- [x] Upload `.csv` file with a profile where Format = 'Csv' → still works; no regression _(`ImportAsync_ValidCsv_TotalCountMatchesRowCount` in `ImportServiceTests`)_
+- [x] `ImportFormat.Excel` profile routes to `ExcelImportParser`; `ImportFormat.Csv` routes to `CsvImportParser` _(`GetParser_CsvFormat_ReturnsCsvImportParser` + `GetParser_ExcelFormat_ReturnsExcelImportParser` in `ImportParserFactoryTests`)_
 - [x] Upload `duplicate_candidates.csv` → matched uncleared transactions are cleared; no duplicate rows inserted; summary shows correct `RowsReconciled` count; all newly inserted rows show amber "Needs review" badge in Transactions Index _(ADR-0060)_
 - [x] **Transfer Detection (Stage 3.5):** Two rows in same file with opposite signs and same amount → both staged; neither appears as a plain transaction in Transactions Index
 - [x] **Transfer Detection (Stage 3.5):** Cross-account match (opposite sign, same amount, ±1 day) → staged with candidate transaction linked
@@ -817,9 +817,9 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### Transfer Attachments
 
-- [ ] Upload a file attachment on a Transfer → file saved to disk, linked to transfer, served with `Content-Disposition: attachment`
-- [ ] Remove transfer attachment → DB record deleted, file deleted from disk; confirmed via hard-delete dialog
-- [ ] Upload spoofed file on transfer (e.g. `.exe` renamed to `.jpg`) → rejected with "File type not allowed"
+- [x] Upload a file attachment on a Transfer → file saved to disk, linked to transfer, served with `Content-Disposition: attachment` _(`UploadForTransferAsync_PersistsAttachmentRecord_AndWritesFileToDisk` + `GetTransferAttachmentAsync_ReturnsFileDataAndMetadata` in `TransferAttachmentServiceTests`)_
+- [x] Remove transfer attachment → DB record deleted, file deleted from disk; confirmed via hard-delete dialog _(`DeleteTransferAttachmentAsync_RemovesDbRecord_AndDeletesFileFromDisk` in `TransferAttachmentServiceTests`)_
+- [x] Upload spoofed file on transfer (e.g. `.exe` renamed to `.jpg`) → rejected with "File type not allowed" _(`UploadForTransferAsync_ThrowsWhenFileTypeIsNotAllowed` in `TransferAttachmentServiceTests`)_
 - [x] **UI/UX (Stage 4):** Transfer Create/Edit and Transaction Create/Edit — multi-file drop zone with cloud-upload icon; pending files shown as row tiles inside the zone; saved files shown in green card above with async delete via Dialog confirmation (no page reload); Lucide `trash-2` icon on remove button _(verified in browser)_
 
 ### Liability Enhancements

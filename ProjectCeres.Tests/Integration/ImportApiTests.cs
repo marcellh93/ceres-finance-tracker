@@ -99,6 +99,29 @@ public class ImportApiTests(TestWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task PostImport_FileSizeExceeds10MB_Returns400WithMessage()
+    {
+        // 11 MB of CSV-like content — over the 10 MB cap enforced in ImportApiController.
+        var oversizedBytes = new byte[11 * 1024 * 1024];
+        // Write a minimal CSV header so it looks like a CSV.
+        var header = System.Text.Encoding.UTF8.GetBytes("Date,Amount,Description\n");
+        Array.Copy(header, oversizedBytes, header.Length);
+
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(oversizedBytes), "file", "big.csv");
+        form.Add(new StringContent("Date"),        "dateColumn");
+        form.Add(new StringContent("Amount"),      "amountColumn");
+        form.Add(new StringContent("Description"), "descriptionColumn");
+        form.Add(new StringContent(Guid.NewGuid().ToString()), "accountId");
+
+        var response = await _client.PostAsync("/api/import", form);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("10 MB");
+    }
+
+    [Fact]
     public async Task GetHeaders_ValidCsv_ReturnsDetectedHeaders()
     {
         var csv = "Fecha,Importe,Concepto\n17/04/2026,100.00,Test\n";

@@ -32,6 +32,7 @@ public class MovementsControllerTests : IAsyncLifetime
     private readonly List<Guid> _seededAccountIds = [];
     private readonly List<Guid> _seededTransactionIds = [];
     private readonly List<Guid> _seededTransferIds = [];
+    private readonly List<Guid> _seededLiabilityPaymentIds = [];
 
     public MovementsControllerTests(TestWebApplicationFactory factory)
     {
@@ -52,6 +53,9 @@ public class MovementsControllerTests : IAsyncLifetime
 
         if (_seededTransferIds.Count > 0)
             await db.Transfers.Where(t => _seededTransferIds.Contains(t.Id)).ExecuteDeleteAsync();
+
+        if (_seededLiabilityPaymentIds.Count > 0)
+            await db.LiabilityPayments.Where(p => _seededLiabilityPaymentIds.Contains(p.Id)).ExecuteDeleteAsync();
 
         if (_seededAccountIds.Count > 0)
             await db.Accounts.Where(a => _seededAccountIds.Contains(a.Id)).ExecuteDeleteAsync();
@@ -122,6 +126,46 @@ public class MovementsControllerTests : IAsyncLifetime
         return transfer.Id;
     }
 
+    private async Task<Guid> SeedLiabilityAccountAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var account = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = $"WAF Liability {Guid.NewGuid():N}",
+            AccountTypeId = 2,
+            CurrencyId    = 1,
+            IsActive      = true
+        };
+        db.Accounts.Add(account);
+        await db.SaveChangesAsync();
+        _seededAccountIds.Add(account.Id);
+        return account.Id;
+    }
+
+    private async Task<Guid> SeedLiabilityPaymentAsync(Guid assetAccountId, Guid liabilityAccountId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var payment = new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = new DateOnly(2025, 6, 1),
+            Amount             = 75m,
+            AssetAccountId     = assetAccountId,
+            LiabilityAccountId = liabilityAccountId,
+            IsCleared          = false,
+            CreatedAt          = DateTime.UtcNow
+        };
+        db.LiabilityPayments.Add(payment);
+        await db.SaveChangesAsync();
+        _seededLiabilityPaymentIds.Add(payment.Id);
+        return payment.Id;
+    }
+
     // -------------------------------------------------------------------------
     // GET /Movements — 200 OK
     // -------------------------------------------------------------------------
@@ -135,6 +179,27 @@ public class MovementsControllerTests : IAsyncLifetime
 
         var body = await response.Content.ReadAsStringAsync();
         body.Should().Contain("Movements", because: "the Movements index page must render its own content");
+    }
+
+    [Fact]
+    public async Task GetMovements_WithAllThreeMovementTypes_RendersAllThreeTypeBadges()
+    {
+        // Seed one Transaction, one Transfer, and one LiabilityPayment so the page
+        // must render rows for all three movement types.
+        var assetId1     = await SeedAssetAccountAsync();
+        var assetId2     = await SeedAssetAccountAsync();
+        var liabilityId  = await SeedLiabilityAccountAsync();
+        await SeedTransactionAsync(assetId1);
+        await SeedTransferAsync(assetId1, assetId2);
+        await SeedLiabilityPaymentAsync(assetId2, liabilityId);
+
+        var response = await _client.GetAsync("/Movements");
+        var body = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        body.Should().Contain("Transaction",        because: "a seeded Transaction row must appear");
+        body.Should().Contain("Transfer",           because: "a seeded Transfer row must appear");
+        body.Should().Contain("Liability Payment",  because: "a seeded LiabilityPayment row must appear");
     }
 
     // -------------------------------------------------------------------------
