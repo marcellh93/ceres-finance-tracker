@@ -181,6 +181,23 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.SetNull);
         });
 
+        modelBuilder.Entity<ImportStagedTransaction>(entity =>
+        {
+            entity.Property(e => e.Status)
+                  .HasConversion<string>()
+                  .HasMaxLength(30);
+
+            entity.HasOne(e => e.Account)
+                  .WithMany()
+                  .HasForeignKey(e => e.AccountId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.MatchedTransaction)
+                  .WithMany()
+                  .HasForeignKey(e => e.MatchedTransactionId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
         modelBuilder.Entity<ImportTransferExclusion>(entity =>
         {
             entity.ToTable("ImportTransferExclusions");

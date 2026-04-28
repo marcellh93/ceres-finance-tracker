@@ -12,7 +12,7 @@ using ProjectCeres.Data;
 namespace ProjectCeres.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260428145715_AddImportStagedTransaction")]
+    [Migration("20260428150447_AddImportStagedTransaction")]
     partial class AddImportStagedTransaction
     {
         /// <inheritdoc />
@@ -603,7 +603,7 @@ namespace ProjectCeres.Migrations
                     b.Property<DateTime>("ImportedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("MatchedTransactionId")
+                    b.Property<Guid?>("MatchedTransactionId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("RawAmount")
@@ -618,8 +618,10 @@ namespace ProjectCeres.Migrations
                     b.Property<DateTime?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 
@@ -1105,14 +1107,13 @@ namespace ProjectCeres.Migrations
                     b.HasOne("ProjectCeres.Models.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("ProjectCeres.Models.Transaction", "MatchedTransaction")
                         .WithMany()
                         .HasForeignKey("MatchedTransactionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Account");
 
