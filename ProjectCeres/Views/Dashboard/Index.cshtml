@@ -85,7 +85,13 @@
 </div>
 
 <div class="dashboard-actions">
-    <a asp-controller="Transactions" asp-action="Create" class="btn btn-primary">+ Record Transaction</a>
-    <a asp-controller="Transfers" asp-action="Create" class="btn btn-secondary">+ Record Transfer</a>
+    <a asp-controller="Transactions" asp-action="Create" class="btn btn-primary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Record Transaction
+    </a>
+    <a asp-controller="Transfers" asp-action="Create" class="btn btn-secondary inline-flex items-center gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Record Transfer
+    </a>
     <a asp-controller="Reports" asp-action="Index" class="btn btn-secondary">View Reports</a>
 </div>
