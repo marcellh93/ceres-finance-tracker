@@ -400,14 +400,21 @@ See [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md).
 
 See [planning.md — Open Questions](planning.md#open-questions--decisions) for the full list. Key items:
 
-- Authentication framework
 - Hosting platform
 - Email service
 - Invite mechanism
-- Multi-tenancy implementation
-- Settings migration
-- MVC → Web API decoupling — base migration plan documented in [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md); finalize at Phase 3 kickoff
-- Production migration strategy
-- CI service
-- CD strategy
+- Concurrency handling — last-write-wins accepted for Phase 1/2; decide whether to add EF Core optimistic concurrency tokens (`RowVersion`) to mutable entities before Phase 3 launch
+- Production migration strategy — `dotnet ef database update` vs. pre-deploy CI/CD step vs. reviewed SQL scripts
+- CI service — GitHub Actions is the leading candidate; confirm before Phase 3 launch
+- CD strategy — no pipeline designed; must define trigger (merge to main, tag, manual), staging environment, migration step, and rollback plan
+- File attachment storage — local filesystem does not scale to hosted multi-user; must decide between cloud storage (Azure Blob, S3) and server disk; `StoredPath` will need a data migration if the backend changes after data exists
+- Timezone handling — transaction dates stored as local date with no timezone; must decide on a strategy (store UTC + convert, require user timezone, or accept ambiguity) before Phase 3 launch
+- Mobile app — React Native is the leading candidate; no scope, timeline, or platform targets defined
 - E2E testing — Playwright chosen; implement after Phase 2 React migration stabilizes. See [testing.md](testing.md#e2e-tool-playwright).
+
+**Resolved** — moved to [planning-resolved.md](planning-resolved.md):
+- ~~Authentication framework~~ — ASP.NET Core Identity + Argon2id + TOTP, cookie-based auth. Resolved.
+- ~~Multi-tenancy implementation~~ — `UserId` FK on all user-owned entities + HMAC pseudonymisation. See `multi-tenancy-strategy.md`. Resolved.
+- ~~Settings migration~~ — Per-user row created on registration with system defaults; onboarding Preferences step handles overrides. Resolved.
+- ~~WCAG 2.1 AA compliance~~ — Full spec in §8 above. Resolved.
+- ~~MVC → Web API decoupling~~ — Approach locked 2026-04-28. See `planning-phase3-spa-migration.md`. Resolved.
