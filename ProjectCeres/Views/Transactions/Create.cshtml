@@ -82,14 +82,9 @@
     </div>
 
     @* Attachment only applies to regular transactions *@
-    <div id="attachment-field">
-        <div class="form-group">
-            <label asp-for="Attachments"></label>
-            <input asp-for="Attachments" type="file" class="form-control" multiple
-                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
-            <small>Optional. Max 10 MB each. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
-            <span asp-validation-for="Attachments" class="field-error"></span>
-        </div>
+    <div id="attachment-field" class="form-group">
+        @{ ViewData["InputName"] = "Attachments"; }
+        @await Html.PartialAsync("_AttachmentWidget")
     </div>
 
     <div class="form-actions">
