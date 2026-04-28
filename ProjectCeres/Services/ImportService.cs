@@ -101,7 +101,7 @@ public class ImportService(
                         await transactionService.MarkClearedAsync(match.Id, cleared: true);
                     }
 
-                    if (stagedTransactionService is not null && db is not null)
+                    if (stagedTransactionService is not null)
                     {
                         db.ImportStagedTransactions.Add(new ImportStagedTransaction
                         {
