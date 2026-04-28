@@ -7,7 +7,9 @@ public class DashboardController(IDashboardService dashboardService) : Controlle
 {
     public async Task<IActionResult> Index()
     {
-        var data = await dashboardService.GetDashboardDataAsync();
+        var data     = await dashboardService.GetDashboardDataAsync();
+        var snapshot = await dashboardService.GetHealthSnapshotAsync();
+        ViewBag.HealthSnapshot = snapshot;
         return View(data);
     }
 }

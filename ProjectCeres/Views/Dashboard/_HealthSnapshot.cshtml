@@ -1,0 +1,65 @@
+@using ProjectCeres.Helpers
+@{
+    var snapshot = ViewBag.HealthSnapshot as ProjectCeres.Services.HealthSnapshotData;
+}
+
+@if (snapshot != null)
+{
+    <section class="dashboard-card">
+        <h2>Financial Health</h2>
+        <dl class="stat-list">
+
+            <dt>Spendable Balance</dt>
+            @if (snapshot.SpendableBalance == null)
+            {
+                <dd class="text-muted">— <small>Not enough data</small></dd>
+            }
+            else
+            {
+                <dd class="@(snapshot.SpendableBalance >= 0 ? "amount-income" : "amount-expense") whitespace-nowrap">
+                    @snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.SpendableBalance.Value, ViewData["NumberFormat"] as string)
+                </dd>
+            }
+
+            <dt>Runway</dt>
+            @if (snapshot.RunwayMonths == null)
+            {
+                <dd class="text-muted">— <small>Not enough data</small></dd>
+            }
+            else
+            {
+                var runwayClass = snapshot.RunwayMonths > 6 ? "amount-income"
+                                : snapshot.RunwayMonths >= 3 ? "text-amber-600"
+                                : "amount-expense";
+                <dd class="@runwayClass">@snapshot.RunwayMonths.Value.ToString("F1") months</dd>
+            }
+
+            <dt>Income vs. Avg</dt>
+            @if (snapshot.IncomeDeltaPercent == null)
+            {
+                <dd class="text-muted">— <small>Not enough data</small></dd>
+            }
+            else
+            {
+                var incomeClass = snapshot.IncomeDeltaPercent > 0 ? "amount-income"
+                                : snapshot.IncomeDeltaPercent < 0 ? "amount-expense"
+                                : "text-muted";
+                <dd class="@incomeClass">@(snapshot.IncomeDeltaPercent >= 0 ? "+" : "")@snapshot.IncomeDeltaPercent.Value.ToString("P1")</dd>
+            }
+
+            <dt>Budget Burn Rate</dt>
+            @if (snapshot.BudgetBurnRate == null)
+            {
+                <dd class="text-muted">— <small>Not enough data</small></dd>
+            }
+            else
+            {
+                var burnClass = snapshot.BudgetBurnRate < 0.5m ? "amount-income"
+                             : snapshot.BudgetBurnRate <= 0.8m ? "text-amber-600"
+                             : "amount-expense";
+                <dd class="@burnClass">@snapshot.BudgetBurnRate.Value.ToString("P1")</dd>
+            }
+
+        </dl>
+    </section>
+}
