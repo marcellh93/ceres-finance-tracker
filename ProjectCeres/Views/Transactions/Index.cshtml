@@ -52,7 +52,7 @@ else
                 <th>Details</th>
                 <th>Description</th>
                 <th>Type</th>
-                <th>Amount</th>
+                <th class="text-right">Amount</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
@@ -68,8 +68,8 @@ else
                         <td>@item.AssetAccountName</td>
                         <td>→ @item.LiabilityAccountName</td>
                         <td>@(item.Description ?? "—")</td>
-                        <td>Liability Payment</td>
-                        <td class="amount-neutral">
+                        <td><span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800 whitespace-nowrap">Liability Payment</span></td>
+                        <td class="amount-neutral text-right">
                             @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
                         </td>
                     }
@@ -79,7 +79,7 @@ else
                         <td>@item.CategoryName</td>
                         <td>@(item.Description ?? "—")</td>
                         <td>@item.CategoryTypeName</td>
-                        <td class="@(item.CategoryTypeName == "Income" ? "amount-income" : "amount-expense") whitespace-nowrap">
+                        <td class="@(item.CategoryTypeName == "Income" ? "amount-income" : "amount-expense") whitespace-nowrap text-right">
                             @item.CurrencySymbol @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
                         </td>
                     }
