@@ -42,7 +42,16 @@ else
                             @if (category.IsSystem) { <span class="badge">system</span> }
                         </td>
                         <td>@(category.LifestyleTag ?? "—")</td>
-                        <td>@(category.IsActive ? "Active" : "Inactive")</td>
+                        <td>
+                            @if (category.IsActive)
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">Active</span>
+                            }
+                            else
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
+                            }
+                        </td>
                         <td class="actions">
                             <div class="flex gap-2 items-center">
                                 @if (!category.IsSystem && category.IsActive)
