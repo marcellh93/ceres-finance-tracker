@@ -121,9 +121,9 @@
   .btn-secondary  { @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-400; }
   .btn-danger     { @apply btn bg-red-600 text-white hover:bg-red-700 hover:text-white focus:ring-red-600; }
   .btn-info       { @apply btn bg-blue-600 text-white hover:bg-blue-700 hover:text-white focus:ring-blue-600; }
-  .btn-warning    { @apply btn bg-amber-500 text-white hover:bg-amber-600 hover:text-white focus:ring-amber-500; }
+  .btn-warning    { @apply btn bg-amber-600 text-white hover:bg-amber-700 hover:text-white focus:ring-amber-600; }
   .btn-link       { @apply text-sm text-gray-600 underline hover:text-gray-900; }
-  .btn-sm         { @apply px-2.5 py-1 text-xs rounded; }
+  .btn-sm         { @apply inline-flex items-center px-2.5 py-1 text-xs rounded; }
 
   /* ─── Forms ────────────────────────────────────────── */
 

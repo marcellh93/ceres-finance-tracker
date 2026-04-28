@@ -280,7 +280,8 @@ public class ReportsController(
     private FileContentResult CsvFile(List<string> lines, string fileName)
     {
         var content = string.Join("\n", lines);
-        return File(System.Text.Encoding.UTF8.GetBytes(content), "text/csv", fileName);
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(content)).ToArray();
+        return File(bytes, "text/csv; charset=utf-8", fileName);
     }
 
     private async Task PopulateViewBagAsync(int selectedCurrencyId, DateOnly from, DateOnly to)
