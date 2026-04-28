@@ -348,4 +348,44 @@ public class AccountServiceTests : IAsyncLifetime
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*interest rate*");
     }
+
+    // -------------------------------------------------------------------------
+    // Stage 9 — Health metrics / ExcludeFromSpendable
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateAsync_AssetAccount_WithExcludeFromSpendable_True_PersistedAsTrue()
+    {
+        var account = await _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name               = $"Test Account {Guid.NewGuid():N}",
+            AccountTypeId      = 1,  // Asset
+            CurrencyId         = 1,  // EUR
+            Description        = null,
+            OpeningBalance     = 0m,
+            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today),
+            ExcludeFromSpendable = true
+        });
+
+        var reloaded = await _fixture.Db.Accounts.FindAsync(account.Id);
+        reloaded!.ExcludeFromSpendable.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateAsync_LiabilityAccount_WithExcludeFromSpendable_True_ForcedToFalse()
+    {
+        var account = await _service.CreateAsync(new AccountCreateViewModel
+        {
+            Name               = $"Test Credit Card {Guid.NewGuid():N}",
+            AccountTypeId      = 2,  // Liability
+            CurrencyId         = 1,  // EUR
+            Description        = null,
+            OpeningBalance     = 0m,
+            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today),
+            ExcludeFromSpendable = true
+        });
+
+        var reloaded = await _fixture.Db.Accounts.FindAsync(account.Id);
+        reloaded!.ExcludeFromSpendable.Should().BeFalse();
+    }
 }
