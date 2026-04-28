@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Moq;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 
@@ -65,7 +64,7 @@ public class TransactionExportServiceTests : IAsyncLifetime
             MakeTx(today, 50m));
         await _fixture.Db.SaveChangesAsync();
 
-        var rows = await _service.ExportAsync();
+        var rows = await _service.ExportAsync(accountId: _accountId);
 
         rows.Count.Should().Be(5);
     }
@@ -114,11 +113,14 @@ public class TransactionExportServiceTests : IAsyncLifetime
         await _fixture.Db.SaveChangesAsync();
 
         var rows = await _service.ExportAsync(
+            accountId: _accountId,
             from: new DateOnly(2025, 1, 1),
             to:   new DateOnly(2025, 1, 31));
 
         rows.Should().HaveCount(2);
-        rows.Should().OnlyContain(r => r.Date <= new DateOnly(2025, 1, 31));
+        rows.Should().OnlyContain(r =>
+            r.Date >= new DateOnly(2025, 1, 1) &&
+            r.Date <= new DateOnly(2025, 1, 31));
     }
 
     [Fact]

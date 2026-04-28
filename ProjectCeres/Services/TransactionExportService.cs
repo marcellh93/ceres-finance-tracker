@@ -11,9 +11,9 @@ public class TransactionExportService(AppDbContext db) : ITransactionExportServi
         DateOnly? to        = null)
     {
         var query = db.Transactions
-            .Where(t => !t.Category.IsSystem)
             .Include(t => t.Account)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
+            .Where(t => !t.Category.IsSystem)
             .AsQueryable();
 
         if (accountId.HasValue)
