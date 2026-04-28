@@ -10,7 +10,11 @@ public record DashboardData(
     string CurrencySymbol);
 
 public record HealthSnapshotData(
-    decimal? SpendableBalance,
+    decimal? AvailableToday,
+    decimal? SafeToSpend,
+    decimal? ImminentBills,
+    decimal? LaterBills,
+    decimal? BudgetReserve,
     decimal? RunwayMonths,
     decimal? CurrentMonthIncome,
     decimal? RollingAverageIncome,

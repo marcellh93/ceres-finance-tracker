@@ -49,20 +49,24 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var currencyId = settings.DefaultCurrencyId;
         var currency   = settings.DefaultCurrency;
 
-        var spendable    = await GetSpendableBalanceAsync(currencyId);
-        var runway       = await GetRunwayAsync(currencyId);
+        var (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve) = await GetSpendableBalanceAsync(currencyId);
+        var runway        = await GetRunwayAsync(currencyId);
         var incomeMetrics = await GetIncomeMetricsAsync(currencyId);
-        var burnRate     = await GetBudgetBurnRateAsync(currencyId);
+        var burnRate      = await GetBudgetBurnRateAsync(currencyId);
 
         return new HealthSnapshotData(
-            SpendableBalance:    spendable,
-            RunwayMonths:        runway,
-            CurrentMonthIncome:  incomeMetrics.currentMonth,
+            AvailableToday:       availableToday,
+            SafeToSpend:          safeToSpend,
+            ImminentBills:        imminentBills,
+            LaterBills:           laterBills,
+            BudgetReserve:        budgetReserve,
+            RunwayMonths:         runway,
+            CurrentMonthIncome:   incomeMetrics.currentMonth,
             RollingAverageIncome: incomeMetrics.rollingAverage,
-            IncomeDeltaPercent:  incomeMetrics.deltaPercent,
-            BudgetBurnRate:      burnRate,
-            CurrencySymbol:      currency.Symbol,
-            CurrencyCode:        currency.Code);
+            IncomeDeltaPercent:   incomeMetrics.deltaPercent,
+            BudgetBurnRate:       burnRate,
+            CurrencySymbol:       currency.Symbol,
+            CurrencyCode:         currency.Code);
     }
 
     // -------------------------------------------------------------------------
@@ -70,16 +74,25 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Spendable balance = SUM of non-excluded asset account balances − SUM of
-    /// EstimatedAmount for qualifying recurring transactions (due this month).
-    /// Liability accounts are never included regardless of ExcludeFromSpendable.
-    /// Returns null if there are no qualifying accounts.
+    /// Layered spendable balance calculation.
+    ///
+    /// AvailableToday = liquid balance of non-excluded asset accounts
+    ///                  − imminent bills (due within 7 days or overdue, this calendar month)
+    ///
+    /// LaterBills     = recurring bills due this calendar month but outside the 7-day window
+    ///
+    /// BudgetReserve  = SUM(MAX(0, limit − actual spend this month)) per active CategoryBudget
+    ///
+    /// SafeToSpend    = AvailableToday − LaterBills − BudgetReserve
+    ///
+    /// Returns all nulls if there are no qualifying accounts.
     /// </summary>
-    private async Task<decimal?> GetSpendableBalanceAsync(int currencyId)
+    private async Task<(decimal? availableToday, decimal? safeToSpend, decimal? imminentBills, decimal? laterBills, decimal? budgetReserve)> GetSpendableBalanceAsync(int currencyId)
     {
-        var today      = DateOnly.FromDateTime(DateTime.Today);
-        var firstDay   = new DateOnly(today.Year, today.Month, 1);
-        var lastDay    = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        var today    = DateOnly.FromDateTime(DateTime.Today);
+        var firstDay = new DateOnly(today.Year, today.Month, 1);
+        var lastDay  = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        const int imminentWindowDays = 7;
 
         // Load active, non-excluded asset accounts with their transactions and category types.
         var accounts = await db.Accounts
@@ -93,13 +106,13 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
 
         if (accounts.Count == 0)
-            return null;
+            return (null, null, null, null, null);
 
-        // Derive balance per account (same sign logic as ReportService).
-        decimal totalBalance = 0m;
+        // Derive liquid balance per account (same sign logic as AccountService).
+        decimal liquid = 0m;
         foreach (var account in accounts)
         {
-            totalBalance += account.Transactions.Sum(t =>
+            liquid += account.Transactions.Sum(t =>
             {
                 if (t.Category.IsSystem) return t.Amount;
                 bool isIncome = t.Category.CategoryType.Name == "Income";
@@ -107,16 +120,25 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             });
         }
 
-        // Load liability payments that touch these asset accounts.
+        // Subtract liability payments that source from these asset accounts.
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
         var liabilityPayments = await db.LiabilityPayments
             .AsNoTracking()
             .Where(p => accountIds.Contains(p.AssetAccountId))
             .ToListAsync();
-        totalBalance -= liabilityPayments.Sum(p => p.Amount);
+        liquid -= liabilityPayments.Sum(p => p.Amount);
 
-        // Subtract recurring transactions due this calendar month — only those linked
-        // to the same qualifying (non-excluded) asset accounts included in the balance.
+        // Include transfers (cross-boundary transfers must be counted to match displayed balances).
+        var transfersIn = await db.Transfers
+            .Where(t => accountIds.Contains(t.DestAccountId))
+            .SumAsync(t => (decimal?)t.Amount) ?? 0m;
+        var transfersOut = await db.Transfers
+            .Where(t => accountIds.Contains(t.SourceAccountId))
+            .SumAsync(t => (decimal?)t.Amount) ?? 0m;
+        liquid += transfersIn;
+        liquid -= transfersOut;
+
+        // Split recurring transactions due this month into imminent (≤7 days or overdue) and later (>7 days).
         var dueRecurring = await db.RecurringTransactions
             .Where(r => r.IsActive
                      && r.EstimatedAmount != null
@@ -125,8 +147,46 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
                      && accountIds.Contains(r.AccountId))
             .ToListAsync();
 
-        var dueTotal = dueRecurring.Sum(r => r.EstimatedAmount ?? 0m);
-        return totalBalance - dueTotal;
+        var imminentCutoff = today.AddDays(imminentWindowDays);
+        decimal imminentBills = dueRecurring
+            .Where(r => r.NextDueDate <= imminentCutoff)
+            .Sum(r => r.EstimatedAmount ?? 0m);
+        decimal laterBills = dueRecurring
+            .Where(r => r.NextDueDate > imminentCutoff)
+            .Sum(r => r.EstimatedAmount ?? 0m);
+
+        // Budget reserve = SUM(MAX(0, limit − actual spend this month)) per active CategoryBudget.
+        var activeBudgets = await db.CategoryBudgets
+            .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
+            .ToListAsync();
+
+        decimal budgetReserve = 0m;
+        if (activeBudgets.Count > 0)
+        {
+            var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
+            var actualSpendByCategory = await db.Transactions
+                .Where(t => t.Date >= firstDay
+                         && t.Date <= today
+                         && budgetCategoryIds.Contains(t.CategoryId)
+                         && t.Account.CurrencyId == currencyId)
+                .GroupBy(t => t.CategoryId)
+                .Select(g => new { CategoryId = g.Key, Total = g.Sum(t => t.Amount) })
+                .ToListAsync();
+
+            var spendMap = actualSpendByCategory.ToDictionary(x => x.CategoryId, x => x.Total);
+            foreach (var budget in activeBudgets)
+            {
+                var actual  = spendMap.GetValueOrDefault(budget.CategoryId);
+                var reserve = budget.LimitAmount - actual;
+                if (reserve > 0)
+                    budgetReserve += reserve;
+            }
+        }
+
+        var availableToday = liquid - imminentBills;
+        var safeToSpend    = availableToday - laterBills - budgetReserve;
+
+        return (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve);
     }
 
     /// <summary>
