@@ -1,8 +1,10 @@
 @inject ProjectCeres.Services.IRecurringTransactionService RecurringTransactionService
 @inject ProjectCeres.Services.ITransferReviewService TransferReviewService
+@inject ProjectCeres.Services.IImportStagedTransactionService ImportStagedTransactionService
 @{
-    var upcomingCount    = (await RecurringTransactionService.GetUpcomingAsync(withinDays: 5)).Count();
-    var pendingTransfers = await TransferReviewService.GetPendingCountAsync();
+    var upcomingCount          = (await RecurringTransactionService.GetUpcomingAsync(withinDays: 5)).Count();
+    var pendingTransfers       = await TransferReviewService.GetPendingCountAsync();
+    var pendingReconciliations = await ImportStagedTransactionService.GetPendingCountAsync();
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -14,7 +16,10 @@
 </head>
 <body>
     <header>
-        <div id="navbar-root" data-upcoming-count="@upcomingCount" data-pending-transfers="@pendingTransfers"></div>
+        <div id="navbar-root"
+     data-upcoming-count="@upcomingCount"
+     data-pending-transfers="@pendingTransfers"
+     data-pending-reconciliations="@pendingReconciliations"></div>
     </header>
 
     <main>

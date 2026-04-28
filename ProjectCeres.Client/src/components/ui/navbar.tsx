@@ -4,9 +4,10 @@ import { Badge } from '@/components/ui/badge'
 interface NavbarProps {
   upcomingPaymentsCount?: number
   pendingTransfers?: number
+  pendingReconciliations?: number
 }
 
-export function Navbar({ upcomingPaymentsCount = 0, pendingTransfers = 0 }: NavbarProps) {
+export function Navbar({ upcomingPaymentsCount = 0, pendingTransfers = 0, pendingReconciliations = 0 }: NavbarProps) {
   return (
     <nav className="bg-gray-900 text-white">
       <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between px-4">
@@ -25,6 +26,14 @@ export function Navbar({ upcomingPaymentsCount = 0, pendingTransfers = 0 }: Navb
             {pendingTransfers > 0 && (
               <Badge className="ml-1.5" variant="destructive">
                 {pendingTransfers}
+              </Badge>
+            )}
+          </a>
+          <a href="/ReconciliationReview" className="relative !text-gray-300 hover:!text-white hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors no-underline inline-flex items-center gap-1.5">
+            Reconciliation
+            {pendingReconciliations > 0 && (
+              <Badge className="ml-1.5" variant="destructive">
+                {pendingReconciliations}
               </Badge>
             )}
           </a>

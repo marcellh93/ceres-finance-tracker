@@ -11,14 +11,20 @@ import { IncomeExpenseChart } from './components/IncomeExpenseChart'
 import { SpendingByCategoryChart } from './components/SpendingByCategoryChart'
 import { AccountBalancesChart } from './components/AccountBalancesChart'
 import { CashFlowChart } from './components/CashFlowChart'
+import { ConfirmDialog } from './components/ConfirmDialog'
 
 const navbarEl = document.getElementById('navbar-root')
 if (navbarEl) {
-  const upcomingCount = parseInt(navbarEl.dataset.upcomingCount ?? '0', 10)
-  const pendingTransfers = parseInt(navbarEl.dataset.pendingTransfers ?? '0', 10)
+  const upcomingCount          = parseInt(navbarEl.dataset.upcomingCount ?? '0', 10)
+  const pendingTransfers       = parseInt(navbarEl.dataset.pendingTransfers ?? '0', 10)
+  const pendingReconciliations = parseInt(navbarEl.dataset.pendingReconciliations ?? '0', 10)
   createRoot(navbarEl).render(
     <StrictMode>
-      <Navbar upcomingPaymentsCount={upcomingCount} pendingTransfers={pendingTransfers} />
+      <Navbar
+        upcomingPaymentsCount={upcomingCount}
+        pendingTransfers={pendingTransfers}
+        pendingReconciliations={pendingReconciliations}
+      />
     </StrictMode>,
   )
 }
@@ -107,3 +113,24 @@ if (cashFlowChartEl) {
     </StrictMode>,
   )
 }
+
+document.querySelectorAll<HTMLElement>('[data-react="confirm-dialog"]').forEach((el) => {
+  const message = el.dataset.message ?? 'Are you sure?'
+  const confirmLabel = el.dataset.confirmLabel ?? 'Confirm'
+  const formId = el.dataset.formId ?? ''
+  const triggerLabel = el.dataset.triggerLabel ?? 'Submit'
+  const triggerClassName = el.dataset.triggerClassName ?? ''
+  const triggerIcon = el.dataset.triggerIcon
+  createRoot(el).render(
+    <StrictMode>
+      <ConfirmDialog
+        message={message}
+        confirmLabel={confirmLabel}
+        formId={formId}
+        triggerLabel={triggerLabel}
+        triggerClassName={triggerClassName}
+        triggerIcon={triggerIcon}
+      />
+    </StrictMode>,
+  )
+})
