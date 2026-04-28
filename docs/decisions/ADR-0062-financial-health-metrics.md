@@ -20,7 +20,11 @@ Add four financial health metrics to `IDashboardService.GetHealthSnapshotAsync()
 
 ```csharp
 public record HealthSnapshotData(
-    decimal? SpendableBalance,
+    decimal? AvailableToday,
+    decimal? SafeToSpend,
+    decimal? ImminentBills,
+    decimal? LaterBills,
+    decimal? BudgetReserve,
     decimal? RunwayMonths,
     decimal? CurrentMonthIncome,
     decimal? RollingAverageIncome,
@@ -32,23 +36,27 @@ public record HealthSnapshotData(
 
 ### Metric 1: Spendable Balance
 
-**Formula:** `SUM(balances of non-excluded asset accounts) − SUM(EstimatedAmount of qualifying recurring transactions due this calendar month)`
+**Formula (two-tier):**
 
-An asset account's balance is included unless the account is flagged with `ExcludeFromSpendable = true`. Liability accounts are always excluded regardless of the flag.
+```
+AvailableToday = liquid − ImminentBills
+SafeToSpend    = AvailableToday − LaterBills − BudgetReserve
 
-A recurring transaction qualifies if:
-- `IsActive = true`
-- `EstimatedAmount != null`
-- `NextDueDate` falls within the current calendar month
-- Linked account is one of the qualifying (non-excluded) asset accounts
+liquid         = SUM(balances of non-excluded EUR asset accounts, including transfers)
+ImminentBills  = SUM(EstimatedAmount of active recurring transactions whose NextDueDate
+                     falls between firstDayOfMonth and today+7, inclusive; overdue also included)
+LaterBills     = SUM(EstimatedAmount of active recurring transactions whose NextDueDate
+                     falls between today+8 and lastDayOfMonth, inclusive)
+BudgetReserve  = SUM(MAX(0, LimitAmount − actualSpendThisMonth) per active CategoryBudget)
+```
 
-**Why NextDueDate filter:** Once a recurring transaction is confirmed, `NextDueDate` advances to the next month automatically. This prevents double-counting against a balance that already reflects the confirmed payment.
+**Imminent window:** 7 days. Catches genuinely urgent obligations (direct debits often post 1–2 business days early) without sweeping in mid-month items.
 
-**Why liability accounts are always excluded:** A liability balance represents debt owed, not available funds.
+**Budget reserve is soft:** It reduces only `SafeToSpend`, never `AvailableToday`. Budgets are aspirational allocations; bills are obligations.
 
-**Why the ExcludeFromSpendable flag exists:** Some asset accounts (e.g., a locked savings account, a pension fund) have balances that are not accessible for day-to-day spending. The flag lets users opt those accounts out while keeping them in net worth reports.
+**Known double-count:** If a subscription has both a recurring entry and a CategoryBudget, it is subtracted twice from `SafeToSpend`. Accepted in Phase 2 — resolution requires linking RecurringTransaction to Category.
 
-**Returns null when:** No qualifying (non-excluded) asset accounts exist.
+**Returns null when:** No qualifying (non-excluded) asset accounts exist (both tiers null).
 
 ### Metric 2: Runway
 
@@ -98,7 +106,7 @@ Null means "insufficient data to compute this metric" — not zero.
 - Zero is a valid computed value (e.g., runway = 0 means net worth = liabilities; burn rate = 0% means no tracked spending).
 - Null is returned when computation is not meaningful (no accounts, no history, no budgets).
 
-**UI rendering:** Null renders as `—` with an inline note "Not enough data" (`text-muted` class). Zero renders as the numeric value.
+**UI rendering:** Null renders as "No asset accounts found" (italic, muted). `AvailableToday` is the headline number (large, green/red). `SafeToSpend` renders below it as a smaller secondary number (neutral gray or amber when negative). An inline breakdown (bills due soon, bills later, budget reserve) appears when at least one deduction is non-zero. All other null metrics render as an italic muted note.
 
 **Rationale:** Forcing a fallback like 0 would be misleading. A 0% burn rate when no budgets exist looks like a goal achieved rather than a missing input. Null makes the absence of data explicit.
 

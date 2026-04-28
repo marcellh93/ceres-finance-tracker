@@ -17,7 +17,30 @@ derived values `DashboardService` already computes or can easily extend.
 **Included in Phase 2.** A financial health snapshot panel lives on the dashboard,
 always visible, requiring no user action to generate.
 
-### Three metrics
+### Four metrics
+
+**0. Spendable Balance (two-tier)**
+
+How much can the user spend right now vs. after all planned obligations?
+
+```
+Available Today = liquid balance of non-excluded asset accounts
+                − recurring bills due within the next 7 days (or overdue)
+
+Safe to Spend   = Available Today
+                − recurring bills due 8–31 days from now (same calendar month)
+                − budget reserve (SUM of MAX(0, limit − actual spend) per active CategoryBudget)
+```
+
+*Available Today* answers "can I buy this right now without missing a bill?"
+*Safe to Spend* answers "can I buy this and stay on plan for the month?"
+
+Both figures are displayed in the Financial Health card. *Available Today* is the headline. *Safe to Spend* is a smaller secondary line below it. A breakdown of deductions (bills due soon, bills later, budget reserve) is shown inline when any deduction is non-zero.
+
+Edge cases:
+- No qualifying asset accounts → both null (not shown)
+- Safe to Spend < 0 → shown in amber, not red (it is a planning signal, not a crisis)
+- Over-budget categories contribute zero to BudgetReserve (overspend is already reflected in the liquid balance)
 
 **1. Runway**
 
