@@ -872,10 +872,13 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### Financial Health
 
-- [ ] `ExcludeFromSpendable` account: balance excluded from spendable balance dashboard stat; still included in net worth
-- [ ] Runway panel: value matches manual calculation of (assets − liabilities) ÷ avg monthly expenses (last 6 months)
-- [ ] Runway indicator: green when > 6 months, amber when 3–6 months, red when < 3 months
-- [ ] Income vs. rolling average: delta percentage updates when a new income transaction is recorded
+- [ ] Spendable Balance panel: value matches non-excluded asset balances minus due recurring transactions _(manual — requires browser)_
+- [ ] `ExcludeFromSpendable` account: balance excluded from spendable balance dashboard stat; still included in net worth _(manual — requires browser)_
+- [ ] Runway panel: value matches manual calculation of (assets − liabilities) ÷ avg monthly expenses (last 6 months) _(manual — requires browser)_
+- [ ] Runway indicator: green when > 6 months, amber when 3–6 months, red when < 3 months _(manual — requires browser)_
+- [ ] Income vs. rolling average: delta percentage updates when a new income transaction is recorded _(manual — requires browser)_
+- [ ] Budget burn rate panel: percentage matches active CategoryBudget spend vs. limit _(manual — requires browser)_
+- [ ] Note: toggle uses a custom CSS switch (not shadcn/ui Checkbox) — per the Stage 9 spec doc, which overrides the original roadmap UI/UX note
 
 ### CSV Export
 
