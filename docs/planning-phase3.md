@@ -236,16 +236,50 @@ Commit to the token structure that supports dark mode — no hardcoded color val
 
 ---
 
-### 8. Accessibility baseline
+### 8. Accessibility baseline (EU Accessibility Act — EN 301 549 / WCAG 2.1 AA)
 
-Non-negotiable before any beta user accesses the app:
-- WCAG AA color contrast on all text/background pairs — verify at token definition time
-- Visible focus ring on all interactive elements
-- `aria-label` on all icon-only buttons (Lucide standard from Phase 2)
-- Screen reader labels on all charts (`aria-label` on canvas, `role="img"`)
-- All form fields have associated `<label>` elements — no placeholder-as-label
-- Error messages programmatically associated with their fields (`aria-describedby`)
-- Modal focus trap — shadcn/ui Dialog handles this; verify it is not overridden anywhere
+The EU Accessibility Act (Directive 2019/882) private sector obligations are in force from 28 June 2025. As of Phase 3 launch, full compliance is legally required. Penalties range up to EUR 1,000,000 or 4% of EU turnover for serious/very serious infractions. See [`docs/legal.md — EU Accessibility Act`](legal.md#eu-accessibility-act) for the full analysis including applicability, SME exemption assessment, and penalty tiers.
+
+The operative technical standard is **EN 301 549 v3.2.1**, which incorporates **WCAG 2.1 Level AA** for web content.
+
+**Legal prerequisites — must exist before any external user:**
+- Accessibility statement published at `/accesibilidad` (conformance status, known gaps, feedback contact, enforcement link)
+- `accesibilidad@[domain]` feedback inbox operational with ≤30-day SLA
+- "Declaración de Accesibilidad" link in global footer on all pages
+- `lang="es"` (or correct language) on `<html>` in the React SPA shell (`index.html`)
+
+**High-impact implementation requirements:**
+- All form labels associated — `<Label htmlFor>` on every input; no placeholder-as-label
+- Validation errors: text description with `aria-describedby` association; descriptive messages ("Use DD/MM/YYYY", not "Invalid date"); focus moves to first error on failed submit
+- Focus visible on all interactive elements — audit for `focus:outline-none` without replacement in shadcn base styles; every element must have a visible focus ring
+- `<DialogTitle>` present on every `<Dialog>`; focus returns to trigger on close; fallback focus for dialogs where trigger is removed from DOM
+- Toast notifications: `aria-live="polite"` for success, `role="alert"` for errors — differentiated by severity
+- Icon-only buttons: `aria-label` on every `<Button>` containing only a Lucide icon; `aria-hidden="true"` on the SVG
+- DataTable: `aria-sort` on sortable columns, `<button>` inside sortable `<th>`, `aria-label` on row actions including entity context, `aria-live` result count region, `<caption>` or `aria-label` on `<table>`
+- Income/Expense and all status badges: text label must accompany color coding — color cannot be the only differentiator (WCAG 1.4.1)
+
+**Charts (recharts) — all charts require:**
+- Container: `role="img"` + `aria-label="[Chart type]: [brief summary]"` on the wrapper div
+- Data alternative: `<details><summary>View data as table</summary><table>...</table></details>` or a `sr-only` table beneath each chart
+- Individual data points keyboard-focusable via recharts `Cell` component with `aria-label`
+- Non-color differentiators for multi-series charts (direct labels, patterns)
+- Create a `ChartWrapper` component that enforces these requirements; wrap all charts in it
+
+**Complex widgets — known gaps requiring active work:**
+- **Combobox (cmdk-based):** cmdk does not fully implement the ARIA 1.2 combobox pattern. Must be audited and patched or replaced with a conformant implementation. Add result-count `aria-live` announcer.
+- **Date picker:** verify react-day-picker v8; trigger `aria-label` must reflect current value; keyboard navigation (arrows, Page Up/Down, Escape); test with VoiceOver + Safari
+- **Onboarding wizard:** on step transition, move focus to new step `<h2>` heading (`tabindex="-1"` + `.focus()`); `aria-live="polite"` step announcer; `aria-current="step"` on step indicator; error focus management
+
+**Reflow and contrast:**
+- Color contrast: run axe-core across all routes; zero `critical` contrast violations before launch; verify chart labels and muted text specifically
+- Reflow at 320px CSS width: DataTable must be inside a keyboard-accessible horizontal scroll container (`tabindex="0"`, `role="region"`, `aria-label`)
+- Fixed-height containers: replace `h-[x]` with `min-h-[x]` on interactive rows/cards to survive WCAG text spacing overrides (WCAG 1.4.12)
+
+**Tooling (integrate into CI):**
+- `eslint-plugin-jsx-a11y` in React ESLint config — treat violations as build failures
+- `vitest-axe` assertions in Vitest tests for Dialog, DataTable, Combobox, DatePicker, Wizard — zero `critical`/`serious` axe violations
+- Manual screen reader testing before launch: NVDA + Firefox, VoiceOver + Safari, keyboard-only walkthrough of all critical flows
+- Third-party WCAG audit recommended before public launch (budget EUR 3,000–8,000)
 
 ---
 
