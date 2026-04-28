@@ -90,3 +90,12 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
 - When an open question in any planning doc (`docs/planning.md`, `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md`) is resolved, remove it from Open Questions, mark it `[x]`, and append it to `docs/planning-resolved.md`. If the decision is architectural, execute the sync-docs skill.
+
+## After Completing Any Stage
+
+After finishing a stage implementation, regardless of phase:
+1. Identify the current phase from this file's **Current Phase** section
+2. Look for a roadmap doc in `docs/` matching that phase (e.g. `roadmap-phase-two.md`, `roadmap-phase-three.md`). If none exists, note that no roadmap checklist is available.
+3. Find the completed stage's section in that roadmap and its verification checklist items
+4. Mark any items now covered by automated tests as `[x]`; leave manual browser-only items as `[ ]`
+5. Flag explicitly any checklist items the implementation did not address
