@@ -25,7 +25,7 @@ How much can the user spend right now vs. after all planned obligations?
 
 ```
 Available Today = liquid balance of non-excluded asset accounts
-                − recurring bills due within the next 7 days (or overdue)
+                − recurring bills due within the next 7 days (or overdue this calendar month)
 
 Safe to Spend   = Available Today
                 − recurring bills due 8–31 days from now (same calendar month)
@@ -41,6 +41,7 @@ Edge cases:
 - No qualifying asset accounts → both null (not shown)
 - Safe to Spend < 0 → shown in amber, not red (it is a planning signal, not a crisis)
 - Over-budget categories contribute zero to BudgetReserve (overspend is already reflected in the liquid balance)
+- Known limitation: If a subscription has both a recurring entry and a CategoryBudget, it is subtracted twice from Safe to Spend (accepted in Phase 2).
 
 **1. Runway**
 

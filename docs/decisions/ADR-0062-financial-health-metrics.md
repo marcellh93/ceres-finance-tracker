@@ -56,6 +56,10 @@ BudgetReserve  = SUM(MAX(0, LimitAmount − actualSpendThisMonth) per active Cat
 
 **Known double-count:** If a subscription has both a recurring entry and a CategoryBudget, it is subtracted twice from `SafeToSpend`. Accepted in Phase 2 — resolution requires linking RecurringTransaction to Category.
 
+**Safe to Spend < 0:** Shown in amber (warning), not red. It is a planning signal (over-budget or over-obligated for the month), not a crisis.
+
+**Over-budget categories:** Contribute zero to BudgetReserve — overspend is already reflected in the liquid balance, preventing double-counting.
+
 **Returns null when:** No qualifying (non-excluded) asset accounts exist (both tiers null).
 
 ### Metric 2: Runway
