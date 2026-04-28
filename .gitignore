@@ -115,5 +115,6 @@ vite.config.*.timestamp-*
 ProjectCeres/uploads/*
 !ProjectCeres/uploads/.gitkeep
 
-# Claude Code worktrees
+# Claude Code worktrees and tooling
 .worktrees/
+.superpowers/
