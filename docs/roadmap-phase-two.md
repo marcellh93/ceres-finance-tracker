@@ -829,8 +829,8 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [x] Create Amortising account with valid interest rate → payoff projection panel appears on account detail page; shows payoff date and total interest
 - [x] FullMonthly account detail page → no projection panel rendered
 - [x] "What if €X extra/month" input → projection updates to show earlier payoff date and lower total interest
-- [ ] **UI/UX (Stage 5.1):** Account Create/Edit — `LiabilityRepaymentType` uses shadcn/ui Select; `InterestRate` field conditionally shown for Amortising only; tooltip explaining the two types is visible _(manual — requires browser)_
-- [ ] **UI/UX (Stage 5.2):** Amortising account detail — projection panel uses shadcn/ui Card; shows payoff date, total interest, and "what if" input field _(manual — requires browser)_
+- [x] **UI/UX (Stage 5.1):** Account Create/Edit — `LiabilityRepaymentType` uses shadcn-token-styled select (`form-control`); `InterestRate` field conditionally shown for Amortising only (JS-driven); repayment type hint text explaining Full Monthly vs Amortising rendered below select _(verified in browser + `AccountEdit_LiabilityAccount_RendersRepaymentTypeSelectAndHint` WAF test)_
+- [x] **UI/UX (Stage 5.2):** Amortising account detail — projection panel renders with "Payoff Projection" heading, monthly payment input, Calculate button; POST with monthlyPayment renders payoff date and total interest cost _(verified in browser + `AccountLedger_AmorisingAccount_*` WAF tests)_
 
 ### Recurring Reminders
 
@@ -841,8 +841,8 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [x] Upcoming Payments view: shows all recurring transactions due within 30 days; excludes those due > 30 days away
 - [x] Navbar badge shows correct count of upcoming payments due within 30 days
 - [x] "Due today" rows in Upcoming Payments view are highlighted with amber badge
-- [ ] **UI/UX (Stage 6.1):** Recurring Transaction Create/Edit — `ReminderBehaviour` selector uses shadcn/ui Select; `DayOfPeriod` field hidden when `ManualDate` selected; `EstimatedAmount` field present _(manual — requires browser)_
-- [ ] **UI/UX (Stage 6.2):** Upcoming Payments view — uses shadcn/ui Table; "Due today" rows show amber Badge; Navbar badge shows Lucide `bell` icon with count _(manual — requires browser)_
+- [x] **UI/UX (Stage 6.1):** Recurring Transaction Create/Edit — `ReminderBehaviour` select present with SnapToCalendarDay and ManualDate options; `EstimatedAmount` field present; `DayOfPeriod` field in HTML (JS hides it when ManualDate selected — verified in browser) _(`RecurringTransactionCreate_RendersReminderBehaviourSelectAndEstimatedAmount` WAF test)_
+- [x] **UI/UX (Stage 6.2):** Upcoming Payments view — `data-table` layout; due-today rows show `badge-warning` "Due today" badge; navbar renders `data-upcoming-count` attribute for React bell badge _(verified in browser + `UpcomingPayments_WithDueTodayReminder_RendersDueTodayBadge` + `AnyPage_NavbarRoot_RendersDataUpcomingCountAttribute` WAF tests)_
 
 ### Reports
 

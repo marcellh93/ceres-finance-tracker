@@ -35,6 +35,10 @@
             <option value="FullMonthly">Full Monthly (pay in full each month)</option>
             <option value="Amortising">Amortising (fixed monthly payment + interest)</option>
         </select>
+        <small class="form-hint">
+            <strong>Full Monthly</strong> — pay the full balance each month; no interest accrues.
+            <strong>Amortising</strong> — fixed monthly payment with interest; use for loans and mortgages.
+        </small>
         <span asp-validation-for="LiabilityRepaymentType" class="field-error"></span>
     </div>
 
