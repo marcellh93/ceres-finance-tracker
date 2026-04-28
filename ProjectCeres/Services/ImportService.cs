@@ -12,7 +12,8 @@ public class ImportService(
     ImportParserFactory parserFactory,
     AppDbContext? db = null,
     ITransactionService? transactionService = null,
-    ITransferDetectionService? transferDetectionService = null) : IImportService
+    ITransferDetectionService? transferDetectionService = null,
+    IImportStagedTransactionService? stagedTransactionService = null) : IImportService
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
@@ -99,6 +100,23 @@ public class ImportService(
                     {
                         await transactionService.MarkClearedAsync(match.Id, cleared: true);
                     }
+
+                    if (stagedTransactionService is not null && db is not null)
+                    {
+                        db.ImportStagedTransactions.Add(new ImportStagedTransaction
+                        {
+                            Id                   = Guid.NewGuid(),
+                            ImportedAt           = DateTime.UtcNow,
+                            AccountId            = accountId,
+                            RawDate              = row.Date,
+                            RawAmount            = Math.Abs(row.Amount),
+                            RawDescription       = row.Description,
+                            MatchedTransactionId = match.Id,
+                            Status               = StagedTransactionStatus.Pending
+                        });
+                        await db.SaveChangesAsync();
+                    }
+
                     result.RowsReconciled++;
                     continue;
                 }

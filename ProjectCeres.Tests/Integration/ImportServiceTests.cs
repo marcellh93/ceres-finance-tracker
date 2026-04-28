@@ -37,8 +37,9 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         var transactionService      = new TransactionService(
             _fixture.Db, accountService, liabilityPaymentService, attachmentService);
 
+        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService);
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
-        _service = new ImportService(parserFactory, _fixture.Db, transactionService);
+        _service = new ImportService(parserFactory, _fixture.Db, transactionService, stagedTransactionService: stagedTransactionService);
 
         var account = new Account
         {
@@ -178,6 +179,40 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         var txn = await _fixture.Db.Transactions.FirstAsync(t => t.AccountId == _accountId);
         txn.CategoryId.Should().Be(UncategorizedIncomeId);
         txn.NeedsReview.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReconciledRow_CreatesStagedTransactionRecord()
+    {
+        // Seed one pre-existing transaction matching first row of valid_import.csv
+        // (2024-01-01, 50.00, "Grocery store")
+        var existingId = Guid.NewGuid();
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id          = existingId,
+            Date        = new DateOnly(2024, 1, 1),
+            Amount      = 50.00m,
+            Description = "Grocery store",
+            AccountId   = _accountId,
+            CategoryId  = UncategorizedExpenseId,
+            IsCleared   = false,
+            CreatedAt   = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var file   = FileFromFixture("valid_import.csv");
+        var result = await _service.ImportAsync(file, _accountId, StandardMappings());
+
+        result.RowsReconciled.Should().Be(1);
+
+        var staged = await _fixture.Db.ImportStagedTransactions
+            .Where(s => s.MatchedTransactionId == existingId)
+            .ToListAsync();
+
+        staged.Should().ContainSingle();
+        staged[0].Status.Should().Be(StagedTransactionStatus.Pending);
+        staged[0].RawAmount.Should().Be(50.00m);
+        staged[0].AccountId.Should().Be(_accountId);
     }
 
     [Fact]
