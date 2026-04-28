@@ -10,17 +10,17 @@
         <div class="border border-gray-200 rounded-lg overflow-hidden grid grid-cols-4">
 
             @* — Spendable Balance — *@
-            <div class="p-[14px_18px] border-r border-gray-200 @(snapshot.SpendableBalance == null ? "bg-gray-50" : "")">
+            <div class="p-[14px_18px] border-r border-gray-200 @(snapshot.AvailableToday == null ? "bg-gray-50" : "")">
                 <div class="text-[10.5px] uppercase tracking-widest text-gray-400 font-medium mb-2">Spendable Balance</div>
-                @if (snapshot.SpendableBalance == null)
+                @if (snapshot.AvailableToday == null)
                 {
                     <div class="text-[11.5px] italic text-gray-400 leading-snug">No asset accounts found</div>
                 }
                 else
                 {
-                    <div class="text-lg font-bold @(snapshot.SpendableBalance >= 0 ? "text-green-600" : "text-red-600")"
+                    <div class="text-lg font-bold @(snapshot.AvailableToday >= 0 ? "text-green-600" : "text-red-600")"
                          style="font-family:'IBM Plex Mono',ui-monospace,monospace">
-                        @snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.SpendableBalance.Value, ViewData["NumberFormat"] as string)
+                        @snapshot.CurrencySymbol @NumberFormatHelper.FormatAmount(snapshot.AvailableToday.Value, ViewData["NumberFormat"] as string)
                     </div>
                 }
             </div>
