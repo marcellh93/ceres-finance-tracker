@@ -1,2 +1,119 @@
+# ========================
+# .NET / Build artifacts
+# ========================
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Dd]ebug/
+[Rr]elease/
+[Dd]ebugPublic/
+[Rr]elease[Bb]uild/
+x64/
+x86/
+ARM/
+ARM64/
+bld/
+artifacts/
+out/
+publish/
+
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.pdb
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+[Pp]ackages/
+BenchmarkDotNet.Artifacts/
+
+# Test results & coverage
+TestResult*/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+coverage.cobertura.xml
+coverage.opencover.xml
+lcov.info
+*.trx
+
+# Publish profiles
+*.[Pp]ublish.xml
+*.pubxml
+*.pubxml.user
+PublishProfiles/
+
+# ========================
+# Secrets & credentials
+# ========================
+appsettings.Local.json
+appsettings.*.Local.json
+appsettings.Production.json
+appsettings.Staging.json
+secrets.json
+**/UserSecrets/
+.env
+.env.local
+.env.*.local
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.snk
+
+# ========================
+# macOS
+# ========================
+.DS_Store
+**/.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# ========================
+# Windows
+# ========================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ========================
+# IDE — VS Code / Visual Studio / JetBrains
+# ========================
+.vs/
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ========================
+# React / Vite (client layer)
+# ========================
 node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+vite.config.*.timestamp-*
+
+# ========================
+# Project-specific
+# ========================
+# Runtime attachment storage — never commit user files
+ProjectCeres/uploads/*
+!ProjectCeres/uploads/.gitkeep
+
+# Claude Code worktrees
 .worktrees/
