@@ -221,20 +221,19 @@ Distinct from reports: reports are formal documents produced on demand; these ar
 
 ### Financial Health Metrics (Phase 2)
 
-**Savings rate**
+Implemented in Stage 9. An always-on "Financial Health" panel on the dashboard (server-rendered Razor, not React) shows four metrics via `IDashboardService.GetHealthSnapshotAsync()`. All metrics are scoped to the default currency, computed on request, and return `null` when insufficient data exists. See ADR-0062.
 
-- Savings rate = (Income − Expenses) ÷ Income for a selected period
-- Displayed on the Phase 1 dashboard (current month) and available as a Phase 2 report metric
+**Spendable Balance** — `SUM(non-excluded asset account balances) − SUM(EstimatedAmount of qualifying recurring transactions due this calendar month)`. Recurring transactions are only subtracted if their linked account is one of the qualifying non-excluded accounts. Liability accounts are never included.
 
-**Ratio-based frameworks (50/30/20)**
+**Runway** — `(total assets − total liabilities) ÷ avg monthly expenses (last 6 full calendar months)`. Returns `null` when no expenses exist in the 6-month window.
 
-- Methods like 50/30/20 require each expense category to be tagged as "need" or "want"
-- `LifestyleTag` column added to `Category` in Phase 1 to support this without a Phase 2 migration
-- Starter categories ship with suggested default tags (e.g. Rent → Needs, Dining Out → Wants)
-- Creation-time prompt for new Expense categories: "Needs / Wants / Skip for now"
-- Untagged is a visible fourth bucket in the Financial Health report — never silently excluded
-- Framework options: 50/30/20 (most common), 80/20
-- Users can re-tag any category at any time from the Category settings page
+**Income vs. 6-Month Rolling Average** — current month income compared to average of prior 6 full months, expressed as a delta percentage. Returns `null` when no prior-month income exists.
+
+**Budget Burn Rate** — `SUM(actual spend this month across active CategoryBudgets) ÷ SUM(limit across those budgets)`. Returns `null` when no active CategoryBudgets exist.
+
+**ExcludeFromSpendable flag** — surfaced on Account Create and Edit forms (Asset accounts only; hidden for Liability). `AccountService` forces the flag to `false` for Liability accounts regardless of submitted value. The flag was already in the schema from the Phase 2 baseline migration.
+
+Note: Savings rate (displayed in the Phase 1 MTD stats panel), ratio-based frameworks (50/30/20), and `LifestyleTag` categories are deferred to Phase 3 or later.
 
 ### Opening Balance Cutover UX (Phase 2)
 
