@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
 
         var lines = new List<string> { "Date,Account,Category,Type,Description,Amount" };
         foreach (var r in rows)
-            lines.Add($"{r.Date:yyyy-MM-dd},{CsvFormattingHelper.Csv(r.Account)},{CsvFormattingHelper.Csv(r.Category)},{CsvFormattingHelper.Csv(r.CategoryType)},{CsvFormattingHelper.Csv(r.Description)},{r.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+            lines.Add($"{r.Date:yyyy-MM-dd},{CsvFormattingHelper.Csv(r.Account)},{CsvFormattingHelper.Csv(r.Category)},{CsvFormattingHelper.Csv(r.CategoryType)},{CsvFormattingHelper.Csv(r.Description)},{r.Amount.ToString("F2", CultureInfo.InvariantCulture)}");
 
         var fileName = from.HasValue && to.HasValue
             ? $"transactions_{from:yyyy-MM-dd}_{to:yyyy-MM-dd}.csv"
