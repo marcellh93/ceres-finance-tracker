@@ -35,8 +35,8 @@ public class TransactionEditViewModel
     [Display(Name = "Liability Account")]
     public Guid? LiabilityAccountId { get; set; }
 
-    [Display(Name = "Attachment")]
-    public IFormFile? Attachment { get; set; }
+    [Display(Name = "Attachments")]
+    public List<IFormFile>? Attachments { get; set; }
 
     public bool IsCleared { get; set; }
     public bool NeedsReview { get; set; }

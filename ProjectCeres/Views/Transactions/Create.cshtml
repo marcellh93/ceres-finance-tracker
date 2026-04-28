@@ -84,11 +84,11 @@
     @* Attachment only applies to regular transactions *@
     <div id="attachment-field">
         <div class="form-group">
-            <label asp-for="Attachment"></label>
-            <input asp-for="Attachment" type="file" class="form-control"
+            <label asp-for="Attachments"></label>
+            <input asp-for="Attachments" type="file" class="form-control" multiple
                    accept=".jpg,.jpeg,.png,.gif,.webp,.pdf" />
-            <small>Optional. Max 10 MB. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
-            <span asp-validation-for="Attachment" class="field-error"></span>
+            <small>Optional. Max 10 MB each. Accepted: JPEG, PNG, GIF, WebP, PDF.</small>
+            <span asp-validation-for="Attachments" class="field-error"></span>
         </div>
     </div>
 

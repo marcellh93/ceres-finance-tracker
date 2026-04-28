@@ -33,7 +33,6 @@ public class TransactionCreateViewModel
     [Display(Name = "Liability Account")]
     public Guid? LiabilityAccountId { get; set; }
 
-    // Optional file attachment — validated before transaction is saved
-    [Display(Name = "Attachment")]
-    public IFormFile? Attachment { get; set; }
+    [Display(Name = "Attachments")]
+    public List<IFormFile>? Attachments { get; set; }
 }

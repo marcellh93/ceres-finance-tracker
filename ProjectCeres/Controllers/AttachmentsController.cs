@@ -45,19 +45,17 @@ public class AttachmentsController(IFileAttachmentService attachmentService) : C
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id, Guid transactionId)
+    public async Task<IActionResult> Delete(Guid id)
     {
         try
         {
             await attachmentService.DeleteAsync(id);
-            TempData["SuccessMessage"] = "Attachment deleted.";
+            return Ok();
         }
         catch (InvalidOperationException ex)
         {
-            TempData["ErrorMessage"] = ex.Message;
+            return BadRequest(ex.Message);
         }
-
-        return RedirectToAction("Edit", "Transactions", new { id = transactionId });
     }
 
     [HttpPost]
@@ -99,18 +97,16 @@ public class AttachmentsController(IFileAttachmentService attachmentService) : C
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteTransfer(Guid id, Guid transferId)
+    public async Task<IActionResult> DeleteTransfer(Guid id)
     {
         try
         {
             await attachmentService.DeleteTransferAttachmentAsync(id);
-            TempData["SuccessMessage"] = "Attachment deleted.";
+            return Ok();
         }
         catch (InvalidOperationException ex)
         {
-            TempData["ErrorMessage"] = ex.Message;
+            return BadRequest(ex.Message);
         }
-
-        return RedirectToAction("Edit", "Transfers", new { id = transferId });
     }
 }

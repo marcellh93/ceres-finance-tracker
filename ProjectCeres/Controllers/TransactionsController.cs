@@ -75,15 +75,18 @@ public class TransactionsController(ITransactionService transactionService, IFil
             return View(vm);
         }
 
-        // Validate attachment before saving anything
-        if (vm.Attachment is not null)
+        // Validate attachments before saving anything
+        if (vm.Attachments is { Count: > 0 })
         {
-            try { await attachmentService.ValidateAsync(vm.Attachment); }
-            catch (InvalidOperationException ex)
+            foreach (var file in vm.Attachments)
             {
-                ModelState.AddModelError(nameof(vm.Attachment), ex.Message);
-                await PopulateViewBagAsync();
-                return View(vm);
+                try { await attachmentService.ValidateAsync(file); }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError(nameof(vm.Attachments), ex.Message);
+                    await PopulateViewBagAsync();
+                    return View(vm);
+                }
             }
         }
 
@@ -99,13 +102,15 @@ public class TransactionsController(ITransactionService transactionService, IFil
             return View(vm);
         }
 
-        if (vm.Attachment is not null)
+        if (vm.Attachments is { Count: > 0 })
         {
-            try { await attachmentService.UploadAsync(newId, vm.Attachment); }
-            catch (InvalidOperationException ex)
+            foreach (var file in vm.Attachments)
             {
-                TempData["ErrorMessage"] = $"Transaction saved, but the attachment could not be uploaded: {ex.Message}";
-                return RedirectToAction(nameof(Edit), new { id = newId });
+                try { await attachmentService.UploadAsync(newId, file); }
+                catch (InvalidOperationException ex)
+                {
+                    TempData["ErrorMessage"] = $"Transaction saved, but '{file.FileName}' could not be uploaded: {ex.Message}";
+                }
             }
         }
 
@@ -156,15 +161,18 @@ public class TransactionsController(ITransactionService transactionService, IFil
             return View(vm);
         }
 
-        if (vm.Attachment is not null)
+        if (vm.Attachments is { Count: > 0 })
         {
-            try { await attachmentService.ValidateAsync(vm.Attachment); }
-            catch (InvalidOperationException ex)
+            foreach (var file in vm.Attachments)
             {
-                ModelState.AddModelError(nameof(vm.Attachment), ex.Message);
-                ViewBag.ReturnUrl = returnUrl;
-                await PopulateViewBagAsync(currencyFilterAccountId: vm.AccountId);
-                return View(vm);
+                try { await attachmentService.ValidateAsync(file); }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError(nameof(vm.Attachments), ex.Message);
+                    ViewBag.ReturnUrl = returnUrl;
+                    await PopulateViewBagAsync(currencyFilterAccountId: vm.AccountId);
+                    return View(vm);
+                }
             }
         }
 
@@ -180,13 +188,15 @@ public class TransactionsController(ITransactionService transactionService, IFil
             return View(vm);
         }
 
-        if (vm.Attachment is not null)
+        if (vm.Attachments is { Count: > 0 })
         {
-            try { await attachmentService.UploadAsync(vm.Id, vm.Attachment); }
-            catch (InvalidOperationException ex)
+            foreach (var file in vm.Attachments)
             {
-                TempData["ErrorMessage"] = $"Transaction saved, but the attachment could not be uploaded: {ex.Message}";
-                return RedirectToAction(nameof(Edit), new { id = vm.Id, returnUrl });
+                try { await attachmentService.UploadAsync(vm.Id, file); }
+                catch (InvalidOperationException ex)
+                {
+                    TempData["ErrorMessage"] = $"Transaction saved, but '{file.FileName}' could not be uploaded: {ex.Message}";
+                }
             }
         }
 
