@@ -200,7 +200,8 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
 
         r1!.Status.Should().Be(StagedTransactionStatus.Confirmed);
         r2!.Status.Should().Be(StagedTransactionStatus.Confirmed);
-        r3!.ResolvedAt.Should().BeNull();
+        r3!.Status.Should().Be(StagedTransactionStatus.Confirmed); // already confirmed, not re-processed
+        r3.ResolvedAt.Should().BeNull(); // ConfirmAllAsync did not set ResolvedAt on already-confirmed row
     }
 
     // -------------------------------------------------------------------------

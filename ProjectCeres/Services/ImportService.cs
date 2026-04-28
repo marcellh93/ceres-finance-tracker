@@ -109,7 +109,7 @@ public class ImportService(
                             ImportedAt           = DateTime.UtcNow,
                             AccountId            = accountId,
                             RawDate              = row.Date,
-                            RawAmount            = Math.Abs(row.Amount),
+                            RawAmount            = row.Amount,
                             RawDescription       = row.Description,
                             MatchedTransactionId = match.Id,
                             Status               = StagedTransactionStatus.Pending
