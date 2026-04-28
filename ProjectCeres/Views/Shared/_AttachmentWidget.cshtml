@@ -1,0 +1,303 @@
+@* ProjectCeres/Views/Shared/_AttachmentWidget.cshtml *@
+@using ProjectCeres.Models
+@{
+    var inputName = ViewData["InputName"] as string ?? "Attachments";
+
+    // SavedAttachments is typed differently for transactions vs transfers.
+    // Both expose Id (Guid), FileName (string), FileSizeBytes (long), and a delete URL.
+    // The caller passes a pre-built list of anonymous objects via ViewData.
+    var saved = ViewData["SavedAttachments"] as IEnumerable<(Guid Id, string FileName, long FileSizeBytes, string DeleteUrl)>
+                ?? Enumerable.Empty<(Guid, string, long, string)>();
+    var hasSaved = saved.Any();
+    var widgetId = "aw-" + Guid.NewGuid().ToString("N")[..8];
+}
+
+@* Saved attachments — only rendered when there are saved files *@
+@if (hasSaved)
+{
+    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3" id="@(widgetId)-saved">
+        <div class="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-2">Saved</div>
+        <div class="flex flex-col gap-1.5" id="@(widgetId)-saved-list">
+            @foreach (var a in saved)
+            {
+                <div class="flex items-center gap-2 bg-white border border-green-100 rounded-md px-3 py-2 text-sm"
+                     id="@(widgetId)-saved-@a.Id">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <a href="@a.DeleteUrl.Replace("/Attachments/Delete/", "/Attachments/Download/").Replace("/Attachments/DeleteTransfer/", "/Attachments/DownloadTransfer/")"
+                       class="flex-1 text-green-700 underline truncate">@a.FileName</a>
+                    <span class="text-xs text-gray-400 shrink-0">@((a.FileSizeBytes / 1024.0).ToString("N0")) KB</span>
+                    <button type="button"
+                            class="shrink-0 text-red-500 hover:text-red-700"
+                            data-delete-url="@a.DeleteUrl"
+                            data-file-name="@a.FileName"
+                            data-row-id="@(widgetId)-saved-@a.Id"
+                            data-widget-id="@widgetId"
+                            onclick="awOpenDeleteDialog(this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                        </svg>
+                    </button>
+                </div>
+            }
+        </div>
+        <p class="text-xs text-red-600 mt-1 hidden" id="@(widgetId)-delete-error">Could not delete file — please try again.</p>
+    </div>
+}
+else
+{
+    <div class="hidden" id="@(widgetId)-saved"></div>
+}
+
+@* Drop zone *@
+<div class="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-white"
+     id="@(widgetId)-zone"
+     ondragover="awDragOver(event, '@widgetId')"
+     ondragleave="awDragLeave(event, '@widgetId')"
+     ondrop="awDrop(event, '@widgetId')"
+     onclick="document.getElementById('@(widgetId)-input').click()">
+
+    <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Add files</div>
+
+    @* Empty prompt — shown when no files are queued *@
+    <div class="text-center py-5" id="@(widgetId)-prompt">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400 mx-auto mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+        </svg>
+        <p class="text-sm font-semibold text-gray-800">Drop files here or click to browse</p>
+        <p class="text-xs text-gray-400 mt-1">JPEG, PNG, GIF, WebP, PDF · Max 10 MB each</p>
+    </div>
+
+    @* File tile list — shown when files are queued *@
+    <div class="hidden flex-col gap-1.5 mb-3" id="@(widgetId)-tiles"></div>
+
+    @* "Drop more" hint — shown when files are queued *@
+    <div class="hidden text-center text-xs text-gray-400 border-t border-dashed border-gray-200 pt-2 mt-1" id="@(widgetId)-hint">
+        Drop more or <span class="text-[#248e38] font-medium cursor-pointer" onclick="event.stopPropagation();document.getElementById('@(widgetId)-input').click()">click to browse</span>
+    </div>
+</div>
+
+@* Validation error *@
+<p class="text-xs text-red-600 mt-1 hidden" id="@(widgetId)-error"></p>
+
+@* Hidden file input — multiple, outside the visible zone so clicks don't bubble *@
+<input type="file"
+       id="@(widgetId)-input"
+       name="@inputName"
+       multiple
+       accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+       class="hidden"
+       onclick="event.stopPropagation()"
+       onchange="awFilesAdded(event, '@widgetId')" />
+
+@* Delete confirmation dialog *@
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40"
+     id="@(widgetId)-dialog">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
+        <h3 class="text-base font-semibold text-gray-900 mb-1">Delete attachment</h3>
+        <p class="text-sm text-gray-600 mb-4">
+            Delete <strong id="@(widgetId)-dialog-name"></strong>? This cannot be undone.
+        </p>
+        <div class="flex justify-end gap-2">
+            <button type="button"
+                    class="btn btn-secondary btn-sm"
+                    onclick="awCloseDialog('@widgetId')">Cancel</button>
+            <button type="button"
+                    class="btn btn-danger btn-sm"
+                    id="@(widgetId)-dialog-confirm"
+                    onclick="awConfirmDelete('@widgetId')">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    // Per-widget state — keyed by widgetId to avoid collisions when multiple widgets exist on a page
+    const ALLOWED_TYPES = ['image/jpeg','image/png','image/gif','image/webp','application/pdf'];
+    const MAX_BYTES = 10 * 1024 * 1024;
+
+    // DataTransfer trick: accumulate File objects across multiple picker opens.
+    // We can't modify a FileList directly, so we maintain a parallel array
+    // and rebuild the input's files using a DataTransfer object each time.
+    const _queues = {};
+    const _pendingDelete = {};
+
+    function queue(id) {
+        if (!_queues[id]) _queues[id] = [];
+        return _queues[id];
+    }
+
+    function getToken() {
+        const el = document.querySelector('input[name="__RequestVerificationToken"]');
+        return el ? el.value : '';
+    }
+
+    function renderTiles(widgetId) {
+        const q = queue(widgetId);
+        const tilesEl = document.getElementById(widgetId + '-tiles');
+        const promptEl = document.getElementById(widgetId + '-prompt');
+        const hintEl = document.getElementById(widgetId + '-hint');
+
+        tilesEl.innerHTML = '';
+
+        if (q.length === 0) {
+            tilesEl.classList.add('hidden');
+            tilesEl.classList.remove('flex');
+            promptEl.classList.remove('hidden');
+            hintEl.classList.add('hidden');
+            return;
+        }
+
+        promptEl.classList.add('hidden');
+        tilesEl.classList.remove('hidden');
+        tilesEl.classList.add('flex');
+        hintEl.classList.remove('hidden');
+
+        q.forEach((file, idx) => {
+            const isImage = file.type.startsWith('image/');
+            const iconPath = isImage
+                ? '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'
+                : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>';
+
+            const sizeKb = (file.size / 1024).toFixed(0);
+            const tile = document.createElement('div');
+            tile.className = 'flex items-center gap-2 border border-gray-200 rounded-md bg-gray-50 px-3 py-2 text-sm';
+            tile.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg>
+                <span class="flex-1 truncate text-gray-800">${escHtml(file.name)}</span>
+                <span class="text-xs text-gray-400 shrink-0">${sizeKb} KB</span>
+                <button type="button" class="shrink-0 text-red-500 hover:text-red-700" onclick="awRemoveFile('${widgetId}', ${idx})">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>`;
+            tilesEl.appendChild(tile);
+        });
+
+        syncInput(widgetId);
+    }
+
+    function syncInput(widgetId) {
+        const input = document.getElementById(widgetId + '-input');
+        const dt = new DataTransfer();
+        queue(widgetId).forEach(f => dt.items.add(f));
+        input.files = dt.files;
+    }
+
+    function addFiles(widgetId, files) {
+        const errorEl = document.getElementById(widgetId + '-error');
+        errorEl.classList.add('hidden');
+        errorEl.textContent = '';
+        const errors = [];
+
+        Array.from(files).forEach(file => {
+            if (!ALLOWED_TYPES.includes(file.type)) {
+                errors.push(`"${file.name}" is not an allowed file type.`);
+                return;
+            }
+            if (file.size > MAX_BYTES) {
+                errors.push(`"${file.name}" exceeds the 10 MB limit.`);
+                return;
+            }
+            queue(widgetId).push(file);
+        });
+
+        if (errors.length) {
+            errorEl.textContent = errors.join(' ');
+            errorEl.classList.remove('hidden');
+        }
+
+        renderTiles(widgetId);
+    }
+
+    function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Public API (called by inline event handlers)
+    window.awFilesAdded = function(event, widgetId) {
+        addFiles(widgetId, event.target.files);
+        event.target.value = '';
+    };
+
+    window.awRemoveFile = function(widgetId, idx) {
+        queue(widgetId).splice(idx, 1);
+        renderTiles(widgetId);
+    };
+
+    window.awDragOver = function(event, widgetId) {
+        event.preventDefault();
+        const zone = document.getElementById(widgetId + '-zone');
+        zone.classList.add('border-green-400', 'bg-green-50');
+        zone.classList.remove('border-gray-300');
+    };
+
+    window.awDragLeave = function(event, widgetId) {
+        const zone = document.getElementById(widgetId + '-zone');
+        zone.classList.remove('border-green-400', 'bg-green-50');
+        zone.classList.add('border-gray-300');
+    };
+
+    window.awDrop = function(event, widgetId) {
+        event.preventDefault();
+        awDragLeave(event, widgetId);
+        addFiles(widgetId, event.dataTransfer.files);
+    };
+
+    window.awOpenDeleteDialog = function(btn) {
+        const widgetId = btn.dataset.widgetId;
+        _pendingDelete[widgetId] = {
+            url: btn.dataset.deleteUrl,
+            rowId: btn.dataset.rowId
+        };
+        document.getElementById(widgetId + '-dialog-name').textContent = btn.dataset.fileName;
+        const dialog = document.getElementById(widgetId + '-dialog');
+        dialog.classList.remove('hidden');
+        dialog.classList.add('flex');
+    };
+
+    window.awCloseDialog = function(widgetId) {
+        const dialog = document.getElementById(widgetId + '-dialog');
+        dialog.classList.add('hidden');
+        dialog.classList.remove('flex');
+        delete _pendingDelete[widgetId];
+    };
+
+    window.awConfirmDelete = async function(widgetId) {
+        const pending = _pendingDelete[widgetId];
+        if (!pending) return;
+
+        const confirmBtn = document.getElementById(widgetId + '-dialog-confirm');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting…';
+
+        try {
+            const resp = await fetch(pending.url, {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': getToken() }
+            });
+
+            if (!resp.ok) throw new Error('Server error');
+
+            // Remove the row from the DOM
+            const row = document.getElementById(pending.rowId);
+            if (row) row.remove();
+
+            // Hide the saved section if no rows remain
+            const list = document.getElementById(widgetId + '-saved-list');
+            if (list && list.children.length === 0) {
+                document.getElementById(widgetId + '-saved').classList.add('hidden');
+            }
+
+            awCloseDialog(widgetId);
+        } catch {
+            const errEl = document.getElementById(widgetId + '-delete-error');
+            errEl.classList.remove('hidden');
+            awCloseDialog(widgetId);
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Delete';
+        }
+    };
+})();
+</script>
