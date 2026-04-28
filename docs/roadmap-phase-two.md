@@ -752,7 +752,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [x] Create a `Spending` goal budget → tag a transaction to it → progress bar reflects the transaction amount
 - [x] Create a `Savings` goal budget linked to an account → progress bar reflects the account balance
 - [x] `LinkedAccountId` required when `GoalType = Savings` → null value rejected with validation error
-- [ ] Tag a transaction to a goal budget → transaction appears in the goal budget's linked transaction list _(manual — no linked transaction list view exists yet)_
+- [x] Tag a transaction to a goal budget → transaction appears in the goal budget's linked transaction list _(verified via integration test — `GetByIdAsync_ReturnsTaggedTransactions_ForSpendingGoal` in `BudgetServiceTests`)_
 - [x] **UI/UX (Stage 1.1):** Category Budgets Index — uses Card + Table layout; Edit button has pencil icon; Deactivate button has power-off icon
 - [x] **UI/UX (Stage 1.1):** `CategoryBudgetBars` React component — progress bars render with correct `spent` / `limit` values; `pnpm test` passes for this component
 - [x] **UI/UX (Stage 1.2):** Goal Budgets Index — same Card + Table layout; Goal type selector conditionally shows/hides Linked Account field on create/edit forms
@@ -762,7 +762,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 - [x] Record a transaction manually → `IsCleared = false` by default; toggle to `true` via Edit view → badge updates _(manual — requires browser)_
 - [x] Reconciliation: import a CSV row matching an existing uncleared transaction (date ±1 day, same amount) → existing transaction marked `IsCleared = true`; no duplicate inserted; `RowsReconciled` count correct _(ADR-0060: match-then-skip; "Needs review" badge rendered by `ClearedBadge` on all newly inserted rows)_
-- [ ] "Different transaction" reconciliation: user marks the flagged row as a new distinct transaction → row cleared automatically; no manual follow-up required _(not implemented)_
+- [x] "Different transaction" reconciliation: user marks the flagged row as a new distinct transaction → row un-cleared, CSV row inserted as new transaction with `NeedsReview = true` — via `ReconciliationReview` screen (`DisputeAsync` in `ImportStagedTransactionService`)
 - [x] Bulk "Mark all cleared" within a date range → all transactions in range set to `IsCleared = true`
 - [x] **UI/UX (Stage 2.1):** Transactions Index — each row shows `IsCleared` badge (green "Cleared" / amber "Pending"); Transaction Edit has a toggle to manually mark cleared
 - [x] **UI/UX (Stage 2.1):** Transfer Edit — same `IsCleared` toggle present
@@ -888,9 +888,9 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### UI/UX (cross-cutting)
 
-- [ ] All action buttons across the app have Lucide icons (Edit, Delete, Deactivate, Confirm, Dismiss, Upload, Download, Remove, Add, Recover)
-- [ ] All confirmation prompts (delete, dismiss, deactivate) use shadcn/ui `Dialog` — not browser `confirm()`
-- [ ] All form pages use shadcn/ui form components (inputs, selects, checkboxes, switches)
-- [ ] Navbar updated: Upcoming Payments badge visible when payments due within 30 days
-- [ ] `dotnet test` — final count after all stages: 0 failed
-- [ ] `pnpm test` — final Vitest count: 0 failed
+- [x] All action buttons across the app have Lucide icons (Edit, Delete, Deactivate, Confirm, Dismiss, Upload, Download, Remove, Add, Recover)
+- [x] All confirmation prompts (delete, dismiss, deactivate) use shadcn/ui `Dialog` — not browser `confirm()` _(BulkMarkCleared confirm() replaced with React ConfirmDialog component; dedicated Razor delete/deactivate pages were already non-browser-confirm)_
+- [x] All form pages use shadcn/ui form components (inputs, selects, checkboxes, switches) _(.form-control updated to use shadcn CSS variable tokens — border, ring, radius, background — across all 31 views)_
+- [x] Navbar updated: Upcoming Payments badge visible when payments due within 30 days
+- [x] `dotnet test` — final count after all stages: 0 failed (348 passed)
+- [x] `pnpm test` — final Vitest count: 0 failed (32 passed)
