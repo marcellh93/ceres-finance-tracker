@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
     public DbSet<ImportProfile> ImportProfiles => Set<ImportProfile>();
     public DbSet<ImportStagedTransfer> ImportStagedTransfers => Set<ImportStagedTransfer>();
     public DbSet<ImportTransferExclusion> ImportTransferExclusions => Set<ImportTransferExclusion>();
+    public DbSet<ImportStagedTransaction> ImportStagedTransactions => Set<ImportStagedTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
