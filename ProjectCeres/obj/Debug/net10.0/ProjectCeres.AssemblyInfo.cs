@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ProjectCeres")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8b5bcd81a2a6861e96633b68dbd52ea40a5f1676")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b1f1ab29c3b9c98b41c4ba308a8d0d502eb9c227")]
 [assembly: System.Reflection.AssemblyProductAttribute("ProjectCeres")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ProjectCeres")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

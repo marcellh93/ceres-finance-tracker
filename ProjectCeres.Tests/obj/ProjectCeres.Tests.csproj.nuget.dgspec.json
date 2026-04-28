@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "<repo>/ProjectCeres.Tests/ProjectCeres.Tests.csproj": {}
+    "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres.Tests/ProjectCeres.Tests.csproj": {}
   },
   "projects": {
-    "<repo>/ProjectCeres.Tests/ProjectCeres.Tests.csproj": {
+    "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres.Tests/ProjectCeres.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "<repo>/ProjectCeres.Tests/ProjectCeres.Tests.csproj",
+        "projectUniqueName": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres.Tests/ProjectCeres.Tests.csproj",
         "projectName": "ProjectCeres.Tests",
-        "projectPath": "<repo>/ProjectCeres.Tests/ProjectCeres.Tests.csproj",
+        "projectPath": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres.Tests/ProjectCeres.Tests.csproj",
         "packagesPath": "~/.nuget/packages/",
-        "outputPath": "<repo>/ProjectCeres.Tests/obj/",
+        "outputPath": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres.Tests/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "~/.nuget/NuGet/NuGet.Config"
@@ -20,15 +20,15 @@
           "net10.0"
         ],
         "sources": {
-          "/opt/homebrew/Cellar/dotnet/10.0.105/libexec/library-packs": {},
+          "/opt/homebrew/Cellar/dotnet/10.0.107/libexec/library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "<repo>/ProjectCeres/ProjectCeres.csproj": {
-                "projectPath": "<repo>/ProjectCeres/ProjectCeres.csproj"
+              "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres/ProjectCeres.csproj": {
+                "projectPath": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres/ProjectCeres.csproj"
               }
             }
           }
@@ -106,7 +106,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/opt/homebrew/Cellar/dotnet/10.0.105/libexec/sdk/10.0.105/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/opt/homebrew/Cellar/dotnet/10.0.107/libexec/sdk/10.0.107/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -384,14 +384,14 @@
         }
       }
     },
-    "<repo>/ProjectCeres/ProjectCeres.csproj": {
+    "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres/ProjectCeres.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "<repo>/ProjectCeres/ProjectCeres.csproj",
+        "projectUniqueName": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres/ProjectCeres.csproj",
         "projectName": "ProjectCeres",
-        "projectPath": "<repo>/ProjectCeres/ProjectCeres.csproj",
+        "projectPath": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres/ProjectCeres.csproj",
         "packagesPath": "~/.nuget/packages/",
-        "outputPath": "<repo>/ProjectCeres/obj/",
+        "outputPath": "<repo>/.worktrees/stage-9-health-metrics/ProjectCeres/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "~/.nuget/NuGet/NuGet.Config"
@@ -400,7 +400,7 @@
           "net10.0"
         ],
         "sources": {
-          "/opt/homebrew/Cellar/dotnet/10.0.105/libexec/library-packs": {},
+          "/opt/homebrew/Cellar/dotnet/10.0.107/libexec/library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -425,6 +425,10 @@
         "net10.0": {
           "targetAlias": "net10.0",
           "dependencies": {
+            "ClosedXML": {
+              "target": "Package",
+              "version": "[0.105.0, )"
+            },
             "CsvHelper": {
               "target": "Package",
               "version": "[33.0.1, )"
@@ -467,7 +471,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/opt/homebrew/Cellar/dotnet/10.0.105/libexec/sdk/10.0.105/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/opt/homebrew/Cellar/dotnet/10.0.107/libexec/sdk/10.0.107/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
