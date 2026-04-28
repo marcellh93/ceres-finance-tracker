@@ -187,4 +187,230 @@ public class DashboardServiceTests : IAsyncLifetime
 
         countAfter.Should().Be(countBefore);
     }
+
+    // -------------------------------------------------------------------------
+    // GetHealthSnapshotAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_SpendableBalance_ExcludesExcludedAccountAndSubtractsDueRecurring()
+    {
+        // Non-excluded asset account (_accountId): balance 1000m
+        AddMtdTransaction(SalaryCategoryId, 1000m);
+
+        // Excluded asset account: balance 500m — must NOT count toward spendable
+        var excludedAccount = new Account
+        {
+            Id                  = Guid.NewGuid(),
+            Name                = $"Excluded Account {Guid.NewGuid():N}",
+            AccountTypeId       = 1,
+            CurrencyId          = 1,
+            IsActive            = true,
+            ExcludeFromSpendable = true
+        };
+        _fixture.Db.Accounts.Add(excludedAccount);
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = Guid.NewGuid(),
+            Date       = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1),
+            Amount     = 500m,
+            AccountId  = excludedAccount.Id,
+            CategoryId = SalaryCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+
+        // Recurring transaction due this month (first day of current month) — should be subtracted
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _fixture.Db.RecurringTransactions.Add(new RecurringTransaction
+        {
+            Id              = Guid.NewGuid(),
+            Name            = "Due This Month",
+            EstimatedAmount = 200m,
+            AccountId       = _accountId,
+            CategoryId      = HousingCategoryId,
+            Frequency       = Frequency.Monthly,
+            NextDueDate     = new DateOnly(today.Year, today.Month, 1),
+            IsActive        = true
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        // 1000 (non-excluded balance) - 200 (due recurring) = 800
+        snapshot.SpendableBalance.Should().Be(800m);
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_SpendableBalance_NextMonthRecurringNotSubtracted()
+    {
+        // Asset account balance 1000m
+        AddMtdTransaction(SalaryCategoryId, 1000m);
+
+        // Recurring transaction due next month — must NOT be subtracted
+        _fixture.Db.RecurringTransactions.Add(new RecurringTransaction
+        {
+            Id              = Guid.NewGuid(),
+            Name            = "Due Next Month",
+            EstimatedAmount = 200m,
+            AccountId       = _accountId,
+            CategoryId      = HousingCategoryId,
+            Frequency       = Frequency.Monthly,
+            NextDueDate     = DateOnly.FromDateTime(DateTime.Today).AddMonths(1),
+            IsActive        = true
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        snapshot.SpendableBalance.Should().Be(1000m);
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_Runway_ReturnsCorrectValue_GivenKnownExpensesAndNetWorth()
+    {
+        // Asset account (_accountId, CurrencyId=1): give it 6000m income this month
+        AddMtdTransaction(SalaryCategoryId, 6000m);
+
+        // Liability account: add 1000m housing expense → liability balance = 1000m
+        var liabilityAccount = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = $"Liability Account {Guid.NewGuid():N}",
+            AccountTypeId = 2,
+            CurrencyId    = 1,
+            IsActive      = true
+        };
+        _fixture.Db.Accounts.Add(liabilityAccount);
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = Guid.NewGuid(),
+            Date       = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1),
+            Amount     = 1000m,
+            AccountId  = liabilityAccount.Id,
+            CategoryId = HousingCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+
+        // 6 past-month Housing expense transactions (500m each) — directly inserted with past dates
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        for (var i = 1; i <= 6; i++)
+        {
+            var pastDate = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
+            _fixture.Db.Transactions.Add(new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = pastDate,
+                Amount     = 500m,
+                AccountId  = _accountId,
+                CategoryId = HousingCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            });
+        }
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        // Net worth = 6000 (asset) - 1000 (liability) = 5000
+        // Avg monthly expense (last 6 months) = 500
+        // Runway = 5000 / 500 = 10
+        snapshot.RunwayMonths.Should().NotBeNull();
+        snapshot.RunwayMonths!.Value.Should().BeApproximately(10m, 0.01m);
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_Runway_ReturnsNull_WhenNoExpensesInLast6Months()
+    {
+        // No past-month expense transactions seeded
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        snapshot.RunwayMonths.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_IncomeDelta_ReturnsCorrectPercentage()
+    {
+        // 6 months of past income (1000m each) → rolling average = 1000
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        for (var i = 1; i <= 6; i++)
+        {
+            var pastDate = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
+            _fixture.Db.Transactions.Add(new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = pastDate,
+                Amount     = 1000m,
+                AccountId  = _accountId,
+                CategoryId = SalaryCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            });
+        }
+
+        // Current month income: 1200m
+        AddMtdTransaction(SalaryCategoryId, 1200m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        // deltaPercent = (1200 - 1000) / 1000 = 0.2
+        snapshot.IncomeDeltaPercent.Should().NotBeNull();
+        snapshot.IncomeDeltaPercent!.Value.Should().BeApproximately(0.2m, 0.001m);
+        snapshot.CurrentMonthIncome.Should().BeGreaterThanOrEqualTo(1200m);
+        snapshot.RollingAverageIncome.Should().NotBeNull();
+        snapshot.RollingAverageIncome!.Value.Should().BeApproximately(1000m, 0.01m);
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_IncomeDelta_ReturnsNull_WhenNoPriorMonthIncome()
+    {
+        // Only current month income, no prior months
+        AddMtdTransaction(SalaryCategoryId, 500m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        snapshot.IncomeDeltaPercent.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_BudgetBurnRate_ReturnsCorrectRatio()
+    {
+        // Create an active CategoryBudget for Housing (CurrencyId=1, limit=1000)
+        _fixture.Db.CategoryBudgets.Add(new CategoryBudget
+        {
+            Id          = Guid.NewGuid(),
+            CategoryId  = HousingCategoryId,
+            CurrencyId  = 1,
+            LimitAmount = 1000m,
+            IsActive    = true
+        });
+
+        // Spend 400m Housing this month on the EUR account
+        AddMtdTransaction(HousingCategoryId, 400m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        // BurnRate = 400 / 1000 = 0.4
+        snapshot.BudgetBurnRate.Should().NotBeNull();
+        snapshot.BudgetBurnRate!.Value.Should().BeApproximately(0.4m, 0.001m);
+    }
+
+    [Fact]
+    public async Task GetHealthSnapshotAsync_BudgetBurnRate_ReturnsNull_WhenNoActiveCategoryBudgets()
+    {
+        // Deactivate any existing active CategoryBudgets for CurrencyId=1
+        var activeBudgets = _fixture.Db.CategoryBudgets
+            .Where(b => b.IsActive && b.CurrencyId == 1)
+            .ToList();
+        foreach (var budget in activeBudgets)
+            budget.IsActive = false;
+
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        snapshot.BudgetBurnRate.Should().BeNull();
+    }
 }
