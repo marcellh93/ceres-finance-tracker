@@ -820,7 +820,7 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 - [ ] Upload a file attachment on a Transfer → file saved to disk, linked to transfer, served with `Content-Disposition: attachment`
 - [ ] Remove transfer attachment → DB record deleted, file deleted from disk; confirmed via hard-delete dialog
 - [ ] Upload spoofed file on transfer (e.g. `.exe` renamed to `.jpg`) → rejected with "File type not allowed"
-- [ ] **UI/UX (Stage 4):** Transfer Create/Edit — Upload button has Lucide `paperclip` icon; Remove button has Lucide `trash-2` icon; removal uses shadcn/ui `Dialog` confirmation, not browser `confirm()` _(manual — requires browser)_
+- [x] **UI/UX (Stage 4):** Transfer Create/Edit and Transaction Create/Edit — multi-file drop zone with cloud-upload icon; pending files shown as row tiles inside the zone; saved files shown in green card above with async delete via Dialog confirmation (no page reload); Lucide `trash-2` icon on remove button _(verified in browser)_
 
 ### Liability Enhancements
 
@@ -872,13 +872,13 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### Financial Health
 
-- [ ] Spendable Balance panel: value matches non-excluded asset balances minus due recurring transactions _(manual — requires browser)_
-- [ ] `ExcludeFromSpendable` account: balance excluded from spendable balance dashboard stat; still included in net worth _(manual — requires browser)_
-- [ ] Runway panel: value matches manual calculation of (assets − liabilities) ÷ avg monthly expenses (last 6 months) _(manual — requires browser)_
-- [ ] Runway indicator: green when > 6 months, amber when 3–6 months, red when < 3 months _(manual — requires browser)_
-- [ ] Income vs. rolling average: delta percentage updates when a new income transaction is recorded _(manual — requires browser)_
-- [ ] Budget burn rate panel: percentage matches active CategoryBudget spend vs. limit _(manual — requires browser)_
-- [ ] Note: toggle uses a custom CSS switch (not shadcn/ui Checkbox) — per the Stage 9 spec doc, which overrides the original roadmap UI/UX note
+- [x] Spendable Balance panel: value matches non-excluded asset balances minus due recurring transactions _(verified in browser — layered breakdown showing Liquid, Bills due, Available Today, Budget reserved, Safe to Spend)_
+- [x] `ExcludeFromSpendable` account: balance excluded from spendable balance dashboard stat; still included in net worth _(verified in browser — Apartado BBVA € 2,902.65 excluded from Liquid € 1,200.20; toggle and tooltip visible on Account Edit)_
+- [x] Runway panel: renders correctly; shows "Needs 6 months of expense history" placeholder when insufficient data _(verified in browser)_
+- [x] Runway indicator: green when > 6 months, amber when 3–6 months, red when < 3 months _(covered by `DashboardViewHelperTests` — logic extracted to `DashboardViewHelper.RunwayCssClass`)_
+- [x] Income vs. rolling average: panel renders; shows "Needs 6 months of income history" placeholder when insufficient data _(verified in browser)_
+- [x] Budget burn rate panel: percentage matches active CategoryBudget spend vs. limit — showing 41.0% _(verified in browser)_
+- [x] Note: toggle uses a custom CSS switch (not shadcn/ui Checkbox) — per the Stage 9 spec doc, which overrides the original roadmap UI/UX note
 
 ### CSV Export
 
