@@ -128,13 +128,26 @@
   /* ─── Forms ────────────────────────────────────────── */
 
   .form-group     { @apply mb-4; }
-  .form-control   { @apply block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm
-                    focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500; }
+  .form-control {
+    @apply block w-full px-3 py-2 text-sm;
+    border-radius: var(--radius-md, 0.5rem);
+    border: 1px solid var(--border, oklch(0.922 0 0));
+    background-color: var(--background, #fff);
+    color: var(--foreground, inherit);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-control:focus {
+    border-color: var(--ring, oklch(0.708 0 0));
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.708 0 0)) 20%, transparent);
+  }
   input[type="file"].form-control {
     @apply p-0 cursor-pointer;
-    @apply file:mr-3 file:cursor-pointer file:rounded-l-md file:border-0 file:border-r file:border-gray-300
-           file:bg-gray-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700
-           hover:file:bg-gray-100;
+    @apply file:mr-3 file:cursor-pointer file:rounded-l-md file:border-0 file:border-r
+           file:px-3 file:py-2 file:text-sm file:font-medium;
+    border-color: var(--border, oklch(0.922 0 0));
+    file-border-color: var(--border, oklch(0.922 0 0));
   }
   .field-error    { @apply mt-1 text-xs text-red-600; }
   .form-hint      { @apply mt-1 text-xs text-gray-500; }
