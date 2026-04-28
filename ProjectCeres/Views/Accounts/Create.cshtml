@@ -47,6 +47,22 @@
         <span asp-validation-for="InterestRate" class="field-error"></span>
     </div>
 
+    <div class="form-group" id="exclude-from-spendable-field" style="display:none;">
+        <label class="toggle-label">
+            <span class="toggle-text">Exclude from spendable balance</span>
+            <span class="relative inline-block w-11 h-6">
+                <input asp-for="ExcludeFromSpendable" type="checkbox"
+                       class="peer absolute opacity-0 w-0 h-0" />
+                <span class="absolute inset-0 rounded-full bg-gray-200 transition-colors duration-200
+                             peer-checked:bg-[#248e38] peer-focus:ring-2 peer-focus:ring-[#248e38]
+                             peer-focus:ring-offset-1 cursor-pointer"></span>
+                <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow
+                             transition-transform duration-200 peer-checked:translate-x-5 cursor-pointer"></span>
+            </span>
+        </label>
+        <small class="form-hint">Excluded accounts don't count toward your spendable balance but still appear in net worth.</small>
+    </div>
+
     <div class="form-group">
         <label asp-for="Description"></label>
         <input asp-for="Description" class="form-control" />
@@ -79,18 +95,20 @@
     @await Html.PartialAsync("_ValidationScriptsPartial")
     <script>
         (function () {
-            var accountTypeSelect     = document.getElementById('AccountTypeId');
-            var repaymentTypeSelect   = document.getElementById('LiabilityRepaymentType');
-            var liabilityFields       = document.getElementById('liability-fields');
-            var interestRateField     = document.getElementById('interest-rate-field');
+            var accountTypeSelect          = document.getElementById('AccountTypeId');
+            var repaymentTypeSelect        = document.getElementById('LiabilityRepaymentType');
+            var liabilityFields            = document.getElementById('liability-fields');
+            var interestRateField          = document.getElementById('interest-rate-field');
+            var excludeFromSpendableField  = document.getElementById('exclude-from-spendable-field');
 
-            // AccountType seed: 2 = Liability
+            // AccountType seed: 1 = Asset, 2 = Liability
             function isLiability() { return accountTypeSelect.value === '2'; }
             function isAmortising() { return repaymentTypeSelect.value === 'Amortising'; }
 
             function updateVisibility() {
-                liabilityFields.style.display   = isLiability() ? '' : 'none';
-                interestRateField.style.display  = isLiability() && isAmortising() ? '' : 'none';
+                liabilityFields.style.display              = isLiability() ? '' : 'none';
+                interestRateField.style.display            = isLiability() && isAmortising() ? '' : 'none';
+                excludeFromSpendableField.style.display    = accountTypeSelect.value === '1' ? '' : 'none';
             }
 
             accountTypeSelect.addEventListener('change', updateVisibility);
