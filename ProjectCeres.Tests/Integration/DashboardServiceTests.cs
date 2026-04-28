@@ -194,7 +194,7 @@ public class DashboardServiceTests : IAsyncLifetime
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetHealthSnapshotAsync_SpendableBalance_ExcludesExcludedAccountAndSubtractsDueRecurring()
+    public async Task GetHealthSnapshotAsync_AvailableToday_ExcludesExcludedAccountAndSubtractsDueRecurring()
     {
         // Capture baseline spendable before seeding test data
         var baselineSnapshot = await _service.GetHealthSnapshotAsync();
@@ -246,7 +246,7 @@ public class DashboardServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetHealthSnapshotAsync_SpendableBalance_NextMonthRecurringNotSubtracted()
+    public async Task GetHealthSnapshotAsync_AvailableToday_NextMonthRecurringNotSubtracted()
     {
         // Capture baseline spendable before seeding test data
         var baselineSnapshot = await _service.GetHealthSnapshotAsync();
@@ -530,7 +530,7 @@ public class DashboardServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetHealthSnapshotAsync_SpendableBalance_ExcludesTransfersOutToExcludedAccounts()
+    public async Task GetHealthSnapshotAsync_AvailableToday_ExcludesTransfersOutToExcludedAccounts()
     {
         // Arrange: capture baseline before seeding
         var baselineSnapshot = await _service.GetHealthSnapshotAsync();
