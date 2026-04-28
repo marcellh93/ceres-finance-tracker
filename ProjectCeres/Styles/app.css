@@ -111,7 +111,7 @@
   .nav-brand      { @apply text-base font-bold text-white no-underline tracking-tight shrink-0 hover:text-gray-200; }
   .nav-links      { @apply flex items-center gap-1; }
   .nav-link       { @apply text-sm text-gray-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-gray-800 no-underline transition-colors; }
-  .page-content   { @apply max-w-6xl mx-auto px-6 py-8; }
+  .page-content   { @apply max-w-screen-xl mx-auto px-6 py-8; }
   .page-header    { @apply flex items-center justify-between mb-6; }
 
   /* ─── Buttons ──────────────────────────────────────── */
