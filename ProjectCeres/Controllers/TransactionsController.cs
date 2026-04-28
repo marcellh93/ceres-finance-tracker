@@ -2,12 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Data;
+using ProjectCeres.Helpers;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Controllers;
 
-public class TransactionsController(ITransactionService transactionService, IFileAttachmentService attachmentService, AppDbContext db) : Controller
+public class TransactionsController(ITransactionService transactionService, IFileAttachmentService attachmentService, ITransactionExportService exportService, AppDbContext db) : Controller
 {
     private const int PageSize = 50;
 
@@ -26,6 +27,21 @@ public class TransactionsController(ITransactionService transactionService, IFil
             await db.Accounts.Where(a => a.IsActive).OrderBy(a => a.Name).ToListAsync(), "Id", "Name");
 
         return View(items);
+    }
+
+    public async Task<IActionResult> Export(Guid? accountId, DateOnly? from, DateOnly? to)
+    {
+        var rows = await exportService.ExportAsync(accountId, from, to);
+
+        var lines = new List<string> { "Date,Account,Category,Type,Description,Amount" };
+        foreach (var r in rows)
+            lines.Add($"{r.Date:yyyy-MM-dd},{CsvFormattingHelper.Csv(r.Account)},{CsvFormattingHelper.Csv(r.Category)},{CsvFormattingHelper.Csv(r.CategoryType)},{CsvFormattingHelper.Csv(r.Description)},{r.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+
+        var fileName = from.HasValue && to.HasValue
+            ? $"transactions_{from:yyyy-MM-dd}_{to:yyyy-MM-dd}.csv"
+            : $"transactions_{DateTime.Today:yyyy-MM-dd}.csv";
+
+        return File(CsvFormattingHelper.CsvBytes(lines), "text/csv; charset=utf-8", fileName);
     }
 
     public async Task<IActionResult> Create()
