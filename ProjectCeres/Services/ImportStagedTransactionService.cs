@@ -61,7 +61,7 @@ public class ImportStagedTransactionService(
         var txId = await transactionService.CreateAsync(new TransactionCreateViewModel
         {
             Date        = staged.RawDate,
-            Amount      = staged.RawAmount,
+            Amount      = Math.Abs(staged.RawAmount),
             Description = staged.RawDescription,
             AccountId   = staged.AccountId,
             CategoryId  = categoryId

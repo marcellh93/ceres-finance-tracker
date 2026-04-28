@@ -263,4 +263,32 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
         var act = async () => await _service.DisputeAsync(Guid.NewGuid());
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
+
+    [Fact]
+    public async Task DisputeAsync_WhenMatchedTransactionIsNull_StillInsertsNewTransaction()
+    {
+        var staged = new ImportStagedTransaction
+        {
+            Id                   = Guid.NewGuid(),
+            ImportedAt           = DateTime.UtcNow,
+            AccountId            = _accountId,
+            RawDate              = DateOnly.FromDateTime(DateTime.Today),
+            RawAmount            = 75m,
+            RawDescription       = "Orphaned CSV row",
+            MatchedTransactionId = null,
+            Status               = StagedTransactionStatus.Pending
+        };
+        _fixture.Db.ImportStagedTransactions.Add(staged);
+        await _fixture.Db.SaveChangesAsync();
+
+        var countBefore = _fixture.Db.Transactions.Count(t => t.AccountId == _accountId);
+
+        await _service.DisputeAsync(staged.Id);
+
+        var reloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(staged.Id);
+        reloaded!.Status.Should().Be(StagedTransactionStatus.Disputed);
+
+        var countAfter = _fixture.Db.Transactions.Count(t => t.AccountId == _accountId);
+        countAfter.Should().Be(countBefore + 1);
+    }
 }
