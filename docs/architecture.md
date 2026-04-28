@@ -69,7 +69,7 @@ sequenceDiagram
     Controller->>Browser: Razor View → Full HTML page
 ```
 
-### Phase 2 — Hybrid (React components embedded in Razor)
+### Phase 2 — Hybrid (React components embedded in Razor) ✅ Complete
 
 Razor still drives page rendering. The delta from Phase 1: selected pages (e.g. the dashboard) embed interactive React components that fetch JSON from dedicated controller actions — a second async request path layered on top of the initial page load.
 
@@ -91,7 +91,7 @@ sequenceDiagram
 
 MVC routing still owns the page. React owns only the component. No separate frontend server or build pipeline beyond a Vite bundle is needed.
 
-### Phase 3 — Full SPA (evaluation point)
+### Phase 3 — Full SPA (evaluation point) ← Current
 
 The app is hosted, behind authentication, with no SEO concern for authenticated pages. The SPA model becomes viable and appropriate.
 

@@ -15,7 +15,7 @@
 
 ---
 
-**Gate: Phase 2 must be fully complete before starting.**
+**Phase 2 is complete as of 2026-04-28. This is now the active phase.**
 
 The app moves from local to a hosted server. Goal: make the app accessible to a small group
 of collaborators who can help test and improve it. This phase introduces the foundational

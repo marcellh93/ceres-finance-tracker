@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Reference — defines Phase 2 scope, planned features, and open decisions for the local extended phase.
 >
-> **This is the active phase.** Phase 1 is complete as of 2026-04-22.
+> **Phase 2 is complete as of 2026-04-28.** All 371 dotnet tests and 32 Vitest tests pass. The active phase is now Phase 3 — see `planning-phase3.md`.
 
 ## Index
 

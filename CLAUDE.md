@@ -8,7 +8,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 
 ## Current Phase
 
-**Phase 2 — Local Extended.** Phase 1 (Local MVP) is complete. Building on top of the local foundation with budgeting UI, charts, React components, CSV import, and enhanced reports.
+**Phase 3 — Hosted Beta.** Phase 1 (Local MVP) and Phase 2 (Local Extended) are complete. Phase 3 moves the app from local to a hosted server, introducing authentication, multi-tenancy, and the MVC → SPA migration. See `docs/planning-phase3.md` for scope and open decisions.
 
 ## Tech Stack
 
