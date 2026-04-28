@@ -34,7 +34,7 @@ else
                     <td>@t.Date.ToString("dd/MM/yyyy")</td>
                     <td>@t.SourceAccount.Name</td>
                     <td>@t.DestAccount.Name</td>
-                    <td>@NumberFormatHelper.FormatAmount(t.Amount, ViewData["NumberFormat"] as string) @t.SourceAccount.Currency.Code</td>
+                    <td class="amount-mono whitespace-nowrap">@(string.IsNullOrEmpty(t.SourceAccount.Currency.Symbol) ? t.SourceAccount.Currency.Code : t.SourceAccount.Currency.Symbol) @NumberFormatHelper.FormatAmount(t.Amount, ViewData["NumberFormat"] as string)</td>
                     <td>@(t.Description ?? "—")</td>
                     <td>
                         <div data-react="cleared-badge"

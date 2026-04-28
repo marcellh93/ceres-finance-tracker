@@ -18,18 +18,30 @@ public class ReportService(AppDbContext db) : IReportService
                     .ThenInclude(c => c.CategoryType)
             .ToListAsync();
 
+        var accountIds = accounts.Select(a => a.Id).ToHashSet();
+        var liabilityPayments = await db.LiabilityPayments
+            .AsNoTracking()
+            .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
+            .ToListAsync();
+
+        var paymentsByAsset = liabilityPayments
+            .GroupBy(p => p.AssetAccountId)
+            .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+        var paymentsByLiability = liabilityPayments
+            .GroupBy(p => p.LiabilityAccountId)
+            .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
         var grouped = accounts
             .GroupBy(a => new { a.Currency.Code, a.Currency.Symbol, a.CurrencyId })
             .Select(g =>
             {
-                decimal assets      = 0;
+                decimal assets = 0;
                 decimal liabilities = 0;
 
                 foreach (var account in g)
                 {
                     bool isLiability = account.AccountType.Name == "Liability";
 
-                    // Same formula as AccountService.GetBalanceAsync.
                     var balance = account.Transactions.Sum(t =>
                     {
                         if (t.Category.IsSystem) return t.Amount;
@@ -37,6 +49,9 @@ public class ReportService(AppDbContext db) : IReportService
                         bool addsToBalance = isLiability ? !isIncome : isIncome;
                         return addsToBalance ? t.Amount : -t.Amount;
                     });
+
+                    balance -= paymentsByAsset.GetValueOrDefault(account.Id);
+                    balance -= paymentsByLiability.GetValueOrDefault(account.Id);
 
                     if (!isLiability)
                         assets += balance;
@@ -62,9 +77,9 @@ public class ReportService(AppDbContext db) : IReportService
                 .ThenInclude(c => c.CategoryType)
             .ToListAsync();
 
-        var income   = transactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
+        var income = transactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
         var expenses = transactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
-        var savings  = income > 0 ? (income - expenses) / income : 0;
+        var savings = income > 0 ? (income - expenses) / income : 0;
 
         return new IncomeExpenseSummary(currency.Code, currency.Symbol, income, expenses, savings);
     }

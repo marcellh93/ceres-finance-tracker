@@ -17,6 +17,7 @@ public class TransactionListItemViewModel
 
     // Regular transaction fields
     public string? AccountName { get; set; }
+    public string? CurrencySymbol { get; set; }
     public string? CategoryName { get; set; }
     public string? CategoryTypeName { get; set; }
 

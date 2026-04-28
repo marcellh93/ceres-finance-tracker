@@ -38,15 +38,6 @@
     </form>
 }
 
-@if (TempData["SuccessMessage"] is string successMsg)
-{
-    <div class="alert alert-success">@successMsg</div>
-}
-@if (TempData["ErrorMessage"] is string errorMsg)
-{
-    <div class="alert alert-error">@errorMsg</div>
-}
-
 @if (!Model.Any())
 {
     <p class="empty-state">No transactions found.</p>
@@ -88,8 +79,8 @@ else
                         <td>@item.CategoryName</td>
                         <td>@(item.Description ?? "—")</td>
                         <td>@item.CategoryTypeName</td>
-                        <td class="@(item.CategoryTypeName == "Income" ? "amount-income" : "amount-expense")">
-                            @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
+                        <td class="@(item.CategoryTypeName == "Income" ? "amount-income" : "amount-expense") whitespace-nowrap">
+                            @item.CurrencySymbol @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
                         </td>
                     }
 

@@ -18,7 +18,13 @@ else
     @foreach (var group in Model.GroupBy(c => c.CategoryType.Name).OrderBy(g => g.Key))
     {
         <h2>@group.Key</h2>
-        <table class="data-table">
+        <table class="data-table table-fixed">
+            <colgroup>
+                <col class="w-1/2" />
+                <col class="w-1/4" />
+                <col class="w-24" />
+                <col class="w-48" />
+            </colgroup>
             <thead>
                 <tr>
                     <th>Name</th>

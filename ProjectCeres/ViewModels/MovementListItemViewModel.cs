@@ -20,6 +20,7 @@ public class MovementListItemViewModel
     // Transaction fields
     public Guid? AccountId { get; set; }
     public string? AccountName { get; set; }
+    public string? CurrencySymbol { get; set; }
     public Guid? CategoryId { get; set; }
     public string? CategoryName { get; set; }
     public string? CategoryTypeName { get; set; }

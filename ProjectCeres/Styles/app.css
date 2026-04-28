@@ -120,6 +120,8 @@
   .btn-primary    { @apply btn bg-[#248e38] text-white hover:bg-green-700 hover:text-white focus:ring-green-700; }
   .btn-secondary  { @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-400; }
   .btn-danger     { @apply btn bg-red-600 text-white hover:bg-red-700 hover:text-white focus:ring-red-600; }
+  .btn-info       { @apply btn bg-blue-600 text-white hover:bg-blue-700 hover:text-white focus:ring-blue-600; }
+  .btn-warning    { @apply btn bg-amber-500 text-white hover:bg-amber-600 hover:text-white focus:ring-amber-500; }
   .btn-link       { @apply text-sm text-gray-600 underline hover:text-gray-900; }
   .btn-sm         { @apply px-2.5 py-1 text-xs rounded; }
 
@@ -152,7 +154,7 @@
   .data-table                    { @apply w-full text-sm border-collapse bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200; }
   .data-table thead              { @apply bg-gray-50; }
   .data-table th                 { @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200; }
-  .data-table td                 { @apply px-4 py-3 border-b border-gray-100; }
+  .data-table td                 { @apply px-4 py-3 border-b border-gray-100 align-middle; }
   .data-table tbody tr:last-child td { @apply border-b-0; }
   .data-table tbody tr:hover     { @apply bg-gray-50; }
 

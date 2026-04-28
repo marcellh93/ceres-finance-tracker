@@ -21,7 +21,7 @@ public class TransactionService(
         // --- Regular transactions ---
         var txQuery = db.Transactions
             .Where(t => !t.Category.IsSystem)
-            .Include(t => t.Account)
+            .Include(t => t.Account).ThenInclude(a => a.Currency)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .AsQueryable();
 
@@ -45,6 +45,7 @@ public class TransactionService(
             IsCleared        = t.IsCleared,
             NeedsReview      = t.NeedsReview,
             AccountName      = t.Account.Name,
+            CurrencySymbol   = t.Account.Currency.Symbol,
             CategoryName     = t.Category.Name,
             CategoryTypeName = t.Category.CategoryType.Name
         });

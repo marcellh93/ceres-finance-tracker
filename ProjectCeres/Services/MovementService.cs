@@ -55,7 +55,7 @@ public class MovementService : IMovementService
         Guid? accountId, DateOnly? from, DateOnly? to)
     {
         var query = _db.Transactions
-            .Include(t => t.Account)
+            .Include(t => t.Account).ThenInclude(a => a.Currency)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .AsQueryable();
 
@@ -77,6 +77,7 @@ public class MovementService : IMovementService
             CreatedAt    = t.CreatedAt,
             AccountId        = t.AccountId,
             AccountName      = t.Account.Name,
+            CurrencySymbol   = t.Account.Currency.Symbol,
             CategoryId       = t.CategoryId,
             CategoryName     = t.Category.Name,
             CategoryTypeName = t.Category.CategoryType.Name
@@ -87,7 +88,7 @@ public class MovementService : IMovementService
         Guid? accountId, DateOnly? from, DateOnly? to)
     {
         var query = _db.Transfers
-            .Include(t => t.SourceAccount)
+            .Include(t => t.SourceAccount).ThenInclude(a => a.Currency)
             .Include(t => t.DestAccount)
             .AsQueryable();
 
@@ -109,6 +110,7 @@ public class MovementService : IMovementService
             CreatedAt           = t.CreatedAt,
             SourceAccountId     = t.SourceAccountId,
             SourceAccountName   = t.SourceAccount.Name,
+            CurrencySymbol      = t.SourceAccount.Currency.Symbol,
             DestAccountId       = t.DestAccountId,
             DestAccountName     = t.DestAccount.Name
         }).ToListAsync();

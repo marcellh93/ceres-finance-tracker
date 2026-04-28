@@ -132,6 +132,71 @@ public class ReportsController(
         return View(data);
     }
 
+    public async Task<IActionResult> ExportNetWorth()
+    {
+        var data = await reportService.GetNetWorthAsync();
+
+        var lines = new List<string> { "Currency,Assets,Liabilities,Net Worth" };
+        foreach (var entry in data)
+            lines.Add($"{Csv(entry.CurrencyCode)},{entry.Assets.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{entry.Liabilities.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{entry.NetWorth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+
+        return CsvFile(lines, $"net-worth_{DateTime.Today:yyyy-MM-dd}.csv");
+    }
+
+    public async Task<IActionResult> ExportIncomeExpense(int? currencyId, DateOnly? from, DateOnly? to)
+    {
+        var settings = await settingsService.GetAsync();
+        var cid   = currencyId ?? settings.DefaultCurrencyId;
+        var end   = to   ?? DateOnly.FromDateTime(DateTime.Today);
+        var start = from ?? new DateOnly(end.Year, end.Month, 1);
+
+        var data = await reportService.GetIncomeExpenseSummaryAsync(cid, start, end);
+
+        var lines = new List<string> { "Metric,Value" };
+        lines.Add($"Total Income,{data.TotalIncome.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+        lines.Add($"Total Expenses,{data.TotalExpenses.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+        lines.Add($"Net,{(data.TotalIncome - data.TotalExpenses).ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+        lines.Add($"Savings Rate,{data.SavingsRate.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)}");
+
+        return CsvFile(lines, $"income-expense_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
+    }
+
+    public async Task<IActionResult> ExportExpenseBreakdown(int? currencyId, DateOnly? from, DateOnly? to)
+    {
+        var settings = await settingsService.GetAsync();
+        var cid   = currencyId ?? settings.DefaultCurrencyId;
+        var end   = to   ?? DateOnly.FromDateTime(DateTime.Today);
+        var start = from ?? new DateOnly(end.Year, end.Month, 1);
+
+        var data = await reportService.GetExpenseBreakdownAsync(cid, start, end);
+        var total = data.Categories.Sum(c => c.Total);
+
+        var lines = new List<string> { "Category,Lifestyle Tag,Amount,% of Total" };
+        foreach (var cat in data.Categories)
+        {
+            var pct = total > 0 ? cat.Total / total : 0;
+            lines.Add($"{Csv(cat.CategoryName)},{Csv(cat.LifestyleTag ?? "")},{cat.Total.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{pct.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)}");
+        }
+
+        return CsvFile(lines, $"expense-breakdown_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
+    }
+
+    public async Task<IActionResult> ExportTransactionHistory(int? currencyId, DateOnly? from, DateOnly? to, Guid? accountId, Guid? categoryId)
+    {
+        var settings = await settingsService.GetAsync();
+        var cid   = currencyId ?? settings.DefaultCurrencyId;
+        var end   = to   ?? DateOnly.FromDateTime(DateTime.Today);
+        var start = from ?? new DateOnly(end.Year, 1, 1);
+
+        var data = await reportService.GetTransactionHistoryAsync(cid, start, end, accountId, categoryId, limit: 10_000, offset: 0);
+
+        var lines = new List<string> { "Date,Account,Category,Description,Type,Amount" };
+        foreach (var t in data)
+            lines.Add($"{t.Date:yyyy-MM-dd},{Csv(t.Account.Name)},{Csv(t.Category.Name)},{Csv(t.Description ?? "")},{Csv(t.Category.CategoryType.Name)},{t.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
+
+        return CsvFile(lines, $"transaction-history_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
+    }
+
     public async Task<IActionResult> ExportBudgetVsActual(int? currencyId, DateOnly? from, DateOnly? to)
     {
         var settings = await settingsService.GetAsync();
@@ -146,7 +211,7 @@ public class ReportsController(
         foreach (var row in data)
         {
             var pct = row.LimitAmount > 0 ? row.ActualSpend / row.LimitAmount : 0;
-            lines.Add($"{Csv(row.CategoryName)},{row.LimitAmount:F2},{row.ActualSpend:F2},{row.Variance:F2},{pct:P1}");
+            lines.Add($"{Csv(row.CategoryName)},{row.LimitAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{row.ActualSpend.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{row.Variance.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{pct.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)}");
         }
 
         return CsvFile(lines, $"budget-vs-actual_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
@@ -164,7 +229,7 @@ public class ReportsController(
 
         var lines = new List<string> { "Date,Description,Category,Account,Amount" };
         foreach (var row in data)
-            lines.Add($"{row.Date:yyyy-MM-dd},{Csv(row.Description)},{Csv(row.CategoryName)},{Csv(row.AccountName)},{row.Amount:F2}");
+            lines.Add($"{row.Date:yyyy-MM-dd},{Csv(row.Description)},{Csv(row.CategoryName)},{Csv(row.AccountName)},{row.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
 
         return CsvFile(lines, $"largest-expenses_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
     }
@@ -181,7 +246,7 @@ public class ReportsController(
 
         var lines = new List<string> { "Month,Income,Expenses,Net" };
         foreach (var row in data)
-            lines.Add($"{new DateTime(row.Year, row.Month, 1):MMM yyyy},{row.TotalIncome:F2},{row.TotalExpenses:F2},{row.Net:F2}");
+            lines.Add($"{new DateTime(row.Year, row.Month, 1):MMM yyyy},{row.TotalIncome.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{row.TotalExpenses.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{row.Net.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
 
         return CsvFile(lines, $"monthly-cash-flow_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
     }
@@ -198,7 +263,7 @@ public class ReportsController(
 
         var lines = new List<string> { "Month,Assets,Liabilities,Net Worth" };
         foreach (var row in data)
-            lines.Add($"{new DateTime(row.Year, row.Month, 1):MMM yyyy},{row.Assets:F2},{row.Liabilities:F2},{row.NetWorth:F2}");
+            lines.Add($"{new DateTime(row.Year, row.Month, 1):MMM yyyy},{row.Assets.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{row.Liabilities.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)},{row.NetWorth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)}");
 
         return CsvFile(lines, $"net-worth-over-time_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
     }
