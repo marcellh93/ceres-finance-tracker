@@ -121,6 +121,50 @@ public class BudgetServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetByIdAsync_ReturnsTaggedTransactions_ForSpendingGoal()
+    {
+        var budget    = await _service.CreateAsync(new BudgetCreateViewModel
+        {
+            Name         = "Vacation Fund",
+            TargetAmount = 2000m,
+            CurrencyId   = 1,
+            StartDate    = DateOnly.FromDateTime(DateTime.Today),
+            GoalType     = "Spending"
+        });
+        var accountId = await CreateAssetAccountAsync();
+
+        _fixture.Db.Transactions.AddRange(
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = DateOnly.FromDateTime(DateTime.Today),
+                Amount     = 400m,
+                AccountId  = accountId,
+                CategoryId = HousingCategoryId,
+                BudgetId   = budget.Id,
+                CreatedAt  = DateTime.UtcNow
+            },
+            new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = DateOnly.FromDateTime(DateTime.Today),
+                Amount     = 600m,
+                AccountId  = accountId,
+                CategoryId = HousingCategoryId,
+                BudgetId   = budget.Id,
+                CreatedAt  = DateTime.UtcNow
+            }
+        );
+        await _fixture.Db.SaveChangesAsync();
+
+        var result = await _service.GetByIdAsync(budget.Id);
+
+        result.Should().NotBeNull();
+        result!.Transactions.Should().HaveCount(2);
+        result.Transactions.Sum(t => t.Amount).Should().Be(1000m);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_ReturnsNull_WhenNotFound()
     {
         var result = await _service.GetByIdAsync(Guid.NewGuid());
