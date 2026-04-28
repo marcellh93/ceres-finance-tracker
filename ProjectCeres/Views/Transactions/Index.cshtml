@@ -88,7 +88,16 @@ else
                         <td>@item.AccountName</td>
                         <td>@item.CategoryName</td>
                         <td>@(item.Description ?? "—")</td>
-                        <td>@item.CategoryTypeName</td>
+                        <td>
+                            @if (item.CategoryTypeName == "Income")
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 whitespace-nowrap">Income</span>
+                            }
+                            else
+                            {
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 whitespace-nowrap">Expense</span>
+                            }
+                        </td>
                         <td class="@(item.CategoryTypeName == "Income" ? "amount-income" : "amount-expense") whitespace-nowrap text-right">
                             @item.CurrencySymbol @NumberFormatHelper.FormatAmount(item.Amount, ViewData["NumberFormat"] as string)
                         </td>
