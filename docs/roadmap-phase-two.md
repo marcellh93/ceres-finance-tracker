@@ -882,9 +882,9 @@ Once all stages are complete. **Prerequisite: all tests must be passing before s
 
 ### CSV Export
 
-- [ ] Export all transactions (no filter) → CSV row count matches transaction count in the database
-- [ ] Export with date range filter → CSV contains only transactions within that range
-- [ ] CSV injection prevention: transaction with description starting with `=` → exported cell prefixed with `'`; opens correctly in Excel/Google Sheets without formula execution
+- [x] Export all transactions (no filter) → CSV row count matches transaction count in the database
+- [x] Export with date range filter → CSV contains only transactions within that range
+- [x] CSV injection prevention: transaction with description starting with `=` → exported cell prefixed with `'`; opens correctly in Excel/Google Sheets without formula execution
 
 ### UI/UX (cross-cutting)
 
