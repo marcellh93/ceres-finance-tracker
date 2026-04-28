@@ -32,16 +32,19 @@
 
 @if (ViewBag.From is not null && ViewBag.To is not null)
 {
-    <form asp-action="BulkMarkCleared" method="post" class="bulk-action-bar"
-          onsubmit="return confirm('Mark all transactions in this date range as cleared?')">
+    <form asp-action="BulkMarkCleared" method="post" class="bulk-action-bar" id="bulk-mark-cleared-form">
         @Html.AntiForgeryToken()
         <input type="hidden" name="from" value="@ViewBag.From" />
         <input type="hidden" name="to" value="@ViewBag.To" />
         <input type="hidden" name="accountId" value="@ViewBag.AccountId" />
-        <button type="submit" class="btn btn-secondary inline-flex items-center gap-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Mark all cleared
-        </button>
+        <div data-react="confirm-dialog"
+             data-form-id="bulk-mark-cleared-form"
+             data-message="Mark all transactions in this date range as cleared? This cannot be undone."
+             data-confirm-label="Mark all cleared"
+             data-trigger-label="Mark all cleared"
+             data-trigger-icon="check"
+             data-trigger-class-name="btn btn-secondary inline-flex items-center gap-1.5">
+        </div>
     </form>
 }
 
