@@ -167,7 +167,7 @@
   .total-row td,
   .total-row th   { @apply bg-gray-50 font-semibold border-t border-gray-200; }
   .row-inactive td { @apply opacity-50 italic; }
-  .actions        { @apply flex gap-3 items-center; }
+  .actions        { @apply align-middle whitespace-nowrap; }
 
   /* ─── Import Summary Cards ──────────────────────────── */
 

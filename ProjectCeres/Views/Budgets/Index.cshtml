@@ -46,17 +46,19 @@ else
                             }
                         </td>
                         <td class="actions">
-                            @if (budget.IsActive)
-                            {
-                                <a asp-action="Edit" asp-route-id="@budget.Id" class="btn btn-sm btn-secondary inline-flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                                    Edit
-                                </a>
-                                <a asp-action="Deactivate" asp-route-id="@budget.Id" class="btn btn-sm btn-danger inline-flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-                                    Deactivate
-                                </a>
-                            }
+                            <div class="flex gap-2 items-center">
+                                @if (budget.IsActive)
+                                {
+                                    <a asp-action="Edit" asp-route-id="@budget.Id" class="btn btn-sm btn-warning gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                                        Edit
+                                    </a>
+                                    <a asp-action="Deactivate" asp-route-id="@budget.Id" class="btn btn-sm btn-danger gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                                        Deactivate
+                                    </a>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }
