@@ -9,6 +9,16 @@ public record DashboardData(
     string CurrencyCode,
     string CurrencySymbol);
 
+public record HealthSnapshotData(
+    decimal? SpendableBalance,
+    decimal? RunwayMonths,
+    decimal? CurrentMonthIncome,
+    decimal? RollingAverageIncome,
+    decimal? IncomeDeltaPercent,
+    decimal? BudgetBurnRate,
+    string CurrencySymbol,
+    string CurrencyCode);
+
 public interface IDashboardService
 {
     /// <summary>
@@ -16,4 +26,10 @@ public interface IDashboardService
     /// MTD = month-to-date (1st of current month through today).
     /// </summary>
     Task<DashboardData> GetDashboardDataAsync();
+
+    /// <summary>
+    /// Returns a financial health snapshot scoped to the default currency.
+    /// Includes spendable balance, runway, income delta, and budget burn rate.
+    /// </summary>
+    Task<HealthSnapshotData> GetHealthSnapshotAsync();
 }
