@@ -115,119 +115,131 @@ flowchart TD
 
 ## Design System & Visual Overhaul
 
-> **Status: Base plan only.** This section is a planning foundation to be refined at Phase 3 kickoff, after Phase 2 daily use has revealed which surfaces need the most design attention. Do not begin implementation until the SPA migration is underway.
+> **Status: Approved.** Design decisions locked via brainstorming session 2026-04-28. See full spec: [`docs/superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md`](superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md).
 
-The full SPA migration (Razor deleted, ASP.NET Core becomes a pure Web API, React Router handles all routing) is the architectural prerequisite for this work. That decision is already committed — see [architecture.md](architecture.md#phase-3--full-spa-evaluation-point). No design system work begins until the SPA migration is complete or happening in parallel.
-
----
-
-### 1. Brand foundation
-
-Resolve all of these as design decisions before writing any component. Write the outcomes into `docs/design-system.md` at Phase 3 kickoff.
-
-- **Color palette** — primary brand color, surface colors (background, card, muted), semantic colors (success, warning, destructive, info). All defined as CSS custom properties (`--color-primary`, `--color-surface`, etc.) — not hardcoded Tailwind classes.
-- **Typography** — typeface (system font stack vs. a single web font such as Inter or Geist), size scale (xs → 4xl), weight scale, line heights. One typeface only.
-- **Spacing scale** — confirm Tailwind's default scale is sufficient or define a custom one. No magic numbers anywhere in the codebase.
-- **Border radius scale** — sm / md / lg / full. One value per level, used consistently.
-- **Shadow scale** — subtle / default / elevated. Communicates depth hierarchy (cards vs. modals vs. dropdowns).
-- **Chart color palette** — separate from the brand palette. 6–8 distinct, accessible colors that work on both light and dark backgrounds. Chart components never pull from brand tokens directly.
-- **Motion tokens** — transition duration and easing for hover states, modal open/close, badge flips. Defined once, not duplicated across components.
-- **shadcn/ui token override strategy** — shadcn/ui uses CSS variables (`--background`, `--foreground`, `--primary`, etc.). Override those variables with Ceres brand values; do not fight the system. Document which variables are overridden and which are left at shadcn defaults.
+The full SPA migration (Razor deleted, ASP.NET Core becomes a pure Web API, React Router handles all routing) is the architectural prerequisite for this work. That decision is already committed — see [architecture.md](architecture.md#phase-3--full-spa-evaluation-point). Approach: design-first, then migrate feature by feature — each ported page gets the final design on arrival, no second-pass redesign.
 
 ---
 
-### 2. Dark mode
+### 1. Navigation shell
 
-Commit to the token structure that supports dark mode — no hardcoded color values anywhere. Ship light-only at Phase 3 launch. Enable dark mode as a fast follow once the token layer is verified. This avoids a full audit pass later while keeping Phase 3 scope contained.
+**Left sidebar (primary navigation)**
+- Fixed position, full height
+- Expanded state: icon + label, ~240px wide
+- Collapsed state: icon-only rail, ~56px wide — toggle at the bottom of the sidebar
+- Logo/wordmark at top in both states
 
----
+Nav groups:
 
-### 3. Page and surface inventory
-
-Every screen grouped by migration burden. Use this list at kickoff to scope design effort per surface.
-
-**New in Phase 3 — design from scratch, no legacy debt:**
-- Login, TOTP verification, registration, password reset flow
-- Guided onboarding wizard (first-run setup)
-- Active sessions list (security settings)
-- Support ticket form and list
-
-**Ported from Razor — existing functionality, new rendering layer:**
-- Dashboard
-- Transactions list + create/edit forms
-- Transfers list + create/edit forms
-- Movements unified ledger
-- Accounts list + create/edit forms
-- Categories list + create/edit forms
-- Category Budgets + Goal Budgets
-- Recurring Transactions list + create/edit forms
-- CSV Import (upload + summary) + CSV Export
-- Reports (Budget vs. Actual, Largest Expenses, Cash Flow, Net Worth Over Time)
-- Settings / user preferences
-
-**React components already built in Phase 2 — visual audit only, not rebuild:**
-- `CategoryBudgetBars`, `GoalBudgetBars`, `ClearedBadge`
-- `NetWorthChart`, `IncomeExpenseChart`, `SpendingDonutChart`, `AccountBalancesChart`, `CashFlowChart`
-
----
-
-### 4. Layout system
-
-- **App shell** — sidebar vs. top nav decision. Phase 2 uses a top navbar; a persistent sidebar is more conventional for a dense data app. Decide once at kickoff, implement once.
-- **Responsive breakpoints** — desktop-primary app. Define a readable mobile baseline (not optimized) and an optimized desktop target. Tablet is secondary.
-- **Content width zones** — full-width (tables, charts), constrained (forms), narrow (modals, dialogs). Define each as a layout primitive, not ad-hoc per page.
-- **Grid system** — dashboard card grid and single-column form layout defined as reusable primitives.
-
----
-
-### 5. Component library audit and extension
-
-shadcn/ui covers the Phase 2 baseline. Phase 3 will need these additional components — confirm availability and integrate before building any screen that needs them:
-
-| Component | Where needed |
+| Group | Items |
 |---|---|
-| `Tabs` | Settings page, report filter panels |
-| `Tooltip` | Contextual help on financial terms (runway, LifestyleTag, etc.) |
-| `Sheet` (slide-over) | Mobile-friendly edit forms |
-| `Breadcrumb` | Deep navigation (Account → filtered Transactions) |
-| `Avatar` | User menu, session list |
-| `Skeleton` | Loading states for async chart and table data |
-| `Toast` / `Sonner` | Success/error feedback after create/edit/delete — replaces full-page redirects |
-| `Command` / `Combobox` | Searchable dropdowns for category and account selection on large datasets |
-| `DataTable` | Transactions and Movements lists require sorting, filtering, and pagination beyond `Table` |
+| Main | Dashboard, Movements, Transactions, Transfers |
+| Money | Accounts, Categories, Budgets |
+| Tools | Recurring Transactions, Import, Reports |
+| (bottom-pinned) | Settings, Support |
+
+All nav items use Lucide icons. Every item must have an icon that works standalone in rail mode.
+
+**Top bar (global)**
+- Fixed, full width; logo area width matches sidebar and shifts on collapse
+- Left: logo; Center: global search input; Right: quick-add "+", notifications bell, user avatar
+- User avatar dropdown: Profile, Preferences, Security (sessions), Logout
+
+**Responsiveness (applies to all surfaces)**
+- Desktop (≥1024px): sidebar expanded by default, collapsible to rail
+- Tablet (640px–1023px): sidebar collapsed to icon-rail by default
+- Mobile (<640px): sidebar hidden entirely; hamburger in top bar opens a slide-over drawer
+- Top bar search collapses to a search icon on mobile; tapping expands it inline
+- Tables scroll horizontally on small screens with priority columns pinned left
+- Forms stack to single-column on mobile
 
 ---
 
-### 6. Form pattern standardization
+### 2. Global search
 
-Standardize once, apply everywhere:
-- Label position: above the field, not inline
-- Validation errors: below the field inline, not a top-of-form summary
-- Required field indicator: `*` with a legend
-- Disabled state appearance consistent across all inputs
-- Submit button: spinner + disabled during loading
-- Unsaved changes: browser `beforeunload` warning + in-app confirmation dialog
+- Triggered from top bar input or `⌘K` / `Ctrl+K`
+- Opens a modal with a focused search input and grouped results below
+- Searches across: transactions (description, amount), accounts (name), categories, recurring transactions, reports
+- Results grouped by entity type; keyboard navigable (arrows + Enter); Escape to close
+- **MVP:** plain text search, no filters
+- **Future:** filter layer (by entity type, date range, account, category); full command palette with page navigation and action triggers
 
 ---
 
-### 7. Data table pattern
+### 3. Per-table search & saved searches
 
-Every list view uses a table. Decide once, apply everywhere:
-- Column sorting: which columns are sortable, consistent sort indicator icon
-- Pagination vs. infinite scroll: pick one model across all tables
-- Empty state: distinguish "no data yet" from "no results for current filter"
-- Row actions: inline buttons vs. hover reveal vs. context menu — pick one
-- Bulk actions: checkbox selection + action bar pattern
-- Filter bar: above the table, not in a sidebar
+- Filter bar above every table: text search input + entity-specific filter chips
+- Active filters shown as dismissible chips; "Clear all" resets all at once
+- Entity-specific filters:
+  - Transactions / Movements: date range, category, account, type, cleared status
+  - Transfers: date range, source account, destination account
+  - Accounts: type, currency, active/inactive
+  - Categories: type, active/inactive
+  - Recurring Transactions: frequency, next due date range, active/inactive
+- "Save search" appears when any filter is active → name it → stored server-side per user per table
+- Saved searches accessible from a dropdown next to the filter bar; deletable with confirmation
+- **MVP:** filters + text search saved. **Future:** include column visibility and sort order (named views)
+
+---
+
+### 4. Form fields
+
+**Visual polish**
+- Floating labels: animate above the field on focus or when a value is present
+- Focus ring: brand color, smooth transition
+- Error state: red border + inline message below the field — never a top-of-form summary
+- Required indicator: `*` next to label, legend at the bottom ("* Required")
+- Disabled state: muted appearance, consistent across all input types
+- Submit button: spinner + disabled during loading; re-enables on error
+
+**Smarter field behavior**
+- Category / account selectors: searchable combobox, recently used items at top
+- Date fields: date picker with presets (Today, Yesterday, This week, This month, Last month, Custom range)
+- Amount fields: formats as currency as the user types, respects user's currency setting
+- Multi-step forms (onboarding, import): progress indicator at top showing step N of M
+- Unsaved changes: browser `beforeunload` warning + in-app confirmation dialog on navigate away
+
+**Cancel / back navigation**
+- All forms track the originating route and Cancel returns there — never a hardcoded redirect
+- Full audit of all cancel/back paths during implementation (recurring transaction dismiss is a known case)
+
+---
+
+### 5. Movements & quick-add fixes
+
+- "New Transaction" and "New Transfer" buttons added to the Movements page header
+- After creating from Movements, return to Movements — not the respective index page
+- Quick-add "+" in the top bar: compact modal (type, date, amount, account, category, description); saves without navigating away; confirms with a toast
+
+---
+
+### 6. Brand foundation
+
+Resolve all of these as design decisions before writing any component. Write outcomes into `docs/design-system.md` at Phase 3 kickoff.
+
+- **Color palette** — primary brand color, surface colors, semantic colors (success, warning, destructive, info). All as CSS custom properties — not hardcoded Tailwind classes.
+- **Typography** — one typeface, size scale (xs → 4xl), weight scale, line heights.
+- **Spacing scale** — confirm Tailwind default or define custom. No magic numbers.
+- **Border radius scale** — sm / md / lg / full. One value per level, used consistently.
+- **Shadow scale** — subtle / default / elevated. Communicates depth hierarchy.
+- **Chart color palette** — 6–8 distinct accessible colors, separate from brand palette.
+- **Motion tokens** — transition duration and easing defined once, not duplicated.
+- **shadcn/ui token override strategy** — override CSS variables with Ceres brand values; document which are overridden vs. left at shadcn defaults.
+
+---
+
+### 7. Dark mode
+
+Commit to the token structure that supports dark mode — no hardcoded color values anywhere. Ship light-only at Phase 3 launch. Enable dark mode as a fast follow once the token layer is verified.
 
 ---
 
 ### 8. Accessibility baseline
 
 Non-negotiable before any beta user accesses the app:
-- WCAG AA color contrast on all text/background pairs — verify at token definition time, not after
+- WCAG AA color contrast on all text/background pairs — verify at token definition time
 - Visible focus ring on all interactive elements
-- `aria-label` on all icon-only buttons (carried forward from Phase 2 Lucide standard)
+- `aria-label` on all icon-only buttons (Lucide standard from Phase 2)
 - Screen reader labels on all charts (`aria-label` on canvas, `role="img"`)
 - All form fields have associated `<label>` elements — no placeholder-as-label
 - Error messages programmatically associated with their fields (`aria-describedby`)
@@ -240,14 +252,14 @@ Non-negotiable before any beta user accesses the app:
 The SPA model eliminates Razor redirect-with-flash-message. Replace with:
 - Toast notifications for non-critical success (transaction saved, attachment uploaded)
 - Field-level inline errors for form validation
-- Full error state for failed page loads (error boundary with retry, not a blank screen)
-- Optimistic UI where appropriate — `ClearedBadge` already does this; extend the pattern to other fast-feedback interactions
+- Full error state for failed page loads (error boundary with retry)
+- Optimistic UI where appropriate — `ClearedBadge` already does this; extend the pattern
 
 ---
 
 ### 10. Auth screen design
 
-Login, TOTP, register, and password reset are the first thing beta users see — design to a higher bar than internal screens:
+Login, TOTP, register, and password reset are the first thing beta users see — design to a higher bar:
 - Ceres logo / wordmark placement
 - Minimal layout: centered card, no sidebar or app shell
 - Clear error states: wrong password, expired TOTP, locked account
@@ -263,38 +275,49 @@ Multi-step wizard for first-run users (deferred from Phase 2 — see ADR-0053):
 3. Record opening balance
 4. Immediate net worth display
 
-Needs its own layout treatment — full-screen stepper with progress indicator, distinct from the standard app shell.
+Full-screen stepper with progress indicator, distinct from the standard app shell.
 
 ---
 
 ### 12. `docs/design-system.md`
 
-Create this document at Phase 3 kickoff, not before. It is the source of truth for all visual decisions. Contents:
+Create at Phase 3 kickoff. Source of truth for all visual decisions:
 - Token definitions: CSS variable name → purpose → light value → dark value
 - shadcn/ui override list
 - Color palette with hex values and contrast ratios
-- Typography scale table
-- Spacing scale table
-- Chart color palette with accessibility notes
-- Component usage guidelines (when Card vs. Sheet vs. Dialog)
-- Icon usage rules (Lucide — carried forward from Phase 2 standard)
-- Motion tokens
+- Typography, spacing, chart color palette, component usage guidelines, icon rules, motion tokens
 
 ---
 
-### 13. Implementation order within Phase 3
+### 13. Component library additions
 
-Design and implement surface by surface — do not design everything before building:
+shadcn/ui covers the Phase 2 baseline. Phase 3 additions required:
+
+| Component | Where needed |
+|---|---|
+| `Tabs` | Settings page, report filter panels |
+| `Tooltip` | Contextual help on financial terms |
+| `Sheet` (slide-over) | Mobile-friendly edit forms, sidebar mobile drawer |
+| `Breadcrumb` | Deep navigation (Account → filtered Movements) |
+| `Avatar` | User menu, session list |
+| `Skeleton` | Loading states for async chart and table data |
+| `Toast` / `Sonner` | Success/error feedback — replaces full-page redirects |
+| `Command` / `Combobox` | Global search modal, category/account selectors |
+| `DataTable` | Transactions, Movements, Transfers lists |
+
+---
+
+### 14. Implementation order
 
 1. Token layer + `docs/design-system.md` — zero visible change; everything downstream depends on it
-2. App shell (sidebar/nav, layout zones) — everything mounts inside it
-3. Auth screens (login, TOTP, register, password reset) — first impression for beta users
-4. Onboarding flow — second impression for beta users
-5. Dashboard — highest-visibility internal screen
-6. Transactions + Transfers + Movements — highest daily usage
-7. Budgets + Reports — complex, less frequent
-8. Accounts + Categories + Recurring Transactions — management screens
-9. Settings + Session management + Support tickets — lowest frequency
+2. App shell (sidebar, top bar, responsive behavior)
+3. Auth screens (login, TOTP, register, password reset) — outside the shell
+4. Onboarding wizard — outside the shell
+5. Dashboard — first page inside the shell
+6. Movements + Transactions + Transfers — highest daily usage; includes quick-add, per-table search, saved searches
+7. Accounts + Categories + Budgets + Recurring Transactions — management screens
+8. Reports + Import/Export — complex, lower frequency
+9. Settings + Sessions + Support — lowest frequency; includes saved searches management
 
 ---
 
@@ -304,7 +327,7 @@ The execution plan for migrating from ASP.NET Core MVC + Razor Views to a pure W
 
 See [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md).
 
-> **Status: Base plan only.** Finalize at Phase 3 kickoff after Phase 2 is fully complete. Nothing in that document is locked.
+> **Status: Approach locked (2026-04-28).** Design-first, migrate feature by feature — each feature area is fully API-tested, then React-built, then Razor-deleted. Never a big-bang deletion. Hosting model: Option A (React served from ASP.NET Core `wwwroot/`). See full spec: [`docs/superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md`](superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md).
 
 ---
 
