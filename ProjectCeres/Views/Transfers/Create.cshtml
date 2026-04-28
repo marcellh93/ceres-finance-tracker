@@ -4,7 +4,7 @@
 <h1>New Transfer</h1>
 <p class="form-hint">Source and destination accounts must share the same currency.</p>
 
-<form asp-action="Create" method="post">
+<form asp-action="Create" method="post" enctype="multipart/form-data">
     <div asp-validation-summary="ModelOnly" class="alert alert-error"></div>
 
     <div class="form-group">
@@ -39,6 +39,11 @@
         <label asp-for="Description"></label>
         <input asp-for="Description" class="form-control" />
         <span asp-validation-for="Description" class="field-error"></span>
+    </div>
+
+    <div class="form-group">
+        @{ ViewData["InputName"] = "Attachments"; }
+        @await Html.PartialAsync("_AttachmentWidget")
     </div>
 
     <div class="form-actions">

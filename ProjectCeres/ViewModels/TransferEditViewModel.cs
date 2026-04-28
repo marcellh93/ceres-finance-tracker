@@ -27,6 +27,6 @@ public class TransferEditViewModel
 
     public bool IsCleared { get; set; }
 
-    [Display(Name = "Attach file")]
-    public IFormFile? Attachment { get; set; }
+    [Display(Name = "Attachments")]
+    public List<IFormFile>? Attachments { get; set; }
 }

@@ -32,9 +32,35 @@ public class TransfersController(ITransferService transferService, AppDbContext 
             return View(vm);
         }
 
+        if (vm.Attachments is { Count: > 0 })
+        {
+            foreach (var file in vm.Attachments)
+            {
+                try { await attachmentService.ValidateAsync(file); }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError(nameof(vm.Attachments), ex.Message);
+                    await PopulateViewBagAsync();
+                    return View(vm);
+                }
+            }
+        }
+
         try
         {
-            await transferService.CreateAsync(vm);
+            var newTransfer = await transferService.CreateAsync(vm);
+
+            if (vm.Attachments is { Count: > 0 })
+            {
+                foreach (var file in vm.Attachments)
+                {
+                    try { await attachmentService.UploadForTransferAsync(newTransfer.Id, file); }
+                    catch (InvalidOperationException ex)
+                    {
+                        TempData["ErrorMessage"] = $"Transfer saved, but '{file.FileName}' could not be uploaded: {ex.Message}";
+                    }
+                }
+            }
 
             TempData["SuccessMessage"] = "Transfer recorded.";
             return RedirectToAction(nameof(Index));
@@ -87,12 +113,40 @@ public class TransfersController(ITransferService transferService, AppDbContext 
             return View(vm);
         }
 
+        if (vm.Attachments is { Count: > 0 })
+        {
+            foreach (var file in vm.Attachments)
+            {
+                try { await attachmentService.ValidateAsync(file); }
+                catch (InvalidOperationException ex)
+                {
+                    ModelState.AddModelError(nameof(vm.Attachments), ex.Message);
+                    ViewBag.ReturnUrl = returnUrl;
+                    ViewBag.Attachments = await db.TransferAttachments
+                        .Where(a => a.TransferId == vm.Id)
+                        .OrderBy(a => a.UploadedAt)
+                        .ToListAsync();
+                    await PopulateViewBagAsync();
+                    return View(vm);
+                }
+            }
+        }
+
         try
         {
             await transferService.UpdateAsync(vm);
 
-            if (vm.Attachment is { Length: > 0 })
-                await attachmentService.UploadForTransferAsync(vm.Id, vm.Attachment);
+            if (vm.Attachments is { Count: > 0 })
+            {
+                foreach (var file in vm.Attachments)
+                {
+                    try { await attachmentService.UploadForTransferAsync(vm.Id, file); }
+                    catch (InvalidOperationException ex)
+                    {
+                        TempData["ErrorMessage"] = $"Transfer saved, but '{file.FileName}' could not be uploaded: {ex.Message}";
+                    }
+                }
+            }
 
             TempData["SuccessMessage"] = "Transfer updated.";
 
