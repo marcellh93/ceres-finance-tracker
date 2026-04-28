@@ -108,6 +108,15 @@ GET /api/accounts?currencyId=1
 
 The `meta` field is only present on paginated collections. Non-paginated list endpoints (e.g. accounts, categories) return `data` only.
 
+### Pagination defaults
+
+| Parameter | Default | Maximum | Notes |
+|-----------|---------|---------|-------|
+| `page` | `1` | — | 1-based |
+| `pageSize` | `50` | `200` | Requests above 200 are rejected with `422` |
+
+Offset-based pagination (`page` + `pageSize`) is used throughout Phase 3. Cursor-based pagination is not introduced until a performance requirement justifies it — do not add it preemptively.
+
 ### Amounts
 
 Financial amounts are returned as **strings**, not numbers. JavaScript's `Number` type is IEEE 754 floating-point — it cannot represent all decimal values exactly. `120.50` stored as a float may be read back as `120.49999999...`. Return amounts as strings and parse them with a decimal library on the client.
@@ -151,26 +160,43 @@ The `details` array is present only for validation errors (422). For other error
 |--------|-------------|
 | `200 OK` | Successful GET, PATCH, PUT |
 | `201 Created` | Successful POST — include `Location` header pointing to the new resource |
+| `202 Accepted` | Async job accepted (e.g. GDPR data export) — body: `{ "data": { "jobId": "...", "message": "Export started. You will be notified by email when ready." } }` |
 | `204 No Content` | Successful DELETE — no body |
 | `400 Bad Request` | Malformed request (invalid JSON, missing required fields at the HTTP level) |
 | `401 Unauthorized` | Request is not authenticated |
 | `404 Not Found` | Resource does not exist **or belongs to another user** — never use 403 for user-owned resources |
 | `422 Unprocessable Entity` | Request is well-formed but fails business validation (negative amount, wrong currency, etc.) |
-| `429 Too Many Requests` | Rate limit exceeded |
+| `429 Too Many Requests` | Rate limit exceeded — always include `Retry-After: <seconds>` header |
 | `500 Internal Server Error` | Unexpected server error — return a generic message, never a stack trace |
 
 **Do not return `403 Forbidden` for user-owned resources.** Returning 403 confirms the resource exists, which is information an attacker can exploit to enumerate valid IDs. See `security-model.md → IDOR Prevention`.
+
+### Deprecation header
+
+When an endpoint or field is deprecated, include in the response:
+
+```
+Deprecation: true
+Sunset: Sat, 01 Jan 2027 00:00:00 GMT
+Link: <https://docs.projectceres.com/api/v2/migration>; rel="successor-version"
+```
+
+Define the deprecation policy before releasing v2: minimum notice period (recommended: 6 months), how deprecated endpoints are communicated (release notes, in-API header, email to registered developers).
 
 ---
 
 ## Authentication
 
-Phase 3 API authentication uses **cookie-based auth** (the same mechanism as the MVC app), not JWT bearer tokens. Reasons:
-- The React SPA is served from the same domain as the API — a same-domain cookie setup is simpler and avoids storing tokens in localStorage (XSS risk)
+Phase 3 API authentication uses **cookie-based auth**, not JWT bearer tokens.
+
+- The React SPA is served from the same origin as the API (Option A hosting: React build in `wwwroot/`) — HttpOnly cookie is the correct credential mechanism
 - HttpOnly cookies are inaccessible to JavaScript — safer than localStorage-stored JWTs
 - ASP.NET Core Data Protection handles cookie encryption and validation
+- No token is stored in `localStorage`, `sessionStorage`, or any JS-accessible state — see `security-model.md → Authentication Model`
 
-If a future mobile app (React Native) requires the API, a separate bearer token flow (JWT or opaque token) will need to be designed at that point. This document will be updated.
+**JWT access tokens are Phase 4+**, when a mobile client or third-party API consumer requires bearer token authentication. The identity masking section in `planning-phase3.md` (HMAC pseudonymisation, `USER_REF_SECRET`) applies to Phase 3 data storage, but the JWT token issuance mechanism is deferred. Do not implement JWT issuance in Phase 3.
+
+If a future mobile app requires the API, a bearer token flow (short-lived JWT + refresh token stored as hash in `UserSession`) will be added at that point. This document will be updated.
 
 ### Anti-forgery (CSRF)
 
@@ -235,6 +261,7 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Account balances | GET | `/api/dashboard/accounts` | All account balances, grouped by currency — for dashboard balance list |
 | Category budget progress | GET | `/api/dashboard/category-budgets` | Spent vs. limit per expense category for the current month |
 | Goal budget progress | GET | `/api/dashboard/goal-budgets` | Spent vs. target per goal budget |
+| Financial health snapshot | GET | `/api/dashboard/health` | Spendable balance breakdown (liquid, bills due, available today, budget reserved, safe to spend, `WarningLevel`) |
 | Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction or Transfer — body: `{ "type": "transaction"\|"transfer", "cleared": bool }` |
 | Import file headers | POST | `/api/import/headers` | Upload a CSV or XLSX file; returns detected column headers and auto-matched field mappings (`HeaderDetectionResult`) |
 | Import transactions | POST | `/api/import` | Upload file + column mappings; runs the full import pipeline; returns `ImportResult` (rows imported, reconciled, flagged, failed) |
@@ -243,17 +270,23 @@ This table lists what the API will expose. It is not a full endpoint specificati
 
 | Resource | Endpoints | Notes |
 |----------|-----------|-------|
-| Accounts | CRUD + list | |
-| Transactions | CRUD + list (paginated, filterable by account/category/date) | |
+| Accounts | CRUD + list | Includes `Notes` field (Phase 3) and `ExcludeFromSpendable` flag |
+| Transactions | CRUD + list (paginated, filterable by account/category/date/type/cleared) | |
 | Transfers | CRUD + list | |
+| Movements | List (paginated, filterable by account/date/type/cleared) | Unified ledger — read-only aggregate of Transactions and Transfers; no separate CRUD |
 | Categories | List (system + user), create, update, deactivate | No hard delete |
 | Budgets | CRUD + list | |
-| CategoryBudgets | CRUD + list | |
+| CategoryBudgets | CRUD + list | Includes `PeriodStartDay` override field |
 | SavedReports | CRUD + list | Soft-deletable; restorable |
+| SavedSearches | CRUD + list | Per-user, per-table; stores filter set + text search; scoped to table name |
 | RecurringTransactions | CRUD + list | Templates only; confirming a reminder creates a Transaction |
 | Reports | GET only (generated on demand) | Net Worth, Income/Expense, Expense Breakdown, Transaction History |
 | Attachments | Upload (POST), download (GET), delete | Scoped to a Transaction |
-| Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3 |
+| Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3; includes `BudgetPeriodStartDay`, notification preferences |
+| Notifications | GET (list preferences), PATCH (update preferences) | Controls: weekly digest opt-in, new session alert opt-out, Safe to Spend alert |
+| DataExport | POST (request export), GET (download by token) | Async: POST returns `202 Accepted` with a job ID; user notified by email when ready; download link is time-limited (24 h) and authenticated |
+| AuditLog | GET (list, paginated) | User's own audit log entries only — no delete endpoint |
+| SupportTickets | POST (submit), GET list, GET by ID | User-facing; admin management surface is separate |
 | Sessions | List active sessions, revoke session | Security settings |
 | BlockedIps | List, add, remove | Security settings |
-| Auth | Register, login, logout, MFA setup, password change, password reset | ASP.NET Core Identity endpoints or custom |
+| Auth | Register, login (`POST /auth/login`), logout, TOTP verify (`POST /auth/totp`), MFA setup, MFA enroll verify, backup codes generate, password change, password reset request, password reset confirm | Cookie-based; sets HttpOnly session cookie on successful login |
