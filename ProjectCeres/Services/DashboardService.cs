@@ -115,13 +115,14 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
         totalBalance -= liabilityPayments.Sum(p => p.Amount);
 
-        // Subtract recurring transactions due this calendar month.
+        // Subtract recurring transactions due this calendar month — only those linked
+        // to the same qualifying (non-excluded) asset accounts included in the balance.
         var dueRecurring = await db.RecurringTransactions
             .Where(r => r.IsActive
                      && r.EstimatedAmount != null
                      && r.NextDueDate >= firstDay
                      && r.NextDueDate <= lastDay
-                     && r.Account.CurrencyId == currencyId)
+                     && accountIds.Contains(r.AccountId))
             .ToListAsync();
 
         var dueTotal = dueRecurring.Sum(r => r.EstimatedAmount ?? 0m);

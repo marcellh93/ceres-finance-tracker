@@ -6,123 +6,124 @@
 
 ## Context
 
-Personal finance trackers need to distill account positions, spending patterns, and future obligations into a few high-level indicators so users can quickly assess their financial health. A user wants to know: "How much can I safely spend this month?" (spendable), "How long can I live on my assets if expenses don't change?" (runway), and "Am I trending toward or away from my goals?" (burn rate and savings rate).
+Personal finance trackers need to distill account positions, spending patterns, and future obligations into a few high-level indicators so users can quickly assess their financial health. A user wants to know: "How much can I safely spend this month?" (spendable balance), "How long can I sustain current expenses?" (runway), "Is my income trending up or down?" (income vs. rolling average), and "Am I within my budgets?" (budget burn rate).
 
-These metrics are derived from transaction history and account balances. Computing them involves filtering, aggregating, and normalization — all done on request, never stored as columns. This keeps the data model normalized and avoids stale state problems.
+These metrics are derived from transaction history, account balances, and category budgets. All are computed on request — never stored as columns — which keeps the data model normalized and avoids stale state problems.
 
-The metrics also need to handle incomplete data gracefully. A user might have only one week of transaction history, or no budget at all. Returning a computed zero (e.g., "0% savings rate") when the input is missing would be misleading. Instead, null signals "not enough data," which is honest and disappears once history accumulates.
+The metrics also need to handle incomplete data gracefully. A user might have only one week of transaction history, or no budgets at all. Returning a computed zero when the input is missing would be misleading. Instead, null signals "not enough data," which is honest and disappears once history accumulates.
 
 ---
 
 ## Decision
 
-Add four financial health metrics, all computed on request, all nullable.
+Add four financial health metrics to `IDashboardService.GetHealthSnapshotAsync()`, all computed on request, all nullable. Results are returned as a `HealthSnapshotData` record.
 
-### Metric 1: Spendable
+```csharp
+public record HealthSnapshotData(
+    decimal? SpendableBalance,
+    decimal? RunwayMonths,
+    decimal? CurrentMonthIncome,
+    decimal? RollingAverageIncome,
+    decimal? IncomeDeltaPercent,
+    decimal? BudgetBurnRate,
+    string CurrencySymbol,
+    string CurrencyCode);
+```
+
+### Metric 1: Spendable Balance
 
 **Formula:** `SUM(balances of non-excluded asset accounts) − SUM(EstimatedAmount of qualifying recurring transactions due this calendar month)`
 
-An asset account's balance is included unless the account is flagged with `ExcludeFromSpendable = true` OR the account type is `Liability` (liability accounts are always excluded regardless of the flag).
+An asset account's balance is included unless the account is flagged with `ExcludeFromSpendable = true`. Liability accounts are always excluded regardless of the flag.
 
 A recurring transaction qualifies if:
-- It is active and not paused.
-- Its `NextDueDate` falls within the current calendar month.
+- `IsActive = true`
+- `EstimatedAmount != null`
+- `NextDueDate` falls within the current calendar month
+- Linked account is one of the qualifying (non-excluded) asset accounts
 
-**Why NextDueDate filter:** Once a recurring transaction is confirmed (marked as realized), `NextDueDate` advances to the next month automatically. This prevents double-counting against a spendable balance that already reflects the confirmed payment. Unconfirmed recurring transactions with a due date in the past remain in the calculation until manually confirmed or dismissed.
+**Why NextDueDate filter:** Once a recurring transaction is confirmed, `NextDueDate` advances to the next month automatically. This prevents double-counting against a balance that already reflects the confirmed payment.
 
-**Why liability accounts are always excluded:** A liability balance represents debt owed, not available funds. A user's spendable amount should never include borrowed money, even if they have not flagged the liability for exclusion.
+**Why liability accounts are always excluded:** A liability balance represents debt owed, not available funds.
 
-**Why the ExcludeFromSpendable flag exists:** Some asset accounts (e.g., a locked savings account, a pension fund, a college fund with withdrawal restrictions) have balances that are not accessible for day-to-day spending. The flag lets users opt those accounts out of the spendable calculation while keeping them in net worth reports. This is an account-level decision, not a metric-level one.
+**Why the ExcludeFromSpendable flag exists:** Some asset accounts (e.g., a locked savings account, a pension fund) have balances that are not accessible for day-to-day spending. The flag lets users opt those accounts out while keeping them in net worth reports.
 
-**Returns null when:** No asset accounts exist OR all asset accounts are excluded OR no recurring transactions are due.
+**Returns null when:** No qualifying (non-excluded) asset accounts exist.
 
 ### Metric 2: Runway
 
 **Formula:** `(total assets − total liabilities) ÷ average monthly expenses (last 6 full calendar months)`
 
-Total assets = SUM of all active `Account` balances where `AccountType.AccountCategory == Asset`.
-Total liabilities = SUM of all active `Account` balances where `AccountType.AccountCategory == Liability` (as positive values).
-Average monthly expenses = `SUM(Transaction.Amount for all Expense transactions in the 6-month window) ÷ 6`.
+Total assets = SUM of all active asset account balances.
+Total liabilities = SUM of all active liability account balances.
+Average monthly expenses = `SUM(Expense transactions in the 6-month window) ÷ 6`.
 
 The 6-month window includes the six completed calendar months immediately prior to the current month. The current month is excluded because it is incomplete and would understate the average.
 
 For example, on 2026-04-15:
-- Window is 2025-10-01 through 2026-03-31 (October, November, December, January, February, March).
-- 2026-04 is excluded.
+- Window is 2025-10-01 through 2026-03-31.
 
-**Why 6 full calendar months (not including the current month):** Provides a stable trailing window with enough history to smooth month-to-month volatility. Including the current partial month would bias the average toward the current spending pace, which is not yet representative. Excluding recent months entirely (e.g., only looking at 2025) would ignore seasonal changes in expense patterns.
+**Why 6 full calendar months:** Provides a stable trailing window. The current partial month is excluded to avoid biasing the average toward an unrepresentative pace.
 
-**Why not store the computed value:** All health metrics are derived on request — storing them would require periodic updates and create stale state problems. A user's runway changes daily as new transactions are added and account balances shift. Recomputing on each request is more reliable than maintaining a cached column.
+**Returns null when:** Average monthly expenses = 0 or no expense transactions exist in the 6-month window.
 
-**Returns null when:**
-- Average monthly expenses = 0 (no expenses recorded in the 6-month window).
-- No transactions exist in the 6-month window.
-- Net worth (assets − liabilities) is negative and expenses are positive (mathematically undefined; a negative net worth with ongoing spend means no runway).
+### Metric 3: Income vs. 6-Month Rolling Average
 
-Returning null is more honest than returning infinity (when net worth > 0 but expenses = 0) or a very large number. Null means "not enough data" — a transient state.
+**Formula:**
+- `rollingAverage` = average monthly income over the last 6 full calendar months
+- `currentMonthIncome` = income recorded so far in the current calendar month
+- `deltaPercent` = `(currentMonthIncome − rollingAverage) / rollingAverage`
 
-### Metric 3: Burn Rate
+All three values (`CurrentMonthIncome`, `RollingAverageIncome`, `IncomeDeltaPercent`) are returned in `HealthSnapshotData`. `IncomeDeltaPercent` is null if there is no income in the prior 6-month window.
 
-**Formula:** `(sum of all Expense transactions this calendar month) ÷ (total assets − total liabilities)`
+**Why compare to rolling average:** A single month of income is noisy. The 6-month rolling average provides a stable baseline for detecting meaningful trends — a month well above average is a positive signal; well below is a warning.
 
-Expressed as a percentage: `(expenses ÷ net worth) × 100%`.
+**Returns null when:** No income transactions exist in the last 6 full calendar months (rollingAverage = 0, so delta is undefined).
 
-A burn rate of 5% means the user is spending 5% of their net worth per month at the current pace.
+### Metric 4: Budget Burn Rate
 
-**Why this calendar month:** Captures the current spending trend. The month is incomplete, but the user benefits from an up-to-date signal.
+**Formula:** `SUM(actual spend this month across active CategoryBudgets) ÷ SUM(limit across those same budgets)`
 
-**Returns null when:** Total net worth ≤ 0 (division by non-positive number is undefined or economically meaningless) OR no expense transactions exist this month.
+"Active CategoryBudgets" = `IsActive = true`, scoped to default currency.
 
-### Metric 4: Savings Rate
+Actual spend for each budget = SUM of transactions where `t.CategoryId == budget.CategoryId && t.Account.CurrencyId == budget.CurrencyId` for the current calendar month — same derivation as `CategoryBudgetService.GetActualSpendAsync`.
 
-**Formula:** `(SUM(Income transactions this calendar month) − SUM(Expense transactions this calendar month)) ÷ SUM(Income transactions this calendar month)`
-
-Expressed as a percentage. A savings rate of 25% means 25% of income is retained (not spent) this month.
-
-**Why this calendar month:** Captures the current savings trend. The month is incomplete, but the user benefits from an up-to-date signal.
-
-**Returns null when:** Total income = 0 (division by zero) OR no income transactions exist this month.
+**Returns null when:** No active CategoryBudgets exist for the default currency.
 
 ### Null handling
 
-All four metrics return nullable (e.g., `decimal?` in C#, `number | null` in TypeScript).
+All four metrics return nullable values.
 
-Null does not mean zero. Null means "insufficient data to compute this metric."
-- Zero is a valid computed value (e.g., runway = 0 means net worth equals zero; burn rate = 0% means no expenses this month).
-- Null is returned when computation is not meaningful (e.g., no income to divide by, no assets to assess).
+Null means "insufficient data to compute this metric" — not zero.
+- Zero is a valid computed value (e.g., runway = 0 means net worth = liabilities; burn rate = 0% means no tracked spending).
+- Null is returned when computation is not meaningful (no accounts, no history, no budgets).
 
-**UI rendering:**
-- If a metric is null, the UI renders a dash (`—`) with a help tooltip: "Not enough data."
-- If a metric is zero, the UI renders the numeric value (e.g., "0%", "0 days").
+**UI rendering:** Null renders as `—` with an inline note "Not enough data" (`text-muted` class). Zero renders as the numeric value.
 
-**Rationale:** Forcing a fallback like 0 for metrics that have not yet been computed would be misleading. A 0% burn rate when no budgets exist looks like a goal achieved (spending is under control) rather than a missing input (no budgets were set up). Null makes the absence of data explicit.
+**Rationale:** Forcing a fallback like 0 would be misleading. A 0% burn rate when no budgets exist looks like a goal achieved rather than a missing input. Null makes the absence of data explicit.
 
 ### Scope
 
-These metrics apply only to transactions and accounts in the user's home currency (Phase 1 scope). Multi-currency support is deferred to Phase 3. Reports and dashboards that display health metrics filter their transaction and account data by currency before computing metrics.
+All metrics are scoped to the default currency from Settings. Currency conversion is out of scope (Phase 3+).
 
 ---
 
 ## Alternatives Rejected
 
-**Store computed metrics as columns:** Creates stale state. A user's runway changes daily; a column would require nightly or real-time recomputation. This is a maintenance burden and a source of bugs. Computing on request is simpler and always current.
+**Separate service interface (`IFinancialHealthService`):** A dedicated service would add indirection without benefit — these metrics are tightly coupled to the same account, transaction, and budget data that `DashboardService` already queries. Adding `GetHealthSnapshotAsync()` to the existing `IDashboardService` is simpler and avoids a proliferation of single-method services.
 
-**Return 0 or a default value instead of null:** Misleading. A user with no transactions yet would see "0% savings rate," which looks like a valid result rather than missing input. Null is semantically correct.
+**Store computed metrics as columns:** Creates stale state. A user's runway changes daily; a column would require nightly recomputation. Computing on request is always current.
 
-**Use a shorter window for runway (e.g., 3 months):** Increases month-to-month volatility. 6 months balances stability with recency. Shorter windows are deferred as a user preference in Phase 3.
+**Return 0 instead of null:** Misleading (see null handling rationale above).
 
-**Include the current partial month in the 6-month window:** Biases the average toward the current pace, which is not yet representative. The current month should be treated separately (e.g., for burn rate and savings rate, which benefit from an up-to-date signal, but excluded from the runway historical baseline).
+**Use a shorter window for runway (e.g., 3 months):** Increases month-to-month volatility. 6 months balances stability with recency.
 
 ---
 
 ## Consequences
 
-- New `IFinancialHealthService` interface with four methods: `GetSpendableAsync()`, `GetRunwayAsync()`, `GetBurnRateAsync()`, `GetSavingsRateAsync()`. All return nullable decimals or return null directly.
-- Metrics are computed in-memory after fetching accounts and transactions. No new database queries or indexes are required.
-- Dashboard and reports pages call the service methods to populate health metric tiles. Tiles render null as `—` with a tooltip.
-- `AccountService.GetAccountsAsync()` and related queries are enhanced to support filtering by `ExcludeFromSpendable` flag and account type.
-- `RecurringTransactionService` already provides `NextDueDate`; no changes required to the recurring transaction layer.
-- Transaction queries already support filtering by date and category type; no changes required.
-- UI components for health metric tiles are added to the React client (if the client displays the dashboard; this is a Razor template in Phase 2, so no React changes required yet).
-- No migration required; no new columns or tables are added.
-- All four metrics are unit-testable without database access — the service receives accounts and transactions as parameters.
+- New `Task<HealthSnapshotData> GetHealthSnapshotAsync()` method added to `IDashboardService` and implemented in `DashboardService` as four private async query methods.
+- `AccountCreateViewModel` and `AccountEditViewModel` gain `bool ExcludeFromSpendable`. `AccountService` maps the field on create and edit, forcing `false` for Liability accounts.
+- `DashboardController.Index()` calls both `GetDashboardDataAsync()` and `GetHealthSnapshotAsync()`, passing the snapshot via `ViewBag.HealthSnapshot`.
+- New `Views/Dashboard/_HealthSnapshot.cshtml` partial renders a "Financial Health" dashboard card with four stat rows, color-coded by severity threshold.
+- No migration required — `Account.ExcludeFromSpendable` was already in the schema (Phase 2 baseline migration).

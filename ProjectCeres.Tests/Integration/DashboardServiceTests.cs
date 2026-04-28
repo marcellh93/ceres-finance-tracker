@@ -317,13 +317,20 @@ public class DashboardServiceTests : IAsyncLifetime
         }
         await _fixture.Db.SaveChangesAsync();
 
+        // Capture baseline before our seed data is included (net worth may include other seed accounts).
+        // After seeding: net worth increases by +5000 (6000 asset - 1000 liability),
+        // avg monthly expense increases by +500/6 per month.
+        // We can't assert an exact value because seed accounts contribute unknown balances,
+        // but we can assert the value is non-null and positive, and that it is
+        // consistent with the formula by checking it is > 0 and finite (not infinity/NaN).
         var snapshot = await _service.GetHealthSnapshotAsync();
 
-        // Net worth = 6000 (asset) - 1000 (liability) = 5000
-        // Avg monthly expense (last 6 months) = 500
-        // Runway = 5000 / 500 = 10
+        // Net worth includes our +5000 contribution; expenses include our +500/month.
+        // At minimum runway should be well above zero.
         snapshot.RunwayMonths.Should().NotBeNull();
-        snapshot.RunwayMonths.Should().BeGreaterThan(0m);
+        snapshot.RunwayMonths!.Value.Should().BeGreaterThan(0m);
+        // Sanity ceiling: no realistic seed data produces runway > 10,000 months.
+        snapshot.RunwayMonths!.Value.Should().BeLessThan(10_000m);
     }
 
     [Fact]
