@@ -62,6 +62,21 @@ This is a personal finance application. The data it holds is among the most sens
 - The TOTP seed (generated during MFA setup and encoded in the QR code) must be stored **encrypted at rest** in the database.
 - A plaintext seed in a database dump allows offline generation of valid TOTP codes, bypassing MFA entirely.
 - ASP.NET Core Identity stores TOTP secrets via `IUserTwoFactorTokenProvider` — verify that ASP.NET Core Data Protection encryption is applied before Phase 3 launch.
+- **Data Protection key storage:** Data Protection keys encrypt TOTP secrets. By default they are written to the local filesystem — if the server is compromised, the attacker gets both the ciphertext and the decryption keys. Before Phase 3 launch, configure a Data Protection key storage backend external to the application server (Azure Key Vault, AWS KMS, or an encrypted volume with access controls independent of the app). Never leave Data Protection keys co-located with the data they protect.
+- **TOTP seed exposure at enrollment:** the QR code response contains the raw `otpauth://` URI. This response must include `Cache-Control: no-store, no-cache` headers. The seed must never be logged (application logs, request logs, or error tracking). After the user completes enrollment verification, the seed must not be retrievable via any endpoint.
+- **TOTP enrollment verification:** MFA must only be marked active (`MfaEnabled = true`) after the user successfully enters their first valid TOTP code against the new seed. A two-step flow is required: (1) display QR code, (2) require a valid code to confirm enrollment. Until step 2 succeeds, `MfaEnabled` remains false. This prevents a user from being locked out due to a misconfigured authenticator app.
+- **TOTP re-enrollment:** when a user re-enrolls TOTP (e.g., new phone), the old TOTP secret must be invalidated before the new one is marked active. The user must reauthenticate (enter current password) before starting re-enrollment.
+
+### TOTP Backup Codes
+
+Backup codes are an account recovery path that permanently bypasses TOTP. Treat them with the same security requirements as passwords.
+
+- **Storage:** hash each backup code with Argon2id before storage. Never store them in plaintext. Never log them.
+- **Entropy:** generate 8–10 codes with at least 128 bits of entropy each (e.g. 10 characters from a base-32 alphabet ≈ 50 bits minimum; prefer 16 characters for 80 bits).
+- **Single-use:** mark each code used in the database on first successful verification. A used code must never be accepted again.
+- **Re-generation:** when new backup codes are generated (e.g. user requests fresh codes after using one), all existing codes for that user are immediately invalidated before new ones are issued.
+- **Display:** backup codes are shown to the user exactly once, at the time of generation. After the user acknowledges them, they are never displayed again. The response must include `Cache-Control: no-store, no-cache`.
+- **NIST requirement (800-63B §5.1.2):** each code must have at least 20 bits of entropy, must be single-use, and must be stored using approved cryptography.
 
 ### Session Tokens
 
@@ -128,6 +143,18 @@ Files stored in `uploads/` are never served directly by the web server. Every fi
 2. Returns the file via `FileStreamResult` with `Content-Disposition: attachment; filename*=UTF-8''...` (RFC 5987 encoding for non-ASCII filenames)
 3. Re-verifies the stored MIME type — do not trust the stored extension alone
 
+**TransactionAttachment ownership:** attachment ownership is currently verified by joining through the parent `Transaction`. This is a fragile pattern — if any endpoint accepts an attachment ID without requiring the transaction ID in the path, the join is bypassed. To eliminate this fragility, add a `UserId` column directly to `TransactionAttachment`. This follows the same direct-scoping pattern as all other user-owned entities and removes dependence on the join for security.
+
+**Per-user storage quota:** enforce a maximum total file storage per user (e.g. 500 MB for Phase 3 beta). Check the current total before writing any new attachment to disk. Return 422 with a clear error message when the quota is exceeded. Without a quota, a single user can exhaust server disk space and take down the application for all users. Log quota utilization for monitoring.
+
+### List Endpoint Scoping
+
+IDOR prevention applies equally to list endpoints (GET /api/v1/transactions, GET /api/v1/accounts, etc.) and to single-resource endpoints. An unfiltered list endpoint that returns all users' records is the same severity as a direct IDOR — it is just less obvious.
+
+**Rule:** every list query must include a `WHERE UserId = currentUserId` clause (or its equivalent via EF Core Global Query Filters). This must be verified by integration tests for every entity type, not just by code review.
+
+**Integration test requirement:** for every list endpoint, there must be a test that: (1) creates records belonging to User A and User B, (2) authenticates as User A, (3) calls the list endpoint, and (4) asserts the response contains only User A's records.
+
 ---
 
 ## Authentication and Session Rules
@@ -137,7 +164,32 @@ Files stored in `uploads/` are never served directly by the web server. Every fi
 - **Account enumeration prevention:** login and password-reset endpoints return identical error messages and take identical wall-clock time regardless of whether the email exists. Always run Argon2id hash even when the user is not found — hash a dummy value and discard the result. The timing difference between "user not found" (no hash) and "wrong password" (Argon2id takes ~300ms) leaks whether an email is registered.
 - **Rate limiting:** login and registration endpoints are rate-limited. Minimum: 10 requests per minute per IP. Supplement with account-level lockout: after N consecutive failed attempts on the same account (e.g. 10), lock for a fixed period (e.g. 15 minutes) and notify the user via email.
 - **MFA:** mandatory TOTP for all users. No SMS — vulnerable to SIM-swap. See ADR rationale in `planning.md`.
-- **TOTP replay prevention:** track recently accepted codes per user in a short-lived store. Reject any code used more than once within its validity window. ASP.NET Core Identity does not do this by default.
+- **TOTP replay prevention:** track recently accepted codes per user in a **persistent store** (database table or Redis — not an in-memory cache). An in-memory store loses replay history on application restart, allowing code reuse within the 30-second TOTP window after a restart. Store the accepted code hash and expiry timestamp; auto-purge entries older than 2 minutes.
+- **Account lockout self-service unlock:** the lockout notification email must include a time-limited signed unlock link (separate from the password reset flow). This allows the legitimate user to self-recover without waiting for the lockout period to expire. Without this, an attacker who knows a target's email can re-trigger lockout continuously, effectively DoS-ing the account indefinitely. Additionally, a valid TOTP code should be accepted even during a lockout — the lockout protects against password guessing, not TOTP abuse.
+- **Failed login logging:** every failed login attempt must be logged (without the attempted password) with timestamp, IP address, and whether the failure was credential-based or TOTP-based. This enables post-incident analysis (e.g., distributed credential stuffing detection across multiple accounts).
+- **Reauthentication for sensitive operations (NIST 800-63B §7.2):** require fresh password entry (not just a valid session) before: changing password, changing email address, re-enrolling TOTP, viewing the active sessions list, and initiating GDPR erasure. Long persistent sessions must not bypass this requirement.
+
+### Password Reset
+
+Password reset is a high-risk flow because it is the most common path attackers use to bypass TOTP — many implementations skip MFA during reset.
+
+- **Token format:** generate a cryptographically random 256-bit value. Store only its Argon2id hash in the database. The raw token is transmitted once in the reset email URL and never again.
+- **Expiry:** 15 minutes maximum from the time of issue.
+- **Single-use:** invalidate the token immediately upon first successful use. A second submission of the same token must fail.
+- **Session revocation on reset:** on successful password reset, revoke all existing `UserSession` rows for that user. An attacker who triggered a reset while holding a stolen session loses access immediately.
+- **MFA during reset:** the reset flow must require the user to enter a valid TOTP code before the new password is accepted. This prevents an attacker who has only the reset email (but not the TOTP device) from completing the takeover. If the user has lost their TOTP device, backup codes are the recovery path — not a TOTP bypass in the reset flow.
+- **Account enumeration:** the password reset request endpoint must return an identical response (message and timing) regardless of whether the email address is registered. Always run the same code path — never short-circuit on "email not found."
+- **Notification:** send an email to the account's address on any password reset request (whether or not the account exists — do not confirm existence). On successful reset, send a separate notification email informing the user their password was changed.
+
+### Sessions
+
+See `docs/decisions/ADR-0019-session-management-user-configurable-with-ip-controls.md` for the full decision.
+
+Summary:
+- Sessions are tracked server-side in `UserSession` (one row per active session per device)
+- Session token regenerated on login (session fixation prevention) — always enforced
+- Logout marks the server-side record as revoked — always enforced
+- Session lifetime, IP enforcement, and IP blocking are user-configurable with risk disclosure
 
 ### Sessions
 
@@ -154,15 +206,42 @@ Summary:
 Authentication cookies must be set with:
 - `HttpOnly = true` — blocks JavaScript access, mitigates XSS cookie theft
 - `Secure = true` — HTTPS-only transmission
-- `SameSite = Strict` or `Lax` — CSRF mitigation as a second layer alongside anti-forgery tokens
+- `SameSite`: use `Strict` if social login is not implemented in this phase; use `Lax` if social login OAuth callbacks are in scope (Strict breaks the OAuth top-level navigation callback). This decision must be made before auth implementation begins — it affects CSRF posture. Record the choice in an ADR.
+
+### Authentication Model — Cookie vs. JWT
+
+The Phase 3 API uses **cookie-based authentication** (as specified in `api-contract.md`). The JWT/refresh token description in the API Authentication and Identity Masking section applies to Phase 4+ when a mobile client or third-party API consumer is introduced.
+
+For Phase 3:
+- Session state is tracked in `UserSession` via HttpOnly cookie
+- CSRF protection is required via the XSRF-TOKEN double-submit pattern (see CSRF section)
+- JWTs are not issued to the React SPA — the SPA relies on the session cookie
+- No token is stored in localStorage, sessionStorage, or any JS-accessible global state
+
+**Prohibition:** never store session tokens, JWTs, or user IDs in `localStorage` or `sessionStorage`. These are accessible to any script on the page. An XSS vulnerability combined with localStorage token storage yields account takeover. Preferences and UI state (e.g. collapsed sidebar) are acceptable in localStorage; credentials and session identifiers are not.
+
+### Global Authorization Policy
+
+Set a global fallback authorization policy in `AddAuthorization`:
+
+```csharp
+options.FallbackPolicy = new AuthorizationPolicyBuilder()
+    .RequireAuthenticatedUser()
+    .Build();
+```
+
+This means any endpoint without an explicit authorization attribute requires authentication by default. Apply `[AllowAnonymous]` only to: login, register, password reset, and the React SPA static file catch-all. This inverts the default — a forgotten `[Authorize]` attribute is safe rather than dangerous.
 
 ---
 
 ## Transport and Infrastructure Rules
 
-### HTTPS
+### HTTPS and TLS
 
-All traffic must use HTTPS. HTTP must redirect to HTTPS. HSTS (`Strict-Transport-Security`) must be configured once HTTPS is enforced. Configure in `Program.cs` via `UseHttpsRedirection()` and `UseHsts()`.
+- All traffic must use HTTPS. HTTP must redirect to HTTPS. HSTS (`Strict-Transport-Security`) must be configured once HTTPS is enforced. Configure in `Program.cs` via `UseHttpsRedirection()` and `UseHsts()`.
+- **TLS version:** require TLS 1.2 minimum; TLS 1.3 preferred. Explicitly disable TLS 1.0 and 1.1 in the hosting platform configuration. Verify with `testssl.sh` or SSL Labs before Phase 3 launch.
+- **Cipher suites:** disable RC4, 3DES, NULL, EXPORT, and ANON cipher suites. The hosting platform (nginx, Caddy, or cloud load balancer) enforces this — document the required configuration.
+- **HSTS preload:** submit the domain to the HSTS preload list at `hstspreload.org`. Preload requires `max-age >= 31536000; includeSubDomains; preload` in the header. Without preload, a first-time visitor before the first HTTPS response is still vulnerable to a downgrade attack.
 
 ### Reverse Proxy
 
@@ -178,9 +257,31 @@ Every response must include:
 | `X-Frame-Options` | `DENY` | Prevents clickjacking |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Limits referrer information leakage |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Enforces HTTPS after first visit |
-| `Content-Security-Policy` | Define before any JS is introduced | Restricts script/style sources, mitigates XSS |
+| `Content-Security-Policy` | See skeleton below | Restricts script/style sources, mitigates XSS |
 
 Use `NetEscapades.AspNetCore.SecurityHeaders` or custom middleware.
+
+**CSP must be defined before any React routes go live** — not after. Even with HttpOnly cookies (which block cookie theft), a XSS payload can call authenticated API endpoints using the session cookie automatically. CSP is the primary control against this.
+
+**Phase 3 CSP skeleton:**
+```
+default-src 'self';
+script-src 'self';
+style-src 'self' 'unsafe-inline';
+img-src 'self' data:;
+font-src 'self';
+connect-src 'self';
+object-src 'none';
+frame-ancestors 'none';
+form-action 'self';
+base-uri 'self';
+```
+
+Notes:
+- `unsafe-inline` for `style-src` may be required by Tailwind v4 — evaluate at implementation time; replace with a nonce if possible
+- `frame-ancestors 'none'` supersedes `X-Frame-Options: DENY` in modern browsers — both must be present for full coverage
+- Any CDN, web font provider, or analytics service requires an additional `src` directive — add only what is needed
+- `dangerouslySetInnerHTML` is prohibited in React components. Enforce via ESLint `react/no-danger` rule. If rich text rendering is ever needed, use a sanitized markdown renderer (DOMPurify + marked)
 
 ### CORS
 
@@ -188,7 +289,15 @@ Required when the React SPA is on a different origin from the API (Phase 3). Con
 
 ### CSRF
 
-All state-changing forms must include CSRF anti-forgery tokens. ASP.NET Core's built-in anti-forgery middleware handles this via `[ValidateAntiForgeryToken]` on controllers and the `<form>` tag helper. JSON API endpoints authenticated via cookies also require anti-forgery protection — configure the anti-forgery middleware to validate on API routes.
+All state-changing API endpoints authenticated via cookies require CSRF protection. CORS does not prevent CSRF — it only blocks cross-origin reads, not cross-origin state-changing requests. `SameSite` cookies reduce the risk but are not a complete substitute for an explicit token.
+
+**Pattern for the React SPA (double-submit cookie):**
+1. The server sets a separate non-HttpOnly `XSRF-TOKEN` cookie on page load
+2. The React client reads this cookie and includes it as an `X-XSRF-TOKEN` request header on all state-changing requests (POST, PUT, PATCH, DELETE)
+3. The server validates that the header value matches the cookie value
+4. Because cross-site requests cannot read the cookie value (same-origin policy), forged requests cannot supply the correct header
+
+**Note:** `planning-phase3-spa-migration.md` previously stated that anti-forgery tokens are "replaced by CORS + HttpOnly cookie auth." This is incorrect — CORS does not prevent CSRF. The double-submit pattern above is the required approach. That statement in the migration doc has been corrected.
 
 ---
 
@@ -198,7 +307,9 @@ All state-changing forms must include CSRF anti-forgery tokens. ASP.NET Core's b
 - **ViewModels, not entities:** form inputs bind to ViewModel classes with validation attributes (`[Required]`, `[StringLength]`, etc.), not directly to EF Core entity classes. This prevents mass-assignment vulnerabilities.
 - **Length limits:** define `[StringLength]` on all string fields in ViewModels to match the database column constraint. Never accept unbounded string input.
 - **CSV export injection:** any exported CSV field must be sanitized. Values starting with `=`, `@`, `+`, or `-` are interpreted as formulas by spreadsheet applications. Prefix such values with a single quote to neutralize them.
-- **Open redirect prevention:** any controller action that accepts a `returnUrl` parameter must validate it with `Url.IsLocalUrl(returnUrl)` before redirecting. If the value is not a local URL, fall back to the controller's own Index action. This applies to every Edit POST and Delete POST action that supports `returnUrl`. An unvalidated redirect allows an attacker to craft a link like `/Transactions/Edit/123?returnUrl=https://evil.com` that sends the user to an external site after a legitimate form submission.
+- **Open redirect prevention (server-side):** any controller action that accepts a `returnUrl` parameter must validate it with `Url.IsLocalUrl(returnUrl)` before redirecting. If the value is not a local URL, fall back to the controller's own Index action. This applies to every Edit POST and Delete POST action that supports `returnUrl`. An unvalidated redirect allows an attacker to craft a link like `/Transactions/Edit/123?returnUrl=https://evil.com` that sends the user to an external site after a legitimate form submission.
+- **Open redirect prevention (client-side):** the React Router login component captures the pre-login URL from location state (`from`) and redirects there after authentication. This client-side redirect must also be validated against a known-safe path allowlist before use. Reject any destination that starts with `javascript:`, `data:`, `//`, or any protocol scheme other than a local path. Server-side `Url.IsLocalUrl()` does not cover this — the React component must do its own validation.
+- **XXE injection prevention (XLSX import):** XLSX files are ZIP archives containing XML. Explicitly configure the XML parser used by ClosedXML with `DtdProcessing = DtdProcessing.Prohibit` and `XmlResolver = null`. Without this, a crafted XLSX file can use XML external entities to read arbitrary files from the server (application secrets, private keys) or make SSRF calls. Verify this configuration is in place before enabling XLSX import in production. Add a fuzz test with a crafted XXE payload as part of the import test suite.
 
 ---
 
@@ -272,6 +383,39 @@ The app holds an API key for the email service provider. A leaked key allows an 
 - Store the API key in environment variables or the hosting platform's secret store. Never commit it to source control or log it in error output.
 - Use a **send-only API key** if the provider supports permission scoping (Postmark, Resend, and SendGrid all support this). A send-only key cannot read inboxes, manage lists, or change account settings even if compromised.
 - Rotate the key immediately on any suspected exposure. Document the rotation procedure before Phase 3 launch.
+
+---
+
+## Dependency Scanning and Secrets Hygiene
+
+### Dependency Scanning
+
+- **Server (.NET):** run `dotnet list package --vulnerable` in CI on every push. Treat Critical and High severity CVEs as build failures. Define a remediation SLA: Critical within 48 hours, High within 7 days.
+- **Client (React):** run `pnpm audit --audit-level=moderate` in CI on every push. The React client has a completely separate dependency graph — .NET scanning does not cover it.
+- **ClosedXML:** given its history of XXE-related CVEs, place it on a dedicated watch list. Subscribe to GitHub security advisories for the package.
+- **Automated patch proposals:** configure Dependabot or Renovate to open PRs when new versions fix known vulnerabilities. Scanning that does not propose fixes requires manual triage on every alert.
+
+### Secrets Scanning
+
+- Add `truffleHog` or GitHub's built-in secret scanning to CI as a pre-push hook and on every PR. This prevents accidental commits of API keys, JWT secrets, database credentials, and TOTP seeds.
+- The following secrets must never appear in source control, logs, or error output: JWT signing secret, `USER_REF_SECRET`, Data Protection keys, email service API key, database credentials, TOTP seeds, backup codes.
+
+### Secrets Rotation Procedures
+
+Document all rotation procedures before Phase 3 launch:
+
+| Secret | Rotation procedure |
+|--------|-------------------|
+| JWT signing secret | (1) Generate new secret, (2) deploy with both old and new accepted (dual-validation window), (3) wait for all existing tokens to expire (15 min), (4) remove old secret |
+| `USER_REF_SECRET` | Requires rewriting all `UserRef` columns in all data tables — plan as a scheduled maintenance window with a migration script. Rotation is a high-risk operation; document the rollback procedure |
+| Email service API key | Rotate in provider dashboard, update secrets store, deploy, verify email delivery |
+| Data Protection keys | Follow ASP.NET Core Data Protection key management docs — key ring automatically retains old keys for decryption while using the newest for encryption |
+
+### Audit Log Security
+
+- Audit log rows are insert-only. The runtime database user must have `INSERT` but not `UPDATE` or `DELETE` on the audit log table. This enforces tamper-evidence at the database level.
+- **Scope extension:** the existing audit log covers login/logout, account creation, data export, and erasure requests. Extend to include: `TransactionCreated`, `TransactionDeleted`, `TransferCreated`, `TransferDeleted` (entity ID, timestamp, IP address — no financial amounts). This is required for dispute resolution.
+- **New session alert email:** default to **enabled** (opt-out, not opt-in). For a financial application, a new sign-in from an unknown IP is always a security-relevant event. A user who never visits settings should still receive compromise notifications. Users may opt out from notification preferences with disclosure of the security implication.
 
 ---
 
@@ -365,33 +509,62 @@ ciphertext  = AES-256-GCM(tenant_key, plaintext_value)
 | Rule | Phase 1 | Phase 2 | Phase 3 |
 |------|---------|---------|---------|
 | HTTPS enforced | — | — | Required |
+| TLS 1.2 minimum, TLS 1.0/1.1 disabled | — | — | Required |
 | HSTS configured | — | — | Required |
+| HSTS preload list submission | — | — | Required before launch |
 | Argon2id for passwords | — | — | Required |
+| Password reset: 256-bit token, hashed, 15-min expiry, single-use, revokes all sessions | — | — | Required |
 | TOTP mandatory | — | — | Required |
-| TOTP replay prevention | — | — | Required |
+| TOTP enrollment verified (user enters first code before MfaEnabled=true) | — | — | Required |
+| TOTP replay prevention (persistent store — DB or Redis, not in-memory) | — | — | Required |
 | TOTP secrets encrypted at rest | — | — | Required |
+| Data Protection keys stored in external backend (not local filesystem) | — | — | Required before launch |
+| TOTP backup codes: Argon2id-hashed, 128-bit entropy, single-use | — | — | Required |
+| Reauthentication required for sensitive operations | — | — | Required |
+| Failed login attempts logged (no password, with timestamp + IP) | — | — | Required |
+| Account lockout self-service unlock link in notification email | — | — | Required |
 | HTTP security headers | — | Required (CSP when JS added) | Required |
-| CSRF anti-forgery tokens | Required | Required | Required |
+| CSP defined before first React route goes live | — | — | Required |
+| `frame-ancestors 'none'` in CSP (supplements X-Frame-Options) | — | — | Required |
+| `dangerouslySetInnerHTML` prohibited; ESLint `react/no-danger` enforced | — | — | Required |
+| CSRF double-submit XSRF-TOKEN pattern (not replaced by CORS) | Required | Required | Required |
+| Global fallback authorization policy (`RequireAuthenticatedUser`) | — | — | Required |
 | UUID primary keys | Required | Required | Required |
-| IDOR prevention (UserId scoping) | — (single user) | — (single user) | Required |
+| IDOR prevention (UserId scoping on ID-based queries) | — (single user) | — (single user) | Required |
+| List endpoint scoping (UserId filter on all list queries) | — | — | Required |
+| List endpoint scope integration tests (all entity types) | — | — | Required |
+| TransactionAttachment direct UserId column | — | — | Required |
+| Per-user file storage quota enforced before write | — | — | Required |
 | Account enumeration prevention | — | — | Required |
 | Rate limiting on auth endpoints | — | — | Required |
 | Account lockout after failed logins | — | — | Required |
 | Session fixation prevention | — | — | Required |
 | Secure cookie flags | — | — | Required |
+| SameSite cookie value decided in ADR (Strict vs. Lax per social login scope) | — | — | Required |
+| No tokens/credentials in localStorage or sessionStorage | — | — | Required |
 | IP enforcement (user-configurable) | — | — | Required |
 | IP blocking | — | — | Required |
 | Active session list + revocation | — | — | Required |
+| New session alert email: opt-out default (not opt-in) | — | — | Required |
 | CORS policy | — | — (no separate origin) | Required |
 | Forwarded headers middleware | — | — | Required |
 | File upload MIME whitelist | Required (if built) | Required | Required |
 | File upload magic bytes check | Required (if built) | Required | Required |
 | File serving via authenticated action | Required (if built) | Required | Required |
+| XXE prevention in XLSX import (DtdProcessing=Prohibit, XmlResolver=null) | — | Required | Required |
+| Open redirect prevention: server-side (`Url.IsLocalUrl`) | — | Required | Required |
+| Open redirect prevention: client-side (React Router `from` allowlist) | — | — | Required |
 | CSV export injection sanitization | — | Required (if export built) | Required |
-| Open redirect prevention (`Url.IsLocalUrl`) | — | Required | Required |
-| Dependency vulnerability scanning | Manual | Manual | CI pipeline |
+| Dependency vulnerability scanning (.NET) | Manual | Manual | CI pipeline — build fails on Critical/High |
+| Dependency vulnerability scanning (React/pnpm) | — | Manual | CI pipeline — `pnpm audit` |
+| Secrets scanning in CI (truffleHog or GitHub secret scanning) | — | — | Required |
+| JWT secret rotation procedure documented | — | — | Required before launch |
+| `USER_REF_SECRET` rotation procedure documented | — | — | Required before launch |
 | Database least privilege (DML user) | Recommended | Recommended | Required |
+| Audit log: insert-only enforced at DB level | — | — | Required |
+| Audit log: extended to cover TransactionCreated/Deleted, TransferCreated/Deleted | — | — | Required |
 | GDPR compliance | — | — | Required before any external user |
+| IP address storage disclosed in privacy policy | — | — | Required before launch |
 | SPF DNS record active and passing | — | — | Required before Phase 3 launch |
 | DKIM signing active and passing | — | — | Required before Phase 3 launch |
 | DMARC policy configured (`p=none` minimum) | — | — | Required before Phase 3 launch |
@@ -399,12 +572,11 @@ ciphertext  = AES-256-GCM(tenant_key, plaintext_value)
 | User-controlled content sanitized before email render | — | — | Required |
 | Email-triggering endpoints rate-limited | — | — | Required |
 | Email service API key stored in secrets, send-only scope | — | — | Required |
-| JWT access tokens (short-lived, signed, no DB storage) | — | — | Required |
-| JWT secret stored outside DB (env/secrets store) | — | — | Required |
-| Refresh token stored as hash only; rotated on each use | — | — | Required |
+| Cookie-based auth for Phase 3 SPA (not JWT in localStorage) | — | — | Required |
 | `UserId` pseudonymised via HMAC in all data rows | — | — | Required |
 | `USER_REF_SECRET` pepper stored outside DB | — | — | Required |
 | HMAC rotation procedure documented before launch | — | — | Required before Phase 3 launch |
+| GDPR export generated asynchronously (background job, not synchronous HTTP) | — | — | Required |
 | Per-tenant payload encryption (amounts, descriptions) | — | — | Phase 4+ |
 
 > Phase 1 and 2 are single-user and local. Many security controls are not required because there is no network exposure and no other users. All controls marked Required for Phase 3 must be in place before the app is reachable from outside the developer's machine.

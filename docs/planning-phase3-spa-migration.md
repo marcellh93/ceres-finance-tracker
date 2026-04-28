@@ -75,8 +75,9 @@ Phase 2 ViewModels are already close to DTOs. At Phase 3:
 The SPA migration and auth are tightly coupled. The migration plan must sequence these together:
 
 - ASP.NET Core auth (Identity or custom) wired before any API endpoint requires `[Authorize]`
-- `[Authorize]` replaces `[ValidateAntiForgeryToken]` on all API controllers
+- `[Authorize]` is applied via a global fallback policy (`RequireAuthenticatedUser`) — not per-controller opt-in. `[AllowAnonymous]` is applied only to login, register, password reset, and the React SPA catch-all.
 - HttpOnly cookie set on login; all subsequent API requests carry it automatically — no token management in JS
+- CSRF protection: the XSRF-TOKEN double-submit pattern (non-HttpOnly `XSRF-TOKEN` cookie + `X-XSRF-TOKEN` request header) is required on all state-changing endpoints. **CORS does not prevent CSRF** — do not remove anti-forgery protection. See `security-model.md → CSRF` for the full pattern.
 - CORS policy configured to allow the React origin (`localhost:5173` in dev, production origin in prod) — see `planning-phase3.md` for CORS rules
 
 ---
