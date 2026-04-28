@@ -356,6 +356,38 @@ public class DashboardServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetHealthSnapshotAsync_AvailableToday_IncludesImminentBillsDueInNextMonth()
+    {
+        // Regression test: a recurring bill due within 7 days but in the NEXT calendar month
+        // (e.g., rent due May 1 when today is April 28) must appear in ImminentBills.
+        var baseline = (await _service.GetHealthSnapshotAsync()).AvailableToday ?? 0m;
+
+        AddMtdTransaction(SalaryCategoryId, 1000m);
+
+        var today           = DateOnly.FromDateTime(DateTime.Today);
+        var nextMonthDue    = today.AddDays(3); // 3 days away — imminent but possibly next month
+        _fixture.Db.RecurringTransactions.Add(new RecurringTransaction
+        {
+            Id              = Guid.NewGuid(),
+            Name            = "Next-Month Imminent Bill",
+            EstimatedAmount = 770m,
+            AccountId       = _accountId,
+            CategoryId      = HousingCategoryId,
+            Frequency       = Frequency.Monthly,
+            NextDueDate     = nextMonthDue,
+            IsActive        = true
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        // Bill is due within 7 days → must be in ImminentBills regardless of calendar month
+        // AvailableToday = baseline + 1000 - 770 = baseline + 230
+        snapshot.AvailableToday.Should().Be(baseline + 230m);
+        snapshot.ImminentBills.Should().BeGreaterThanOrEqualTo(770m);
+    }
+
+    [Fact]
     public async Task GetHealthSnapshotAsync_AvailableToday_TreatsOverdueRecurringAsImminent()
     {
         var baseline = (await _service.GetHealthSnapshotAsync()).AvailableToday ?? 0m;

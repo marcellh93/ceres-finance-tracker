@@ -138,22 +138,29 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         liquid += transfersIn;
         liquid -= transfersOut;
 
-        // Split recurring transactions due this month into imminent (≤7 days or overdue) and later (>7 days).
-        var dueRecurring = await db.RecurringTransactions
+        // Imminent: due between start of this month (catches overdue) and today+7, inclusive.
+        // The +7 window intentionally crosses calendar month boundaries so a bill due May 1
+        // when today is April 28 is correctly treated as imminent.
+        // Later: due after today+7 through end of this calendar month only.
+        var imminentCutoff = today.AddDays(imminentWindowDays);
+
+        var imminentRecurring = await db.RecurringTransactions
             .Where(r => r.IsActive
                      && r.EstimatedAmount != null
                      && r.NextDueDate >= firstDay
+                     && r.NextDueDate <= imminentCutoff
+                     && accountIds.Contains(r.AccountId))
+            .ToListAsync();
+        decimal imminentBills = imminentRecurring.Sum(r => r.EstimatedAmount ?? 0m);
+
+        var laterRecurring = await db.RecurringTransactions
+            .Where(r => r.IsActive
+                     && r.EstimatedAmount != null
+                     && r.NextDueDate > imminentCutoff
                      && r.NextDueDate <= lastDay
                      && accountIds.Contains(r.AccountId))
             .ToListAsync();
-
-        var imminentCutoff = today.AddDays(imminentWindowDays);
-        decimal imminentBills = dueRecurring
-            .Where(r => r.NextDueDate <= imminentCutoff)
-            .Sum(r => r.EstimatedAmount ?? 0m);
-        decimal laterBills = dueRecurring
-            .Where(r => r.NextDueDate > imminentCutoff)
-            .Sum(r => r.EstimatedAmount ?? 0m);
+        decimal laterBills = laterRecurring.Sum(r => r.EstimatedAmount ?? 0m);
 
         // Budget reserve = SUM(MAX(0, limit − actual spend this month)) per active CategoryBudget.
         var activeBudgets = await db.CategoryBudgets
