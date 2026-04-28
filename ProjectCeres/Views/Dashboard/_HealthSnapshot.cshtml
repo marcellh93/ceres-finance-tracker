@@ -85,9 +85,7 @@
                 }
                 else
                 {
-                    var runwayClass = snapshot.RunwayMonths > 6 ? "text-green-600"
-                                    : snapshot.RunwayMonths >= 3 ? "text-amber-600"
-                                    : "text-red-600";
+                    var runwayClass = DashboardViewHelper.RunwayCssClass(snapshot.RunwayMonths!.Value);
                     <div class="text-lg font-bold @runwayClass" style="font-family:'IBM Plex Mono',ui-monospace,monospace">
                         @snapshot.RunwayMonths.Value.ToString("F1") mo
                     </div>
