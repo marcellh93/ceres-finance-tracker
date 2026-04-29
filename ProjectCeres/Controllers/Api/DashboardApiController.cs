@@ -103,9 +103,10 @@ public class DashboardApiController(
         var settings = await settingsService.GetAsync();
         var currencyId = settings.DefaultCurrencyId;
 
+        var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
+
         var today = DateOnly.FromDateTime(DateTime.Today);
 
-        // Load all data once before the loop — avoids N+1 (12 queries → 2)
         var accounts = await db.Accounts
             .Where(a => a.IsActive && a.CurrencyId == currencyId)
             .Include(a => a.AccountType)
@@ -121,9 +122,9 @@ public class DashboardApiController(
             .AsNoTracking()
             .ToListAsync();
 
-        var result = new List<object>();
+        var points = new List<NetWorthTrendPoint>();
 
-        for (int i = 5; i >= 0; i--)
+        for (int i = 11; i >= 0; i--)
         {
             var monthEnd = new DateOnly(today.Year, today.Month, 1).AddMonths(-i + 1).AddDays(-1);
             if (monthEnd > today) monthEnd = today;
@@ -162,16 +163,14 @@ public class DashboardApiController(
                 else liabilities += balance;
             }
 
-            result.Add(new
-            {
-                month       = monthLabel.ToString("yyyy-MM"),
-                assets      = Math.Round(assets, 2),
-                liabilities = Math.Round(liabilities, 2),
-                netWorth    = Math.Round(assets - liabilities, 2)
-            });
+            points.Add(new NetWorthTrendPoint(
+                Month: monthLabel.ToString("yyyy-MM"),
+                Assets: Math.Round(assets, 2),
+                Liabilities: Math.Round(liabilities, 2),
+                NetWorth: Math.Round(assets - liabilities, 2)));
         }
 
-        return Ok(result);
+        return Ok(new NetWorthTrendDto(currency.Code, currency.Symbol, points));
     }
 
     [HttpGet("income-expense")]

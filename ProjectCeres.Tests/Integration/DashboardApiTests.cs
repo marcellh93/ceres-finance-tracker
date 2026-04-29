@@ -54,19 +54,26 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task GetNetWorthTrend_Returns200_WithExpectedShape()
+    public async Task GetNetWorthTrend_Returns200_WithWrappedShape_And12MonthWindow()
     {
         var response = await _client.GetAsync("/api/dashboard/net-worth-trend");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.ValueKind.Should().Be(JsonValueKind.Array);
+        body.ValueKind.Should().Be(JsonValueKind.Object);
 
-        // Should return up to 6 monthly entries
-        body.GetArrayLength().Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(6);
+        body.TryGetProperty("currencyCode", out var code).Should().BeTrue();
+        code.GetString().Should().NotBeNullOrEmpty();
 
-        foreach (var item in body.EnumerateArray())
+        body.TryGetProperty("currencySymbol", out var symbol).Should().BeTrue();
+        symbol.GetString().Should().NotBeNullOrEmpty();
+
+        body.TryGetProperty("points", out var points).Should().BeTrue();
+        points.ValueKind.Should().Be(JsonValueKind.Array);
+        points.GetArrayLength().Should().BeGreaterThan(0).And.BeLessThanOrEqualTo(12);
+
+        foreach (var item in points.EnumerateArray())
         {
             item.TryGetProperty("month", out _).Should().BeTrue();
             item.TryGetProperty("assets", out _).Should().BeTrue();
