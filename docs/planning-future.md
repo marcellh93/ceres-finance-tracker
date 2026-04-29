@@ -236,6 +236,15 @@ Migration path: introduce `QueryClientProvider` in `src/app/main.tsx`, replace `
 
 ---
 
+### Settings-aware formatting
+
+- **What:** A `useSettings()` hook + `formatDate` / `formatMonth` / `formatNumber` / `formatPercent` utils that respect the user's `DateFormat` and `NumberFormat` preferences from `Settings`.
+- **Why:** SPA currently formats dates/numbers with locale-default `Intl` calls. The Razor side already uses `NumberFormatHelper` for amounts and respects `Settings.DateFormat` / `Settings.NumberFormat`. The SPA needs parity before settings UI ships.
+- **Scope:** Cross-cutting — touches charts (axis labels, tooltips), KPI cards, transaction lists, reports. Should land as one coordinated change rather than per-feature drift.
+- **Triggered by:** Dashboard Phase 2 spec (`docs/superpowers/specs/2026-04-29-dashboard-phase-2-design.md`, §9 Out of Scope).
+
+---
+
 ## Phase 5 — Business Model
 
 **Gate: Phase 4 must be stable. See [`business-model.md`](business-model.md) for full detail.**

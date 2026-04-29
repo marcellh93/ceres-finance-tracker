@@ -262,6 +262,11 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Category budget progress | GET | `/api/dashboard/category-budgets` | Spent vs. limit per expense category for the current month |
 | Goal budget progress | GET | `/api/dashboard/goal-budgets` | Spent vs. target per goal budget |
 | Financial health snapshot | GET | `/api/dashboard/health` | 15 fields, every numeric nullable: spendable balance components (liquid, imminent/later bills, budget reserve, available today, safe to spend), runway months + avg monthly expense, current and rolling-average income, income delta percent, budget burn rate + spent + total limit, currency code/symbol |
+| Net worth trend chart | GET | `/api/dashboard/net-worth-trend` | `NetWorthTrendDto { currencyCode, currencySymbol, points: NetWorthTrendPoint[12] }` — `NetWorthTrendPoint { month: "yyyy-MM", assets, liabilities, netWorth }` |
+| Income/expense trend chart | GET | `/api/dashboard/income-expense` | `IncomeExpenseDto { currencyCode, currencySymbol, points: IncomeExpensePoint[12] }` — `IncomeExpensePoint { month: "yyyy-MM", income, expenses }` |
+| Spending by category chart | GET | `/api/dashboard/spending-by-category` | `SpendingByCategoryDto { currencyCode, currencySymbol, total, slices: SpendingByCategorySlice[] }` — `SpendingByCategorySlice { categoryName, amount }` |
+| Account balances chart | GET | `/api/dashboard/account-balances` | `AccountBalancesDto { currencyCode, currencySymbol, rows: AccountBalanceRow[] }` — `AccountBalanceRow { accountName, balance }` |
+| Cash flow trend chart | GET | `/api/dashboard/cash-flow` | `CashFlowDto { currencyCode, currencySymbol, points: CashFlowPoint[12] }` — `CashFlowPoint { month: "yyyy-MM", netFlow }` |
 | Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction, Transfer, or LiabilityPayment — body: `{ "type": "transaction"\|"transfer"\|"liabilitypayment", "cleared": bool }` |
 | Import file headers | POST | `/api/import/headers` | Upload a CSV or XLSX file; returns detected column headers and auto-matched field mappings (`HeaderDetectionResult`) |
 | Import transactions | POST | `/api/import` | Upload file + column mappings; runs the full import pipeline; returns `ImportResult` (rows imported, reconciled, flagged, failed) |

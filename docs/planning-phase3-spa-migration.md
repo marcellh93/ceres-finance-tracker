@@ -53,7 +53,7 @@
 | `RecurringTransactionsController` | Index, Create, Edit, Deactivate, Confirm, Dismiss | Confirm and Dismiss are stateful actions — design endpoint contract carefully |
 | `ReportsController` | Index + report views | Each report → `GET /api/reports/{type}` |
 | `SettingsController` | Edit | → `GET /api/settings` + `PATCH /api/settings` |
-| `DashboardController` | Index | Deleted — dashboard is fully React; data already served by `DashboardApiController` |
+| `DashboardController` | Index | **Migrated (2026-04-29).** Dashboard is fully React; data served by `DashboardApiController`. 302 redirect from `/Dashboard` → `/app/` is live; Razor dashboard view, partial, and controller deleted. |
 | `AttachmentsController` | Serve, Delete | File serving needs special handling: streaming response, `Content-Disposition: attachment` |
 | `HomeController` | Index | Deleted — replaced by React Router's root route |
 

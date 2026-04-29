@@ -266,7 +266,7 @@ shadcn/ui covers the Phase 2 baseline. Phase 3 additions required:
 2. App shell (sidebar, top bar, responsive behavior)
 3. Auth screens (login, TOTP, register, password reset) — outside the shell
 4. Onboarding wizard — outside the shell
-5. Dashboard — first page inside the shell
+5. Dashboard — first page inside the shell ✓ **Migrated (2026-04-29).** All 5 chart endpoints ship typed wrapper DTOs with `currencyCode`/`currencySymbol`. React dashboard is live at `/app/`. Razor dashboard view, partial, and controller deleted; 302 redirect from `/Dashboard` → `/app/` is live.
 6. Movements + Transactions + Transfers — highest daily usage; includes quick-add, per-table search, saved searches
 7. Accounts + Categories + Budgets + Recurring Transactions — management screens
 8. Reports + Import/Export — complex, lower frequency
