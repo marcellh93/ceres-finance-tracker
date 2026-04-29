@@ -20,10 +20,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    manifest: true,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
         designSystem: path.resolve(__dirname, 'design-system.html'),
+        app: path.resolve(__dirname, 'app.html'),
       },
       output: {
         manualChunks(id) {
