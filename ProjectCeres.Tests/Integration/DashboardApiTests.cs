@@ -156,12 +156,13 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.ValueKind.Should().Be(JsonValueKind.Object);
 
-        // All 12 documented fields must be present (values may be null).
+        // All 15 documented fields must be present (values may be null).
         var requiredFields = new[]
         {
             "availableToday", "safeToSpend", "imminentBills", "laterBills",
-            "budgetReserve", "runwayMonths", "currentMonthIncome",
-            "rollingAverageIncome", "incomeDeltaPercent", "budgetBurnRate",
+            "budgetReserve", "runwayMonths", "avgMonthlyExpense",
+            "currentMonthIncome", "rollingAverageIncome", "incomeDeltaPercent",
+            "budgetBurnRate", "budgetSpentMtd", "budgetTotalLimit",
             "currencyCode", "currencySymbol",
         };
         foreach (var field in requiredFields)
