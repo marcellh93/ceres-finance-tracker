@@ -108,16 +108,23 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task GetSpendingByCategory_Returns200_WithExpectedShape()
+    public async Task GetSpendingByCategory_Returns200_WithWrappedShape_AndTotal()
     {
         var response = await _client.GetAsync("/api/dashboard/spending-by-category");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.ValueKind.Should().Be(JsonValueKind.Array);
+        body.ValueKind.Should().Be(JsonValueKind.Object);
+        body.TryGetProperty("currencyCode", out var code).Should().BeTrue();
+        code.GetString().Should().NotBeNullOrEmpty();
+        body.TryGetProperty("currencySymbol", out _).Should().BeTrue();
+        body.TryGetProperty("total", out var total).Should().BeTrue();
+        total.ValueKind.Should().Be(JsonValueKind.Number);
+        body.TryGetProperty("slices", out var slices).Should().BeTrue();
+        slices.ValueKind.Should().Be(JsonValueKind.Array);
 
-        foreach (var item in body.EnumerateArray())
+        foreach (var item in slices.EnumerateArray())
         {
             item.TryGetProperty("categoryName", out _).Should().BeTrue();
             item.TryGetProperty("amount", out _).Should().BeTrue();

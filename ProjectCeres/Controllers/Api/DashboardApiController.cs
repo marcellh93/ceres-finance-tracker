@@ -217,6 +217,7 @@ public class DashboardApiController(
     {
         var settings = await settingsService.GetAsync();
         var currencyId = settings.DefaultCurrencyId;
+        var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         var monthStart = new DateOnly(today.Year, today.Month, 1);
@@ -231,17 +232,17 @@ public class DashboardApiController(
             .AsNoTracking()
             .ToListAsync();
 
-        var result = transactions
+        var slices = transactions
             .GroupBy(t => t.Category.Name)
-            .Select(g => new
-            {
-                categoryName = g.Key,
-                amount       = Math.Round(g.Sum(t => t.Amount), 2)
-            })
-            .OrderByDescending(x => x.amount)
-            .ToList<object>();
+            .Select(g => new SpendingByCategorySlice(
+                CategoryName: g.Key,
+                Amount: Math.Round(g.Sum(t => t.Amount), 2)))
+            .OrderByDescending(x => x.Amount)
+            .ToList();
 
-        return Ok(result);
+        var total = Math.Round(slices.Sum(s => s.Amount), 2);
+
+        return Ok(new SpendingByCategoryDto(currency.Code, currency.Symbol, total, slices));
     }
 
     [HttpGet("account-balances")]
