@@ -1,6 +1,13 @@
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Kbd } from '@/components/ui/kbd';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -69,6 +76,68 @@ export function Components() {
             <TooltipTrigger render={<Button variant="outline">Hover me</Button>} />
             <TooltipContent>Tooltip content here</TooltipContent>
           </Tooltip>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Input</h2>
+          <Input placeholder="Type here…" className="max-w-md" />
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Avatar</h2>
+          <div className="flex gap-3">
+            <Avatar><AvatarFallback>U</AvatarFallback></Avatar>
+            <Avatar><AvatarFallback>JD</AvatarFallback></Avatar>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Separator</h2>
+          <div className="max-w-md space-y-3">
+            <p>Above</p>
+            <Separator />
+            <p>Below</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Dropdown menu</h2>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline">Open menu</Button>} />
+            <DropdownMenuContent>
+              <DropdownMenuItem>One</DropdownMenuItem>
+              <DropdownMenuItem>Two</DropdownMenuItem>
+              <DropdownMenuItem>Three</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Popover</h2>
+          <Popover>
+            <PopoverTrigger render={<Button variant="outline">Open popover</Button>} />
+            <PopoverContent>Popover content here.</PopoverContent>
+          </Popover>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Sheet</h2>
+          <Sheet>
+            <SheetTrigger render={<Button variant="outline">Open sheet</Button>} />
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Sheet title</SheetTitle>
+              </SheetHeader>
+              <p className="p-4 text-sm text-muted-foreground">Sheet body.</p>
+            </SheetContent>
+          </Sheet>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Kbd</h2>
+          <p className="text-sm">
+            Press <Kbd>⌘K</Kbd> to open search.
+          </p>
         </section>
       </div>
     </TooltipProvider>
