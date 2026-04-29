@@ -262,7 +262,7 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Category budget progress | GET | `/api/dashboard/category-budgets` | Spent vs. limit per expense category for the current month |
 | Goal budget progress | GET | `/api/dashboard/goal-budgets` | Spent vs. target per goal budget |
 | Financial health snapshot | GET | `/api/dashboard/health` | Spendable balance breakdown (liquid, bills due, available today, budget reserved, safe to spend, `WarningLevel`) |
-| Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction or Transfer — body: `{ "type": "transaction"\|"transfer", "cleared": bool }` |
+| Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction, Transfer, or LiabilityPayment — body: `{ "type": "transaction"\|"transfer"\|"liabilitypayment", "cleared": bool }` |
 | Import file headers | POST | `/api/import/headers` | Upload a CSV or XLSX file; returns detected column headers and auto-matched field mappings (`HeaderDetectionResult`) |
 | Import transactions | POST | `/api/import` | Upload file + column mappings; runs the full import pipeline; returns `ImportResult` (rows imported, reconciled, flagged, failed) |
 
