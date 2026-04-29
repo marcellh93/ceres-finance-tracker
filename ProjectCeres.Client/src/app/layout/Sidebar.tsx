@@ -16,7 +16,7 @@ export function Sidebar() {
   }, [collapsed]);
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delay={0}>
       <aside
         aria-label="Sidebar"
         className="flex h-full flex-col border-r border-border bg-background"
