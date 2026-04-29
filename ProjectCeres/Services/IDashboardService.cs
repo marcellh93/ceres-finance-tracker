@@ -16,10 +16,13 @@ public record HealthSnapshotData(
     decimal? LaterBills,
     decimal? BudgetReserve,
     decimal? RunwayMonths,
+    decimal? AvgMonthlyExpense,
     decimal? CurrentMonthIncome,
     decimal? RollingAverageIncome,
     decimal? IncomeDeltaPercent,
     decimal? BudgetBurnRate,
+    decimal? BudgetSpentMtd,
+    decimal? BudgetTotalLimit,
     string CurrencySymbol,
     string CurrencyCode);
 

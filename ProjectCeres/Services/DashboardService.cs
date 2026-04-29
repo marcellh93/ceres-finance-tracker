@@ -50,9 +50,9 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var currency   = settings.DefaultCurrency;
 
         var (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve) = await GetSpendableBalanceAsync(currencyId);
-        var runway        = await GetRunwayAsync(currencyId);
+        var (runway, avgMonthlyExpense) = await GetRunwayAsync(currencyId);
         var incomeMetrics = await GetIncomeMetricsAsync(currencyId);
-        var burnRate      = await GetBudgetBurnRateAsync(currencyId);
+        var (burnRate, budgetSpent, budgetTotal) = await GetBudgetBurnRateAsync(currencyId);
 
         return new HealthSnapshotData(
             AvailableToday:       availableToday,
@@ -61,10 +61,13 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             LaterBills:           laterBills,
             BudgetReserve:        budgetReserve,
             RunwayMonths:         runway,
+            AvgMonthlyExpense:    avgMonthlyExpense,
             CurrentMonthIncome:   incomeMetrics.currentMonth,
             RollingAverageIncome: incomeMetrics.rollingAverage,
             IncomeDeltaPercent:   incomeMetrics.deltaPercent,
             BudgetBurnRate:       burnRate,
+            BudgetSpentMtd:       budgetSpent,
+            BudgetTotalLimit:     budgetTotal,
             CurrencySymbol:       currency.Symbol,
             CurrencyCode:         currency.Code);
     }
@@ -200,7 +203,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
     /// Runway = (total assets − total liabilities) ÷ avg monthly expenses over last 6 full months.
     /// Returns null if avg monthly expenses = 0 or no expense transactions exist in that window.
     /// </summary>
-    private async Task<decimal?> GetRunwayAsync(int currencyId)
+    private async Task<(decimal? months, decimal? avgMonthlyExpense)> GetRunwayAsync(int currencyId)
     {
         var today    = DateOnly.FromDateTime(DateTime.Today);
         var sixStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-6);
@@ -262,15 +265,15 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
 
         if (expenseTransactions.Count == 0)
-            return null;
+            return (null, null);
 
         var totalExpenses = expenseTransactions.Sum(t => t.Amount);
         var avgMonthlyExpenses = totalExpenses / 6m;
 
         if (avgMonthlyExpenses == 0m)
-            return null;
+            return (null, null);
 
-        return netWorth / avgMonthlyExpenses;
+        return (netWorth / avgMonthlyExpenses, avgMonthlyExpenses);
     }
 
     /// <summary>
@@ -323,7 +326,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
     ///                    SUM(limit across those same budgets).
     /// Returns null if no active CategoryBudgets exist for the default currency.
     /// </summary>
-    private async Task<decimal?> GetBudgetBurnRateAsync(int currencyId)
+    private async Task<(decimal? burnRate, decimal? spent, decimal? totalLimit)> GetBudgetBurnRateAsync(int currencyId)
     {
         var today   = DateOnly.FromDateTime(DateTime.Today);
         var mtdFrom = new DateOnly(today.Year, today.Month, 1);
@@ -333,11 +336,11 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
 
         if (activeBudgets.Count == 0)
-            return null;
+            return (null, null, null);
 
         var totalLimit = activeBudgets.Sum(cb => cb.LimitAmount);
         if (totalLimit == 0m)
-            return null;
+            return (null, null, null);
 
         // Actual spend this month across all active budget categories.
         var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
@@ -349,6 +352,6 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
                      && t.Account.CurrencyId == currencyId)
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 
-        return actualSpend / totalLimit;
+        return (actualSpend / totalLimit, actualSpend, totalLimit);
     }
 }
