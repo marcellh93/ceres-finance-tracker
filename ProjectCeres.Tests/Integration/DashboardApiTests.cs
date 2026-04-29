@@ -181,4 +181,56 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
         body.GetProperty("currencyCode").GetString().Should().NotBeNullOrEmpty();
         body.GetProperty("currencySymbol").GetString().Should().NotBeNullOrEmpty();
     }
+
+    [Fact]
+    public async Task GetSummary_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/summary");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Object);
+
+        body.TryGetProperty("netWorth", out var netWorth).Should().BeTrue();
+        netWorth.ValueKind.Should().Be(JsonValueKind.Array);
+
+        body.TryGetProperty("mtd", out var mtd).Should().BeTrue();
+        mtd.ValueKind.Should().Be(JsonValueKind.Object);
+
+        body.TryGetProperty("remindersDueCount", out var reminders).Should().BeTrue();
+        reminders.ValueKind.Should().Be(JsonValueKind.Number);
+    }
+
+    [Fact]
+    public async Task GetSummary_MtdHasIncomeExpensesAndSavingsRate()
+    {
+        var response = await _client.GetAsync("/api/dashboard/summary");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var mtd = body.GetProperty("mtd");
+
+        mtd.TryGetProperty("currencyCode", out _).Should().BeTrue();
+        mtd.TryGetProperty("currencySymbol", out _).Should().BeTrue();
+        mtd.TryGetProperty("income", out _).Should().BeTrue();
+        mtd.TryGetProperty("expenses", out _).Should().BeTrue();
+        mtd.TryGetProperty("savingsRate", out var rate).Should().BeTrue();
+        rate.ValueKind.Should().Be(JsonValueKind.Number);
+    }
+
+    [Fact]
+    public async Task GetSummary_NetWorthEntryHasExpectedFields()
+    {
+        var response = await _client.GetAsync("/api/dashboard/summary");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var netWorth = body.GetProperty("netWorth");
+
+        foreach (var entry in netWorth.EnumerateArray())
+        {
+            entry.TryGetProperty("currencyCode", out _).Should().BeTrue();
+            entry.TryGetProperty("currencySymbol", out _).Should().BeTrue();
+            entry.TryGetProperty("assets", out _).Should().BeTrue();
+            entry.TryGetProperty("liabilities", out _).Should().BeTrue();
+            entry.TryGetProperty("netWorth", out _).Should().BeTrue();
+        }
+    }
 }

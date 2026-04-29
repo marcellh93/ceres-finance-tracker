@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
+using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Controllers.Api;
 
@@ -20,6 +21,24 @@ public class DashboardApiController(
     {
         var snapshot = await dashboardService.GetHealthSnapshotAsync();
         return Ok(snapshot);
+    }
+
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetSummary()
+    {
+        var data = await dashboardService.GetDashboardDataAsync();
+
+        var summary = new DashboardSummaryDto(
+            NetWorth: data.NetWorth,
+            Mtd: new MtdSummary(
+                CurrencyCode:   data.CurrencyCode,
+                CurrencySymbol: data.CurrencySymbol,
+                Income:         data.MtdIncome,
+                Expenses:       data.MtdExpenses,
+                SavingsRate:    data.SavingsRate),
+            RemindersDueCount: data.PendingRemindersCount);
+
+        return Ok(summary);
     }
 
     [HttpGet("category-budgets")]
