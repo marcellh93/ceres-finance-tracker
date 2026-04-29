@@ -41,19 +41,16 @@ function netWorthClass(value: number): string {
 
 function SingleCurrency({ entry }: { entry: NetWorthEntry }) {
   return (
-    <dl className="space-y-3">
+    <dl className="space-y-6">
       <StatRow
-        labelClassName="w-32"
         label="Assets"
         value={<Numeric>{entry.currencySymbol} {entry.assets.toFixed(2)}</Numeric>}
       />
       <StatRow
-        labelClassName="w-32"
         label="Liabilities"
         value={<Numeric>{entry.currencySymbol} {entry.liabilities.toFixed(2)}</Numeric>}
       />
       <StatRow
-        labelClassName="w-32"
         label="Net Worth"
         value={
           <Numeric className={netWorthClass(entry.netWorth)}>
