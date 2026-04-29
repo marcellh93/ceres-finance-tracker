@@ -19,10 +19,13 @@ export type HealthDto = {
   laterBills: number | null;
   budgetReserve: number | null;
   runwayMonths: number | null;
+  avgMonthlyExpense: number | null;
   currentMonthIncome: number | null;
   rollingAverageIncome: number | null;
   incomeDeltaPercent: number | null;
   budgetBurnRate: number | null;
+  budgetSpentMtd: number | null;
+  budgetTotalLimit: number | null;
   currencyCode: string;
   currencySymbol: string;
 };
