@@ -1,15 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using ProjectCeres.Services;
 
 namespace ProjectCeres.Controllers;
 
-public class DashboardController(IDashboardService dashboardService) : Controller
+public class DashboardController : Controller
 {
-    public async Task<IActionResult> Index()
-    {
-        var data     = await dashboardService.GetDashboardDataAsync();
-        var snapshot = await dashboardService.GetHealthSnapshotAsync();
-        ViewBag.HealthSnapshot = snapshot;
-        return View(data);
-    }
+    public IActionResult Index() => Redirect("/app/");
 }

@@ -6,11 +6,6 @@ import { IsClearedSwitch } from './components/IsClearedSwitch'
 import { ClearedBadge } from './components/ClearedBadge'
 import { CategoryBudgetBars } from './components/CategoryBudgetBars'
 import { GoalBudgetBars } from './components/GoalBudgetBars'
-import { NetWorthChart } from './components/NetWorthChart'
-import { IncomeExpenseChart } from './components/IncomeExpenseChart'
-import { SpendingByCategoryChart } from './components/SpendingByCategoryChart'
-import { AccountBalancesChart } from './components/AccountBalancesChart'
-import { CashFlowChart } from './components/CashFlowChart'
 import { ConfirmDialog } from './components/ConfirmDialog'
 
 const navbarEl = document.getElementById('navbar-root')
@@ -69,50 +64,6 @@ if (goalBudgetBarsEl) {
   )
 }
 
-const netWorthChartEl = document.querySelector<HTMLElement>('[data-react="net-worth-chart"]')
-if (netWorthChartEl) {
-  createRoot(netWorthChartEl).render(
-    <StrictMode>
-      <NetWorthChart />
-    </StrictMode>,
-  )
-}
-
-const incomeExpenseChartEl = document.querySelector<HTMLElement>('[data-react="income-expense-chart"]')
-if (incomeExpenseChartEl) {
-  createRoot(incomeExpenseChartEl).render(
-    <StrictMode>
-      <IncomeExpenseChart />
-    </StrictMode>,
-  )
-}
-
-const spendingByCategoryChartEl = document.querySelector<HTMLElement>('[data-react="spending-by-category-chart"]')
-if (spendingByCategoryChartEl) {
-  createRoot(spendingByCategoryChartEl).render(
-    <StrictMode>
-      <SpendingByCategoryChart />
-    </StrictMode>,
-  )
-}
-
-const accountBalancesChartEl = document.querySelector<HTMLElement>('[data-react="account-balances-chart"]')
-if (accountBalancesChartEl) {
-  createRoot(accountBalancesChartEl).render(
-    <StrictMode>
-      <AccountBalancesChart />
-    </StrictMode>,
-  )
-}
-
-const cashFlowChartEl = document.querySelector<HTMLElement>('[data-react="cash-flow-chart"]')
-if (cashFlowChartEl) {
-  createRoot(cashFlowChartEl).render(
-    <StrictMode>
-      <CashFlowChart />
-    </StrictMode>,
-  )
-}
 
 document.querySelectorAll<HTMLElement>('[data-react="confirm-dialog"]').forEach((el) => {
   const message = el.dataset.message ?? 'Are you sure?'

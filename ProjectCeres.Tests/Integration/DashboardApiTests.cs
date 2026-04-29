@@ -264,4 +264,19 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
             entry.TryGetProperty("netWorth", out _).Should().BeTrue();
         }
     }
+
+    [Fact]
+    public async Task GetDashboardRoot_Returns302_RedirectingToAppShell()
+    {
+        using var noRedirectClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await noRedirectClient.GetAsync("/Dashboard");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location.Should().NotBeNull();
+        response.Headers.Location!.ToString().Should().Be("/app/");
+    }
 }
