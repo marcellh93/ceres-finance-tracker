@@ -31,16 +31,19 @@ export function MtdCard() {
           <p className="text-sm text-muted-foreground">No transactions this month yet.</p>
         )}
         {data && (data.mtd.income !== 0 || data.mtd.expenses !== 0) && (
-          <dl className="max-w-xs space-y-3">
+          <dl className="space-y-3">
             <StatRow
+              labelClassName="w-32"
               label="Income"
               value={<Numeric className="text-success">{data.mtd.currencySymbol} {data.mtd.income.toFixed(2)}</Numeric>}
             />
             <StatRow
+              labelClassName="w-32"
               label="Expenses"
               value={<Numeric className="text-destructive">{data.mtd.currencySymbol} {data.mtd.expenses.toFixed(2)}</Numeric>}
             />
             <StatRow
+              labelClassName="w-32"
               label="Savings Rate"
               value={<Numeric>{formatPercent(data.mtd.savingsRate)}</Numeric>}
             />
