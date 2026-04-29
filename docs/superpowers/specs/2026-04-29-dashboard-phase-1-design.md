@@ -72,14 +72,14 @@ This is the standard pattern for the SPA until TanStack Query is adopted (criter
 
 ### API endpoints
 
-Four endpoints feed the page:
+Four endpoints feed the page. **Two are new in this plan** — the spec originally assumed `/api/dashboard/health` existed, but inspection of `DashboardApiController.cs` confirmed it does not. Both new endpoints are thin JSON exposures of methods already on `IDashboardService`.
 
-- `GET /api/dashboard/health` — exists. Financial Health snapshot.
 - `GET /api/dashboard/category-budgets` — exists. Used by `CategoryBudgetBars`.
 - `GET /api/dashboard/goal-budgets` — exists. Used by `GoalBudgetBars`.
-- `GET /api/dashboard/summary` — **new in this plan.** Bundles Net Worth, MTD income/expenses/savings rate, and pending reminders count into a single response. The data is currently only computed in the Razor `DashboardController.Index()` for its `DashboardData` ViewModel — no API exposure.
+- `GET /api/dashboard/health` — **new in this plan.** Exposes the existing `IDashboardService.GetHealthSnapshotAsync()` method as JSON. The full `HealthSnapshotData` shape (12 nullable fields) is preserved 1:1.
+- `GET /api/dashboard/summary` — **new in this plan.** Bundles Net Worth, MTD income/expenses/savings rate, and pending reminders count into a single response. Wraps the existing `IDashboardService.GetDashboardDataAsync()` method (which builds `DashboardData`).
 
-See §4 for the new endpoint's full shape.
+See §4 for both new endpoints' full shapes.
 
 ---
 
@@ -194,23 +194,58 @@ The `Skeleton` shadcn primitive is added via `pnpm dlx shadcn add skeleton` in t
 
 ### `FinancialHealthCard`
 
-- **Endpoint:** `GET /api/dashboard/health`
-- **Response DTO:**
+- **Endpoint:** `GET /api/dashboard/health` (new — see §4)
+- **Response DTO** (mirrors the existing `HealthSnapshotData` record exactly; every numeric field is nullable):
   ```ts
   type HealthDto = {
-    liquid: number;
-    billsDue: number;
-    availableToday: number;
-    budgetReserved: number;
-    safeToSpend: number;
-    warningLevel: 'OK' | 'Caution' | 'Critical';
+    availableToday: number | null;
+    safeToSpend: number | null;
+    imminentBills: number | null;     // bills due within 7 days
+    laterBills: number | null;        // bills due later this month
+    budgetReserve: number | null;     // unspent active category-budget headroom
+    runwayMonths: number | null;      // months of expenses covered by liquid assets
+    currentMonthIncome: number | null;
+    rollingAverageIncome: number | null;
+    incomeDeltaPercent: number | null;  // current vs 6-month average, signed fraction
+    budgetBurnRate: number | null;      // 0–1+, fraction of category budgets spent so far
+    currencyCode: string;
+    currencySymbol: string;
   };
   ```
-- **Renders:** a row of stat tiles for the breakdown values (each amount in `<Numeric>` mono), plus a prominent "Safe to Spend" treatment with `WarningLevel` reflected as a colored `Badge`:
-  - `OK` → success (emerald) badge
-  - `Caution` → warning (amber) badge
-  - `Critical` → destructive (rose) badge
-- **Empty:** never empty; if the endpoint returns `null`, treat it as an error state (the financial state is always *some* state).
+
+- **Renders:** a single Card whose body is a 4-panel grid (CSS Grid, `grid-cols-4` desktop, stacks below `lg`). Each panel has its own empty-state copy when its data is null:
+
+  **Panel 1 — Spendable Balance** (left). Step-by-step equation layout reading top to bottom:
+  - Row "Liquid": `currencySymbol (availableToday + imminentBills)` (a derived value).
+  - Row "Bills due (7 days)": `−currencySymbol imminentBills` — *only shown when `imminentBills` is non-zero.*
+  - Divider, then "Available today" headline: `currencySymbol availableToday` in bold. Color: success when `>= 0`, destructive when `< 0`.
+  - Row "Bills later this month": `−currencySymbol laterBills` — *only shown when `laterBills` is non-zero.*
+  - Row "Budget reserved": `−currencySymbol budgetReserve` — *only shown when `budgetReserve` is non-zero.*
+  - Divider, then "Safe to spend" subhead: `currencySymbol safeToSpend` — *only shown when at least one of `laterBills` or `budgetReserve` is non-zero* (otherwise it would equal "Available today" and be redundant). Color: foreground when `>= 0`, warning (amber) when `< 0`.
+  - **Empty state** (when `availableToday` is null): muted text "No asset accounts found".
+  - All amounts use `<Numeric>` (mono).
+
+  **Panel 2 — Runway**:
+  - Headline: `runwayMonths.toFixed(1) + " mo"`. Color rules: `runwayMonths >= 6` success, `>= 3` warning, `< 3` destructive.
+  - **Empty state** (when null): muted text "Needs 6 months of expense history".
+
+  **Panel 3 — Income vs. Avg**:
+  - Headline: signed percentage of `incomeDeltaPercent`, formatted with one decimal (e.g. `+12.3%`, `−8.1%`, `0.0%`). Color: success when `> 0`, destructive when `< 0`, muted when `= 0`.
+  - **Empty state** (when null): muted text "Needs 6 months of income history".
+
+  **Panel 4 — Budget Burn Rate**:
+  - Headline: percentage of `budgetBurnRate`, formatted with one decimal (e.g. `45.0%`). Color: success when `< 0.5`, warning when `0.5–0.8`, destructive when `> 0.8`.
+  - **Empty state** (when null): muted text "No active category budgets".
+
+- **Color tokens.** All colors above resolve to the design-system semantic tokens already defined in `src/index.css`: success → `text-success`, destructive → `text-destructive`, warning → `text-warning`, muted → `text-muted-foreground`. No hex literals in components.
+
+- **Card-level empty:** never. If the endpoint returns `null` (the entire payload), treat as an error state. Per-panel empties are normal — different users have different amounts of history.
+
+- **No "View all →" link** in the card header (no detail page yet).
+
+#### `dashboardViewHelper.ts` — extracted color rules
+
+The color rules above are dense and shared across panels. Centralize them in `src/app/features/dashboard/dashboardViewHelper.ts` so the panels render via small helpers (`runwayClass(value)`, `incomeDeltaClass(value)`, `burnRateClass(value)`, `availableTodayClass(value)`, `safeToSpendClass(value)`). One file, one place to retune thresholds. Mirrors what the Razor view already does in `DashboardViewHelper.cs`.
 
 ### `KpiStrip`
 
@@ -298,21 +333,31 @@ Tested in isolation in `use-api.test.ts`.
 
 ---
 
-## 4. Backend audit and `/api/dashboard/summary`
+## 4. Backend audit and new endpoints
 
-### Audit task (first task in implementation plan)
+### Confirmed during spec review
 
-Read `ProjectCeres/Controllers/Api/DashboardApiController.cs` and `ProjectCeres/Controllers/DashboardController.cs` to confirm:
+Inspection of `ProjectCeres/Controllers/Api/DashboardApiController.cs` and `ProjectCeres/Services/IDashboardService.cs` confirmed:
 
-1. `GET /api/dashboard/health` returns the `HealthDto` shape declared in §3.
-2. `GET /api/dashboard/category-budgets` and `GET /api/dashboard/goal-budgets` exist and return data compatible with the existing React island components (which they do — those components already consume them in production).
-3. **Net Worth + MTD + Reminders data is currently only computed in `DashboardController.Index()`** for its `DashboardData` ViewModel. There is no API endpoint exposing it.
+- `GET /api/dashboard/category-budgets` and `GET /api/dashboard/goal-budgets` exist and return data compatible with the existing React island components.
+- **`GET /api/dashboard/health` does NOT exist.** The Razor `_HealthSnapshot.cshtml` partial reads `ViewBag.HealthSnapshot` populated by `DashboardController.Index()`. The service method `IDashboardService.GetHealthSnapshotAsync()` already returns the full `HealthSnapshotData` shape — we just need to expose it.
+- **Net Worth + MTD + Reminders data is currently only computed in `DashboardController.Index()`** for its `DashboardData` ViewModel via `IDashboardService.GetDashboardDataAsync()`. No API exposure.
 
-If any of (1) or (2) is not as expected, the implementation plan flags it and adapts before continuing.
+Both new endpoints are thin pass-throughs of existing service methods.
+
+### New endpoint: `GET /api/dashboard/health`
+
+**Implementation:**
+
+- Add `[HttpGet("health")]` action to `DashboardApiController`.
+- The action injects `IDashboardService` (constructor-add to the existing primary-constructor parameter list), calls `await dashboardService.GetHealthSnapshotAsync()`, and returns the result via `Ok(snapshot)`.
+- ASP.NET Core serializes the C# record to JSON with default camelCase naming, matching the `HealthDto` shape in §3.
+
+**Response shape:** the same shape as the C# `HealthSnapshotData` record (12 fields, every numeric field nullable). See §3 `FinancialHealthCard` DTO for the full TypeScript form.
 
 ### New endpoint: `GET /api/dashboard/summary`
 
-Bundles the three small KPIs into a single response (one round-trip; they're all small).
+Bundles the three small KPIs into a single response.
 
 **Response shape:**
 
@@ -338,23 +383,32 @@ Bundles the three small KPIs into a single response (one round-trip; they're all
 }
 ```
 
-**Implementation approach:**
+**Note on `DashboardData` shape adaptation.** The existing `DashboardData` record has flat fields:
 
-- Add `[HttpGet("summary")]` action to `DashboardApiController`.
-- The action calls into the existing `DashboardService` (or wherever `DashboardController.Index` builds its ViewModel) and shapes the response as JSON.
-- Reuses existing service logic — no new service methods unless `DashboardService` doesn't expose the constituent pieces independently.
-- `savingsRate` is returned as a fraction (0.4217), not a percentage (42.17). The React side formats for display.
-- `remindersDueCount` uses the existing `RecurringTransactionService.GetUpcomingAsync(withinDays: N)` count call (the Razor view already does this).
+```csharp
+public record DashboardData(
+    IReadOnlyList<NetWorthEntry> NetWorth,
+    decimal MtdIncome, decimal MtdExpenses, decimal SavingsRate,
+    int PendingRemindersCount,
+    string CurrencyCode, string CurrencySymbol);
+```
 
-**Add the route to `docs/api-contract.md`** in the Phase 3 endpoints table:
+The summary endpoint returns the *grouped* shape above (with a nested `mtd` object) for cleaner client consumption. Implementation:
+
+- Add a new C# record `DashboardSummaryDto` in `ProjectCeres/ViewModels/Api/` (or wherever API DTOs live — the audit task confirms the location).
+- The `[HttpGet("summary")]` action calls `dashboardService.GetDashboardDataAsync()` and projects the flat `DashboardData` into the grouped `DashboardSummaryDto`.
+- `savingsRate` is preserved as a fraction (0.4217), not a percentage (42.17). The React side formats for display.
+
+**Add both routes to `docs/api-contract.md`** in the Phase 3 endpoints table:
 
 | Endpoint | Method | Path | Description |
 |---|---|---|---|
+| Dashboard health | GET | `/api/dashboard/health` | Financial health snapshot (12 fields, every numeric nullable): spendable balance components, runway, income delta, budget burn rate |
 | Dashboard summary | GET | `/api/dashboard/summary` | Consolidated KPIs: net worth (per currency), MTD income/expenses/savings rate, pending reminders count |
 
 ### Auth note
 
-No auth in Phase 3 yet. This endpoint is open like all other API endpoints. When auth lands (`[Authorize]` global fallback policy in `planning-phase3.md`), this endpoint will require an authenticated session like everything else. No special handling needed in this plan.
+No auth in Phase 3 yet. Both endpoints are open like all other API endpoints. When auth lands (`[Authorize]` global fallback policy in `planning-phase3.md`), they will require an authenticated session like everything else. No special handling needed in this plan.
 
 ---
 
@@ -362,7 +416,8 @@ No auth in Phase 3 yet. This endpoint is open like all other API endpoints. When
 
 ### React tests
 
-- `FinancialHealthCard.test.tsx` — three cases: loading shows skeleton; error shows retry button; success renders the spendable breakdown with the WarningLevel badge using the right semantic color.
+- `FinancialHealthCard.test.tsx` — covers: loading shows skeleton; error shows retry button; success renders all four panels; per-panel empty states render correct copy when their slice is null (e.g., `runwayMonths: null` → "Needs 6 months of expense history"); equation rows hide correctly when `imminentBills`/`laterBills`/`budgetReserve` are zero; "Safe to spend" subhead only appears when at least one of `laterBills`/`budgetReserve` is non-zero.
+- `dashboardViewHelper.test.ts` — color-rule helpers (`runwayClass`, `incomeDeltaClass`, `burnRateClass`, `availableTodayClass`, `safeToSpendClass`) return the correct token classes at threshold boundaries.
 - `KpiStrip.test.tsx` — composition: renders all three child cards in order. Children are mocked to keep the test focused on the strip itself.
 - `NetWorthCard.test.tsx` — loading/error/empty/data; single-currency renders stat display, multi-currency renders mini-table; amounts use `<Numeric>`; net worth color flips on negative values.
 - `MtdCard.test.tsx` — loading/error/empty/data; income uses success color, expenses use destructive color, savings rate formats as a percentage with one decimal.
@@ -372,7 +427,7 @@ No auth in Phase 3 yet. This endpoint is open like all other API endpoints. When
 - `Dashboard.test.tsx` — page-level smoke: renders the heading "Dashboard" as `<h1>`; mounts all four sections (verified by the presence of each card's title); the page doesn't crash when API endpoints are mocked to return mixed data and errors.
 - `use-api.test.ts` — the hook in isolation: returns loading initially, transitions to data on success, transitions to error on fetch reject, `refetch` re-runs the request, in-flight request is cancelled on unmount.
 
-### Backend integration test
+### Backend integration tests
 
 - `DashboardApiSummaryTests.cs` (xUnit + FluentAssertions, hits real test DB):
   - Returns 200 with the documented shape.
@@ -380,6 +435,12 @@ No auth in Phase 3 yet. This endpoint is open like all other API endpoints. When
   - Multi-currency users return multiple `netWorth` entries.
   - `savingsRate` is a fraction (0–1), not a percentage (0–100).
   - When the user has no transactions in the current month, `mtd.income` and `mtd.expenses` are both 0 and `savingsRate` is 0.
+
+- `DashboardApiHealthTests.cs`:
+  - Returns 200 with the documented `HealthSnapshotData` shape.
+  - All 12 fields are present in the JSON; numeric fields can be `null`.
+  - With no asset accounts, `availableToday` is `null` (other fields may also be null per service rules).
+  - `currencyCode` and `currencySymbol` are non-null strings.
 
 ### Mocking strategy
 
