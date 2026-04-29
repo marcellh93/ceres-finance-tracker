@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
@@ -217,5 +218,56 @@ public class MovementsApiTests : IAsyncLifetime
         var response = await _client.PatchAsync($"/api/movements/{Guid.NewGuid()}/cleared", payload);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/movements — shape and pagination
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetMovements_Returns200_WithWrappedShape()
+    {
+        var response = await _client.GetAsync("/api/movements?pageSize=50");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Object);
+
+        body.TryGetProperty("items", out var items).Should().BeTrue();
+        items.ValueKind.Should().Be(JsonValueKind.Array);
+
+        body.TryGetProperty("totalCount", out var totalCount).Should().BeTrue();
+        totalCount.ValueKind.Should().Be(JsonValueKind.Number);
+
+        body.TryGetProperty("page", out var page).Should().BeTrue();
+        page.GetInt32().Should().Be(1);
+
+        body.TryGetProperty("pageSize", out var pageSize).Should().BeTrue();
+        pageSize.GetInt32().Should().Be(50);
+
+        foreach (var item in items.EnumerateArray())
+        {
+            item.TryGetProperty("id", out _).Should().BeTrue();
+            item.TryGetProperty("movementType", out _).Should().BeTrue();
+            item.TryGetProperty("date", out _).Should().BeTrue();
+            item.TryGetProperty("amount", out _).Should().BeTrue();
+            item.TryGetProperty("currencyCode", out _).Should().BeTrue();
+            item.TryGetProperty("currencySymbol", out _).Should().BeTrue();
+            item.TryGetProperty("isCleared", out _).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task GetMovements_RespectsPaginationParams()
+    {
+        var response = await _client.GetAsync("/api/movements?page=2&pageSize=10");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("page").GetInt32().Should().Be(2);
+        body.GetProperty("pageSize").GetInt32().Should().Be(10);
+        body.GetProperty("items").GetArrayLength().Should().BeLessThanOrEqualTo(10);
     }
 }
