@@ -41,7 +41,7 @@ function netWorthClass(value: number): string {
 
 function SingleCurrency({ entry }: { entry: NetWorthEntry }) {
   return (
-    <dl className="space-y-2">
+    <dl className="max-w-xs space-y-3">
       <StatRow
         label="Assets"
         value={<Numeric>{entry.currencySymbol} {entry.assets.toFixed(2)}</Numeric>}

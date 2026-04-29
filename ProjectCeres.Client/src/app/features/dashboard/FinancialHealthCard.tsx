@@ -119,12 +119,12 @@ function SpendableEquation({ data }: { data: HealthDto }) {
 
 function RunwayPanel({ data }: { data: HealthDto }) {
   return (
-    <div>
+    <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel>Runway</PanelLabel>
       {data.runwayMonths === null ? (
         <PanelEmpty>Needs 6 months of expense history</PanelEmpty>
       ) : (
-        <Numeric className={`text-lg font-bold ${runwayClass(data.runwayMonths)}`}>
+        <Numeric className={`text-2xl font-bold ${runwayClass(data.runwayMonths)}`}>
           {data.runwayMonths.toFixed(1)} mo
         </Numeric>
       )}
@@ -134,12 +134,12 @@ function RunwayPanel({ data }: { data: HealthDto }) {
 
 function IncomeDeltaPanel({ data }: { data: HealthDto }) {
   return (
-    <div>
+    <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel>Income vs. Avg</PanelLabel>
       {data.incomeDeltaPercent === null ? (
         <PanelEmpty>Needs 6 months of income history</PanelEmpty>
       ) : (
-        <Numeric className={`text-lg font-bold ${incomeDeltaClass(data.incomeDeltaPercent)}`}>
+        <Numeric className={`text-2xl font-bold ${incomeDeltaClass(data.incomeDeltaPercent)}`}>
           {data.incomeDeltaPercent >= 0 ? '+' : ''}{(data.incomeDeltaPercent * 100).toFixed(1)}%
         </Numeric>
       )}
@@ -149,12 +149,12 @@ function IncomeDeltaPanel({ data }: { data: HealthDto }) {
 
 function BurnRatePanel({ data }: { data: HealthDto }) {
   return (
-    <div>
+    <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel>Budget Burn Rate</PanelLabel>
       {data.budgetBurnRate === null ? (
         <PanelEmpty>No active category budgets</PanelEmpty>
       ) : (
-        <Numeric className={`text-lg font-bold ${burnRateClass(data.budgetBurnRate)}`}>
+        <Numeric className={`text-2xl font-bold ${burnRateClass(data.budgetBurnRate)}`}>
           {(data.budgetBurnRate * 100).toFixed(1)}%
         </Numeric>
       )}

@@ -18,10 +18,10 @@ export function RemindersCard() {
         {loading && <Skeleton className="h-6 w-32" />}
         {error && <CardError section="Reminders" onRetry={refetch} />}
         {data && data.remindersDueCount === 0 && (
-          <p className="flex items-center gap-2 text-sm text-foreground">
-            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
-            All caught up
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 min-h-[120px]">
+            <CheckCircle2 className="h-12 w-12 text-success" aria-hidden="true" />
+            <p className="text-base font-medium text-foreground">All caught up</p>
+          </div>
         )}
         {data && data.remindersDueCount > 0 && (
           <p className="text-sm">
