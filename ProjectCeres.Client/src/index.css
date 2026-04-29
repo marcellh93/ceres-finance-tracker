@@ -119,6 +119,7 @@
     --sidebar-accent-foreground: oklch(0.300 0.080 195);
     --sidebar-border: oklch(0.910 0.005 285);
     --sidebar-ring: oklch(0.520 0.110 195);
+    --sidebar-w: 240px;
 }
 
 .dark {
@@ -163,6 +164,10 @@
     --sidebar-accent-foreground: oklch(0.900 0.040 195);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.770 0.130 180);
+}
+
+html.sidebar-collapsed {
+    --sidebar-w: 56px;
 }
 
 @layer base {
