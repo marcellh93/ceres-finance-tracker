@@ -29,7 +29,7 @@ describe('RemindersCard', () => {
       }),
     );
     renderCard();
-    await screen.findByText('No reminders due.');
+    await screen.findByText('All caught up');
   });
 
   it('renders the count and "View all →" link when count > 0', async () => {

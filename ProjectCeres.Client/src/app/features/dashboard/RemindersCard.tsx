@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
@@ -17,7 +18,10 @@ export function RemindersCard() {
         {loading && <Skeleton className="h-6 w-32" />}
         {error && <CardError section="Reminders" onRetry={refetch} />}
         {data && data.remindersDueCount === 0 && (
-          <p className="text-sm text-muted-foreground">No reminders due.</p>
+          <p className="flex items-center gap-2 text-sm text-foreground">
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+            All caught up
+          </p>
         )}
         {data && data.remindersDueCount > 0 && (
           <p className="text-sm">
