@@ -98,6 +98,10 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapControllerRoute(
+    name: "app",
+    pattern: "app/{*path}",
+    defaults: new { controller = "App", action = "Index" });
+app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
