@@ -10,6 +10,10 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Numeric } from '@/components/Numeric';
+import { StatTile } from '@/components/StatTile';
+import { StatRow } from '@/components/StatRow';
+import { EquationRow } from '@/components/EquationRow';
 
 export function Components() {
   return (
@@ -138,6 +142,48 @@ export function Components() {
           <p className="text-sm">
             Press <Kbd>⌘K</Kbd> to open search.
           </p>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Stat components</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl">
+            <Card>
+              <CardHeader><CardTitle>StatTile (vertical)</CardTitle></CardHeader>
+              <CardContent>
+                <StatTile
+                  label="Total Spent"
+                  value={<Numeric>€ 1,234.56</Numeric>}
+                  valueClassName="text-2xl font-bold text-success"
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>StatRow (inline)</CardTitle></CardHeader>
+              <CardContent>
+                <dl className="space-y-2">
+                  <StatRow label="Income" value={<Numeric className="text-success">€ 3,200.00</Numeric>} />
+                  <StatRow label="Expenses" value={<Numeric className="text-destructive">€ 1,850.45</Numeric>} />
+                  <StatRow label="Savings Rate" value={<Numeric>42.2%</Numeric>} />
+                </dl>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>EquationRow (compact)</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-1">
+                  <EquationRow label="Liquid" value={<Numeric>€ 1,200.20</Numeric>} />
+                  <EquationRow label="Bills due (7 days)" value={<Numeric>−€ 770.00</Numeric>} />
+                  <EquationRow
+                    label="Available today"
+                    value={<Numeric className="text-base font-bold text-success">€ 430.20</Numeric>}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </section>
       </div>
     </TooltipProvider>
