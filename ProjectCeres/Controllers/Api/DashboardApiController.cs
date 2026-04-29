@@ -178,11 +178,11 @@ public class DashboardApiController(
     {
         var settings = await settingsService.GetAsync();
         var currencyId = settings.DefaultCurrencyId;
+        var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
 
         var today = DateOnly.FromDateTime(DateTime.Today);
-        var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-5);
+        var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-11);
 
-        // Load all transactions for the 6-month window once — avoids N+1
         var allTransactions = await db.Transactions
             .Where(t => t.Date >= windowStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
@@ -191,9 +191,9 @@ public class DashboardApiController(
             .AsNoTracking()
             .ToListAsync();
 
-        var result = new List<object>();
+        var points = new List<IncomeExpensePoint>();
 
-        for (int i = 5; i >= 0; i--)
+        for (int i = 11; i >= 0; i--)
         {
             var monthStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
             var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
@@ -203,15 +203,13 @@ public class DashboardApiController(
             var income   = monthTx.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
             var expenses = monthTx.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
 
-            result.Add(new
-            {
-                month    = monthStart.ToString("yyyy-MM"),
-                income   = Math.Round(income, 2),
-                expenses = Math.Round(expenses, 2)
-            });
+            points.Add(new IncomeExpensePoint(
+                Month: monthStart.ToString("yyyy-MM"),
+                Income: Math.Round(income, 2),
+                Expenses: Math.Round(expenses, 2)));
         }
 
-        return Ok(result);
+        return Ok(new IncomeExpenseDto(currency.Code, currency.Symbol, points));
     }
 
     [HttpGet("spending-by-category")]
