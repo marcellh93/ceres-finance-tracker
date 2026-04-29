@@ -18,9 +18,13 @@ export function PagePlaceholder({ title, description }: PagePlaceholderProps) {
   }, []);
 
   return (
-    <Card className="mx-auto max-w-2xl">
+    <Card className="max-w-2xl">
       <CardHeader>
-        <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold">
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-2xl font-semibold outline-none"
+        >
           {title}
         </h1>
       </CardHeader>
