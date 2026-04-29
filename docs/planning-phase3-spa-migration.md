@@ -1,8 +1,8 @@
 # Phase 3 — MVC → SPA Migration Plan
 
-> **Status: Base plan only.** To be refined at Phase 3 kickoff, after Phase 2 is fully complete. Do not treat any item here as locked — the controller inventory, route map, and `Program.cs` changes will shift as Phase 2 progresses. Revisit every section before starting implementation.
+> **Status: Approach locked 2026-04-28.** Design-first, migrate feature by feature — each area is fully API-tested, then React-built, then Razor-deleted. Never a big-bang deletion. Hosting model: Option A (React served from ASP.NET Core `wwwroot/`). See full spec: [`docs/superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md`](superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md). Controller inventory, route map, and `Program.cs` changes still need a final audit at implementation kickoff.
 
-**Prerequisite:** Phase 2 must be fully complete. The architectural decision to go full SPA at Phase 3 is committed — see [architecture.md](architecture.md#phase-3--full-spa-evaluation-point). This document is the execution plan for that decision.
+**Prerequisite:** Phase 2 is complete (as of 2026-04-28). The architectural decision to go full SPA at Phase 3 is committed — see [architecture.md](architecture.md#phase-3--full-spa-evaluation-point). This document is the execution plan for that decision.
 
 ---
 
@@ -138,13 +138,11 @@ Specific changes required to the ASP.NET Core pipeline at Phase 3:
 
 ## 7. Hosting model for the React SPA
 
-**Decision at Phase 3 kickoff — two options:**
+**Decision (locked 2026-04-28): Option A.** React build output is copied to ASP.NET Core `wwwroot/` and served as static files with `app.MapFallbackToFile("index.html")` for React Router. One deployable unit, no separate web server. Simplest for the invite-only beta.
 
-**Option A — Serve React build from ASP.NET Core (`wwwroot/`):** React build output is copied to `wwwroot/`; ASP.NET Core serves it as static files with a catch-all fallback to `index.html` for React Router. One deployable unit, no separate web server needed. Simpler for an invite-only beta.
+**Revisit at Phase 4** if a mobile client is added — that would warrant Option B (separate origins served by nginx or Caddy, ASP.NET Core as a pure API behind CORS).
 
-**Option B — Separate origins:** nginx or Caddy serves the React SPA; ASP.NET Core is a pure API. Requires CORS and two processes in production. Better if a mobile client is added in Phase 4.
-
-**Default recommendation:** Option A for Phase 3. Revisit at Phase 4 if a mobile app is added. Record the final decision in an ADR at kickoff.
+Record the final decision in an ADR at implementation kickoff.
 
 ---
 
