@@ -10,7 +10,7 @@ export function AppLayout() {
   const isDesktop = useMediaQuery('(min-width: 640px)');
 
   return (
-    <div className="grid min-h-screen grid-rows-[3.5rem_1fr] bg-background text-foreground">
+    <div className="grid h-screen grid-rows-[3.5rem_1fr] bg-background text-foreground">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-1.5 focus:text-primary-foreground"
