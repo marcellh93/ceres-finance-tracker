@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
+import { StatRow } from '@/components/StatRow';
 import { useApi } from '../../lib/use-api';
 import { CardError } from './CardError';
 import { SUMMARY_URL, type SummaryDto } from './api';
@@ -30,29 +31,19 @@ export function MtdCard() {
           <p className="text-sm text-muted-foreground">No transactions this month yet.</p>
         )}
         {data && (data.mtd.income !== 0 || data.mtd.expenses !== 0) && (
-          <dl className="space-y-2 text-sm">
-            <div className="flex items-baseline justify-between">
-              <dt className="text-muted-foreground">Income</dt>
-              <dd>
-                <Numeric className="text-success">
-                  {data.mtd.currencySymbol} {data.mtd.income.toFixed(2)}
-                </Numeric>
-              </dd>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <dt className="text-muted-foreground">Expenses</dt>
-              <dd>
-                <Numeric className="text-destructive">
-                  {data.mtd.currencySymbol} {data.mtd.expenses.toFixed(2)}
-                </Numeric>
-              </dd>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <dt className="text-muted-foreground">Savings Rate</dt>
-              <dd>
-                <Numeric>{formatPercent(data.mtd.savingsRate)}</Numeric>
-              </dd>
-            </div>
+          <dl className="space-y-2">
+            <StatRow
+              label="Income"
+              value={<Numeric className="text-success">{data.mtd.currencySymbol} {data.mtd.income.toFixed(2)}</Numeric>}
+            />
+            <StatRow
+              label="Expenses"
+              value={<Numeric className="text-destructive">{data.mtd.currencySymbol} {data.mtd.expenses.toFixed(2)}</Numeric>}
+            />
+            <StatRow
+              label="Savings Rate"
+              value={<Numeric>{formatPercent(data.mtd.savingsRate)}</Numeric>}
+            />
           </dl>
         )}
       </CardContent>
