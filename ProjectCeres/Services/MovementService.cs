@@ -19,11 +19,12 @@ public class MovementService : IMovementService
         DateOnly? from = null,
         DateOnly? to = null,
         int limit = 50,
-        int offset = 0)
+        int offset = 0,
+        string? q = null)
     {
-        var transactions = await QueryTransactions(accountId, from, to);
-        var transfers    = await QueryTransfers(accountId, from, to);
-        var payments     = await QueryLiabilityPayments(accountId, from, to);
+        var transactions = await QueryTransactions(accountId, from, to, q);
+        var transfers    = await QueryTransfers(accountId, from, to, q);
+        var payments     = await QueryLiabilityPayments(accountId, from, to, q);
 
         return transactions
             .Concat(transfers)
@@ -38,11 +39,12 @@ public class MovementService : IMovementService
     public async Task<int> CountAsync(
         Guid? accountId = null,
         DateOnly? from = null,
-        DateOnly? to = null)
+        DateOnly? to = null,
+        string? q = null)
     {
-        var transactions = await QueryTransactions(accountId, from, to);
-        var transfers    = await QueryTransfers(accountId, from, to);
-        var payments     = await QueryLiabilityPayments(accountId, from, to);
+        var transactions = await QueryTransactions(accountId, from, to, q);
+        var transfers    = await QueryTransfers(accountId, from, to, q);
+        var payments     = await QueryLiabilityPayments(accountId, from, to, q);
 
         return transactions.Count + transfers.Count + payments.Count;
     }
@@ -52,7 +54,7 @@ public class MovementService : IMovementService
     // -------------------------------------------------------------------------
 
     private async Task<List<MovementListItemViewModel>> QueryTransactions(
-        Guid? accountId, DateOnly? from, DateOnly? to)
+        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
     {
         var query = _db.Transactions
             .Include(t => t.Account).ThenInclude(a => a.Currency)
@@ -65,6 +67,10 @@ public class MovementService : IMovementService
             query = query.Where(t => t.Date >= from.Value);
         if (to.HasValue)
             query = query.Where(t => t.Date <= to.Value);
+        if (!string.IsNullOrWhiteSpace(q))
+            query = query.Where(t =>
+                EF.Functions.ILike(t.Description ?? "", $"%{q}%") ||
+                EF.Functions.ILike(t.Category.Name, $"%{q}%"));
 
         return await query.Select(t => new MovementListItemViewModel
         {
@@ -85,7 +91,7 @@ public class MovementService : IMovementService
     }
 
     private async Task<List<MovementListItemViewModel>> QueryTransfers(
-        Guid? accountId, DateOnly? from, DateOnly? to)
+        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
     {
         var query = _db.Transfers
             .Include(t => t.SourceAccount).ThenInclude(a => a.Currency)
@@ -98,6 +104,8 @@ public class MovementService : IMovementService
             query = query.Where(t => t.Date >= from.Value);
         if (to.HasValue)
             query = query.Where(t => t.Date <= to.Value);
+        if (!string.IsNullOrWhiteSpace(q))
+            query = query.Where(t => EF.Functions.ILike(t.Description ?? "", $"%{q}%"));
 
         return await query.Select(t => new MovementListItemViewModel
         {
@@ -117,7 +125,7 @@ public class MovementService : IMovementService
     }
 
     private async Task<List<MovementListItemViewModel>> QueryLiabilityPayments(
-        Guid? accountId, DateOnly? from, DateOnly? to)
+        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
     {
         var query = _db.LiabilityPayments
             .Include(p => p.AssetAccount)
@@ -130,6 +138,8 @@ public class MovementService : IMovementService
             query = query.Where(p => p.Date >= from.Value);
         if (to.HasValue)
             query = query.Where(p => p.Date <= to.Value);
+        if (!string.IsNullOrWhiteSpace(q))
+            query = query.Where(p => EF.Functions.ILike(p.Description ?? "", $"%{q}%"));
 
         return await query.Select(p => new MovementListItemViewModel
         {

@@ -9,10 +9,12 @@ public interface IMovementService
         DateOnly? from = null,
         DateOnly? to = null,
         int limit = 50,
-        int offset = 0);
+        int offset = 0,
+        string? q = null);
 
     Task<int> CountAsync(
         Guid? accountId = null,
         DateOnly? from = null,
-        DateOnly? to = null);
+        DateOnly? to = null,
+        string? q = null);
 }

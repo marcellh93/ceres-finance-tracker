@@ -250,4 +250,87 @@ public class MovementServiceTests : IAsyncLifetime
 
         count.Should().Be(2);
     }
+
+    // -------------------------------------------------------------------------
+    // Sync seed helpers for q-filter tests
+    // -------------------------------------------------------------------------
+
+    private Account SeedAssetAccount(AppDbContext db, string name)
+    {
+        var account = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = name,
+            AccountTypeId = 1,
+            CurrencyId    = 1,
+            IsActive      = true
+        };
+        db.Accounts.Add(account);
+        return account;
+    }
+
+    private void SeedTransaction(AppDbContext db, Guid accountId, Guid categoryId, decimal amount, string description)
+    {
+        var txn = new Transaction
+        {
+            Id          = Guid.NewGuid(),
+            Date        = DateOnly.FromDateTime(DateTime.UtcNow),
+            Amount      = amount,
+            AccountId   = accountId,
+            CategoryId  = categoryId,
+            Description = description,
+            IsCleared   = false,
+            CreatedAt   = DateTime.UtcNow
+        };
+        db.Transactions.Add(txn);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetRecentAsync — q text-search filter
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetRecent_FiltersByDescriptionOrCategoryName_WhenQProvided()
+    {
+        var db = _fixture.Db;
+        var svc = _service;
+
+        var account = SeedAssetAccount(db, "Checking");
+        SeedTransaction(db, account.Id, SalaryCategoryId, amount: 100, description: "March salary");
+        SeedTransaction(db, account.Id, HousingCategoryId, amount: 800, description: "Rent payment");
+        SeedTransaction(db, account.Id, SalaryCategoryId, amount: 200, description: "Bonus");
+        await db.SaveChangesAsync();
+
+        // Match by description
+        var rentResults = await svc.GetRecentAsync(q: "rent");
+        rentResults.Should().HaveCount(1);
+        rentResults[0].Description.Should().Be("Rent payment");
+
+        // Match by category name (Salary category)
+        var salaryResults = await svc.GetRecentAsync(q: "salary");
+        salaryResults.Should().HaveCount(2);
+
+        // Empty q returns all
+        var allResults = await svc.GetRecentAsync(q: "");
+        allResults.Should().HaveCount(3);
+
+        // Null q returns all
+        var nullResults = await svc.GetRecentAsync(q: null);
+        nullResults.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task Count_RespectsQFilter()
+    {
+        var db = _fixture.Db;
+        var svc = _service;
+
+        var account = SeedAssetAccount(db, "Checking");
+        SeedTransaction(db, account.Id, SalaryCategoryId, amount: 100, description: "March salary");
+        SeedTransaction(db, account.Id, HousingCategoryId, amount: 800, description: "Rent payment");
+        await db.SaveChangesAsync();
+
+        (await svc.CountAsync(q: "rent")).Should().Be(1);
+        (await svc.CountAsync(q: null)).Should().Be(2);
+    }
 }
