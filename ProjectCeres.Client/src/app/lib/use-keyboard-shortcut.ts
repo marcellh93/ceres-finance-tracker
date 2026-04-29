@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-function isMac(): boolean {
+export function isMac(): boolean {
   return /Mac|iPhone|iPad/.test(navigator.userAgent);
 }
 

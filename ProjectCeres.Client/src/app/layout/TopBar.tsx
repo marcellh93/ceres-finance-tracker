@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Kbd } from '@/components/ui/kbd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SearchModal } from '../components/SearchModal';
-import { useKeyboardShortcut } from '../lib/use-keyboard-shortcut';
+import { isMac, useKeyboardShortcut } from '../lib/use-keyboard-shortcut';
 import { useMediaQuery } from '../lib/use-media-query';
 
 type TopBarProps = {
@@ -51,7 +51,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           >
             <Search className="h-4 w-4" aria-hidden="true" />
             <span className="flex-1 text-left">Search transactions, accounts…</span>
-            <Kbd>⌘K</Kbd>
+            <Kbd>{isMac() ? '⌘K' : 'Ctrl+K'}</Kbd>
           </button>
         ) : (
           <Button
