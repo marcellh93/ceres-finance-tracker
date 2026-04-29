@@ -165,3 +165,24 @@ Do not delete Razor in a single "big bang" PR. Port feature area by feature area
 5. Budgets + Reports
 6. Accounts + Categories + Recurring Transactions
 7. Settings + Session management + Support tickets
+
+### Per-area redirect rules (during migration)
+
+When a feature area is fully ported and its Razor view is deleted, the corresponding Razor controller action stops returning a `View()` and starts returning a **302 (Found, temporary)** redirect to the SPA route under `/app/...`. Example pattern in the controller:
+
+```csharp
+public IActionResult Index() => Redirect("/app/");
+```
+
+ASP.NET Core's `Redirect()` defaults to 302. **Do not use 301 (`RedirectPermanent`) for these migration redirects** — 301s cache aggressively in browsers and search engines, which makes rollback during migration painful. The redirect itself is throwaway: it disappears entirely in the final cleanup (see below).
+
+### Final cleanup plan (after every Razor view is gone)
+
+Once no Razor views remain (the last feature is ported), a single dedicated cleanup plan does the following in one sweep:
+
+1. **Drop the `/app/` prefix.** React Router `basename` changes from `/app` to `/`. The Razor host view's catch-all route changes from `app/{*path}` to `{*path}` (or equivalent fallback) so the SPA serves at `/` directly.
+2. **Add one-shot 301 redirects** from `/app/*` to `/*` to catch external bookmarks and any cached deep links. These are 301 (permanent) because the move is genuinely permanent.
+3. **Delete every per-area 302 redirect** (`/Dashboard`, `/Movements`, etc.) added during migration — they served their purpose and now point to URLs that no longer exist.
+4. **Strip MVC infrastructure from `Program.cs`** as already noted in step 5 of the migration sequence above.
+
+Net result: a clean URL space (`/`, `/transactions`, etc.) with one one-shot `/app/*` → `/*` 301 catching legacy URLs. Both the migration 302s and the `/app/` prefix vanish.
