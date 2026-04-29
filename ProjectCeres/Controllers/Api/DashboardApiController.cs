@@ -8,12 +8,20 @@ namespace ProjectCeres.Controllers.Api;
 [ApiController]
 [Route("api/dashboard")]
 public class DashboardApiController(
+    IDashboardService dashboardService,
     ICategoryBudgetService categoryBudgetService,
     IBudgetService budgetService,
     ISettingsService settingsService,
     IAccountService accountService,
     AppDbContext db) : ControllerBase
 {
+    [HttpGet("health")]
+    public async Task<IActionResult> GetHealth()
+    {
+        var snapshot = await dashboardService.GetHealthSnapshotAsync();
+        return Ok(snapshot);
+    }
+
     [HttpGet("category-budgets")]
     public async Task<IActionResult> GetCategoryBudgets()
     {

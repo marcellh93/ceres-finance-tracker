@@ -145,4 +145,40 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
             item.TryGetProperty("netFlow", out _).Should().BeTrue();
         }
     }
+
+    [Fact]
+    public async Task GetHealth_Returns200_WithExpectedShape()
+    {
+        var response = await _client.GetAsync("/api/dashboard/health");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Object);
+
+        // All 12 documented fields must be present (values may be null).
+        var requiredFields = new[]
+        {
+            "availableToday", "safeToSpend", "imminentBills", "laterBills",
+            "budgetReserve", "runwayMonths", "currentMonthIncome",
+            "rollingAverageIncome", "incomeDeltaPercent", "budgetBurnRate",
+            "currencyCode", "currencySymbol",
+        };
+        foreach (var field in requiredFields)
+        {
+            body.TryGetProperty(field, out _).Should().BeTrue($"field {field} must be present");
+        }
+    }
+
+    [Fact]
+    public async Task GetHealth_CurrencyCodeAndSymbol_AreNonNullStrings()
+    {
+        var response = await _client.GetAsync("/api/dashboard/health");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        body.GetProperty("currencyCode").ValueKind.Should().Be(JsonValueKind.String);
+        body.GetProperty("currencySymbol").ValueKind.Should().Be(JsonValueKind.String);
+        body.GetProperty("currencyCode").GetString().Should().NotBeNullOrEmpty();
+        body.GetProperty("currencySymbol").GetString().Should().NotBeNullOrEmpty();
+    }
 }
