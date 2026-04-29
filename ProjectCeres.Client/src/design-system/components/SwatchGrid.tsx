@@ -27,16 +27,22 @@ function SwatchCard({ swatch }: { swatch: Swatch }) {
 
   useEffect(() => {
     if (!ref.current) return;
-    const styles = getComputedStyle(ref.current);
-    const bg = styles.backgroundColor;
+    const bg = getComputedStyle(ref.current).backgroundColor;
     let ratio: string | undefined;
     if (swatch.contrastAgainst) {
-      const probe = document.createElement('div');
-      probe.style.color = `var(--${swatch.contrastAgainst})`;
-      ref.current.appendChild(probe);
-      const fg = getComputedStyle(probe).color;
-      ref.current.removeChild(probe);
-      ratio = formatRatio(contrastRatio(bg, fg));
+      try {
+        const probe = document.createElement('div');
+        probe.style.color = `var(--${swatch.contrastAgainst})`;
+        ref.current.appendChild(probe);
+        const fg = getComputedStyle(probe).color;
+        ref.current.removeChild(probe);
+        ratio = formatRatio(contrastRatio(bg, fg));
+      } catch {
+        // Browser returned a non-rgb() color (e.g. oklch()) that the
+        // contrast helper can't parse yet. Skip the ratio rather than
+        // crash the page; track in design-system.md known limitations.
+        ratio = undefined;
+      }
     }
     setInfo({ rgb: bg, ratio });
   }, [swatch.token, swatch.contrastAgainst]);
