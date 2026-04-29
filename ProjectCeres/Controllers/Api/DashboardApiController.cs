@@ -250,25 +250,23 @@ public class DashboardApiController(
     {
         var settings = await settingsService.GetAsync();
         var currencyId = settings.DefaultCurrencyId;
+        var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
 
         var accounts = await db.Accounts
             .Where(a => a.IsActive && a.CurrencyId == currencyId && a.AccountType.Name != "Liability")
             .AsNoTracking()
             .ToListAsync();
 
-        var rows = new List<(string Name, decimal Balance)>();
+        var rowList = new List<AccountBalanceRow>();
         foreach (var account in accounts)
         {
             var balance = await accountService.GetBalanceAsync(account.Id);
-            rows.Add((account.Name, Math.Round(balance, 2)));
+            rowList.Add(new AccountBalanceRow(account.Name, Math.Round(balance, 2)));
         }
 
-        var result = rows
-            .OrderByDescending(r => r.Balance)
-            .Select(r => new { accountName = r.Name, balance = r.Balance })
-            .ToList<object>();
+        var rows = rowList.OrderByDescending(r => r.Balance).ToList();
 
-        return Ok(result);
+        return Ok(new AccountBalancesDto(currency.Code, currency.Symbol, rows));
     }
 
     [HttpGet("cash-flow")]
@@ -276,11 +274,11 @@ public class DashboardApiController(
     {
         var settings = await settingsService.GetAsync();
         var currencyId = settings.DefaultCurrencyId;
+        var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
 
         var today = DateOnly.FromDateTime(DateTime.Today);
-        var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-5);
+        var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-11);
 
-        // Load all transactions for the 6-month window once — avoids N+1
         var allTransactions = await db.Transactions
             .Where(t => t.Date >= windowStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
@@ -289,9 +287,9 @@ public class DashboardApiController(
             .AsNoTracking()
             .ToListAsync();
 
-        var result = new List<object>();
+        var points = new List<CashFlowPoint>();
 
-        for (int i = 5; i >= 0; i--)
+        for (int i = 11; i >= 0; i--)
         {
             var monthStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
             var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
@@ -301,13 +299,11 @@ public class DashboardApiController(
             var income   = monthTx.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
             var expenses = monthTx.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
 
-            result.Add(new
-            {
-                month   = monthStart.ToString("yyyy-MM"),
-                netFlow = Math.Round(income - expenses, 2)
-            });
+            points.Add(new CashFlowPoint(
+                Month: monthStart.ToString("yyyy-MM"),
+                NetFlow: Math.Round(income - expenses, 2)));
         }
 
-        return Ok(result);
+        return Ok(new CashFlowDto(currency.Code, currency.Symbol, points));
     }
 }
