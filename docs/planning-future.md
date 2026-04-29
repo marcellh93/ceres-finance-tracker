@@ -220,6 +220,20 @@ Upload a receipt image (or scan via phone) → an LLM parses it → the transact
 
 **Gate:** Only worth considering after Phase 3 (auth + multi-user) is stable, and only if the app is in consistent daily use.
 
+### TanStack Query (server-data caching layer)
+
+A drop-in `useQuery`/`useMutation` library that wraps `fetch` and adds: cross-component cache by key, stale-while-revalidate, refetch on tab focus, retry with exponential backoff, request deduplication, and mutation-driven cache invalidation. Industry standard for React data fetching; ~13KB gzipped + a `QueryClientProvider` at the root.
+
+**Why not now:** the Phase 3 SPA pages each fetch independent data with no overlap. The `useApi` hook in `src/app/lib/use-api.ts` covers the loading/data/error/refetch lifecycle for one component at a time, which is all we need.
+
+**Adopt when any of these become true:**
+- Two pages share a data source (e.g. a sidebar unread-count and a dashboard unread-count both hit the same endpoint — should share one cache, not double-fetch).
+- We add mutations that should invalidate related queries across pages (e.g. creating a transaction should refresh the dashboard, the Transactions page, and the Movements page in one declaration).
+- We have 5+ pages with their own ad-hoc fetch state and the boilerplate starts wearing thin.
+- We want optimistic updates or offline reads.
+
+Migration path: introduce `QueryClientProvider` in `src/app/main.tsx`, replace `useApi` call sites with `useQuery` one page at a time. The two patterns coexist during migration.
+
 ---
 
 ## Phase 5 — Business Model
