@@ -66,9 +66,7 @@ export function Components() {
         <section>
           <h2 className="mb-4 text-xl font-medium">Tooltip</h2>
           <Tooltip>
-            <TooltipTrigger>
-              <Button variant="outline">Hover me</Button>
-            </TooltipTrigger>
+            <TooltipTrigger render={<Button variant="outline">Hover me</Button>} />
             <TooltipContent>Tooltip content here</TooltipContent>
           </Tooltip>
         </section>
