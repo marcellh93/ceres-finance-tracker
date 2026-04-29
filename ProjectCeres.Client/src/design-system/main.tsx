@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import '../index.css';
 import { App } from './App';
 
@@ -9,8 +9,8 @@ if (!root) throw new Error('design-system root element missing');
 
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter basename="/design-system.html">
+    <HashRouter>
       <App />
-    </BrowserRouter>
+    </HashRouter>
   </StrictMode>,
 );

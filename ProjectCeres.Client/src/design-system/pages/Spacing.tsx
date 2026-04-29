@@ -15,7 +15,10 @@ export function Spacing() {
           {spacingSteps.map((n) => (
             <div key={n} className="flex items-center gap-3 text-sm">
               <code className="w-12 text-muted-foreground">p-{n}</code>
-              <div className={`bg-primary h-3 w-${n}`} />
+              <div
+                className="bg-primary h-3"
+                style={{ width: `${n * 0.25}rem` }}
+              />
               <span className="text-muted-foreground">{n * 0.25}rem</span>
             </div>
           ))}

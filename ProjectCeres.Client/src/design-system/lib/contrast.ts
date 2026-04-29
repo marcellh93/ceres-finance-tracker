@@ -1,7 +1,7 @@
 function parseRgb(input: string): [number, number, number] {
   const m = input.match(/rgba?\(([^)]+)\)/i);
   if (!m) throw new Error(`Cannot parse color: ${input}`);
-  const parts = m[1].split(',').map((s) => parseFloat(s.trim()));
+  const parts = m[1].split(/[\s,]+/).map((s) => parseFloat(s.trim())).filter((n) => !Number.isNaN(n));
   return [parts[0], parts[1], parts[2]];
 }
 

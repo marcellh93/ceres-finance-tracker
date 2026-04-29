@@ -15,6 +15,10 @@ describe('contrastRatio', () => {
     const b = contrastRatio('rgb(200,210,220)', 'rgb(20,40,60)');
     expect(a).toBeCloseTo(b, 4);
   });
+
+  it('handles space-separated rgb() syntax', () => {
+    expect(contrastRatio('rgb(0 0 0)', 'rgb(255 255 255)')).toBeCloseTo(21, 0);
+  });
 });
 
 describe('formatRatio', () => {
