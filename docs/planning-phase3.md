@@ -142,16 +142,7 @@ The navigation shell, global search, per-table search and saved searches, form f
 
 ### 6. Brand foundation
 
-Resolve all of these as design decisions before writing any component. Write outcomes into `docs/design-system.md` at Phase 3 kickoff.
-
-- **Color palette** — primary brand color, surface colors, semantic colors (success, warning, destructive, info). All as CSS custom properties — not hardcoded Tailwind classes.
-- **Typography** — one typeface, size scale (xs → 4xl), weight scale, line heights.
-- **Spacing scale** — confirm Tailwind default or define custom. No magic numbers.
-- **Border radius scale** — sm / md / lg / full. One value per level, used consistently.
-- **Shadow scale** — subtle / default / elevated. Communicates depth hierarchy.
-- **Chart color palette** — 6–8 distinct accessible colors, separate from brand palette.
-- **Motion tokens** — transition duration and easing defined once, not duplicated.
-- **shadcn/ui token override strategy** — override CSS variables with Ceres brand values; document which are overridden vs. left at shadcn defaults.
+**Status: Resolved.** All brand tokens — color palette (deep teal primary + zinc neutrals + emerald/rose/amber/sky semantics + 8-color chart palette), typography (Inter + IBM Plex Mono), spacing, radius, shadow, motion, and shadcn override list — are defined in [`docs/design-system.md`](design-system.md) and live in `ProjectCeres.Client/src/index.css`. The internal `/design-system.html` route renders every token for visual reference. See plan: [`docs/superpowers/plans/2026-04-29-design-system-foundation.md`](superpowers/plans/2026-04-29-design-system-foundation.md).
 
 ---
 
