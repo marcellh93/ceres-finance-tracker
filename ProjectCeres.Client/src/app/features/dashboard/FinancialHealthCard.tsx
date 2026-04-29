@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
+import { EquationRow } from '@/components/EquationRow';
 import { useApi } from '../../lib/use-api';
 import { CardError } from './CardError';
 import { HEALTH_URL, type HealthDto } from './api';
@@ -24,7 +25,7 @@ export function FinancialHealthCard() {
         {loading && <Skeleton className="h-32 w-full" />}
         {error && <CardError section="Financial Health" onRetry={refetch} />}
         {data && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-6">
             <SpendablePanel data={data} />
             <RunwayPanel data={data} />
             <IncomeDeltaPanel data={data} />
@@ -71,39 +72,47 @@ function SpendableEquation({ data }: { data: HealthDto }) {
 
   return (
     <div className="space-y-1.5">
-      <Row label="Liquid" value={`${sym} ${liquid.toFixed(2)}`} />
+      <EquationRow label="Liquid" value={<Numeric>{sym} {liquid.toFixed(2)}</Numeric>} />
       {hasImminent && (
-        <Row label="Bills due (7 days)" value={`−${sym} ${(data.imminentBills ?? 0).toFixed(2)}`} />
+        <EquationRow
+          label="Bills due (7 days)"
+          value={<Numeric>−{sym} {(data.imminentBills ?? 0).toFixed(2)}</Numeric>}
+        />
       )}
-      <div className="border-t border-border pt-1 flex items-baseline justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Available today</span>
-        <Numeric className={`text-base font-bold ${availableTodayClass(data.availableToday!)}`}>
-          {sym} {data.availableToday!.toFixed(2)}
-        </Numeric>
+      <div className="border-t border-border mt-1 pt-2">
+        <EquationRow
+          label="Available today"
+          value={
+            <Numeric className={`text-base font-bold ${availableTodayClass(data.availableToday!)}`}>
+              {sym} {data.availableToday!.toFixed(2)}
+            </Numeric>
+          }
+        />
       </div>
       {hasLater && (
-        <Row label="Bills later this month" value={`−${sym} ${(data.laterBills ?? 0).toFixed(2)}`} />
+        <EquationRow
+          label="Bills later this month"
+          value={<Numeric>−{sym} {(data.laterBills ?? 0).toFixed(2)}</Numeric>}
+        />
       )}
       {hasReserve && (
-        <Row label="Budget reserved" value={`−${sym} ${(data.budgetReserve ?? 0).toFixed(2)}`} />
+        <EquationRow
+          label="Budget reserved"
+          value={<Numeric>−{sym} {(data.budgetReserve ?? 0).toFixed(2)}</Numeric>}
+        />
       )}
       {showSafeToSpend && (
-        <div className="border-t border-border pt-1 flex items-baseline justify-between">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Safe to spend</span>
-          <Numeric className={`text-sm font-semibold ${safeToSpendClass(data.safeToSpend!)}`}>
-            {sym} {data.safeToSpend!.toFixed(2)}
-          </Numeric>
+        <div className="border-t border-border mt-1 pt-2">
+          <EquationRow
+            label="Safe to spend"
+            value={
+              <Numeric className={`text-sm font-semibold ${safeToSpendClass(data.safeToSpend!)}`}>
+                {sym} {data.safeToSpend!.toFixed(2)}
+              </Numeric>
+            }
+          />
         </div>
       )}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-[11px] text-muted-foreground">
-      <span>{label}</span>
-      <Numeric className="text-[11px]">{value}</Numeric>
     </div>
   );
 }
