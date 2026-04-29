@@ -10,10 +10,13 @@ const baseHealth: HealthDto = {
   laterBills: 0,
   budgetReserve: 0,
   runwayMonths: 8,
+  avgMonthlyExpense: 1000,
   currentMonthIncome: 3000,
   rollingAverageIncome: 2700,
   incomeDeltaPercent: 0.111,
   budgetBurnRate: 0.45,
+  budgetSpentMtd: 143,
+  budgetTotalLimit: 350,
   currencyCode: 'EUR',
   currencySymbol: '€',
 };
@@ -96,5 +99,33 @@ describe('FinancialHealthCard', () => {
     );
     render(<FinancialHealthCard />);
     expect(await screen.findByText(/safe to spend/i)).toBeDefined();
+  });
+
+  it('Burn Rate panel shows spent/total caption when both fields are present', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(
+      mockHealth({ budgetBurnRate: 0.41, budgetSpentMtd: 143, budgetTotalLimit: 350 }),
+    );
+    render(<FinancialHealthCard />);
+    expect(await screen.findByText(/143/)).toBeDefined();
+    expect(screen.getByText(/350/)).toBeDefined();
+    expect(screen.getByText(/spent/i)).toBeDefined();
+  });
+
+  it('Runway panel shows avg-monthly-expense caption when present', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(
+      mockHealth({ runwayMonths: 8.5, avgMonthlyExpense: 1000 }),
+    );
+    render(<FinancialHealthCard />);
+    expect(await screen.findByText(/\/mo/)).toBeDefined();
+  });
+
+  it('Income vs. Avg panel shows current/rolling-avg caption when both fields are present', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(
+      mockHealth({ incomeDeltaPercent: 0.111, currentMonthIncome: 3000, rollingAverageIncome: 2700 }),
+    );
+    render(<FinancialHealthCard />);
+    expect(await screen.findByText(/\/mo/i)).toBeDefined();
+    expect(screen.getAllByText(/2700/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/ avg$/)).toBeDefined();
   });
 });

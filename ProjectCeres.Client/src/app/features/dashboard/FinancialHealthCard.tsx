@@ -118,45 +118,76 @@ function SpendableEquation({ data }: { data: HealthDto }) {
 }
 
 function RunwayPanel({ data }: { data: HealthDto }) {
+  const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel>Runway</PanelLabel>
       {data.runwayMonths === null ? (
         <PanelEmpty>Needs 6 months of expense history</PanelEmpty>
       ) : (
-        <Numeric className={`text-2xl font-bold ${runwayClass(data.runwayMonths)}`}>
-          {data.runwayMonths.toFixed(1)} mo
-        </Numeric>
+        <>
+          <Numeric className={`text-2xl font-bold ${runwayClass(data.runwayMonths)}`}>
+            {data.runwayMonths.toFixed(1)} mo
+          </Numeric>
+          {data.avgMonthlyExpense != null && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              {'at '}
+              <Numeric>{sym} {data.avgMonthlyExpense.toFixed(0)}/mo</Numeric>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 function IncomeDeltaPanel({ data }: { data: HealthDto }) {
+  const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel>Income vs. Avg</PanelLabel>
       {data.incomeDeltaPercent === null ? (
         <PanelEmpty>Needs 6 months of income history</PanelEmpty>
       ) : (
-        <Numeric className={`text-2xl font-bold ${incomeDeltaClass(data.incomeDeltaPercent)}`}>
-          {data.incomeDeltaPercent >= 0 ? '+' : ''}{(data.incomeDeltaPercent * 100).toFixed(1)}%
-        </Numeric>
+        <>
+          <Numeric className={`text-2xl font-bold ${incomeDeltaClass(data.incomeDeltaPercent)}`}>
+            {data.incomeDeltaPercent >= 0 ? '+' : ''}{(data.incomeDeltaPercent * 100).toFixed(1)}%
+          </Numeric>
+          {data.currentMonthIncome != null && data.rollingAverageIncome != null && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              <Numeric>{sym} {data.currentMonthIncome.toFixed(0)}</Numeric>
+              {' vs '}
+              <Numeric>{sym} {data.rollingAverageIncome.toFixed(0)}</Numeric>
+              {' avg'}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 function BurnRatePanel({ data }: { data: HealthDto }) {
+  const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel>Budget Burn Rate</PanelLabel>
       {data.budgetBurnRate === null ? (
         <PanelEmpty>No active category budgets</PanelEmpty>
       ) : (
-        <Numeric className={`text-2xl font-bold ${burnRateClass(data.budgetBurnRate)}`}>
-          {(data.budgetBurnRate * 100).toFixed(1)}%
-        </Numeric>
+        <>
+          <Numeric className={`text-2xl font-bold ${burnRateClass(data.budgetBurnRate)}`}>
+            {(data.budgetBurnRate * 100).toFixed(1)}%
+          </Numeric>
+          {data.budgetSpentMtd != null && data.budgetTotalLimit != null && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              <Numeric>{sym} {data.budgetSpentMtd.toFixed(0)}</Numeric>
+              {' / '}
+              <Numeric>{sym} {data.budgetTotalLimit.toFixed(0)}</Numeric>
+              {' spent'}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
