@@ -129,4 +129,72 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         attachments[0].GetProperty("sizeBytes").GetInt64().Should().Be(4096);
         attachments[0].GetProperty("contentType").GetString().Should().Be("application/pdf");
     }
+
+    [Fact]
+    public async Task Put_Returns204_AndUpdatesFields()
+    {
+        var (accountId, txId) = await SeedTransactionAsync();
+
+        var response = await _client.PutAsJsonAsync($"/api/transactions/{txId}", new
+        {
+            date        = "2026-04-20",
+            amount      = 99.00m,
+            accountId   = accountId,
+            categoryId  = HousingCategoryId,
+            description = "Updated",
+            isCleared   = true
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var saved = await db.Transactions.FindAsync(txId);
+        saved!.Amount.Should().Be(99.00m);
+        saved.Description.Should().Be("Updated");
+        saved.IsCleared.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Put_Returns422_WhenAmountZero()
+    {
+        var (accountId, txId) = await SeedTransactionAsync();
+
+        var response = await _client.PutAsJsonAsync($"/api/transactions/{txId}", new
+        {
+            date        = "2026-04-20",
+            amount      = 0m,
+            accountId   = accountId,
+            categoryId  = HousingCategoryId,
+            isCleared   = false
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Put_Returns404_WhenIdMissing()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account = new Account
+        {
+            Id = Guid.NewGuid(), Name = $"Tx-Put-Missing-{Guid.NewGuid():N}",
+            AccountTypeId = 1, CurrencyId = 1, IsActive = true
+        };
+        db.Accounts.Add(account);
+        await db.SaveChangesAsync();
+        _seededAccountIds.Add(account.Id);
+
+        var response = await _client.PutAsJsonAsync($"/api/transactions/{Guid.NewGuid()}", new
+        {
+            date        = "2026-04-20",
+            amount      = 10m,
+            accountId   = account.Id,
+            categoryId  = HousingCategoryId,
+            isCleared   = false
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
