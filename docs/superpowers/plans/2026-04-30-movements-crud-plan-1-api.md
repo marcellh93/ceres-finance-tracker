@@ -362,6 +362,8 @@ public async Task<ActionResult<TransactionEditDto>> Get(Guid id)
             t.Description,
             t.IsCleared,
             t.Attachments
+                .OrderBy(a => a.UploadedAt)
+                .ThenBy(a => a.Id)
                 .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
                 .ToList()))
         .SingleOrDefaultAsync();
@@ -456,6 +458,8 @@ public async Task Get_Returns200_WithAttachmentMetadata_WhenAttachmentsExist()
 ```
 
 Run all three tests and expect 3/3 PASS.
+
+**Sanity Check:** Before Tasks 9/11 begin, verify that the project's `Program.cs` does not have `options.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)` configured globally on the `AppDbContext`. If it is, the GET projection above will silently emit two queries (one for the row, one for attachments) instead of a single JOIN. Default behaviour (`SingleQuery`) is what this projection assumes. Verify with: `grep -n UseQuerySplittingBehavior ProjectCeres/Program.cs`.
 
 - [ ] **Step 5: Commit**
 
@@ -561,6 +565,8 @@ git commit -m "test(api): failing tests for PUT /api/transactions/:id"
 ---
 
 ## Task 6: Implement `PUT /api/transactions/{id}`
+
+**Note:** Only the `GET /:id` actions project directly from EF. PUT and DELETE keep the service-layer existence check (`transactionService.GetByIdForEditAsync(id)` / `transferService.GetByIdAsync(id)` / `liabilityPaymentService.GetByIdAsync(id)`) — those need the persisted entity for update/delete operations, not a projection.
 
 **Files:**
 - Modify: `ProjectCeres/Controllers/Api/TransactionsApiController.cs`
@@ -881,6 +887,8 @@ public async Task<ActionResult<TransferEditDto>> Get(Guid id)
             t.Description,
             t.IsCleared,
             t.Attachments
+                .OrderBy(a => a.UploadedAt)
+                .ThenBy(a => a.Id)
                 .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
                 .ToList()))
         .SingleOrDefaultAsync();
@@ -2252,7 +2260,7 @@ public async Task<IActionResult> UploadAttachment(Guid id, IFormFile file)
         {
             id          = saved.Id,
             fileName    = saved.FileName,
-            sizeBytes   = saved.SizeBytes,
+            sizeBytes   = saved.FileSizeBytes,
             contentType = saved.ContentType
         });
     }
@@ -2455,7 +2463,7 @@ public async Task<IActionResult> UploadAttachment(Guid id, IFormFile file)
         {
             id          = saved.Id,
             fileName    = saved.FileName,
-            sizeBytes   = saved.SizeBytes,
+            sizeBytes   = saved.FileSizeBytes,
             contentType = saved.ContentType
         });
     }
