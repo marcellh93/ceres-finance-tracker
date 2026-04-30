@@ -54,7 +54,6 @@ public class TransactionsCrudApiTests : IAsyncLifetime
             IsActive      = true
         };
         db.Accounts.Add(account);
-        _seededAccountIds.Add(account.Id);
 
         var tx = new Transaction
         {
@@ -67,9 +66,10 @@ public class TransactionsCrudApiTests : IAsyncLifetime
             IsCleared   = false
         };
         db.Transactions.Add(tx);
-        _seededTransactionIds.Add(tx.Id);
 
         await db.SaveChangesAsync();
+        _seededAccountIds.Add(account.Id);
+        _seededTransactionIds.Add(tx.Id);
         return (account.Id, tx.Id);
     }
 
@@ -133,13 +133,29 @@ public class TransactionsCrudApiTests : IAsyncLifetime
     [Fact]
     public async Task Put_Returns204_AndUpdatesFields()
     {
-        var (accountId, txId) = await SeedTransactionAsync();
+        var (_, txId) = await SeedTransactionAsync();
+
+        // Seed a second account so the AccountId round-trip is non-degenerate.
+        Guid newAccountId;
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var newAccount = new Account
+            {
+                Id = Guid.NewGuid(), Name = $"TxCrud-Acct2-{Guid.NewGuid():N}",
+                AccountTypeId = 1, CurrencyId = 1, IsActive = true
+            };
+            seedDb.Accounts.Add(newAccount);
+            await seedDb.SaveChangesAsync();
+            _seededAccountIds.Add(newAccount.Id);
+            newAccountId = newAccount.Id;
+        }
 
         var response = await _client.PutAsJsonAsync($"/api/transactions/{txId}", new
         {
             date        = "2026-04-20",
             amount      = 99.00m,
-            accountId   = accountId,
+            accountId   = newAccountId,
             categoryId  = HousingCategoryId,
             description = "Updated",
             isCleared   = true
@@ -153,6 +169,8 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         saved!.Amount.Should().Be(99.00m);
         saved.Description.Should().Be("Updated");
         saved.IsCleared.Should().BeTrue();
+        saved.Date.Should().Be(new DateOnly(2026, 4, 20));
+        saved.AccountId.Should().Be(newAccountId);
     }
 
     [Fact]
@@ -170,6 +188,12 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
+        var details = body.GetProperty("error").GetProperty("details").EnumerateArray().ToList();
+        details.Should().NotBeEmpty();
+        details.Should().Contain(d => d.GetProperty("field").GetString() == "Amount");
     }
 
     [Fact]
