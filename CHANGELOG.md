@@ -2,6 +2,122 @@
 
 ## [Unreleased]
 
+### Phase 3
+
+#### Added
+
+**Design System**
+- OKLCH color palette (light + dark) covering background, foreground, card, popover, primary (deep teal), secondary, muted, accent (pale teal), destructive (rose), success (emerald), warning (amber), info (sky), border, input, ring; tokens defined in `src/index.css` and aliased via `@theme inline`
+- Inter Variable + IBM Plex Mono fonts self-hosted via `@fontsource-variable/inter` and `@fontsource/ibm-plex-mono`
+- 8-color chart palette (`--chart-1` through `--chart-8`), all WCAG AA against `--background` in both modes
+- Motion tokens: `--motion-duration-fast/base/slow`, `--motion-easing-standard/emphasized`
+- Shadow tokens (`--shadow-sm` through `--shadow-lg`) tuned for both light and dark surfaces
+- `<Numeric>` component for tabular numerics (mono + tabular-nums); enforcement mechanism — never apply `font-mono` directly
+- `/design-system.html` showcase route with live token rendering, dark/light toggle, and pages for Overview, Colors, Typography, Spacing, Motion, Charts, Components
+- Layout primitives: `<StatTile>` (vertical), `<StatRow>` (inline justify-between), `<EquationRow>` (compact muted caption) — codified in `src/components/`
+
+**App Shell**
+- React SPA mounted at `/app/` via ASP.NET Core catch-all route + Vite middleware; shell components: `AppLayout`, `Sidebar` (with collapse toggle + persisted state), `TopBar` (brand mark, global search, quick-add `+`, notifications, avatar menu), `MobileDrawer` for narrow viewports
+- React Router v7 (BrowserRouter, basename `/app`) with route map for Dashboard, Movements, Transactions, Transfers, Accounts, Categories, Budgets, Recurring, Reports, Import, Settings, Support, Profile, Security
+- Cmd+K / Ctrl+K keyboard shortcut to open global search modal; `useKeyboardShortcut` hook
+- shadcn/ui (`base-nova` style) primitives installed: Button, Card, Dialog, Dropdown menu, Input, Label, Popover, Sheet, Skeleton, Switch, Tabs, Tooltip, Avatar, Badge, Kbd, Separator, Progress, Navbar
+- Vitest + React Testing Library scaffold
+
+**Dashboard**
+- React Dashboard at `/app/` replacing Razor view; cards for Financial Health, KPI strip (Net Worth + Month-to-Date + Reminders), Category Budgets, Goal Budgets
+- 4-panel asymmetric Financial Health card with vertical dividers; equation rows for Spendable Balance breakdown (Liquid, Bills due, Available today, Budget reserved, Safe to spend)
+- Health card panel captions beneath headlines (Burn Rate "€143 / €350 spent", Runway "at €1000/mo", Income vs Avg "€3000 vs €2700 avg")
+- MTD card rendered as 3 KPI tiles (Income / Expenses / Savings Rate) with `bg-muted/40` surfaces
+- `useApi<T>` hook with `AbortController` cancellation on unmount and URL change
+- Loading skeletons, error states with retry, and empty states on every card
+
+**Backend**
+- New `AppController` + `Views/App/Index.cshtml` host the SPA; catch-all route `app/{*path}` for client routing
+- Typed `HealthSnapshotData` record (15 fields including `AvailableToday`, `SafeToSpend`, `RunwayMonths`, `AvgMonthlyExpense`, `CurrentMonthIncome`, `RollingAverageIncome`, `IncomeDeltaPercent`, `BudgetBurnRate`, `BudgetSpentMtd`, `BudgetTotalLimit`)
+- Typed `DashboardSummaryDto` and `MtdSummary` records
+- New `/api/dashboard/health` and `/api/dashboard/summary` endpoints in `DashboardApiController`
+- `DashboardService.GetRunwayAsync` now returns `(months, avgMonthlyExpense)` tuple; `GetBudgetBurnRateAsync` returns `(burnRate, spent, totalLimit)` tuple
+
+**Components**
+- `<CardError section onRetry>` cross-feature primitive for "couldn't load X" + retry UI
+
+**Movements**
+- React Movements page at `/app/movements` with text search (debounced 300ms), account filter, date range filter, and numbered pagination (50/page); URL-encoded filter state (`?q=&accountId=&from=&to=&page=`); `useApi` `AbortController` handles request concurrency
+- `MovementsTable`, `MovementsFilterBar`, `MovementsPagination`, `MovementClearedToggle` components under `src/app/features/movements/`
+- `IMovementService.GetRecentAsync` and `CountAsync` accept `string? q` parameter; matches description OR category name for transactions, description-only for transfers and liability payments (PostgreSQL `EF.Functions.ILike`)
+- `GET /api/movements` returning paged `MovementsPageDto`
+- `MovementsApiController.PatchCleared` switch extended to handle `liabilitypayment` type (`ILiabilityPaymentService.MarkClearedAsync` added)
+
+**Quick-Add**
+- `<QuickAddModal>` with three tabs (Transaction / Transfer / Liability Payment) wired to TopBar `+` button and Movements page header "+ New" button
+- Currency symbol auto-derived from selected account, displayed as amount input prefix
+- Inline 422 validation errors mapped from `ValidationProblemDetails` (PascalCase → camelCase key conversion)
+- `AccountCombobox` and `CategoryCombobox` searchable selectors using shadcn Command + Popover
+- `useDebounced<T>(value, delayMs)` hook for search-input debouncing
+
+**Toasts**
+- Sonner adopted as SPA-wide toast system; `<Toaster />` mounted in `AppLayout`; conventions documented in `docs/design-system.md`
+- Toaster configured with `position="top-right"`, `closeButton`, `duration={5000}`, neutral popover background with semantic-colored icon (avoids dark-mode contrast issues from `richColors`)
+
+**Backend**
+- `POST /api/transactions`, `POST /api/transfers`, `POST /api/liability-payments` create endpoints
+- `GET /api/accounts/active` and `GET /api/categories/active` combobox helper endpoints (return minimal `AccountOptionDto` / `CategoryOptionDto`)
+
+**Charts**
+- 5 dashboard chart components migrated from Razor islands to SPA (NetWorth Over Time, Income vs Expense, Spending by Category, Account Balances, Cash Flow); moved from `src/components/` to `src/app/features/dashboard/`
+- `chartColors` util — semantic tokens (`income`, `expense`, `netWorth`, `assets`, `liabilities`) + `slot(n)` for chart palette; replaces hex literals in chart components
+- `formatMonth(yyyyMm)` helper for chart axis labels — uses `Intl.DateTimeFormat` with `{ month: 'short', year: 'numeric' }` (e.g. "Apr 2026")
+- Dashboard layout: NetWorth chart full-width as headline trend, then 2x2 grid for IncomeExpense / SpendingByCategory / AccountBalances / CashFlow
+- All 5 chart endpoints converted to typed wrapper DTOs with `currencyCode` and `currencySymbol`: `NetWorthTrendDto`, `IncomeExpenseDto`, `SpendingByCategoryDto` (adds `total` for % calculations), `AccountBalancesDto`, `CashFlowDto`
+- Trend endpoints (`net-worth-trend`, `income-expense`, `cash-flow`) extended from 6-month to 12-month window
+
+**Design System (v1.2)**
+- shadcn `<Badge>` extended with `success`, `warning`, `info` semantic variants matching the existing soft-tinted `destructive` recipe
+- `<Tile>` KPI surface wrapper extracted from `MtdCard` into `src/components/Tile.tsx`
+- Showcase `Toasts` page (Sonner variants + 5-stack queueing demo)
+- Showcase `Patterns` page covering layout primitives (StatTile, StatRow, EquationRow, Tile) and CardError; existing Stat components moved out of Components page
+
+**Docs**
+- `docs/design-system.md` — Status badges section, Layout primitives section, CardError section, Skeleton convention paragraph, Known browser console messages section (SES + WebSocket + Recharts width warnings)
+
+#### Changed
+
+**Dashboard**
+- `CategoryBudgetBars` and `GoalBudgetBars` refactored to render bare body without owning Card chrome (parent owns chrome)
+- `CardTitle` accessibility upgrade: `<div>` → `<h3>` with `font-semibold`
+
+**Movements**
+- `MovementsTable` Type column migrated to `<Badge>` — Transaction = info, Transfer = chart-6 violet, Liability Payment = chart-7 orange (chart palette opt-out via className for non-status colors)
+- `MovementClearedToggle` migrated to `<Badge variant="success|warning">`
+
+**Components**
+- `<CardError>` moved from `src/app/features/dashboard/` to `src/app/components/` (cross-feature primitive); 10 import paths updated via `git mv`
+- shadcn `<Button>` primitive: `cursor-pointer` added to base classes (every interactive button across the SPA)
+
+**Frontend**
+- `AppLayout` grid bounded with `h-screen` (was `min-h-screen`) so only `<main>` scrolls and sidebar footer (Settings/Support/Collapse) stays pinned
+- `TopBar` Cmd+K hint shows `Ctrl+K` on non-Mac platforms via `isMac()` runtime check
+- All 5 chart `<ResponsiveContainer>` instances given `minWidth={0}` to silence Recharts "width(-1)" warnings
+- tsconfig: deprecated `baseUrl` removed (TypeScript bundler resolution handles `paths` without it)
+
+**Razor**
+- `/Dashboard` now 302-redirects to `/app/`; Razor dashboard view (`Index.cshtml`), partial (`_HealthSnapshot.cshtml`), and MVC `DashboardController` deleted
+- `data-react` mounting blocks for the 5 chart selectors removed from the legacy Razor `main.tsx`
+- `/Movements` now 302-redirects to `/app/movements`; Razor `Views/Movements/Index.cshtml` deleted; MVC `MovementsController` reduced to redirect-only stub
+- `TransactionsController` and `TransfersController` Razor pages remain for full CRUD; new POST API actions are quick-add only
+
+#### Fixed
+
+**Quick-Add**
+- Quick-add modal: per-tab fields (account, category, source/dest, asset/liability) reset on tab switch so a stale selection from another tab can't leak in (shared fields like date, amount, description still persist)
+- Combobox labels rendered as `<div>` instead of `<label>` since there's no input element to associate (fixes a11y "label without for" warning)
+
+#### Removed
+
+**Razor**
+- `ProjectCeres/Helpers/DashboardViewHelper.cs` (server-side runway color helper) — only consumer was the deleted `_HealthSnapshot.cshtml` partial
+- `ProjectCeres.Tests/DashboardViewHelperTests.cs`
+
 ---
 
 ## [0.3.0] — 2026-04-26
