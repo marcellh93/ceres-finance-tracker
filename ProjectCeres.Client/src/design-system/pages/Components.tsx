@@ -10,10 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Numeric } from '@/components/Numeric';
-import { StatTile } from '@/components/StatTile';
-import { StatRow } from '@/components/StatRow';
-import { EquationRow } from '@/components/EquationRow';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function Components() {
   return (
@@ -47,6 +44,9 @@ export function Components() {
             <Badge variant="secondary">Secondary</Badge>
             <Badge variant="outline">Outline</Badge>
             <Badge variant="destructive">Destructive</Badge>
+            <Badge variant="success">Success</Badge>
+            <Badge variant="warning">Warning</Badge>
+            <Badge variant="info">Info</Badge>
           </div>
         </section>
 
@@ -145,44 +145,28 @@ export function Components() {
         </section>
 
         <section>
-          <h2 className="mb-4 text-xl font-medium">Stat components</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl">
-            <Card>
-              <CardHeader><CardTitle>StatTile (vertical)</CardTitle></CardHeader>
-              <CardContent>
-                <StatTile
-                  label="Total Spent"
-                  value={<Numeric>€ 1,234.56</Numeric>}
-                  valueClassName="text-2xl font-bold text-success"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>StatRow (inline)</CardTitle></CardHeader>
-              <CardContent>
-                <dl className="space-y-2">
-                  <StatRow label="Income" value={<Numeric className="text-success">€ 3,200.00</Numeric>} />
-                  <StatRow label="Expenses" value={<Numeric className="text-destructive">€ 1,850.45</Numeric>} />
-                  <StatRow label="Savings Rate" value={<Numeric>42.2%</Numeric>} />
-                </dl>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>EquationRow (compact)</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-1">
-                  <EquationRow label="Liquid" value={<Numeric>€ 1,200.20</Numeric>} />
-                  <EquationRow label="Bills due (7 days)" value={<Numeric>−€ 770.00</Numeric>} />
-                  <EquationRow
-                    label="Available today"
-                    value={<Numeric className="text-base font-bold text-success">€ 430.20</Numeric>}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          <h2 className="mb-4 text-xl font-medium">Skeleton</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Match the rendered content's height to prevent layout shift.
+            For chart cards we use 220px (<code>h-[220px]</code>).
+          </p>
+          <div className="flex flex-col gap-6 max-w-md">
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">Chart skeleton (h-[220px])</p>
+              <Skeleton className="h-[220px] w-full" />
+            </div>
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">Table skeleton (h-[400px])</p>
+              <Skeleton className="h-[400px] w-full" />
+            </div>
+            <div>
+              <p className="mb-2 text-xs text-muted-foreground">Text rows (h-5 w-32)</p>
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+            </div>
           </div>
         </section>
       </div>
