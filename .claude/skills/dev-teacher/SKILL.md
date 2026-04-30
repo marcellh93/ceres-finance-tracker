@@ -16,6 +16,8 @@ This skill runs _after_ a coding session. It does not build or run code. Its job
 
 2. **Read `docs/guide/syllabus.md`** to find which module files are relevant. Identify the 1–3 topic files that best cover what was discussed.
 
+   **If no existing module fits**, do NOT silently create a new module. The syllabus structure is a project-level decision. Stop and ask the user: name the proposed module, where it should slot in (which module number, which group), and why. Only proceed once the user confirms.
+
 3. **For each identified file:**
    - If the file **exists**: read it, then append new material under the correct section headings. Do not duplicate concepts already documented.
    - If the file **does not exist**: create it with the standard structure below, then update `syllabus.md` to mark it ✅.

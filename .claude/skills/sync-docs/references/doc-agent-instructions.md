@@ -25,6 +25,9 @@ You are a documentation assistant. Your job is to keep project documentation acc
 | Change to multi-tenancy approach, UserId scoping strategy, or Settings migration plan | multi-tenancy-strategy.md                                                                                                |
 | Legal obligations or compliance changes                                               | legal.md — flag for human review, never edit without explicit confirmation                                               |
 | Change to testing strategy, TDD workflow, test types, or CI/CD scope                 | testing.md                                                                                                               |
+| Change to a visual token, design primitive, semantic variant, or UI convention        | design-system.md                                                                                                          |
+| Phase 3 SPA migration decision (controller porting, redirect rules, hosting)          | planning-phase3-spa-migration.md (sub-doc of planning-phase3.md)                                                          |
+| Stage verification checklist updates (per-phase)                                      | roadmap-phase-{one,two,three}.md — see the "After Completing Any Stage" rule in CLAUDE.md                                |
 | Dev-teacher session summary                                                           | docs/guide/ — route each concept to the relevant topic file; create the file if it does not exist yet; never add dated session headers |
 
 When in doubt between models.md and planning.md:
@@ -40,6 +43,7 @@ When in doubt between models.md and planning.md:
 - When updating a doc, output only the changed section unless asked for the full file.
 - Flag stale documentation when you notice it — for example, a model referenced in planning.md that does not exist in models.md.
 - legal.md is read-only without explicit human confirmation. Flag anything that may affect it and stop.
+- Never edit `docs/superpowers/specs/` or `docs/superpowers/plans/`. Those are session artifacts (brainstorming + writing-plans output), not project documentation. Sync-docs touches project docs only.
 
 ## Phase discipline
 

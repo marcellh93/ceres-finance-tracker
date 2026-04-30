@@ -38,12 +38,34 @@ Triggered by: "update the changelog", "log what I did", "end of session", or whe
    ```
 
    Rules for module grouping:
+   - **Before naming any module, read recent entries in the CHANGELOG and list the module names already in use.** Reuse existing names verbatim. Inventing a new name when an equivalent already exists creates inconsistency.
    - Only create a module group if there are one or more entries that belong to it. Do not create empty groups.
    - If a change genuinely doesn't belong to any specific module (e.g. a global config tweak), list it at the top of the section without a group label, before any groups.
-   - Ask the user if you're unsure which module a change belongs to.
-   - Reuse existing module names already present in the file — read the CHANGELOG before deciding on names to stay consistent.
+   - Ask the user if you're unsure which module a change belongs to or if you're considering a name not already in the file.
 
 5. Insert the new entries under `## [Unreleased]`, under the correct section headers. If a section header (e.g. `### Fixed`) doesn't exist yet under `[Unreleased]`, create it. Maintain this section order: Added, Changed, Deprecated, Removed, Fixed, Security.
+
+   **Phase-subsection convention (Project Ceres specific).** When the project has explicit development phases (Phase 1, Phase 2, Phase 3, etc.), wrap the standard sections in a `### Phase N` subsection inside the version block. The structure becomes:
+
+   ```
+   ## [0.3.0] — YYYY-MM-DD
+
+   ### Phase 2
+
+   #### Added
+   **Module**
+   - Entry
+
+   #### Changed
+   ...
+
+   ### Phase 3
+
+   #### Added
+   ...
+   ```
+
+   The `[Unreleased]` block uses the same `### Phase N` wrapping when entries belong to different phases. This makes phase boundaries explicit in the changelog and matches the project's planning-phase{N}.md document structure. Read recent versioned blocks first to confirm the convention is in use before applying it.
 6. Show the user the proposed additions as a formatted list — one bullet per entry, grouped by section and module, exactly as they will appear in the file. Do NOT write to the file yet. Ask: _"Does this look right? I'll write it once you confirm."_
 7. Write to the file only after the user explicitly confirms. Never write before confirmation.
 
