@@ -8,4 +8,10 @@ describe('formatMonth', () => {
     expect(formatMonth('2025-12')).toBe('Dec 2025');
     expect(formatMonth('2026-01')).toBe('Jan 2026');
   });
+
+  it('returns empty string for non-string input', () => {
+    expect(formatMonth(undefined)).toBe('');
+    expect(formatMonth(null)).toBe('');
+    expect(formatMonth(42)).toBe('');
+  });
 });
