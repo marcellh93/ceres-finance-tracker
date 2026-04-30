@@ -39,7 +39,7 @@ export function MovementsLayout() {
       )}
       {data && data.items.length > 0 && (
         <>
-          <MovementsTable items={data.items} />
+          <MovementsTable items={data.items} onRefetch={refetch} />
           <MovementsPagination totalCount={data.totalCount} pageSize={data.pageSize} />
         </>
       )}

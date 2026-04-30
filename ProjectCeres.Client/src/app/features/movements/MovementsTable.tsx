@@ -1,9 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Numeric } from '@/components/Numeric';
 import { MovementClearedToggle } from './MovementClearedToggle';
+import { MovementRowMenu } from './MovementRowMenu';
 import type { MovementListItemDto, MovementType } from './movements-api';
 
-type Props = { items: MovementListItemDto[] };
+type Props = { items: MovementListItemDto[]; onRefetch: () => void };
 
 const typeLabel: Record<MovementType, string> = {
   Transaction: 'Transaction',
@@ -24,7 +25,7 @@ function amountColor(item: MovementListItemDto): string {
   return 'text-foreground';
 }
 
-export function MovementsTable({ items }: Props) {
+export function MovementsTable({ items, onRefetch }: Props) {
   return (
     <div className="rounded-md border border-border overflow-x-auto">
       <table className="w-full text-sm">
@@ -37,6 +38,7 @@ export function MovementsTable({ items }: Props) {
             <th className="text-left px-3 py-2 font-medium">Description</th>
             <th className="text-right px-3 py-2 font-medium">Amount</th>
             <th className="text-left px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 w-12"></th>
           </tr>
         </thead>
         <tbody>
@@ -70,6 +72,13 @@ export function MovementsTable({ items }: Props) {
               </td>
               <td className="px-3 py-2">
                 <MovementClearedToggle id={item.id} type={item.movementType} isCleared={item.isCleared} />
+              </td>
+              <td className="px-3 py-2 text-right">
+                <MovementRowMenu
+                  movementId={item.id}
+                  movementType={item.movementType}
+                  onDeleted={onRefetch}
+                />
               </td>
             </tr>
           ))}
