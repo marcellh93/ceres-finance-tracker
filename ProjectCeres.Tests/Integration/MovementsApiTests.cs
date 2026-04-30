@@ -29,6 +29,7 @@ public class MovementsApiTests : IAsyncLifetime
     private readonly List<Guid> _seededAccountIds = [];
     private readonly List<Guid> _seededTransactionIds = [];
     private readonly List<Guid> _seededTransferIds = [];
+    private readonly List<Guid> _seededPaymentIds = [];
 
     public MovementsApiTests(TestWebApplicationFactory factory)
     {
@@ -48,6 +49,9 @@ public class MovementsApiTests : IAsyncLifetime
 
         if (_seededTransferIds.Count > 0)
             await db.Transfers.Where(t => _seededTransferIds.Contains(t.Id)).ExecuteDeleteAsync();
+
+        if (_seededPaymentIds.Count > 0)
+            await db.LiabilityPayments.Where(p => _seededPaymentIds.Contains(p.Id)).ExecuteDeleteAsync();
 
         if (_seededAccountIds.Count > 0)
             await db.Accounts.Where(a => _seededAccountIds.Contains(a.Id)).ExecuteDeleteAsync();
@@ -123,6 +127,52 @@ public class MovementsApiTests : IAsyncLifetime
     {
         var scope = _factory.Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    }
+
+    private Account SeedAssetAccount(AppDbContext db, string name)
+    {
+        var account = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = $"{name}-{Guid.NewGuid():N}",
+            AccountTypeId = 1,
+            CurrencyId    = 1,
+            IsActive      = true
+        };
+        db.Accounts.Add(account);
+        _seededAccountIds.Add(account.Id);
+        return account;
+    }
+
+    private Account SeedLiabilityAccount(AppDbContext db, string name)
+    {
+        var account = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = $"{name}-{Guid.NewGuid():N}",
+            AccountTypeId = 2,
+            CurrencyId    = 1,
+            IsActive      = true
+        };
+        db.Accounts.Add(account);
+        _seededAccountIds.Add(account.Id);
+        return account;
+    }
+
+    private Guid SeedLiabilityPayment(AppDbContext db, Guid assetAccountId, Guid liabilityAccountId, decimal amount, bool isCleared)
+    {
+        var payment = new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = DateOnly.FromDateTime(DateTime.Today),
+            Amount             = amount,
+            AssetAccountId     = assetAccountId,
+            LiabilityAccountId = liabilityAccountId,
+            IsCleared          = isCleared,
+            CreatedAt          = DateTime.UtcNow
+        };
+        db.LiabilityPayments.Add(payment);
+        return payment.Id;
     }
 
     // -------------------------------------------------------------------------
@@ -269,5 +319,34 @@ public class MovementsApiTests : IAsyncLifetime
         body.GetProperty("page").GetInt32().Should().Be(2);
         body.GetProperty("pageSize").GetInt32().Should().Be(10);
         body.GetProperty("items").GetArrayLength().Should().BeLessThanOrEqualTo(10);
+    }
+
+    // -------------------------------------------------------------------------
+    // PATCH liability payment cleared → 200; DB updated
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task PatchCleared_TogglesLiabilityPayment()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var asset = SeedAssetAccount(db, "Checking-LP");
+        var liability = SeedLiabilityAccount(db, "Credit Card-LP");
+        var paymentId = SeedLiabilityPayment(db, asset.Id, liability.Id, amount: 50, isCleared: false);
+        await db.SaveChangesAsync();
+        _seededPaymentIds.Add(paymentId);
+
+        var body = new StringContent(
+            JsonSerializer.Serialize(new { type = "liabilitypayment", cleared = true }),
+            Encoding.UTF8, "application/json");
+
+        var response = await _client.PatchAsync($"/api/movements/{paymentId}/cleared", body);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var updated = await verifyDb.LiabilityPayments.FindAsync(paymentId);
+        updated!.IsCleared.Should().BeTrue();
     }
 }

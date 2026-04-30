@@ -57,6 +57,15 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
         await db.SaveChangesAsync();
     }
 
+    public async Task MarkClearedAsync(Guid id, bool cleared)
+    {
+        var payment = await db.LiabilityPayments.FindAsync(id)
+            ?? throw new InvalidOperationException($"Liability payment {id} not found.");
+
+        payment.IsCleared = cleared;
+        await db.SaveChangesAsync();
+    }
+
     private async Task ValidateAsync(Guid assetAccountId, Guid liabilityAccountId, DateOnly date)
     {
         var accounts = await db.Accounts

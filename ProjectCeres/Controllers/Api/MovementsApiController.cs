@@ -54,8 +54,14 @@ public class MovementsApiController(
                 await transferService.MarkClearedAsync(id, request.Cleared);
                 return Ok();
 
+            case "liabilitypayment":
+                var lp = await liabilityPaymentService.GetByIdAsync(id);
+                if (lp is null) return NotFound();
+                await liabilityPaymentService.MarkClearedAsync(id, request.Cleared);
+                return Ok();
+
             default:
-                return BadRequest(new { error = new { code = "INVALID_TYPE", message = "Type must be 'transaction' or 'transfer'." } });
+                return BadRequest(new { error = new { code = "INVALID_TYPE", message = "Type must be 'transaction', 'transfer', or 'liabilitypayment'." } });
         }
     }
 

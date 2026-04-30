@@ -14,4 +14,5 @@ public interface ILiabilityPaymentService
     Task UpdateAsync(TransactionEditViewModel vm);
     /// <summary>Hard delete with no soft-delete fallback.</summary>
     Task DeleteAsync(Guid id);
+    Task MarkClearedAsync(Guid id, bool cleared);
 }
