@@ -52,4 +52,28 @@ public class TransactionsApiController(
 
         return dto is null ? NotFound() : dto;
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTransactionRequest request)
+    {
+        // [ApiController] auto-runs ModelState → 422 via InvalidModelStateResponseFactory.
+
+        var existing = await transactionService.GetByIdForEditAsync(id);
+        if (existing is null) return NotFound();
+
+        var vm = new TransactionEditViewModel
+        {
+            Id              = id,
+            TransactionType = "Regular",
+            Date            = request.Date,
+            Amount          = request.Amount,
+            AccountId       = request.AccountId,
+            CategoryId      = request.CategoryId,
+            Description     = request.Description,
+            IsCleared       = request.IsCleared
+        };
+
+        await transactionService.UpdateAsync(vm);
+        return NoContent();
+    }
 }
