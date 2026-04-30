@@ -272,4 +272,25 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         body.GetProperty("error").GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
         body.GetProperty("error").GetProperty("message").GetString().Should().NotBeNullOrEmpty();
     }
+
+    [Fact]
+    public async Task Delete_Returns204_AndHardDeletes()
+    {
+        var (_, txId) = await SeedTransactionAsync();
+
+        var response = await _client.DeleteAsync($"/api/transactions/{txId}");
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Transactions.FindAsync(txId)).Should().BeNull();
+        _seededTransactionIds.Remove(txId);
+    }
+
+    [Fact]
+    public async Task Delete_Returns404_WhenIdMissing()
+    {
+        var response = await _client.DeleteAsync($"/api/transactions/{Guid.NewGuid()}");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

@@ -93,4 +93,13 @@ public class TransactionsApiController(
             });
         }
     }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var existing = await transactionService.GetByIdForEditAsync(id);
+        if (existing is null) return NotFound();
+        await transactionService.DeleteAsync(id);
+        return NoContent();
+    }
 }
