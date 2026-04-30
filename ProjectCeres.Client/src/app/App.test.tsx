@@ -41,7 +41,8 @@ describe('App routes', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/MovementCreate placeholder/)).toBeDefined();
+    // The type-picker is the landing state for /movements/new (no ?type= query)
+    expect(screen.getByRole('button', { name: /transaction/i })).toBeDefined();
   });
 
   it('renders the Movement Edit page at /movements/:id/edit', () => {
