@@ -1,15 +1,9 @@
+import { Badge } from '@/components/ui/badge';
 import { Numeric } from '@/components/Numeric';
-import { cn } from '@/lib/utils';
 import { MovementClearedToggle } from './MovementClearedToggle';
 import type { MovementListItemDto, MovementType } from './movements-api';
 
 type Props = { items: MovementListItemDto[] };
-
-const typeBadgeClass: Record<MovementType, string> = {
-  Transaction: 'bg-info/10 text-info',
-  Transfer: 'bg-chart-4/10 text-chart-4',
-  LiabilityPayment: 'bg-warning/10 text-warning',
-};
 
 const typeLabel: Record<MovementType, string> = {
   Transaction: 'Transaction',
@@ -50,9 +44,15 @@ export function MovementsTable({ items }: Props) {
             <tr key={`${item.movementType}-${item.id}`} className="border-t border-border">
               <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.date)}</td>
               <td className="px-3 py-2">
-                <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap', typeBadgeClass[item.movementType])}>
-                  {typeLabel[item.movementType]}
-                </span>
+                {item.movementType === 'Transaction' && (
+                  <Badge variant="info">{typeLabel.Transaction}</Badge>
+                )}
+                {item.movementType === 'Transfer' && (
+                  <Badge className="bg-chart-4/10 text-chart-4">{typeLabel.Transfer}</Badge>
+                )}
+                {item.movementType === 'LiabilityPayment' && (
+                  <Badge variant="warning">{typeLabel.LiabilityPayment}</Badge>
+                )}
               </td>
               <td className="px-3 py-2">
                 {item.movementType === 'Transaction' && item.accountName}
