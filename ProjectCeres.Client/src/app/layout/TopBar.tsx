@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { AvatarMenu } from './AvatarMenu';
 import { BrandMark } from './BrandMark';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Kbd } from '@/components/ui/kbd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { QuickAddModal } from '../components/QuickAddModal';
 import { SearchModal } from '../components/SearchModal';
 import { isMac, useKeyboardShortcut } from '../lib/use-keyboard-shortcut';
 import { useMediaQuery } from '../lib/use-media-query';
@@ -85,17 +85,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
 
-      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Quick add</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">
-            Quick-add will let you record a transaction or transfer without leaving the page. Coming
-            in a follow-up plan.
-          </p>
-        </DialogContent>
-      </Dialog>
+      <QuickAddModal open={quickAddOpen} onOpenChange={setQuickAddOpen} />
     </header>
   );
 }
