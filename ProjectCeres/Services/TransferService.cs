@@ -76,6 +76,16 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
         await db.SaveChangesAsync();
     }
 
+    public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null)
+    {
+        var query = db.Transfers.Where(t => !t.IsCleared && t.Date >= from && t.Date <= to);
+        if (accountId.HasValue)
+            query = query.Where(t => t.SourceAccountId == accountId.Value || t.DestAccountId == accountId.Value);
+        var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.IsCleared, true));
+        db.ChangeTracker.Clear();
+        return rowsAffected;
+    }
+
     private async Task ValidateNotBeforeOpeningBalanceAsync(Guid sourceId, Guid destId, DateOnly date)
     {
         foreach (var (accountId, label) in new[] { (sourceId, "source"), (destId, "destination") })

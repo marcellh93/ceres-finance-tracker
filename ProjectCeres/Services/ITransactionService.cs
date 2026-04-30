@@ -17,6 +17,6 @@ public interface ITransactionService
     /// <summary>Hard delete with no soft-delete fallback.</summary>
     Task DeleteAsync(Guid id);
     Task MarkClearedAsync(Guid id, bool cleared);
-    Task BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null);
+    Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null);
     Task MarkNeedsReviewAsync(Guid id, bool needsReview);
 }

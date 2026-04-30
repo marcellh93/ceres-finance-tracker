@@ -256,19 +256,17 @@ public class TransactionService(
         await db.SaveChangesAsync();
     }
 
-    public async Task BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null)
+    public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null)
     {
         var query = db.Transactions
-            .Where(t => t.Date >= from && t.Date <= to && !t.Category.IsSystem);
+            .Where(t => t.Date >= from && t.Date <= to && !t.Category.IsSystem && !t.IsCleared);
 
         if (accountId.HasValue)
             query = query.Where(t => t.AccountId == accountId.Value);
 
-        var transactions = await query.ToListAsync();
-        foreach (var t in transactions)
-            t.IsCleared = true;
-
-        await db.SaveChangesAsync();
+        var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.IsCleared, true));
+        db.ChangeTracker.Clear();
+        return rowsAffected;
     }
 
     private async Task ValidateNotBeforeOpeningBalanceAsync(Guid accountId, DateOnly date)
