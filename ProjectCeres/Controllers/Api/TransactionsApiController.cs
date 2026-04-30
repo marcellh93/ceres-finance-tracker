@@ -44,6 +44,8 @@ public class TransactionsApiController(
                 t.Description,
                 t.IsCleared,
                 t.Attachments
+                    .OrderBy(a => a.UploadedAt)
+                    .ThenBy(a => a.Id)
                     .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
                     .ToList()))
             .SingleOrDefaultAsync();

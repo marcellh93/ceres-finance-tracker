@@ -18,6 +18,7 @@ public class TransactionsCrudApiTests : IAsyncLifetime
     private readonly HttpClient _client;
     private readonly List<Guid> _seededTransactionIds = [];
     private readonly List<Guid> _seededAccountIds = [];
+    private readonly List<Guid> _seededAttachmentIds = [];
 
     public TransactionsCrudApiTests(TestWebApplicationFactory factory)
     {
@@ -31,6 +32,8 @@ public class TransactionsCrudApiTests : IAsyncLifetime
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (_seededAttachmentIds.Count > 0)
+            await db.TransactionAttachments.Where(a => _seededAttachmentIds.Contains(a.Id)).ExecuteDeleteAsync();
         if (_seededTransactionIds.Count > 0)
             await db.Transactions.Where(t => _seededTransactionIds.Contains(t.Id)).ExecuteDeleteAsync();
         if (_seededAccountIds.Count > 0)
@@ -114,24 +117,16 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         };
         db.TransactionAttachments.Add(attachment);
         await db.SaveChangesAsync();
+        _seededAttachmentIds.Add(attachment.Id);
 
-        try
-        {
-            var response = await _client.GetAsync($"/api/transactions/{txId}");
-            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var response = await _client.GetAsync($"/api/transactions/{txId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-            var attachments = body.GetProperty("attachments").EnumerateArray().ToList();
-            attachments.Should().HaveCount(1);
-            attachments[0].GetProperty("fileName").GetString().Should().Be("receipt.pdf");
-            attachments[0].GetProperty("sizeBytes").GetInt64().Should().Be(4096);
-            attachments[0].GetProperty("contentType").GetString().Should().Be("application/pdf");
-        }
-        finally
-        {
-            using var cleanup = _factory.Services.CreateScope();
-            var cleanupDb = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
-            await cleanupDb.TransactionAttachments.Where(a => a.Id == attachment.Id).ExecuteDeleteAsync();
-        }
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var attachments = body.GetProperty("attachments").EnumerateArray().ToList();
+        attachments.Should().HaveCount(1);
+        attachments[0].GetProperty("fileName").GetString().Should().Be("receipt.pdf");
+        attachments[0].GetProperty("sizeBytes").GetInt64().Should().Be(4096);
+        attachments[0].GetProperty("contentType").GetString().Should().Be("application/pdf");
     }
 }
