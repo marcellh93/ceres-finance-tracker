@@ -10,7 +10,8 @@ public class MovementsApiController(
     IMovementService movementService,
     ITransactionService transactionService,
     ITransferService transferService,
-    ILiabilityPaymentService liabilityPaymentService) : ControllerBase
+    ILiabilityPaymentService liabilityPaymentService,
+    IMovementExportService exportService) : ControllerBase
 {
     public record ClearRequest(string Type, bool Cleared);
 
@@ -110,6 +111,22 @@ public class MovementsApiController(
             return (null, BadRequest(new { error = new { code = "INVALID_TYPE", message = "type must be 'transaction', 'transfer', or 'liabilitypayment'." } }));
 
         return (typed, null);
+    }
+
+    [HttpGet("export.csv")]
+    public async Task<IActionResult> Export(
+        [FromQuery] string? q = null,
+        [FromQuery] Guid? accountId = null,
+        [FromQuery] DateOnly? from = null,
+        [FromQuery] DateOnly? to = null,
+        [FromQuery] string? type = null)
+    {
+        var (typedFilter, error) = ParseType(type);
+        if (error is not null) return error;
+
+        var csv = await exportService.BuildCsvAsync(accountId, from, to, q, typedFilter);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+        return File(bytes, "text/csv", "movements.csv");
     }
 
     private static MovementListItemDto MapToDto(MovementListItemViewModel m)
