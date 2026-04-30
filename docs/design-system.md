@@ -12,8 +12,9 @@
 6. [Chart palette](#chart-palette)
 7. [shadcn/ui overrides](#shadcnui-overrides)
 8. [The `<Numeric>` component](#the-numeric-component)
-9. [Showcase route](#showcase-route)
-10. [Known limitations](#known-limitations)
+9. [Toasts](#toasts)
+10. [Showcase route](#showcase-route)
+11. [Known limitations](#known-limitations)
 
 ---
 
@@ -164,6 +165,19 @@ When **not** to use `<Numeric>`: percentages or amounts that appear inside a sen
 // ✗ Don't switch fonts mid-sentence
 <p>You've spent <Numeric>73%</Numeric> of your budget so far.</p>
 ```
+
+---
+
+## Toasts
+
+The SPA uses [Sonner](https://sonner.emilkowal.ski/) for toast notifications. A single `<Toaster />` is mounted in `AppLayout.tsx` — anywhere in the app, import `toast` from `sonner` and call:
+
+- `toast.success('Saved.')` for successful operations
+- `toast.error("Couldn't update status.")` for failures
+
+Recommended message style: short, sentence-case, ends in a period. Past tense for completed actions ("Saved."), contraction-friendly for failures ("Couldn't save.").
+
+For destructive operations, prefer a confirmation dialog over a toast.
 
 ---
 

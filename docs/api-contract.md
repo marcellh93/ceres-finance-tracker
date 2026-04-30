@@ -267,7 +267,13 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Spending by category chart | GET | `/api/dashboard/spending-by-category` | `SpendingByCategoryDto { currencyCode, currencySymbol, total, slices: SpendingByCategorySlice[] }` — `SpendingByCategorySlice { categoryName, amount }` |
 | Account balances chart | GET | `/api/dashboard/account-balances` | `AccountBalancesDto { currencyCode, currencySymbol, rows: AccountBalanceRow[] }` — `AccountBalanceRow { accountName, balance }` |
 | Cash flow trend chart | GET | `/api/dashboard/cash-flow` | `CashFlowDto { currencyCode, currencySymbol, points: CashFlowPoint[12] }` — `CashFlowPoint { month: "yyyy-MM", netFlow }` |
-| Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction, Transfer, or LiabilityPayment — body: `{ "type": "transaction"\|"transfer"\|"liabilitypayment", "cleared": bool }` |
+| Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction, Transfer, or LiabilityPayment — body: `{ "type": "transaction"\|"transfer"\|"liabilitypayment", "cleared": bool }`. The `type` field accepts `"transaction"`, `"transfer"`, or `"liabilitypayment"`. |
+| Movements list | GET | `/api/movements` | Returns `MovementsPageDto { items: MovementListItemDto[], totalCount, page, pageSize }`. Query params: `q` (text search), `accountId`, `from`, `to`, `page`, `pageSize` (default 50, max 200). |
+| Create transaction | POST | `/api/transactions` | Body: `CreateTransactionRequest { date, amount, accountId, categoryId, description? }`. Returns `201 Created` with `{ id }`. Returns `422 Unprocessable Entity` with `ValidationProblemDetails` on invalid input. |
+| Create transfer | POST | `/api/transfers` | Body: `CreateTransferRequest { date, amount, sourceAccountId, destAccountId, description? }`. Returns `201 Created` with `{ id }`. Returns `422` if source == destination, cross-currency, or other validation failures. |
+| Create liability payment | POST | `/api/liability-payments` | Body: `CreateLiabilityPaymentRequest { date, amount, assetAccountId, liabilityAccountId, description? }`. Returns `201 Created` with `{ id }`. Returns `422` on validation failures. |
+| Active accounts | GET | `/api/accounts/active` | Returns `AccountOptionDto[] { id, name, currencyCode, currencySymbol, accountTypeName }`. Active accounts only. |
+| Active categories | GET | `/api/categories/active` | Returns `CategoryOptionDto[] { id, name, categoryTypeName }`. Active, non-system categories only. |
 | Import file headers | POST | `/api/import/headers` | Upload a CSV or XLSX file; returns detected column headers and auto-matched field mappings (`HeaderDetectionResult`) |
 | Import transactions | POST | `/api/import` | Upload file + column mappings; runs the full import pipeline; returns `ImportResult` (rows imported, reconciled, flagged, failed) |
 
