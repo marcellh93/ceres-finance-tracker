@@ -94,4 +94,44 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         var response = await _client.GetAsync($"/api/transactions/{Guid.NewGuid()}");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Get_Returns200_WithAttachmentMetadata_WhenAttachmentsExist()
+    {
+        var (_, txId) = await SeedTransactionAsync();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var attachment = new TransactionAttachment
+        {
+            Id            = Guid.NewGuid(),
+            TransactionId = txId,
+            FileName      = "receipt.pdf",
+            StoredPath    = "/tmp/test-receipt.pdf",
+            FileSizeBytes = 4096,
+            ContentType   = "application/pdf",
+            UploadedAt    = DateTime.UtcNow
+        };
+        db.TransactionAttachments.Add(attachment);
+        await db.SaveChangesAsync();
+
+        try
+        {
+            var response = await _client.GetAsync($"/api/transactions/{txId}");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var attachments = body.GetProperty("attachments").EnumerateArray().ToList();
+            attachments.Should().HaveCount(1);
+            attachments[0].GetProperty("fileName").GetString().Should().Be("receipt.pdf");
+            attachments[0].GetProperty("sizeBytes").GetInt64().Should().Be(4096);
+            attachments[0].GetProperty("contentType").GetString().Should().Be("application/pdf");
+        }
+        finally
+        {
+            using var cleanup = _factory.Services.CreateScope();
+            var cleanupDb = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
+            await cleanupDb.TransactionAttachments.Where(a => a.Id == attachment.Id).ExecuteDeleteAsync();
+        }
+    }
 }
