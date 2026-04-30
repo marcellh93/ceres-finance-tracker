@@ -171,6 +171,12 @@ The `details` array is present only for validation errors (422). For other error
 
 **Do not return `403 Forbidden` for user-owned resources.** Returning 403 confirms the resource exists, which is information an attacker can exploit to enumerate valid IDs. See `security-model.md → IDOR Prevention`.
 
+### Validation responses (implementation note)
+
+`Program.cs` configures `InvalidModelStateResponseFactory` so any `[ApiController]` action whose `ModelState` is invalid auto-returns **422 Unprocessable Entity** with the validation-error JSON shape above. This applies to all built-in attribute validation (`[Required]`, `[Range]`, `[StringLength]`, etc.).
+
+For cross-field validation that runs after the auto-check (e.g. "source account must differ from destination"), do **not** call `return ValidationProblem(ModelState)` — that helper returns 400, bypassing the factory. Return `UnprocessableEntity(...)` directly with the same JSON shape so the response stays consistent at 422.
+
 ### Deprecation header
 
 When an endpoint or field is deprecated, include in the response:

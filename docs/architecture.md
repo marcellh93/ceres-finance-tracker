@@ -91,11 +91,19 @@ sequenceDiagram
 
 MVC routing still owns the page. React owns only the component. No separate frontend server or build pipeline beyond a Vite bundle is needed.
 
-### Phase 3 — Full SPA (evaluation point) ← Current
+### Phase 3 — Full SPA (evaluation point) ← Target
 
 The app is hosted, behind authentication, with no SEO concern for authenticated pages. The SPA model becomes viable and appropriate.
 
 The delta from Phase 2: Razor Views are removed entirely. The backend becomes a pure JSON Web API. All routing moves to the client. Auth tokens replace session cookies.
+
+> **Current state (mid-migration).** Phase 3 is the active phase but the migration runs feature-area by feature-area, not as a single cutover. As of 2026-04-30:
+> - SPA hosted at `/app/*` via ASP.NET Core catch-all route; React Router uses `basename="/app"`.
+> - **Migrated to SPA:** Dashboard (with charts), Movements list, global quick-add modal.
+> - **Still served by Razor:** Accounts, Categories, Budgets, Recurring Transactions, Transactions (full CRUD), Transfers (full CRUD), Reports, Import, Settings — these continue to work as Phase 2-style hybrid pages.
+> - Auth has not yet shipped; session cookies are still in use.
+>
+> The end-state diagram below describes the **target** architecture. See [`planning-phase3-spa-migration.md`](planning-phase3-spa-migration.md) for the per-controller migration status.
 
 ```mermaid
 sequenceDiagram
