@@ -14,7 +14,8 @@
 8. [The `<Numeric>` component](#the-numeric-component)
 9. [Toasts](#toasts)
 10. [Showcase route](#showcase-route)
-11. [Known limitations](#known-limitations)
+11. [Known browser console messages](#known-browser-console-messages)
+12. [Known limitations](#known-limitations)
 
 ---
 
@@ -186,6 +187,16 @@ For destructive operations, prefer a confirmation dialog over a toast.
 `http://localhost:5173/design-system.html` (dev) — renders every token and shadcn primitive in every state, with light/dark toggle. Open it whenever a token changes; visual regressions show up here first.
 
 The showcase mounts a separate React entry (`src/design-system/main.tsx`) and uses `HashRouter` so navigation works on a file-based route without server cooperation. It is isolated from the production-bound `src/main.tsx` Razor-island setup.
+
+---
+
+## Known browser console messages
+
+Browsing the showcase or the SPA, you may see these — none are bugs in our code:
+
+- **`SES Removing unpermitted intrinsics`** (lockdown-install.js). Comes from a wallet/web3 browser extension (typically MetaMask) that injects SES into every page. Verify by opening in incognito with extensions disabled — the warning disappears.
+- **`WebSocket connection to 'ws://localhost:7081/?token=…' failed` + `[vite] failed to connect to websocket`.** Caused by opening the showcase via the ASP.NET Core backend URL (`https://localhost:7081/design-system.html`) instead of the Vite dev server. The page renders correctly, but HMR is disabled. Fix: open `http://localhost:5173/design-system.html` (run `pnpm dev` from `ProjectCeres.Client/` first).
+- **`Recharts: width(-1) and height(-1) of chart should be greater than 0`** in older builds. Fixed by adding `minWidth={0}` to all `<ResponsiveContainer>` instances; if you re-introduce this warning, set `minWidth={0}` on the new chart's container.
 
 ---
 

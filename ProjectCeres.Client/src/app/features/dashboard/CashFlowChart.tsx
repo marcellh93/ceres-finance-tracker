@@ -23,7 +23,7 @@ export function CashFlowChart() {
           <p className="text-sm text-muted-foreground">No data yet.</p>
         )}
         {data && data.points.length > 0 && (
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={220} minWidth={0}>
             <BarChart data={data.points}>
               <XAxis dataKey="month" tick={{ fontSize: 12 }} tickFormatter={formatMonth} />
               <YAxis tick={{ fontSize: 12 }} />

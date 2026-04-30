@@ -24,7 +24,7 @@ export function AccountBalancesChart() {
           <p className="text-sm text-muted-foreground">No data yet.</p>
         )}
         {data && data.rows.length > 0 && (
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={220} minWidth={0}>
             <BarChart data={data.rows} layout="vertical" margin={{ left: 12, right: 12 }}>
               <XAxis type="number" tick={{ fontSize: 12 }} />
               <YAxis type="category" dataKey="accountName" tick={{ fontSize: 12 }} width={100} />

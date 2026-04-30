@@ -175,3 +175,26 @@ html.sidebar-collapsed {
   body { @apply bg-background text-foreground; }
   html { @apply font-sans; }
 }
+
+/*
+ * Sonner toast accents.
+ *
+ * Default Sonner uses a neutral popover background. We tint only the icon
+ * per data-type — the title text stays at popover-foreground so the message
+ * remains AA-readable in both light and dark modes (colored body text against
+ * white/dark zinc fails AA, especially for amber/warning).
+ *
+ * The icon color carries the type at a glance without sacrificing readability.
+ */
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--success);
+}
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--destructive);
+}
+[data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--warning);
+}
+[data-sonner-toast][data-type="info"] [data-icon] {
+  color: var(--info);
+}

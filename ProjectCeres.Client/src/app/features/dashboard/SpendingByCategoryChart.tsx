@@ -27,7 +27,7 @@ export function SpendingByCategoryChart() {
           <p className="text-sm text-muted-foreground">No data yet.</p>
         )}
         {data && data.slices.length > 0 && (
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={220} minWidth={0}>
             <BarChart data={top} layout="vertical" margin={{ left: 12, right: 12 }}>
               <XAxis type="number" tick={{ fontSize: 12 }} />
               <YAxis type="category" dataKey="categoryName" tick={{ fontSize: 12 }} width={100} />
