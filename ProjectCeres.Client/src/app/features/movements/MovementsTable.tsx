@@ -48,10 +48,10 @@ export function MovementsTable({ items }: Props) {
                   <Badge variant="info">{typeLabel.Transaction}</Badge>
                 )}
                 {item.movementType === 'Transfer' && (
-                  <Badge className="bg-chart-4/10 text-chart-4">{typeLabel.Transfer}</Badge>
+                  <Badge className="bg-chart-6/10 text-chart-6">{typeLabel.Transfer}</Badge>
                 )}
                 {item.movementType === 'LiabilityPayment' && (
-                  <Badge variant="warning">{typeLabel.LiabilityPayment}</Badge>
+                  <Badge className="bg-chart-7/10 text-chart-7">{typeLabel.LiabilityPayment}</Badge>
                 )}
               </td>
               <td className="px-3 py-2">
