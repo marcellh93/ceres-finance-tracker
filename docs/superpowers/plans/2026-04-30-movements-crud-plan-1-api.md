@@ -335,43 +335,52 @@ git commit -m "test(api): failing test for GET /api/transactions/:id"
 **Files:**
 - Modify: `ProjectCeres/Controllers/Api/TransactionsApiController.cs`
 
-- [ ] **Step 1: Add the GET action**
+- [ ] **Step 1: Update the controller**
 
-Open `ProjectCeres/Controllers/Api/TransactionsApiController.cs` and append inside the controller class:
+Change the controller's primary constructor to also accept `AppDbContext db`:
+
+```csharp
+public class TransactionsApiController(
+    ITransactionService transactionService,
+    AppDbContext db) : ControllerBase
+```
+
+Replace the entire `Get(Guid id)` action with:
 
 ```csharp
 [HttpGet("{id:guid}")]
 public async Task<ActionResult<TransactionEditDto>> Get(Guid id)
 {
-    var vm = await transactionService.GetByIdForEditAsync(id);
-    if (vm is null) return NotFound();
+    var dto = await db.Transactions
+        .Where(t => t.Id == id)
+        .Select(t => new TransactionEditDto(
+            t.Id,
+            t.Date,
+            t.Amount,
+            t.AccountId,
+            t.CategoryId,
+            t.Description,
+            t.IsCleared,
+            t.Attachments
+                .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
+                .ToList()))
+        .SingleOrDefaultAsync();
 
-    using var scope = HttpContext.RequestServices.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var attachments = await db.TransactionAttachments
-        .Where(a => a.TransactionId == id)
-        .Select(a => new AttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, a.UploadedAt))
-        .ToListAsync();
-
-    return new TransactionEditDto(
-        Id:          vm.Id,
-        Date:        vm.Date,
-        Amount:      vm.Amount,
-        AccountId:   vm.AccountId!.Value,
-        CategoryId:  vm.CategoryId!.Value,
-        Description: vm.Description,
-        IsCleared:   vm.IsCleared,
-        Attachments: attachments);
+    return dto is null ? NotFound() : dto;
 }
 ```
 
-Add the missing using statements at the top of the file:
+Update usings at the top of the file to remove `Microsoft.Extensions.DependencyInjection`. Keep `Microsoft.EntityFrameworkCore` (for `SingleOrDefaultAsync`) and `ProjectCeres.Data` (for `AppDbContext`):
 
 ```csharp
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
+using ProjectCeres.Services;
+using ProjectCeres.ViewModels;
 ```
+
+**Rationale:** Inject `AppDbContext` directly (matches `DashboardApiController`/`AccountsApiController` convention). Project EF rows directly to DTOs in a single query — avoids the VM-passthrough that introduces `Guid?.Value` null-forgiving operators.
 
 - [ ] **Step 2: Run the test — expect PASS**
 
@@ -400,11 +409,59 @@ dotnet test ProjectCeres.Tests --filter "FullyQualifiedName~TransactionsCrudApiT
 
 Expected: PASS for both tests.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Add test for attachments**
+
+Append to `TransactionsCrudApiTests`:
+
+```csharp
+[Fact]
+public async Task Get_Returns200_WithAttachmentMetadata_WhenAttachmentsExist()
+{
+    var (_, txId) = await SeedTransactionAsync();
+
+    using var scope = _factory.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var attachment = new TransactionAttachment
+    {
+        Id            = Guid.NewGuid(),
+        TransactionId = txId,
+        FileName      = "receipt.pdf",
+        StoredPath    = "/tmp/test-receipt.pdf",
+        FileSizeBytes = 4096,
+        ContentType   = "application/pdf",
+        UploadedAt    = DateTime.UtcNow
+    };
+    db.TransactionAttachments.Add(attachment);
+    await db.SaveChangesAsync();
+
+    try
+    {
+        var response = await _client.GetAsync($"/api/transactions/{txId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var attachments = body.GetProperty("attachments").EnumerateArray().ToList();
+        attachments.Should().HaveCount(1);
+        attachments[0].GetProperty("fileName").GetString().Should().Be("receipt.pdf");
+        attachments[0].GetProperty("sizeBytes").GetInt64().Should().Be(4096);
+        attachments[0].GetProperty("contentType").GetString().Should().Be("application/pdf");
+    }
+    finally
+    {
+        using var cleanup = _factory.Services.CreateScope();
+        var cleanupDb = cleanup.ServiceProvider.GetRequiredService<AppDbContext>();
+        await cleanupDb.TransactionAttachments.Where(a => a.Id == attachment.Id).ExecuteDeleteAsync();
+    }
+}
+```
+
+Run all three tests and expect 3/3 PASS.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add ProjectCeres/Controllers/Api/TransactionsApiController.cs ProjectCeres.Tests/Integration/Api/TransactionsCrudApiTests.cs
-git commit -m "feat(api): GET /api/transactions/:id returns TransactionEditDto"
+git commit -m "refactor(api): GET /api/transactions/:id uses direct EF projection (DI fix)"
 ```
 
 ---
@@ -797,33 +854,38 @@ git commit -m "test(api): failing tests for Transfers GET/PUT/DELETE :id"
 **Files:**
 - Modify: `ProjectCeres/Controllers/Api/TransfersApiController.cs`
 
-- [ ] **Step 1: Add the three actions**
+- [ ] **Step 1: Update the controller and add the three actions**
 
-Append inside the controller:
+Change the controller's primary constructor to also accept `AppDbContext db`:
+
+```csharp
+public class TransfersApiController(
+    ITransferService transferService,
+    AppDbContext db) : ControllerBase
+```
+
+Append the GET action:
 
 ```csharp
 [HttpGet("{id:guid}")]
 public async Task<ActionResult<TransferEditDto>> Get(Guid id)
 {
-    var transfer = await transferService.GetByIdAsync(id);
-    if (transfer is null) return NotFound();
+    var dto = await db.Transfers
+        .Where(t => t.Id == id)
+        .Select(t => new TransferEditDto(
+            t.Id,
+            t.Date,
+            t.Amount,
+            t.SourceAccountId,
+            t.DestAccountId,
+            t.Description,
+            t.IsCleared,
+            t.Attachments
+                .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
+                .ToList()))
+        .SingleOrDefaultAsync();
 
-    using var scope = HttpContext.RequestServices.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var attachments = await db.TransferAttachments
-        .Where(a => a.TransferId == id)
-        .Select(a => new AttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, a.UploadedAt))
-        .ToListAsync();
-
-    return new TransferEditDto(
-        Id:              transfer.Id,
-        Date:            transfer.Date,
-        Amount:          transfer.Amount,
-        SourceAccountId: transfer.SourceAccountId,
-        DestAccountId:   transfer.DestAccountId,
-        Description:     transfer.Description,
-        IsCleared:       transfer.IsCleared,
-        Attachments:     attachments);
+    return dto is null ? NotFound() : dto;
 }
 
 [HttpPut("{id:guid}")]
@@ -888,12 +950,14 @@ public async Task<IActionResult> Delete(Guid id)
 }
 ```
 
-Add usings:
+Update usings to include `Microsoft.EntityFrameworkCore` and `ProjectCeres.Data` (remove `Microsoft.Extensions.DependencyInjection`):
 
 ```csharp
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
+using ProjectCeres.Services;
+using ProjectCeres.ViewModels;
 ```
 
 - [ ] **Step 2: Run — expect all PASS**
@@ -1065,23 +1129,35 @@ git commit -m "test(api): failing tests for LiabilityPayments GET/PUT/DELETE :id
 **Files:**
 - Modify: `ProjectCeres/Controllers/Api/LiabilityPaymentsApiController.cs`
 
-- [ ] **Step 1: Append the three actions**
+- [ ] **Step 1: Update the controller and append the three actions**
+
+Change the controller's primary constructor to also accept `AppDbContext db`:
+
+```csharp
+public class LiabilityPaymentsApiController(
+    ILiabilityPaymentService liabilityPaymentService,
+    AppDbContext db) : ControllerBase
+```
+
+Append the GET action:
 
 ```csharp
 [HttpGet("{id:guid}")]
 public async Task<ActionResult<LiabilityPaymentEditDto>> Get(Guid id)
 {
-    var payment = await liabilityPaymentService.GetByIdAsync(id);
-    if (payment is null) return NotFound();
+    var dto = await db.LiabilityPayments
+        .Where(p => p.Id == id)
+        .Select(p => new LiabilityPaymentEditDto(
+            p.Id,
+            p.Date,
+            p.Amount,
+            p.AssetAccountId,
+            p.LiabilityAccountId,
+            p.Description,
+            p.IsCleared))
+        .SingleOrDefaultAsync();
 
-    return new LiabilityPaymentEditDto(
-        Id:                 payment.Id,
-        Date:               payment.Date,
-        Amount:             payment.Amount,
-        AssetAccountId:     payment.AssetAccountId,
-        LiabilityAccountId: payment.LiabilityAccountId,
-        Description:        payment.Description,
-        IsCleared:          payment.IsCleared);
+    return dto is null ? NotFound() : dto;
 }
 
 [HttpPut("{id:guid}")]
