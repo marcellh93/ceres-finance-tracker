@@ -20,11 +20,18 @@ public class MovementService : IMovementService
         DateOnly? to = null,
         int limit = 50,
         int offset = 0,
-        string? q = null)
+        string? q = null,
+        MovementType? type = null)
     {
-        var transactions = await QueryTransactions(accountId, from, to, q);
-        var transfers    = await QueryTransfers(accountId, from, to, q);
-        var payments     = await QueryLiabilityPayments(accountId, from, to, q);
+        var transactions = type is null or MovementType.Transaction
+            ? await QueryTransactions(accountId, from, to, q)
+            : new List<MovementListItemViewModel>();
+        var transfers = type is null or MovementType.Transfer
+            ? await QueryTransfers(accountId, from, to, q)
+            : new List<MovementListItemViewModel>();
+        var payments = type is null or MovementType.LiabilityPayment
+            ? await QueryLiabilityPayments(accountId, from, to, q)
+            : new List<MovementListItemViewModel>();
 
         return transactions
             .Concat(transfers)
@@ -40,13 +47,24 @@ public class MovementService : IMovementService
         Guid? accountId = null,
         DateOnly? from = null,
         DateOnly? to = null,
-        string? q = null)
+        string? q = null,
+        MovementType? type = null)
     {
-        var transactions = await QueryTransactions(accountId, from, to, q);
-        var transfers    = await QueryTransfers(accountId, from, to, q);
-        var payments     = await QueryLiabilityPayments(accountId, from, to, q);
+        var t = type is null or MovementType.Transaction
+            ? (await QueryTransactions(accountId, from, to, q)).Count : 0;
+        var tr = type is null or MovementType.Transfer
+            ? (await QueryTransfers(accountId, from, to, q)).Count : 0;
+        var lp = type is null or MovementType.LiabilityPayment
+            ? (await QueryLiabilityPayments(accountId, from, to, q)).Count : 0;
+        return t + tr + lp;
+    }
 
-        return transactions.Count + transfers.Count + payments.Count;
+    public async Task<MovementType?> GetTypeAsync(Guid id)
+    {
+        if (await _db.Transactions.AnyAsync(t => t.Id == id))     return MovementType.Transaction;
+        if (await _db.Transfers.AnyAsync(t => t.Id == id))        return MovementType.Transfer;
+        if (await _db.LiabilityPayments.AnyAsync(p => p.Id == id)) return MovementType.LiabilityPayment;
+        return null;
     }
 
     // -------------------------------------------------------------------------
