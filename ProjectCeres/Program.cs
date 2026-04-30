@@ -66,6 +66,7 @@ builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();
 builder.Services.AddScoped<IMovementService, MovementService>();
+builder.Services.AddScoped<IMovementExportService, MovementExportService>();
 builder.Services.AddScoped<IImportProfileService, ImportProfileService>();
 builder.Services.AddSingleton<CsvImportParser>();
 builder.Services.AddSingleton<ExcelImportParser>();
