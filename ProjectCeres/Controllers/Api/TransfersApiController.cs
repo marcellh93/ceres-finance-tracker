@@ -10,7 +10,8 @@ namespace ProjectCeres.Controllers.Api;
 [Route("api/transfers")]
 public class TransfersApiController(
     ITransferService transferService,
-    AppDbContext db) : ControllerBase
+    AppDbContext db,
+    IFileAttachmentService attachmentService) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTransferRequest request)
@@ -156,6 +157,52 @@ public class TransfersApiController(
                     details = Array.Empty<object>()
                 }
             });
+        }
+    }
+
+    [HttpPost("{id:guid}/attachments")]
+    public async Task<IActionResult> UploadAttachment(Guid id, IFormFile file)
+    {
+        var existing = await transferService.GetByIdAsync(id);
+        if (existing is null) return NotFound();
+
+        try
+        {
+            await attachmentService.ValidateAsync(file);
+            var saved = await attachmentService.UploadForTransferAsync(id, file);
+            return Created($"/api/transfers/{id}/attachments/{saved.Id}", new
+            {
+                id          = saved.Id,
+                fileName    = saved.FileName,
+                sizeBytes   = saved.FileSizeBytes,
+                contentType = saved.ContentType
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "VALIDATION_ERROR",
+                    message = ex.Message,
+                    details = Array.Empty<object>()
+                }
+            });
+        }
+    }
+
+    [HttpDelete("attachments/{attachmentId:guid}")]
+    public async Task<IActionResult> DeleteAttachment(Guid attachmentId)
+    {
+        try
+        {
+            await attachmentService.DeleteTransferAttachmentAsync(attachmentId);
+            return NoContent();
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound();
         }
     }
 }
