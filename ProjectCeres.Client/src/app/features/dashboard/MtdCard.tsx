@@ -4,7 +4,7 @@ import { Numeric } from '@/components/Numeric';
 import { StatTile } from '@/components/StatTile';
 import { Tile } from '@/components/Tile';
 import { useApi } from '../../lib/use-api';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { SUMMARY_URL, type SummaryDto } from './api';
 
 function formatPercent(fraction: number): string {

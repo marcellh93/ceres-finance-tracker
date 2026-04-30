@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
 import { chartColors } from '../../lib/chart-colors';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { SPENDING_BY_CATEGORY_URL, type SpendingByCategoryDto } from './charts-api';
 
 const SLOT_COUNT = 8;

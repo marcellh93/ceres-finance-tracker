@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
 import { chartColors } from '../../lib/chart-colors';
 import { formatMonth } from '../../lib/format-month';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { INCOME_EXPENSE_URL, type IncomeExpenseDto } from './charts-api';
 
 export function IncomeExpenseChart() {

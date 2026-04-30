@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
 import { EquationRow } from '@/components/EquationRow';
 import { useApi } from '../../lib/use-api';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { HEALTH_URL, type HealthDto } from './api';
 import {
   availableTodayClass,

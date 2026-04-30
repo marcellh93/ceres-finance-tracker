@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
 import { chartColors } from '../../lib/chart-colors';
 import { formatMonth } from '../../lib/format-month';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { CASH_FLOW_URL, type CashFlowDto } from './charts-api';
 
 export function CashFlowChart() {

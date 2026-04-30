@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CardError } from '../features/dashboard/CardError';
+import { CardError } from '../components/CardError';
 import { MovementsFilterBar } from '../features/movements/MovementsFilterBar';
 import { MovementsPagination } from '../features/movements/MovementsPagination';
 import { MovementsTable } from '../features/movements/MovementsTable';

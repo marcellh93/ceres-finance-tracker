@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
 import { chartColors } from '../../lib/chart-colors';
 import { formatMonth } from '../../lib/format-month';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { NET_WORTH_TREND_URL, type NetWorthTrendDto } from './charts-api';
 
 export function NetWorthChart() {

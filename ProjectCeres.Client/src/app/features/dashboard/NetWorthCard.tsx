@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
 import { StatRow } from '@/components/StatRow';
 import { useApi } from '../../lib/use-api';
-import { CardError } from './CardError';
+import { CardError } from '../../components/CardError';
 import { SUMMARY_URL, type NetWorthEntry, type SummaryDto } from './api';
 
 export function NetWorthCard() {
