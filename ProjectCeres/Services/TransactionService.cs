@@ -41,7 +41,7 @@ public class TransactionService(
             CreatedAt        = t.CreatedAt,
             Amount           = t.Amount,
             Description      = t.Description,
-            TransactionType  = "Regular",
+            TransactionType  = TransactionTypes.Regular,
             IsCleared        = t.IsCleared,
             NeedsReview      = t.NeedsReview,
             AccountName      = t.Account.Name,
@@ -162,7 +162,7 @@ public class TransactionService(
 
     public async Task<Guid> CreateAsync(TransactionCreateViewModel vm)
     {
-        if (vm.TransactionType == "LiabilityPayment")
+        if (vm.TransactionType == TransactionTypes.LiabilityPayment)
         {
             var payment = await liabilityPaymentService.CreateAsync(vm);
             return payment.Id;
@@ -193,7 +193,7 @@ public class TransactionService(
 
     public async Task UpdateAsync(TransactionEditViewModel vm)
     {
-        if (vm.TransactionType == "LiabilityPayment")
+        if (vm.TransactionType == TransactionTypes.LiabilityPayment)
         {
             await liabilityPaymentService.UpdateAsync(vm);
             return;

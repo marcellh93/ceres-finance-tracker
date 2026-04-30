@@ -158,7 +158,9 @@ public class TransactionsCrudApiTests : IAsyncLifetime
             accountId   = newAccountId,
             categoryId  = HousingCategoryId,
             description = "Updated",
-            isCleared   = true
+            isCleared   = true,
+            budgetId    = (Guid?)null,
+            needsReview = true
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -171,6 +173,8 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         saved.IsCleared.Should().BeTrue();
         saved.Date.Should().Be(new DateOnly(2026, 4, 20));
         saved.AccountId.Should().Be(newAccountId);
+        saved.NeedsReview.Should().BeTrue();
+        saved.BudgetId.Should().BeNull();
     }
 
     [Fact]
@@ -220,5 +224,52 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Put_Returns422_WhenDateBeforeOpeningBalance()
+    {
+        var (accountId, txId) = await SeedTransactionAsync();
+
+        // Seed an opening balance transaction on 2026-04-20.
+        // Then try to PUT the existing transaction to 2026-04-01 (before the opening balance).
+        var openingBalanceCategoryId = new Guid("20000000-0000-0000-0000-000000000001");
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var openingBalanceTx = new Transaction
+            {
+                Id          = Guid.NewGuid(),
+                Date        = new DateOnly(2026, 4, 20),
+                Amount      = 1000m,
+                AccountId   = accountId,
+                CategoryId  = openingBalanceCategoryId,
+                Description = "Opening balance",
+                IsCleared   = true,
+                CreatedAt   = DateTime.UtcNow
+            };
+            seedDb.Transactions.Add(openingBalanceTx);
+            await seedDb.SaveChangesAsync();
+            _seededTransactionIds.Add(openingBalanceTx.Id);
+        }
+
+        // Now try to update the existing transaction to a date before the opening balance
+        var response = await _client.PutAsJsonAsync($"/api/transactions/{txId}", new
+        {
+            date        = "2026-04-01",
+            amount      = 50m,
+            accountId   = accountId,
+            categoryId  = HousingCategoryId,
+            description = "before-opening",
+            isCleared   = false,
+            budgetId    = (Guid?)null,
+            needsReview = false
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
+        body.GetProperty("error").GetProperty("message").GetString().Should().NotBeNullOrEmpty();
     }
 }

@@ -17,7 +17,7 @@ public class TransactionsApiController(
     {
         var vm = new TransactionCreateViewModel
         {
-            TransactionType = "Regular",
+            TransactionType = TransactionTypes.Regular,
             Date = request.Date,
             Amount = request.Amount,
             AccountId = request.AccountId,
@@ -64,16 +64,33 @@ public class TransactionsApiController(
         var vm = new TransactionEditViewModel
         {
             Id              = id,
-            TransactionType = "Regular",
+            TransactionType = TransactionTypes.Regular,
             Date            = request.Date,
             Amount          = request.Amount,
             AccountId       = request.AccountId,
             CategoryId      = request.CategoryId,
             Description     = request.Description,
-            IsCleared       = request.IsCleared
+            IsCleared       = request.IsCleared,
+            BudgetId        = request.BudgetId,
+            NeedsReview     = request.NeedsReview
         };
 
-        await transactionService.UpdateAsync(vm);
-        return NoContent();
+        try
+        {
+            await transactionService.UpdateAsync(vm);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "VALIDATION_ERROR",
+                    message = ex.Message,
+                    details = Array.Empty<object>()
+                }
+            });
+        }
     }
 }

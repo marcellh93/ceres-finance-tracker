@@ -64,6 +64,10 @@ public class UpdateTransactionRequest
     public string? Description { get; set; }
 
     public bool IsCleared { get; set; }
+
+    public Guid? BudgetId { get; set; }
+
+    public bool NeedsReview { get; set; }
 }
 
 public class UpdateTransferRequest
