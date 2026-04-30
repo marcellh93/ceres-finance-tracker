@@ -142,4 +142,44 @@ public class LiabilityPaymentsCrudApiTests : IAsyncLifetime
         (await db.LiabilityPayments.FindAsync(paymentId)).Should().BeNull();
         _seededPaymentIds.Remove(paymentId);
     }
+
+    [Fact]
+    public async Task Put_Returns422_WhenCrossCurrency()
+    {
+        var (assetId, liabilityId, paymentId) = await SeedPaymentAsync();
+
+        // Seed a liability account in a different currency.
+        Guid otherCurrencyLiabilityId;
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var otherLiability = new Account
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Lp-OtherCcy-{Guid.NewGuid():N}",
+                AccountTypeId = 2,
+                CurrencyId = 2,
+                IsActive = true
+            };
+            seedDb.Accounts.Add(otherLiability);
+            await seedDb.SaveChangesAsync();
+            _seededAccountIds.Add(otherLiability.Id);
+            otherCurrencyLiabilityId = otherLiability.Id;
+        }
+
+        var response = await _client.PutAsJsonAsync($"/api/liability-payments/{paymentId}", new
+        {
+            date = "2026-04-18",
+            amount = 100m,
+            assetAccountId = assetId,
+            liabilityAccountId = otherCurrencyLiabilityId,
+            description = "cross-ccy",
+            isCleared = false
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
+        body.GetProperty("error").GetProperty("details").GetArrayLength().Should().Be(0);
+    }
 }

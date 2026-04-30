@@ -46,6 +46,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
         payment.LiabilityAccountId = vm.LiabilityAccountId!.Value;
         payment.Description        = vm.Description;
         payment.IsCleared          = vm.IsCleared;
+        // LiabilityPayment has no NeedsReview column (unlike Transaction); this is intentional.
         await db.SaveChangesAsync();
     }
 

@@ -143,10 +143,10 @@ public class TransfersCrudApiTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var saved = await db.Transfers.FindAsync(trId);
         saved!.Amount.Should().Be(350m);
-        saved.Description.Should().Be("Updated transfer");
-        saved.IsCleared.Should().BeTrue();
         saved.Date.Should().Be(new DateOnly(2026, 4, 20));
         saved.SourceAccountId.Should().Be(newSourceId);
+        saved.Description.Should().Be("Updated transfer");
+        saved.IsCleared.Should().BeTrue();
     }
 
     [Fact]
@@ -184,5 +184,45 @@ public class TransfersCrudApiTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.Transfers.FindAsync(trId)).Should().BeNull();
         _seededTransferIds.Remove(trId);
+    }
+
+    [Fact]
+    public async Task Put_Returns422_WhenCrossCurrency()
+    {
+        var (srcId, destId, trId) = await SeedTransferAsync();
+
+        // Seed a destination account in a different currency.
+        Guid otherCurrencyDestId;
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var otherDest = new Account
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Tr-OtherCcy-{Guid.NewGuid():N}",
+                AccountTypeId = 1,
+                CurrencyId = 2,
+                IsActive = true
+            };
+            seedDb.Accounts.Add(otherDest);
+            await seedDb.SaveChangesAsync();
+            _seededAccountIds.Add(otherDest.Id);
+            otherCurrencyDestId = otherDest.Id;
+        }
+
+        var response = await _client.PutAsJsonAsync($"/api/transfers/{trId}", new
+        {
+            date = "2026-04-15",
+            amount = 100m,
+            sourceAccountId = srcId,
+            destAccountId = otherCurrencyDestId,
+            description = "cross-ccy",
+            isCleared = false
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("VALIDATION_ERROR");
+        body.GetProperty("error").GetProperty("details").GetArrayLength().Should().Be(0);
     }
 }
