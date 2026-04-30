@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Outlet, useSearchParams } from 'react-router-dom';
+import { Link, Outlet, useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardError } from '../../components/CardError';
 import { MovementsFilterBar } from './MovementsFilterBar';
@@ -27,7 +29,10 @@ export function MovementsLayout() {
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Movements
         </h1>
-        {/* + New button is added in Task 11 (route to /movements/new). */}
+        <Button render={<Link to="new" />}>
+          <Plus className="h-4 w-4" />
+          New
+        </Button>
       </div>
 
       <MovementsFilterBar />

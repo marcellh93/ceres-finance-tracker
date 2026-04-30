@@ -43,4 +43,19 @@ describe('MovementsLayout', () => {
     // List heading still present (parent stays mounted).
     expect(screen.getByRole('heading', { name: /movements/i })).toBeInTheDocument();
   });
+
+  it('renders a "New" button that links to /movements/new', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements']}>
+        <Routes>
+          <Route path="/movements" element={<MovementsLayout />}>
+            <Route index element={null} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /new/i });
+    // The relative `to="new"` resolves to "/movements/new" against the parent route
+    expect(link.getAttribute('href')).toBe('/movements/new');
+  });
 });
