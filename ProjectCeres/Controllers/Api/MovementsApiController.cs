@@ -80,6 +80,14 @@ public class MovementsApiController(
         }
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<MovementTypeDto>> GetType(Guid id)
+    {
+        var type = await movementService.GetTypeAsync(id);
+        if (type is null) return NotFound();
+        return new MovementTypeDto(id, type.ToString()!);
+    }
+
     private static MovementListItemDto MapToDto(MovementListItemViewModel m)
     {
         return new MovementListItemDto(
