@@ -1,4 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
@@ -24,5 +27,29 @@ public class TransactionsApiController(ITransactionService transactionService) :
         var id = await transactionService.CreateAsync(vm);
 
         return Created($"/api/transactions/{id}", new { id });
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<TransactionEditDto>> Get(Guid id)
+    {
+        var vm = await transactionService.GetByIdForEditAsync(id);
+        if (vm is null) return NotFound();
+
+        using var scope = HttpContext.RequestServices.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var attachments = await db.TransactionAttachments
+            .Where(a => a.TransactionId == id)
+            .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
+            .ToListAsync();
+
+        return new TransactionEditDto(
+            Id:          vm.Id,
+            Date:        vm.Date,
+            Amount:      vm.Amount,
+            AccountId:   vm.AccountId!.Value,
+            CategoryId:  vm.CategoryId!.Value,
+            Description: vm.Description,
+            IsCleared:   vm.IsCleared,
+            Attachments: attachments);
     }
 }

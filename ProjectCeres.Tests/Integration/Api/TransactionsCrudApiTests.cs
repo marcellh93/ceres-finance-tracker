@@ -87,4 +87,11 @@ public class TransactionsCrudApiTests : IAsyncLifetime
         body.GetProperty("isCleared").GetBoolean().Should().BeFalse();
         body.GetProperty("attachments").EnumerateArray().Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task Get_Returns404_WhenIdMissing()
+    {
+        var response = await _client.GetAsync($"/api/transactions/{Guid.NewGuid()}");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
