@@ -48,7 +48,7 @@ export function MovementsFilterBar() {
         />
       </div>
       <div className="space-y-1.5 sm:w-56">
-        <Label>Account</Label>
+        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Account</div>
         <AccountCombobox
           accounts={accounts ?? []}
           value={params.get('accountId')}

@@ -273,7 +273,13 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
+      {htmlFor ? (
+        <Label htmlFor={htmlFor}>{label}</Label>
+      ) : (
+        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">
+          {label}
+        </div>
+      )}
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
