@@ -13,7 +13,7 @@ public class TransactionListItemViewModel
     public string? Description { get; set; }
 
     /// <summary>"Regular" or "LiabilityPayment"</summary>
-    public string TransactionType { get; set; } = "Regular";
+    public string TransactionType { get; set; } = TransactionTypes.Regular;
 
     // Regular transaction fields
     public string? AccountName { get; set; }

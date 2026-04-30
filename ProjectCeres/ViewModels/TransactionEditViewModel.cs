@@ -8,7 +8,7 @@ public class TransactionEditViewModel
     public Guid Id { get; set; }
 
     /// <summary>"Regular" or "LiabilityPayment"</summary>
-    public string TransactionType { get; set; } = "Regular";
+    public string TransactionType { get; set; } = TransactionTypes.Regular;
 
     [Required(ErrorMessage = "Date is required.")]
     public DateOnly Date { get; set; }

@@ -688,8 +688,24 @@ public async Task<IActionResult> Delete(Guid id)
 {
     var existing = await transactionService.GetByIdForEditAsync(id);
     if (existing is null) return NotFound();
-    await transactionService.DeleteAsync(id);
-    return NoContent();
+
+    try
+    {
+        await transactionService.DeleteAsync(id);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return UnprocessableEntity(new
+        {
+            error = new
+            {
+                code = "VALIDATION_ERROR",
+                message = ex.Message,
+                details = Array.Empty<object>()
+            }
+        });
+    }
 }
 ```
 
@@ -976,8 +992,24 @@ public async Task<IActionResult> Delete(Guid id)
 {
     var existing = await transferService.GetByIdAsync(id);
     if (existing is null) return NotFound();
-    await transferService.DeleteAsync(id);
-    return NoContent();
+
+    try
+    {
+        await transferService.DeleteAsync(id);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return UnprocessableEntity(new
+        {
+            error = new
+            {
+                code = "VALIDATION_ERROR",
+                message = ex.Message,
+                details = Array.Empty<object>()
+            }
+        });
+    }
 }
 ```
 
@@ -1233,8 +1265,24 @@ public async Task<IActionResult> Delete(Guid id)
 {
     var existing = await liabilityPaymentService.GetByIdAsync(id);
     if (existing is null) return NotFound();
-    await liabilityPaymentService.DeleteAsync(id);
-    return NoContent();
+
+    try
+    {
+        await liabilityPaymentService.DeleteAsync(id);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return UnprocessableEntity(new
+        {
+            error = new
+            {
+                code = "VALIDATION_ERROR",
+                message = ex.Message,
+                details = Array.Empty<object>()
+            }
+        });
+    }
 }
 ```
 

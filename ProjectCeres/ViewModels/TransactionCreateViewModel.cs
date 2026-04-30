@@ -6,7 +6,7 @@ namespace ProjectCeres.ViewModels;
 public class TransactionCreateViewModel
 {
     /// <summary>"Regular" or "LiabilityPayment"</summary>
-    public string TransactionType { get; set; } = "Regular";
+    public string TransactionType { get; set; } = TransactionTypes.Regular;
 
     [Required(ErrorMessage = "Date is required.")]
     public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Today);

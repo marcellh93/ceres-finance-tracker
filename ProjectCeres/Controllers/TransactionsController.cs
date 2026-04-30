@@ -6,6 +6,7 @@ using ProjectCeres.Data;
 using ProjectCeres.Helpers;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
+using static ProjectCeres.ViewModels.TransactionTypes;
 
 namespace ProjectCeres.Controllers;
 
@@ -56,7 +57,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
     public async Task<IActionResult> Create(TransactionCreateViewModel vm)
     {
         // Conditional server-side validation — required fields differ by type
-        if (vm.TransactionType == "LiabilityPayment")
+        if (vm.TransactionType == LiabilityPayment)
         {
             ModelState.Remove("CategoryId");
             if (vm.LiabilityAccountId is null)
@@ -114,7 +115,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
             }
         }
 
-        TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
+        TempData["SuccessMessage"] = vm.TransactionType == LiabilityPayment
             ? "Liability payment recorded."
             : "Transaction recorded.";
         return RedirectToAction(nameof(Index));
@@ -126,7 +127,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
         if (vm is null) return NotFound();
 
         // Attachments only apply to regular transactions
-        if (vm.TransactionType == "Regular")
+        if (vm.TransactionType == Regular)
         {
             var t = await db.Transactions.Include(t => t.Attachments).FirstOrDefaultAsync(t => t.Id == id);
             ViewBag.Attachments = t?.Attachments;
@@ -141,7 +142,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(TransactionEditViewModel vm, string? returnUrl = null)
     {
-        if (vm.TransactionType == "LiabilityPayment")
+        if (vm.TransactionType == LiabilityPayment)
         {
             ModelState.Remove("CategoryId");
             if (vm.LiabilityAccountId is null)
@@ -200,7 +201,7 @@ public class TransactionsController(ITransactionService transactionService, IFil
             }
         }
 
-        TempData["SuccessMessage"] = vm.TransactionType == "LiabilityPayment"
+        TempData["SuccessMessage"] = vm.TransactionType == LiabilityPayment
             ? "Liability payment updated."
             : "Transaction updated.";
 

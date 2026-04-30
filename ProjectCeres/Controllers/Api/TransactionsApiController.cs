@@ -99,7 +99,23 @@ public class TransactionsApiController(
     {
         var existing = await transactionService.GetByIdForEditAsync(id);
         if (existing is null) return NotFound();
-        await transactionService.DeleteAsync(id);
-        return NoContent();
+
+        try
+        {
+            await transactionService.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "VALIDATION_ERROR",
+                    message = ex.Message,
+                    details = Array.Empty<object>()
+                }
+            });
+        }
     }
 }

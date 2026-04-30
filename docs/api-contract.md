@@ -177,6 +177,40 @@ The `details` array is present only for validation errors (422). For other error
 
 For cross-field validation that runs after the auto-check (e.g. "source account must differ from destination"), do **not** call `return ValidationProblem(ModelState)` — that helper returns 400, bypassing the factory. Return `UnprocessableEntity(...)` directly with the same JSON shape so the response stays consistent at 422.
 
+### 422 response body — dual-shape contract
+
+Both `ModelState` validation failures and business-rule validation failures return **422 Unprocessable Entity** with `error.code = "VALIDATION_ERROR"`, but the `details` array has two shapes:
+
+1. **Field validation** (`[Required]`, `[Range]`, `[StringLength]`, etc. — handled by `InvalidModelStateResponseFactory`): `details` is an array of objects `{ field, message }`, one per invalid field.
+2. **Business rule validation** (controller or service-level checks resulting in `InvalidOperationException`): `details` is `[]` (empty array). The human-readable message lives in `error.message` instead.
+
+Frontend code that needs to distinguish field-targeted errors from semantic/business errors should check `details.length`. Field errors render next to form inputs; business errors show as alerts.
+
+Example field validation (422):
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "One or more fields are invalid.",
+    "details": [
+      { "field": "amount", "message": "Amount must be greater than zero." },
+      { "field": "categoryId", "message": "Category not found." }
+    ]
+  }
+}
+```
+
+Example business rule validation (422):
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Source and destination accounts must be different.",
+    "details": []
+  }
+}
+```
+
 ### Deprecation header
 
 When an endpoint or field is deprecated, include in the response:

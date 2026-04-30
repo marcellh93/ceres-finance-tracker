@@ -72,7 +72,7 @@ public class TransactionService(
             CreatedAt            = p.CreatedAt,
             Amount               = p.Amount,
             Description          = p.Description,
-            TransactionType      = "LiabilityPayment",
+            TransactionType      = TransactionTypes.LiabilityPayment,
             AssetAccountName     = p.AssetAccount.Name,
             LiabilityAccountName = p.LiabilityAccount.Name
         });
@@ -127,7 +127,7 @@ public class TransactionService(
             return new TransactionEditViewModel
             {
                 Id              = t.Id,
-                TransactionType = "Regular",
+                TransactionType = TransactionTypes.Regular,
                 Date            = t.Date,
                 Amount          = t.Amount,
                 Description     = t.Description,
@@ -148,7 +148,7 @@ public class TransactionService(
             return new TransactionEditViewModel
             {
                 Id                 = p.Id,
-                TransactionType    = "LiabilityPayment",
+                TransactionType    = TransactionTypes.LiabilityPayment,
                 Date               = p.Date,
                 Amount             = p.Amount,
                 Description        = p.Description,

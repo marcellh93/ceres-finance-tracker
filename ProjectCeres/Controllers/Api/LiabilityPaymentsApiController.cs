@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
+using static ProjectCeres.ViewModels.TransactionTypes;
 
 namespace ProjectCeres.Controllers.Api;
 
@@ -15,7 +16,7 @@ public class LiabilityPaymentsApiController(ILiabilityPaymentService liabilityPa
 
         var vm = new TransactionCreateViewModel
         {
-            TransactionType    = "LiabilityPayment",
+            TransactionType    = LiabilityPayment,
             Date               = request.Date,
             Amount             = request.Amount,
             AccountId          = request.AssetAccountId,
