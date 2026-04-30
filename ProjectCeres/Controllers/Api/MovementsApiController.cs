@@ -15,7 +15,7 @@ public class MovementsApiController(
     public record ClearRequest(string Type, bool Cleared);
 
     [HttpGet]
-    public async Task<IActionResult> GetMovements(
+    public async Task<ActionResult<MovementsPageDto>> GetMovements(
         [FromQuery] string? q = null,
         [FromQuery] Guid? accountId = null,
         [FromQuery] DateOnly? from = null,
@@ -78,7 +78,7 @@ public class MovementsApiController(
     }
 
     [HttpPost("bulk-cleared")]
-    public async Task<IActionResult> BulkCleared([FromBody] BulkClearedRequest request)
+    public async Task<ActionResult<object>> BulkCleared([FromBody] BulkClearedRequest request)
     {
         var (typedFilter, error) = ParseType(request.Type);
         if (error is not null) return error;
@@ -94,7 +94,7 @@ public class MovementsApiController(
         return Ok(new { cleared = total });
     }
 
-    private (MovementType? typed, IActionResult? error) ParseType(string? type)
+    private (MovementType? typed, BadRequestObjectResult? error) ParseType(string? type)
     {
         if (string.IsNullOrWhiteSpace(type)) return (null, null);
 
