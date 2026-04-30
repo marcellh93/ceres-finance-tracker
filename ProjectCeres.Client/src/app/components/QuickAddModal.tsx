@@ -99,6 +99,14 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
   function handleTabChange(value: unknown) {
     setTab(value as TabKey);
     setErrors({});
+    // Reset per-tab fields so a stale selection from another tab can't leak in.
+    // Shared fields (date, amount, description) intentionally persist.
+    setAccountId(null);
+    setCategoryId(null);
+    setSourceAccountId(null);
+    setDestAccountId(null);
+    setAssetAccountId(null);
+    setLiabilityAccountId(null);
   }
 
   async function submit() {
