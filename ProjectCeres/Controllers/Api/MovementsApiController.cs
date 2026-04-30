@@ -88,6 +88,34 @@ public class MovementsApiController(
         return new MovementTypeDto(id, type.ToString()!);
     }
 
+    [HttpPost("bulk-cleared")]
+    public async Task<ActionResult<object>> BulkCleared([FromBody] BulkClearedRequest request)
+    {
+        MovementType? typedFilter = null;
+        if (!string.IsNullOrWhiteSpace(request.Type))
+        {
+            typedFilter = request.Type.ToLowerInvariant() switch
+            {
+                "transaction"      => MovementType.Transaction,
+                "transfer"         => MovementType.Transfer,
+                "liabilitypayment" => MovementType.LiabilityPayment,
+                _ => null
+            };
+            if (typedFilter is null)
+                return BadRequest(new { error = new { code = "INVALID_TYPE", message = "type must be 'transaction', 'transfer', or 'liabilitypayment'." } });
+        }
+
+        var total = 0;
+        if (typedFilter is null or MovementType.Transaction)
+            total += await transactionService.BulkMarkClearedAsync(request.From, request.To, request.AccountId);
+        if (typedFilter is null or MovementType.Transfer)
+            total += await transferService.BulkMarkClearedAsync(request.From, request.To, request.AccountId);
+        if (typedFilter is null or MovementType.LiabilityPayment)
+            total += await liabilityPaymentService.BulkMarkClearedAsync(request.From, request.To, request.AccountId);
+
+        return Ok(new { cleared = total });
+    }
+
     private static MovementListItemDto MapToDto(MovementListItemViewModel m)
     {
         return new MovementListItemDto(
