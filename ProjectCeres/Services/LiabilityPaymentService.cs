@@ -45,6 +45,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
         payment.AssetAccountId     = vm.AccountId!.Value;
         payment.LiabilityAccountId = vm.LiabilityAccountId!.Value;
         payment.Description        = vm.Description;
+        payment.IsCleared          = vm.IsCleared;
         await db.SaveChangesAsync();
     }
 
