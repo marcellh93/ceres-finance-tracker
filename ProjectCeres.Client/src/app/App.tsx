@@ -5,7 +5,6 @@ import { Budgets } from './pages/Budgets';
 import { Categories } from './pages/Categories';
 import { Dashboard } from './pages/Dashboard';
 import { Import } from './pages/Import';
-import { Movements } from './pages/Movements';
 import { NotFound } from './pages/NotFound';
 import { Profile } from './pages/Profile';
 import { Recurring } from './pages/Recurring';
@@ -16,13 +15,19 @@ import { Settings } from './pages/Settings';
 import { Support } from './pages/Support';
 import { Transactions } from './pages/Transactions';
 import { Transfers } from './pages/Transfers';
+import { MovementCreate } from './features/movements/MovementCreate';
+import { MovementEdit } from './features/movements/MovementEdit';
+import { MovementsLayout } from './features/movements/MovementsLayout';
 
 export function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<Dashboard />} />
-        <Route path="movements" element={<Movements />} />
+        <Route path="movements" element={<MovementsLayout />}>
+          <Route path="new" element={<MovementCreate />} />
+          <Route path=":id/edit" element={<MovementEdit />} />
+        </Route>
         <Route path="transactions" element={<Transactions />} />
         <Route path="transfers" element={<Transfers />} />
         <Route path="review" element={<Review />} />

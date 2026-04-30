@@ -34,4 +34,22 @@ describe('App routes', () => {
       expect(heading).toBeDefined();
     });
   }
+
+  it('renders the Movement Create page at /movements/new', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements/new']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/MovementCreate placeholder/)).toBeDefined();
+  });
+
+  it('renders the Movement Edit page at /movements/:id/edit', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements/some-id/edit']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/MovementEdit placeholder/)).toBeDefined();
+  });
 });
