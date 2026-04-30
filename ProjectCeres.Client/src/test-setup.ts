@@ -22,6 +22,9 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 }
 
+// cmdk calls scrollIntoView when navigating items — mock it for jsdom
+Element.prototype.scrollIntoView = () => {}
+
 // Recharts also calls getBoundingClientRect for dimensions
 Element.prototype.getBoundingClientRect = () => ({
   width: 500,
