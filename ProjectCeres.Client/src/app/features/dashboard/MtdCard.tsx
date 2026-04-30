@@ -1,18 +1,14 @@
-import { type ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
 import { StatTile } from '@/components/StatTile';
+import { Tile } from '@/components/Tile';
 import { useApi } from '../../lib/use-api';
 import { CardError } from './CardError';
 import { SUMMARY_URL, type SummaryDto } from './api';
 
 function formatPercent(fraction: number): string {
   return `${(fraction * 100).toFixed(1)}%`;
-}
-
-function Tile({ children }: { children: ReactNode }) {
-  return <div className="rounded-md bg-muted/40 p-4">{children}</div>;
 }
 
 export function MtdCard() {
