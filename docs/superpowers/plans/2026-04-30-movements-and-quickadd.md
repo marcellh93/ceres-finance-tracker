@@ -684,6 +684,8 @@ git commit -m "feat(quickadd): add Create*Request DTOs with data annotations"
 
 ### Task 6: Add `POST /api/transactions` controller
 
+> **CORRECTION (post-implementation):** Validation responses are **422 Unprocessable Entity**, not 400. `Program.cs` configures `InvalidModelStateResponseFactory` to return 422 for all auto-validation failures from `[ApiController]`. Tests must assert `HttpStatusCode.UnprocessableEntity`. The manual `if (!ModelState.IsValid) return ValidationProblem(ModelState);` guard is also unnecessary — `[ApiController]` runs that automatically. **Also:** the `Account` model has no `OpeningBalance`, `OpeningBalanceDate`, or `CreatedAt` fields — seed helpers must only set `Id`, `Name`, `AccountTypeId`, `CurrencyId`, `IsActive`. (Both corrections were applied during implementation.)
+
 **Files:**
 - Create: `ProjectCeres/Controllers/Api/TransactionsApiController.cs`
 - Create: `ProjectCeres.Tests/Integration/TransactionsApiTests.cs`
@@ -880,6 +882,8 @@ git commit -m "feat(transactions): add POST /api/transactions for quick-add"
 ---
 
 ### Task 7: Add `POST /api/transfers` and `POST /api/liability-payments` controllers
+
+> **CORRECTION (post-implementation):** Same 422 / Account-seed corrections as Task 6 apply here. Additionally: a manual `ValidationProblem(ModelState)` call returns 400 (the default ProblemDetails behavior) — it does NOT go through the `InvalidModelStateResponseFactory`. For cross-field validation (e.g., source==destination) and caught service exceptions, return `UnprocessableEntity(...)` directly with the same JSON shape as the factory produces, so the response is consistently 422. (Applied during implementation.)
 
 **Files:**
 - Create: `ProjectCeres/Controllers/Api/TransfersApiController.cs`
@@ -2053,13 +2057,13 @@ describe('QuickAddModal', () => {
     expect(screen.queryByText('Checking')).not.toBeInTheDocument();
   });
 
-  it('renders inline errors on 400 ValidationProblem', async () => {
+  it('renders inline errors on 422 ValidationProblem', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/api/accounts/active')) return Promise.resolve(accountsResponse);
       if (url.includes('/api/categories/active')) return Promise.resolve(categoriesResponse);
       return Promise.resolve({
         ok: false,
-        status: 400,
+        status: 422,
         json: async () => ({ errors: { Amount: ['Amount must be greater than zero.'] } }),
       });
     });
@@ -2228,7 +2232,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
         return;
       }
 
-      if (response.status === 400) {
+      if (response.status === 422) {
         const problem = await response.json();
         const flat: FieldErrors = {};
         if (problem?.errors && typeof problem.errors === 'object') {
@@ -3257,9 +3261,9 @@ git commit -m "chore(movements): retire Razor Movements page, redirect to SPA"
 Read the file first to match its style. Add rows for:
 
 - `GET /api/movements` → `MovementsPageDto { items: MovementListItemDto[], totalCount, page, pageSize }`. Query params: `q`, `accountId`, `from`, `to`, `page`, `pageSize`.
-- `POST /api/transactions` → request body `CreateTransactionRequest { date, amount, accountId, categoryId, description }`. Returns `201 Created` with `{ id }` body. `400` with `ValidationProblemDetails` on invalid input.
-- `POST /api/transfers` → request body `CreateTransferRequest { date, amount, sourceAccountId, destAccountId, description }`. Returns `201` with `{ id }`. `400` if source == destination, on cross-currency, or other validation failures.
-- `POST /api/liability-payments` → request body `CreateLiabilityPaymentRequest { date, amount, assetAccountId, liabilityAccountId, description }`. Returns `201` with `{ id }`. `400` on validation failures.
+- `POST /api/transactions` → request body `CreateTransactionRequest { date, amount, accountId, categoryId, description }`. Returns `201 Created` with `{ id }` body. `422 Unprocessable Entity` with `ValidationProblemDetails` on invalid input.
+- `POST /api/transfers` → request body `CreateTransferRequest { date, amount, sourceAccountId, destAccountId, description }`. Returns `201` with `{ id }`. `422` if source == destination, on cross-currency, or other validation failures.
+- `POST /api/liability-payments` → request body `CreateLiabilityPaymentRequest { date, amount, assetAccountId, liabilityAccountId, description }`. Returns `201` with `{ id }`. `422` on validation failures.
 - `GET /api/accounts/active` → `AccountOptionDto[] { id, name, currencyCode, currencySymbol, accountTypeName }`. Active accounts only.
 - `GET /api/categories/active` → `CategoryOptionDto[] { id, name, categoryTypeName }`. Active, non-system categories only.
 
@@ -3326,7 +3330,7 @@ git commit -m "docs(movements): record Movements + quick-add outcomes"
 - §3k AppLayout `<Toaster />` — Task 9.
 - §4 Layout — Task 19 (page), Task 17 (filter bar), Task 16 (table), Task 14 (modal).
 - §5 Razor cleanup — Task 20.
-- §6 Data flow — covered by component implementations (Task 14: 400 → ModelState mapping; Task 19: `useApi` URL re-fetch; Task 15: optimistic toggle + revert).
+- §6 Data flow — covered by component implementations (Task 14: 422 → ModelState mapping; Task 19: `useApi` URL re-fetch; Task 15: optimistic toggle + revert).
 - §7 Testing — every component/endpoint task has tests; Razor 302 in Task 20.
 - §8 Documentation — Task 21.
 - §9 Out-of-scope items — none implemented; all noted as pending in Task 21 docs updates.
