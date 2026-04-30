@@ -130,6 +130,7 @@ These must be written, published, and accessible before any user outside yoursel
 - [ ] No GDPR obligations yet — only your own data
 
 ### Phase 3 (Hosted Beta — first external users)
+- [ ] Register brand name as a trademark with OEPM (Oficina Española de Patentes y Marcas) once the final product name is decided — approximately EUR 150–200, processing takes several months. File before public launch to establish priority date.
 - [ ] Privacy Policy written and published
 - [ ] Terms of Service written and published
 - [ ] Cookie Policy in place (if applicable)
