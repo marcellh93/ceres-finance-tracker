@@ -51,6 +51,7 @@ describe('App routes', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/MovementEdit placeholder/)).toBeDefined();
+    // MovementEdit fetches the discriminator on mount; the loading state renders first
+    expect(screen.getByText(/loading…/i)).toBeDefined();
   });
 });
