@@ -7,6 +7,7 @@ import { Spacing } from './pages/Spacing';
 import { Motion } from './pages/Motion';
 import { Charts } from './pages/Charts';
 import { Toasts } from './pages/Toasts';
+import { Patterns } from './pages/Patterns';
 import { Components } from './pages/Components';
 
 const sections = [
@@ -17,6 +18,7 @@ const sections = [
   { to: '/motion', label: 'Motion' },
   { to: '/charts', label: 'Charts' },
   { to: '/toasts', label: 'Toasts' },
+  { to: '/patterns', label: 'Patterns' },
   { to: '/components', label: 'Components' },
 ];
 
@@ -57,6 +59,7 @@ export function App() {
           <Route path="/motion" element={<Motion />} />
           <Route path="/charts" element={<Charts />} />
           <Route path="/toasts" element={<Toasts />} />
+          <Route path="/patterns" element={<Patterns />} />
           <Route path="/components" element={<Components />} />
         </Routes>
       </main>
