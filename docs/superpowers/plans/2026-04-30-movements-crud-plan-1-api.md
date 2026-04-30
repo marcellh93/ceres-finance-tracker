@@ -1915,7 +1915,7 @@ git commit -m "feat(api): POST /api/movements/bulk-cleared"
 
 ```csharp
 // ProjectCeres/Services/IMovementExportService.cs
-using ProjectCeres.Models;
+using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
