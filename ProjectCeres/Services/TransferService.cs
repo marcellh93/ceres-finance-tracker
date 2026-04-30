@@ -82,7 +82,6 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
         if (accountId.HasValue)
             query = query.Where(t => t.SourceAccountId == accountId.Value || t.DestAccountId == accountId.Value);
         var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.IsCleared, true));
-        db.ChangeTracker.Clear();
         return rowsAffected;
     }
 

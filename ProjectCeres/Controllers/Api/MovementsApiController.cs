@@ -15,7 +15,7 @@ public class MovementsApiController(
     public record ClearRequest(string Type, bool Cleared);
 
     [HttpGet]
-    public async Task<ActionResult<MovementsPageDto>> GetMovements(
+    public async Task<IActionResult> GetMovements(
         [FromQuery] string? q = null,
         [FromQuery] Guid? accountId = null,
         [FromQuery] DateOnly? from = null,
@@ -28,19 +28,8 @@ public class MovementsApiController(
         if (pageSize < 1) pageSize = 50;
         if (pageSize > 200) pageSize = 200;
 
-        MovementType? typedFilter = null;
-        if (!string.IsNullOrWhiteSpace(type))
-        {
-            typedFilter = type.ToLowerInvariant() switch
-            {
-                "transaction"      => MovementType.Transaction,
-                "transfer"         => MovementType.Transfer,
-                "liabilitypayment" => MovementType.LiabilityPayment,
-                _ => null
-            };
-            if (typedFilter is null)
-                return BadRequest(new { error = new { code = "INVALID_TYPE", message = "type must be 'transaction', 'transfer', or 'liabilitypayment'." } });
-        }
+        var (typedFilter, error) = ParseType(type);
+        if (error is not null) return error;
 
         var offset = (page - 1) * pageSize;
 
@@ -49,7 +38,7 @@ public class MovementsApiController(
 
         var dtoItems = items.Select(MapToDto).ToList();
 
-        return new MovementsPageDto(dtoItems, total, page, pageSize);
+        return Ok(new MovementsPageDto(dtoItems, total, page, pageSize));
     }
 
     [HttpPatch("{id:guid}/cleared")]
@@ -85,25 +74,14 @@ public class MovementsApiController(
     {
         var type = await movementService.GetTypeAsync(id);
         if (type is null) return NotFound();
-        return new MovementTypeDto(id, type.ToString()!);
+        return new MovementTypeDto(id, MovementTypeFormatting.Format(type.Value));
     }
 
     [HttpPost("bulk-cleared")]
-    public async Task<ActionResult<object>> BulkCleared([FromBody] BulkClearedRequest request)
+    public async Task<IActionResult> BulkCleared([FromBody] BulkClearedRequest request)
     {
-        MovementType? typedFilter = null;
-        if (!string.IsNullOrWhiteSpace(request.Type))
-        {
-            typedFilter = request.Type.ToLowerInvariant() switch
-            {
-                "transaction"      => MovementType.Transaction,
-                "transfer"         => MovementType.Transfer,
-                "liabilitypayment" => MovementType.LiabilityPayment,
-                _ => null
-            };
-            if (typedFilter is null)
-                return BadRequest(new { error = new { code = "INVALID_TYPE", message = "type must be 'transaction', 'transfer', or 'liabilitypayment'." } });
-        }
+        var (typedFilter, error) = ParseType(request.Type);
+        if (error is not null) return error;
 
         var total = 0;
         if (typedFilter is null or MovementType.Transaction)
@@ -116,11 +94,29 @@ public class MovementsApiController(
         return Ok(new { cleared = total });
     }
 
+    private (MovementType? typed, IActionResult? error) ParseType(string? type)
+    {
+        if (string.IsNullOrWhiteSpace(type)) return (null, null);
+
+        MovementType? typed = type.ToLowerInvariant() switch
+        {
+            "transaction"      => MovementType.Transaction,
+            "transfer"         => MovementType.Transfer,
+            "liabilitypayment" => MovementType.LiabilityPayment,
+            _ => null
+        };
+
+        if (typed is null)
+            return (null, BadRequest(new { error = new { code = "INVALID_TYPE", message = "type must be 'transaction', 'transfer', or 'liabilitypayment'." } }));
+
+        return (typed, null);
+    }
+
     private static MovementListItemDto MapToDto(MovementListItemViewModel m)
     {
         return new MovementListItemDto(
             Id: m.Id,
-            MovementType: m.MovementType.ToString(),
+            MovementType: MovementTypeFormatting.Format(m.MovementType),
             Date: m.Date,
             Amount: m.Amount,
             CurrencyCode: "",

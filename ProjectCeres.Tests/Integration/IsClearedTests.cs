@@ -133,6 +133,9 @@ public class IsClearedTests : IAsyncLifetime
 
         await _txService.BulkMarkClearedAsync(from: today.AddDays(-2), to: today, accountId: _accountId);
 
+        // Clear change tracker to force reload from database after bulk update
+        _fixture.Db.ChangeTracker.Clear();
+
         var r1 = await _fixture.Db.Transactions.FindAsync(inRange1.Id);
         var r2 = await _fixture.Db.Transactions.FindAsync(inRange2.Id);
         var r3 = await _fixture.Db.Transactions.FindAsync(outRange.Id);

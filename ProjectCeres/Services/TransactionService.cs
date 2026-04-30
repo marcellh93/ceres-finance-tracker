@@ -265,7 +265,6 @@ public class TransactionService(
             query = query.Where(t => t.AccountId == accountId.Value);
 
         var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.IsCleared, true));
-        db.ChangeTracker.Clear();
         return rowsAffected;
     }
 

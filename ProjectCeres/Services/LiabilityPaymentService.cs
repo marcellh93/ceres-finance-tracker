@@ -74,7 +74,6 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
         if (accountId.HasValue)
             query = query.Where(p => p.AssetAccountId == accountId.Value || p.LiabilityAccountId == accountId.Value);
         var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(p => p.IsCleared, true));
-        db.ChangeTracker.Clear();
         return rowsAffected;
     }
 
