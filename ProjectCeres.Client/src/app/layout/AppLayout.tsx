@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
 import { MobileDrawer } from './MobileDrawer';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -32,6 +33,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }
