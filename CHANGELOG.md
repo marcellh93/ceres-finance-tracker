@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
-### Added
+---
+
+## [0.3.0] — 2026-04-26
+
+### Phase 2
+
+#### Added
 
 **Transactions**
 - Goal Budget field on Transaction Create and Edit forms is now hidden when no active Spending-type goal budgets exist — avoids showing an empty, non-functional dropdown
@@ -24,7 +30,7 @@
 **Tests**
 - `ClearedBadge.test.tsx` — 2 new tests: `needsReview = true` renders "Needs review" badge; `isCleared = true` with `needsReview = true` still renders "Cleared" (cleared state takes priority)
 
-### Changed
+#### Changed
 
 **Transactions**
 - Goal Budget label updated to "Goal Budget (must match account currency)" on both Create and Edit forms
@@ -42,7 +48,7 @@
 **CsvImportProfiles**
 - `CsvImportProfiles/Index.cshtml` — deleted profile countdown wording corrected to "Recoverable for X more day(s)"; Recover button SVG updated to the correct Lucide `rotate-ccw` path
 
-### Fixed
+#### Fixed
 
 **Tests**
 - `TransactionServiceTests` — 4 new integration tests: budget currency mismatch on Create throws, budget currency match on Create succeeds, same two cases for Update
@@ -51,7 +57,7 @@
 
 ---
 
-### Added
+#### Added
 
 **Budgets**
 - `CategoryBudgetBars` component upgraded to use shadcn `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Progress`, and `Badge` — progress bars now colour-coded green/amber/red by percent used
@@ -87,7 +93,7 @@
 - 16 integration tests for the four Stage 7 generators: `BudgetVsActual` (returns correct plan vs. actual, excludes out-of-range transactions, excludes inactive budgets, shows zero actual when no spend), `LargestExpenses` (orders by amount desc, respects limit, excludes income, excludes out-of-range), `MonthlyCashFlow` (groups by month, excludes system transactions, filters by currency, omits months with no activity), `NetWorthOverTime` (monthly snapshots, includes liabilities, filters by currency, snapshots are cumulative)
 - 4 factory dispatch unit tests added to `ReportGeneratorFactoryTests` — one per new generator
 
-### Changed
+#### Changed
 
 **Reports**
 - `ReportGeneratorFactory` constructor extended with four new generator parameters; switch extended with four new cases
@@ -122,7 +128,7 @@
 
 ---
 
-### Added
+#### Added
 
 **Recurring Reminders**
 - `ReminderBehaviour` dispatch in `RecurringTransactionService` — `ConfirmAsync` and `DismissAsync` now route date advancement through three strategies: `SnapToCalendarDay` (advances to `DayOfPeriod` in the next calendar month, skips an extra month if confirmed on or after that day), `RelativeToLastConfirmation` (advances from the actual confirm date rather than the scheduled due date), `ManualDate` (throws `InvalidOperationException` unless a `nextDueDate` is supplied)
@@ -138,7 +144,7 @@
 - 5 integration tests for `ReminderBehaviour` advancement: `SnapToCalendarDay` on-time → correct next month snap, `SnapToCalendarDay` confirmed late → skips forward an extra month, `RelativeToLastConfirmation` monthly → advances from confirm date, `ManualDate` without `nextDueDate` → throws, `ManualDate` with `nextDueDate` → sets exact date
 - 1 integration test for `GetUpcomingAsync` — reminders due today and in 5 days included; reminder due in 35 days excluded
 
-### Changed
+#### Changed
 
 **Recurring Reminders**
 - `IRecurringTransactionService.ConfirmAsync` — signature extended with optional `DateOnly? nextDueDate` parameter (backward-compatible default `null`)
@@ -164,7 +170,7 @@
 - 5 integration tests for `AccountService` — Amortising with null interest rate rejected, FullMonthly with interest rate rejected, Amortising with valid rate succeeds, `UpdateAsync` variants for both failure cases
 - 5 unit tests for `LiabilityProjectionService` — known inputs verify payoff and interest range, extra payment yields earlier payoff and less interest, zero interest rate pays off in balance ÷ payment months, very small balance pays off in 1 month, payment too small to cover interest throws
 
-### Changed
+#### Changed
 
 **Accounts**
 - `AccountCreateViewModel` — added `LiabilityRepaymentType` and `InterestRate` fields
@@ -253,7 +259,7 @@
 **Tests**
 - `TransferAttachmentServiceTests` — 4 integration tests: upload persists DB record and writes file to disk, serve returns correct data and metadata, delete removes DB record and file from disk, spoofed file type rejected with "not allowed" message
 
-### Changed
+#### Changed
 
 **Transfer Attachments**
 - `TransferEditViewModel` — added `IFormFile? Attachment` property
@@ -288,7 +294,7 @@
 - All 19 integration test classes annotated with `[Collection("IntegrationTests")]` — eliminates parallel races between `WebApplicationFactory` tests and `TestDbFixture` tests on `project_ceres_test`
 - `MovementsControllerTests` WAF now overrides `ConnectionStrings:DefaultConnection` to target `project_ceres_test` instead of the dev database; seeded rows deleted via `ExecuteDeleteAsync` in `DisposeAsync`
 
-### Fixed
+#### Fixed
 
 **Tests**
 - WAF tests were seeding data into the dev database (`project_ceres`) because individual test classes forgot to call `WithWebHostBuilder`; structural fix via `TestWebApplicationFactory` subclass makes this impossible going forward; orphaned rows cleaned from dev database (6 transactions, 3 transfers, 12 accounts removed)
@@ -298,7 +304,7 @@
 **Movements**
 - `ClearedBadge` was rendering with identical gray styling for both Cleared and Pending states because `badge-success` and `badge-warning` CSS classes were not defined; replaced with Tailwind utility classes (`bg-green-100 text-green-700` for Cleared, `bg-yellow-100 text-yellow-700` for Pending)
 
-### Removed
+#### Removed
 
 **Frontend**
 - `HelloWorld` component and its test removed — React pipeline verification complete, component no longer needed
