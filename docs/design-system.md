@@ -12,10 +12,13 @@
 6. [Chart palette](#chart-palette)
 7. [shadcn/ui overrides](#shadcnui-overrides)
 8. [The `<Numeric>` component](#the-numeric-component)
-9. [Toasts](#toasts)
-10. [Showcase route](#showcase-route)
-11. [Known browser console messages](#known-browser-console-messages)
-12. [Known limitations](#known-limitations)
+9. [Status badges](#status-badges)
+10. [Layout primitives](#layout-primitives)
+11. [The `<CardError>` component](#the-carderror-component)
+12. [Toasts](#toasts)
+13. [Showcase route](#showcase-route)
+14. [Known browser console messages](#known-browser-console-messages)
+15. [Known limitations](#known-limitations)
 
 ---
 
@@ -91,6 +94,8 @@ The `<Numeric>` component (see below) is the enforcement mechanism — wrap any 
 - **Radius:** `--radius: 0.625rem` (10px) is the base. Tailwind's `rounded-sm/md/lg/xl/2xl/3xl/4xl` derive from it.
 - **Shadow:** four steps — `shadow-sm`, `shadow`, `shadow-md`, `shadow-lg`. Dark-mode shadows are darker because they sit on dark surfaces. All four are aliased in `@theme inline` so the Tailwind utilities pick up the custom values.
 
+**Skeletons:** Match the rendered content's height to prevent layout shift. Common heights: `h-[220px]` for chart cards, `h-[400px]` for tables, `h-5 w-32` for individual text rows.
+
 ---
 
 ## Motion
@@ -142,6 +147,8 @@ Always use the tokens via `var(--chart-N)`. Chart components should never hard-c
 | `--shadow-*` | Added | shadcn relies on Tailwind defaults; we tune for both modes |
 | `--motion-*` | Added | Not in shadcn |
 | All other shadcn tokens | Left at defaults (zinc baseline) | Works with the brand |
+| `Button` cursor | Yes | Default shadcn Button has no cursor override; we apply `cursor-pointer` so all interactive buttons get the hand cursor on hover |
+| `Badge` variants | Extended | Added `success`, `warning`, `info` semantic variants (soft-tinted, matching the existing `destructive` recipe) |
 
 The `base-nova` style uses `@base-ui/react` primitives, not Radix. The two have different APIs in places (e.g., the base-ui `Tooltip.Trigger` does not take an `asChild` prop). When porting shadcn snippets from elsewhere, check the primitive source under `src/components/ui/` to confirm the local API.
 
@@ -166,6 +173,95 @@ When **not** to use `<Numeric>`: percentages or amounts that appear inside a sen
 // ✗ Don't switch fonts mid-sentence
 <p>You've spent <Numeric>73%</Numeric> of your budget so far.</p>
 ```
+
+---
+
+## Status badges
+
+Use shadcn `<Badge>` for any small status indicator (cleared/pending state, alert tags, etc.). The semantic variants pair a tinted background with the matching foreground:
+
+| Variant | Background | Text | Use for |
+|---|---|---|---|
+| `default` | primary | primary-foreground | Brand accent (rare on data tables) |
+| `secondary` | secondary | secondary-foreground | Neutral metadata |
+| `outline` | transparent | foreground | Quiet metadata |
+| `destructive` | destructive/10 | destructive | Errors, delete-confirmation tags |
+| `success` | success/10 | success | Cleared, paid, positive states |
+| `warning` | warning/10 | warning | Pending, attention-needed |
+| `info` | info/10 | info | Informational tags |
+
+```tsx
+<Badge variant="success">Cleared</Badge>
+<Badge variant="warning">Pending</Badge>
+<Badge variant="info">Transaction</Badge>
+```
+
+**Chart palette colors are not statuses.** When you need a non-semantic tint to distinguish category-style values (e.g., the Movements page Type column uses `chart-6` violet for Transfer and `chart-7` orange for Liability Payment), opt out of variants and use className: `<Badge className="bg-chart-6/10 text-chart-6">Transfer</Badge>`. The explicit className signals "this is a deliberate non-semantic choice."
+
+For destructive operations (delete confirmations), prefer a confirmation dialog over a badge.
+
+---
+
+## Layout primitives
+
+Four small components for arranging stats and data. All live under `src/components/`.
+
+### `<StatTile>` — vertical KPI
+
+Label on top, value below. Use for prominent metrics that deserve visual weight.
+
+```tsx
+<StatTile label="Net Worth" value={<Numeric>€ 1,234.56</Numeric>} />
+```
+
+### `<StatRow>` — inline label/value
+
+Label on the left, value on the right (justify-between). Use inside a `<dl className="space-y-2">` for grouped stats (MTD card, breakdown lists).
+
+```tsx
+<StatRow label="Income" value={<Numeric className="text-success">€ 3,200</Numeric>} />
+```
+
+### `<EquationRow>` — compact muted caption
+
+Smaller (`text-[11px]`) and muted by default. Use inside dense vertical stacks for breakdowns (e.g., Spendable Balance components). Pass `valueClassName` to override the muted default for a headline row.
+
+```tsx
+<EquationRow label="Liquid" value={<Numeric>€ 1,200</Numeric>} />
+<EquationRow
+  label="Available today"
+  value={<Numeric className="text-base font-bold text-success">€ 430</Numeric>}
+/>
+```
+
+### `<Tile>` — KPI surface wrapper
+
+Muted background + rounded + padding. Use to visually group small numeric tiles (e.g., 3-up MTD breakdown).
+
+```tsx
+<Tile>
+  <StatTile label="Income" value={<Numeric className="text-2xl text-success">€ 3,200</Numeric>} />
+</Tile>
+```
+
+---
+
+## The `<CardError>` component
+
+`ProjectCeres.Client/src/app/components/CardError.tsx`
+
+Standard error+retry UI for any card whose data fetch fails. Use inside `<CardContent>` when the `useApi` hook returns an error.
+
+```tsx
+{error && <CardError section="Net Worth Over Time" onRetry={refetch} />}
+```
+
+**Props:**
+
+- `section: string` — the noun used in the message ("Couldn't load Net Worth Over Time.").
+- `onRetry: () => void` — typically the `refetch` returned by `useApi`.
+
+The component renders a muted error line with an icon, plus an outline-variant Retry button. It does not re-fetch on its own; wire `onRetry` to your data hook.
 
 ---
 
