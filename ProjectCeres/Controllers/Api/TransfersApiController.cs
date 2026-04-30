@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
@@ -6,7 +8,9 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/transfers")]
-public class TransfersApiController(ITransferService transferService) : ControllerBase
+public class TransfersApiController(
+    ITransferService transferService,
+    AppDbContext db) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTransferRequest request)
@@ -43,6 +47,103 @@ public class TransfersApiController(ITransferService transferService) : Controll
         {
             var transfer = await transferService.CreateAsync(vm);
             return Created($"/api/transfers/{transfer.Id}", new { id = transfer.Id });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "VALIDATION_ERROR",
+                    message = ex.Message,
+                    details = Array.Empty<object>()
+                }
+            });
+        }
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<TransferEditDto>> Get(Guid id)
+    {
+        var dto = await db.Transfers
+            .Where(t => t.Id == id)
+            .Select(t => new TransferEditDto(
+                t.Id,
+                t.Date,
+                t.Amount,
+                t.SourceAccountId,
+                t.DestAccountId,
+                t.Description,
+                t.IsCleared,
+                t.Attachments
+                    .OrderBy(a => a.UploadedAt)
+                    .ThenBy(a => a.Id)
+                    .Select(a => new AttachmentDto(a.Id, a.FileName, a.FileSizeBytes, a.ContentType, a.UploadedAt))
+                    .ToList()))
+            .SingleOrDefaultAsync();
+
+        return dto is null ? NotFound() : dto;
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTransferRequest request)
+    {
+        var existing = await transferService.GetByIdAsync(id);
+        if (existing is null) return NotFound();
+
+        if (request.SourceAccountId == request.DestAccountId)
+        {
+            return UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "VALIDATION_ERROR",
+                    message = "Source and destination accounts must be different.",
+                    details = Array.Empty<object>()
+                }
+            });
+        }
+
+        var vm = new TransferEditViewModel
+        {
+            Id              = id,
+            Date            = request.Date,
+            Amount          = request.Amount,
+            SourceAccountId = request.SourceAccountId,
+            DestAccountId   = request.DestAccountId,
+            Description     = request.Description,
+            IsCleared       = request.IsCleared
+        };
+
+        try
+        {
+            await transferService.UpdateAsync(vm);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "VALIDATION_ERROR",
+                    message = ex.Message,
+                    details = Array.Empty<object>()
+                }
+            });
+        }
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var existing = await transferService.GetByIdAsync(id);
+        if (existing is null) return NotFound();
+
+        try
+        {
+            await transferService.DeleteAsync(id);
+            return NoContent();
         }
         catch (InvalidOperationException ex)
         {
