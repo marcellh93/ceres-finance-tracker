@@ -140,6 +140,10 @@ public class UpdateTransactionRequest
     public string? Description { get; set; }
 
     public bool IsCleared { get; set; }
+
+    public Guid? BudgetId { get; set; }
+
+    public bool NeedsReview { get; set; }
 }
 
 public class UpdateTransferRequest
@@ -568,6 +572,8 @@ git commit -m "test(api): failing tests for PUT /api/transactions/:id"
 
 **Note:** Only the `GET /:id` actions project directly from EF. PUT and DELETE keep the service-layer existence check (`transactionService.GetByIdForEditAsync(id)` / `transferService.GetByIdAsync(id)` / `liabilityPaymentService.GetByIdAsync(id)`) — those need the persisted entity for update/delete operations, not a projection.
 
+The PUT action also wraps the service call in a try/catch for `InvalidOperationException` (thrown by service-layer business-rule validators: date-before-opening-balance, budget-currency mismatch, etc.) and converts them to 422 with `error.code = "VALIDATION_ERROR"`.
+
 **Files:**
 - Modify: `ProjectCeres/Controllers/Api/TransactionsApiController.cs`
 
@@ -587,17 +593,34 @@ public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTransactionReq
     var vm = new TransactionEditViewModel
     {
         Id              = id,
-        TransactionType = "Regular",
+        TransactionType = TransactionTypes.Regular,
         Date            = request.Date,
         Amount          = request.Amount,
         AccountId       = request.AccountId,
         CategoryId      = request.CategoryId,
         Description     = request.Description,
-        IsCleared       = request.IsCleared
+        IsCleared       = request.IsCleared,
+        BudgetId        = request.BudgetId,
+        NeedsReview     = request.NeedsReview
     };
 
-    await transactionService.UpdateAsync(vm);
-    return NoContent();
+    try
+    {
+        await transactionService.UpdateAsync(vm);
+        return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return UnprocessableEntity(new
+        {
+            error = new
+            {
+                code = "VALIDATION_ERROR",
+                message = ex.Message,
+                details = Array.Empty<object>()
+            }
+        });
+    }
 }
 ```
 
@@ -1177,7 +1200,7 @@ public async Task<IActionResult> Update(Guid id, [FromBody] UpdateLiabilityPayme
     var vm = new TransactionEditViewModel
     {
         Id                  = id,
-        TransactionType     = "LiabilityPayment",
+        TransactionType     = TransactionTypes.LiabilityPayment,
         Date                = request.Date,
         Amount              = request.Amount,
         AccountId           = request.AssetAccountId,
