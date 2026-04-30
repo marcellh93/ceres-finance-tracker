@@ -243,23 +243,6 @@ Migration path: introduce `QueryClientProvider` in `src/app/main.tsx`, replace `
 - **Scope:** Cross-cutting — touches charts (axis labels, tooltips), KPI cards, transaction lists, reports. Should land as one coordinated change rather than per-feature drift.
 - **Triggered by:** Dashboard Phase 2 spec (`docs/superpowers/specs/2026-04-29-dashboard-phase-2-design.md`, §9 Out of Scope).
 
-### Developer guide — batch 3 expansion
-
-Round 1 of the dev-teacher audit (2026-04-30) shipped two batches against `docs/guide/`. Batch 3 was deliberately deferred at user request — all the routing decisions are already made; the work is mechanical writing once a session is allocated.
-
-- **What:** Eight remaining concept areas to document, all in Module 08 (and one extension to Module 06 + one to Module 07):
-  1. **New file:** `08-javascript-and-react/react-router.md` — covers `Routes` / `Route` / `Outlet` / `NavLink` / catch-all routes, `useSearchParams` for URL-as-source-of-truth filter state, BrowserRouter (`basename="/app"`) vs HashRouter usage.
-  2. **New file:** `08-javascript-and-react/sonner-toast.md` — covers `<Toaster />` mount in `AppLayout`, `toast.success/error/info/warning/()` API, the project's customizations (`position="top-right"`, `closeButton`, `duration={5000}`, neutral background with semantic-colored icon only), and the CSS override pattern via `[data-sonner-toast][data-type="..."] [data-icon]` selectors that lives in `src/index.css`.
-  3. **Extend `shadcn-ui.md`:** base-ui's `useRender` + `mergeProps`, the `render={...}` slot pattern (vs Radix `asChild`), `cva` variant extension (how we added `success`/`warning`/`info` to `<Badge>`), and the `Command` + `Popover` combobox composition pattern (used by `AccountCombobox` and `CategoryCombobox`).
-  4. **Extend `charting-libraries.md`:** semantic chart colors via CSS variables (`var(--success)`, `var(--chart-N)`) using the `chartColors` util, `formatMonth` helper for axis labels, and the `<ResponsiveContainer minWidth={0}>` workaround for "width(-1)" warnings.
-  5. **Extend `06-tailwind-css/build-pipeline.md`:** Tailwind v4's `@theme inline` directive and the OKLCH color system (perceptual uniformity, why we chose it, light vs `.dark` overrides).
-  6. **Extend `vite-and-react-setup.md`:** multi-entry-point Vite builds (the project has three: `index.html`, `design-system.html`, `app.html`) and `manualChunks` bundle-splitting (vendor-react, vendor-charts, vendor-ui).
-  7. **Extend `vitest-and-react-testing-library.md`:** custom-hook testing with `renderHook` + `act` + `vi.useFakeTimers` (used by `use-api.test.ts` and `use-debounced.test.ts`); jsdom polyfills in `test-setup.ts` (`matchMedia`, `ResizeObserver`, `scrollIntoView`, `getBoundingClientRect`) and why each one is needed.
-  8. **Extend `08-javascript-and-react/react-basics.md`:** `<Tile>` + `<StatTile>` composition pattern; `<CardError>` standardized error+retry component.
-- **Why:** Batches 1 and 2 closed all known internal-quality gaps and documented the React patterns most likely to recur (custom hooks, form validation, discriminated unions). Batch 3 covers the routing and infrastructure layer — important but more stable, less likely to bite as recurring patterns.
-- **Scope:** ~600–800 lines of writing across two new files + extensions to four existing files. Plus a `syllabus.md` update marking the two new files ✅.
-- **Triggered by:** Dev-teacher audit performed 2026-04-30; Agent A coverage findings #6, #7, #8, #9, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #23, #24, #28, #29 from that audit are the source-of-truth content list (the Agent A report lived only in the conversation transcript — this entry is the persistent record).
-
 ---
 
 ## Phase 5 — Business Model
