@@ -1,6 +1,7 @@
 import { CheckCircle, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import type { MovementType } from './movements-api';
 import { MOVEMENTS_CLEARED_URL } from './movements-api';
 
@@ -44,18 +45,18 @@ export function MovementClearedToggle({ id, type, isCleared: initial }: Props) {
       type="button"
       onClick={toggle}
       aria-label={cleared ? 'Mark as pending' : 'Mark as cleared'}
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex cursor-pointer items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {cleared ? (
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-success/10 text-success">
+        <Badge variant="success">
           <CheckCircle size={12} aria-hidden="true" />
           Cleared
-        </span>
+        </Badge>
       ) : (
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-warning/10 text-warning">
+        <Badge variant="warning">
           <Clock size={12} aria-hidden="true" />
           Pending
-        </span>
+        </Badge>
       )}
     </button>
   );
