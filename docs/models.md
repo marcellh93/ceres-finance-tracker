@@ -556,7 +556,7 @@ Feeds the Category Budget Progress bars on the dashboard.
 | CurrencyId | int     | FK, NOT NULL | → Currency                                       |
 | LimitAmount    | decimal(18,2) | NOT NULL  | Maximum amount to spend in this category per month |
 | IsActive       | bit           | NOT NULL  | False = deactivated, hidden from dashboard       |
-| PeriodStartDay | int           | nullable  | Phase 3. Day of month this budget period starts (1–28). Overrides the global `Settings.BudgetPeriodStartDay` for this budget only. Null = use global default. Days 29–31 excluded to avoid month-length edge cases. |
+| PeriodStartDay | int           | nullable  | **Deferred.** Originally planned as a per-budget override, but the global `Settings.BudgetPeriodStartDay` shipped first (2026-05-01). The override can be added later without breaking existing data. |
 
 **Note:** CategoryBudget only applies to Expense categories — setting a cap on an Income
 category is not meaningful. This constraint should be enforced at the application level.
@@ -677,7 +677,7 @@ only the scope changes.
 | NumberFormat      | varchar | NOT NULL     | `"period_decimal"` (1,234.56) or `"comma_decimal"` (1.234,56)   |
 | DateFormat        | varchar | NOT NULL     | `"DD/MM/YYYY"`, `"MM/DD/YYYY"`, or `"YYYY-MM-DD"`. The separator is embedded in the format string — no separate separator field is needed. |
 | DefaultCurrencyId    | int     | FK, NOT NULL | → Currency. Pre-selected in the account creation form. Seeds to EUR on first run. Editable via the Settings page. |
-| BudgetPeriodStartDay | int     | NOT NULL DEFAULT 1 | Phase 3. Day of month all budget periods start by default (1–28). Applies to all `CategoryBudget` rows that have no `PeriodStartDay` override. Days 29–31 excluded to avoid month-length edge cases. |
+| BudgetPeriodStartDay | int     | NOT NULL DEFAULT 1 | **Implemented (2026-05-01).** Day of month all budget periods start (1–31). For months shorter than the chosen day (e.g., 31 in April), the cycle starts on that month's last day. Period boundaries are computed via the `BudgetPeriod` helper; periods are named after their end-date's calendar month. Default 1 = calendar months. |
 | Language             | varchar(5) | NOT NULL DEFAULT `'en'` | Phase 3. BCP 47 language tag. Supported values: `en`, `es`. Validated at service layer — reject unsupported codes. Determines language for UI, transactional emails, and generated reports. |
 | Country              | varchar(2) | nullable | Phase 3. ISO 3166-1 alpha-2 country code (e.g. `ES`, `US`, `GB`, `CO`, `AR`, `VE`). Nullable — users who select "Other" or skip without specifying are stored as null. Used for legal/compliance scoping. No lookup table — country is a preference label until it drives data logic. |
 

@@ -83,6 +83,12 @@
 **Docs**
 - `docs/design-system.md` — Status badges section, Layout primitives section, CardError section, Skeleton convention paragraph, Known browser console messages section (SES + WebSocket + Recharts width warnings)
 
+**Budgets**
+- Full Budgets CRUD on the SPA at `/app/budgets`: unified tabbed list (Category / Goal), `+New` dropdown (Category Budget / Spending Goal / Savings Goal), routed Create + Edit pages with discriminator-based routing, archive lifecycle with one-click reactivate, "Show archived" toggle, conflict-aware Create flow that offers to reactivate existing archived budgets
+- `Settings.BudgetPeriodStartDay` (1–31, default 1) — all category-budget actual-spend math respects the configured cycle. Configurable via the existing Razor Settings page (the SPA Settings page migration is a follow-up)
+- 16 typed API endpoints under `/api/category-budgets`, `/api/goal-budgets`, `/api/budgets`, and `/api/currencies` (see `docs/api-contract.md`)
+- Movement form gains a conditional Spending-Goal picker so transactions can be tagged toward Spending goals — visible only when ≥1 active matching goal exists in the transaction's currency
+
 #### Changed
 
 **Dashboard**
@@ -109,6 +115,10 @@
 - `/Movements` now 302-redirects to `/app/movements`; Razor `Views/Movements/Index.cshtml` deleted; MVC `MovementsController` reduced to redirect-only stub
 - Razor `TransactionsController` and `TransfersController` page actions (Index/Create/Edit/Delete) now 302-redirect to the SPA at `/app/movements*`
 - TopBar quick-add button and keyboard shortcut suppressed on `/app/movements*` routes (the routed Create page replaces the modal there)
+- Razor `BudgetsController` page actions (Index, Goals, Create, CreateGoal, Edit, EditGoal, Deactivate, DeactivateGoal) now 302-redirect to the SPA at `/app/budgets/*`
+
+**Budgets**
+- `ICategoryBudgetService.GetActualSpendAsync(id, year, month)` semantics shift: `(year, month)` now identifies the period whose end falls in that calendar month, computed via the `BudgetPeriod` helper. Behavior unchanged for the default `BudgetPeriodStartDay = 1`
 
 #### Fixed
 
@@ -122,6 +132,8 @@
 - `ProjectCeres/Helpers/DashboardViewHelper.cs` (server-side runway color helper) — only consumer was the deleted `_HealthSnapshot.cshtml` partial
 - `ProjectCeres.Tests/DashboardViewHelperTests.cs`
 - Razor views for Transactions and Transfers (Index, Create, Edit, Delete) and `Views/Shared/_AttachmentWidget.cshtml` deleted
+- Razor views for Budgets (8 files under `Views/Budgets/`) deleted
+- `BudgetsController` POST overloads (Create, CreateGoal, Edit, EditGoal, Deactivate, DeactivateGoal) removed entirely — the SPA POSTs JSON to the new `/api/category-budgets` and `/api/goal-budgets`
 
 ---
 

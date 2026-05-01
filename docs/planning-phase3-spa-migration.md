@@ -48,7 +48,7 @@
 | `AccountsController` | Index, Create, Edit, Deactivate, Ledger | Ledger becomes a filtered Movements query |
 | `TransactionsController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `BulkMarkCleared` and `ToggleCleared` POST actions remain `[Obsolete]` until final SPA cleanup. |
 | `TransfersController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `ToggleCleared` POST action remains `[Obsolete]` until final SPA cleanup. |
-| `BudgetsController` | Index, Create, Edit, Deactivate (×2 for Category + Goal) | Partially covered by `DashboardApiController` already — audit for overlap |
+| `BudgetsController` | Index, Create, Edit, Deactivate (×2 for Category + Goal) | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/budgets/*`. Razor views deleted. POST overloads removed entirely (the SPA POSTs JSON to the new `/api/category-budgets` and `/api/goal-budgets`). |
 | `CategoriesController` | Index, Create, Edit, Deactivate | — |
 | `RecurringTransactionsController` | Index, Create, Edit, Deactivate, Confirm, Dismiss | Confirm and Dismiss are stateful actions — design endpoint contract carefully |
 | `ReportsController` | Index + report views | Each report → `GET /api/reports/{type}` |
@@ -96,8 +96,9 @@ The SPA migration and auth are tightly coupled. The migration plan must sequence
 /movements                  → Unified ledger
 /movements/new              → Create movement (transaction / transfer / liability payment)
 /movements/:id/edit         → Edit movement
-/budgets/categories         → Category budgets
-/budgets/goals              → Goal budgets
+/budgets                    → Unified Budgets page (tabbed: Category / Goal)
+/budgets/new                → Routed Create (?type=category|spending|savings)
+/budgets/:id/edit           → Routed Edit (discriminator endpoint resolves CategoryBudget vs GoalBudget)
 /categories                 → Categories list
 /categories/new             → Create category
 /categories/:id/edit        → Edit category

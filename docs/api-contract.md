@@ -332,6 +332,37 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Active categories | GET | `/api/categories/active` | Returns `CategoryOptionDto[] { id, name, categoryTypeName }`. Active, non-system categories only. |
 | Import file headers | POST | `/api/import/headers` | Upload a CSV or XLSX file; returns detected column headers and auto-matched field mappings (`HeaderDetectionResult`) |
 | Import transactions | POST | `/api/import` | Upload file + column mappings; runs the full import pipeline; returns `ImportResult` (rows imported, reconciled, flagged, failed) |
+| List category budgets | GET | `/api/category-budgets` | Query: `currency` (code), `includeArchived` (bool). Returns `CategoryBudgetListItemDto[]`. |
+| Create category budget | POST | `/api/category-budgets` | Body: `CreateCategoryBudgetRequest { categoryId, currencyId, limitAmount }`. Returns `201 Created` with `{ id }`. Returns `409 Conflict` with `error.code = "DUPLICATE_BUDGET"` (see below) when an active or archived budget already exists for the same `(categoryId, currencyId)`. Returns `422` on validation failures. |
+| Get category budget | GET | `/api/category-budgets/{id}` | Returns `CategoryBudgetEditDto`. `404` if missing. |
+| Update category budget | PUT | `/api/category-budgets/{id}` | Body: `UpdateCategoryBudgetRequest`. `204 No Content` on success, `422` on validation. |
+| Archive category budget | PATCH | `/api/category-budgets/{id}/archive` | Sets `IsActive = false`. `204` on success, `404` on missing. |
+| Reactivate category budget | PATCH | `/api/category-budgets/{id}/reactivate` | Sets `IsActive = true`. `204` on success, `404` on missing, `409 DUPLICATE_BUDGET` if another active budget already exists for the same `(categoryId, currencyId)`. |
+| Category budget spend | GET | `/api/category-budgets/{id}/spend` | Query: `year`, `month`. Returns spend for the budget period whose end-date falls in `(year, month)` — see `BudgetPeriod` helper in `models.md`. |
+| List goal budgets | GET | `/api/goal-budgets` | Query: `currency` (code), `type` (`spending` \| `savings`), `includeArchived` (bool). Returns `GoalBudgetListItemDto[]`. |
+| Create goal budget | POST | `/api/goal-budgets` | Body: `CreateGoalBudgetRequest`. Returns `201 Created` with `{ id }`. `422` on validation failures (e.g. Savings goal with no `linkedAccountId`). |
+| Get goal budget | GET | `/api/goal-budgets/{id}` | Returns `GoalBudgetEditDto`. `404` if missing. |
+| Update goal budget | PUT | `/api/goal-budgets/{id}` | Body: `UpdateGoalBudgetRequest`. `204` on success, `422` on validation. |
+| Archive goal budget | PATCH | `/api/goal-budgets/{id}/archive` | Sets `IsActive = false`. `204` on success, `404` on missing. |
+| Reactivate goal budget | PATCH | `/api/goal-budgets/{id}/reactivate` | Sets `IsActive = true`. `204` on success, `404` on missing. |
+| Goal budget progress | GET | `/api/goal-budgets/{id}/progress` | Returns progress payload. For Spending goals: SUM of tagged transactions vs. target. For Savings goals: linked-account balance vs. target. |
+| Budget discriminator | GET | `/api/budgets/{id}` | Returns `{ id, kind: "CategoryBudget" \| "GoalBudget" }` — used by SPA edit route to dispatch to the correct typed endpoint. `404` if neither exists. |
+| List currencies | GET | `/api/currencies` | Returns `{ id, code, symbol }[]` — supported currencies for budget/account forms. |
+
+#### `409 DUPLICATE_BUDGET` response shape
+
+Returned by `POST /api/category-budgets` and `PATCH /api/category-budgets/{id}/reactivate` when activating a budget would violate the unique `(CategoryId, CurrencyId)` active-budget constraint. The body extends the standard error envelope with `existingBudgetId` and `existingIsActive` so the SPA can offer an inline "reactivate the existing one" flow without an extra round-trip:
+
+```json
+{
+  "error": {
+    "code": "DUPLICATE_BUDGET",
+    "message": "A budget for this category and currency already exists.",
+    "existingBudgetId": "3f7a2b1c-4d5e-6789-abcd-ef0123456789",
+    "existingIsActive": true
+  }
+}
+```
 
 ### Phase 3 — Full Web API (`/api/v1/`)
 
