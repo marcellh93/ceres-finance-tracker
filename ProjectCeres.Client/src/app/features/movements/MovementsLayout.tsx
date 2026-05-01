@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ArrowLeftRight, ChevronDown, CreditCard, Plus, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -51,22 +51,36 @@ export function MovementsLayout() {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button>
+              <Button
+                className="gap-2 transition-colors hover:bg-primary/90 data-[popup-open]:bg-primary/90"
+              >
                 <Plus className="h-4 w-4" />
                 New
-                <ChevronDown className="h-4 w-4 opacity-70" />
+                <ChevronDown className="h-4 w-4 opacity-70 transition-transform duration-200 group-data-[popup-open]/button:rotate-180" />
               </Button>
             }
           />
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate('new?type=transaction')}>
-              Transaction
+          <DropdownMenuContent align="end" sideOffset={8} className="min-w-[12rem] p-1.5">
+            <DropdownMenuItem
+              onClick={() => navigate('new?type=transaction')}
+              className="gap-2.5 px-3 py-2 transition-colors"
+            >
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+              <span>Transaction</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('new?type=transfer')}>
-              Transfer
+            <DropdownMenuItem
+              onClick={() => navigate('new?type=transfer')}
+              className="gap-2.5 px-3 py-2 transition-colors"
+            >
+              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+              <span>Transfer</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('new?type=liabilitypayment')}>
-              Liability Payment
+            <DropdownMenuItem
+              onClick={() => navigate('new?type=liabilitypayment')}
+              className="gap-2.5 px-3 py-2 transition-colors"
+            >
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span>Liability Payment</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
