@@ -46,8 +46,8 @@
 | MVC Controller | Actions to port to API | Notes |
 |---|---|---|
 | `AccountsController` | Index, Create, Edit, Deactivate, Ledger | Ledger becomes a filtered Movements query |
-| `TransactionsController` | Index, Create, Edit, Delete | **Create** is partially served via `POST /api/transactions` for the SPA quick-add modal. Full Razor CRUD (Index/Edit/Delete) still serves Razor pages until that slice migrates. Delete → `DELETE /api/transactions/{id}` |
-| `TransfersController` | Index, Create, Edit, Delete | **Create** is partially served via `POST /api/transfers` and `POST /api/liability-payments` for the SPA quick-add modal. Full Razor CRUD (Index/Edit/Delete) still serves Razor pages until that slice migrates. |
+| `TransactionsController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `BulkMarkCleared` and `ToggleCleared` POST actions remain `[Obsolete]` until final SPA cleanup. |
+| `TransfersController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `ToggleCleared` POST action remains `[Obsolete]` until final SPA cleanup. |
 | `BudgetsController` | Index, Create, Edit, Deactivate (×2 for Category + Goal) | Partially covered by `DashboardApiController` already — audit for overlap |
 | `CategoriesController` | Index, Create, Edit, Deactivate | — |
 | `RecurringTransactionsController` | Index, Create, Edit, Deactivate, Confirm, Dismiss | Confirm and Dismiss are stateful actions — design endpoint contract carefully |
@@ -93,13 +93,9 @@ The SPA migration and auth are tightly coupled. The migration plan must sequence
 /accounts/new               → Create account
 /accounts/:id/edit          → Edit account
 /accounts/:id/ledger        → Account ledger (filtered Movements)
-/transactions               → Transactions list
-/transactions/new           → Create transaction
-/transactions/:id/edit      → Edit transaction
-/transfers                  → Transfers list
-/transfers/new              → Create transfer
-/transfers/:id/edit         → Edit transfer
 /movements                  → Unified ledger
+/movements/new              → Create movement (transaction / transfer / liability payment)
+/movements/:id/edit         → Edit movement
 /budgets/categories         → Category budgets
 /budgets/goals              → Goal budgets
 /categories                 → Categories list

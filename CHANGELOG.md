@@ -47,6 +47,9 @@
 - `IMovementService.GetRecentAsync` and `CountAsync` accept `string? q` parameter; matches description OR category name for transactions, description-only for transfers and liability payments (PostgreSQL `EF.Functions.ILike`)
 - `GET /api/movements` returning paged `MovementsPageDto`
 - `MovementsApiController.PatchCleared` switch extended to handle `liabilitypayment` type (`ILiabilityPaymentService.MarkClearedAsync` added)
+- Full Movements CRUD on the SPA at `/app/movements*`: routed Create page (`/movements/new` with type picker), routed Edit page (`/movements/:id/edit`) with danger-zone delete, row-level ⋯ menu (Edit/Delete), type filter dropdown, attachment upload (two-phase save-first), bulk mark-cleared, CSV export
+- 22 typed API endpoints under `/api/transactions`, `/api/transfers`, `/api/liability-payments`, and `/api/movements` (see `docs/api-contract.md`)
+- View-transition CSS hooks on movement rows and the form (animation upgrade is a follow-up)
 
 **Quick-Add**
 - `<QuickAddModal>` with three tabs (Transaction / Transfer / Liability Payment) wired to TopBar `+` button and Movements page header "+ New" button
@@ -104,7 +107,8 @@
 - `/Dashboard` now 302-redirects to `/app/`; Razor dashboard view (`Index.cshtml`), partial (`_HealthSnapshot.cshtml`), and MVC `DashboardController` deleted
 - `data-react` mounting blocks for the 5 chart selectors removed from the legacy Razor `main.tsx`
 - `/Movements` now 302-redirects to `/app/movements`; Razor `Views/Movements/Index.cshtml` deleted; MVC `MovementsController` reduced to redirect-only stub
-- `TransactionsController` and `TransfersController` Razor pages remain for full CRUD; new POST API actions are quick-add only
+- Razor `TransactionsController` and `TransfersController` page actions (Index/Create/Edit/Delete) now 302-redirect to the SPA at `/app/movements*`
+- TopBar quick-add button and keyboard shortcut suppressed on `/app/movements*` routes (the routed Create page replaces the modal there)
 
 #### Fixed
 
@@ -117,6 +121,7 @@
 **Razor**
 - `ProjectCeres/Helpers/DashboardViewHelper.cs` (server-side runway color helper) — only consumer was the deleted `_HealthSnapshot.cshtml` partial
 - `ProjectCeres.Tests/DashboardViewHelperTests.cs`
+- Razor views for Transactions and Transfers (Index, Create, Edit, Delete) and `Views/Shared/_AttachmentWidget.cshtml` deleted
 
 ---
 

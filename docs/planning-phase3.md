@@ -269,8 +269,8 @@ shadcn/ui covers the Phase 2 baseline. Phase 3 additions required:
 5. Dashboard — first page inside the shell ✓ **Migrated (2026-04-29).** All 5 chart endpoints ship typed wrapper DTOs with `currencyCode`/`currencySymbol`. React dashboard is live at `/app/`. Razor dashboard view, partial, and controller deleted; 302 redirect from `/Dashboard` → `/app/` is live.
 6. Movements + Transactions + Transfers — highest daily usage; includes quick-add, per-table search, saved searches
    - ✓ **Movements list page + quick-add (2026-04-30).** SPA Movements at `/app/movements` with text search + 3 filters. Quick-add modal wired to TopBar `+` and Movements page header. POST endpoints for Transactions, Transfers, Liability Payments. Sonner toasts. Razor `MovementsController` redirected to SPA.
+   - ✓ **Full Transactions/Transfers/LiabilityPayments CRUD (2026-05-01).** SPA Movements supports Create/Edit/Delete via routed pages at `/app/movements/new` and `/app/movements/:id/edit`. Attachments via two-phase upload on Edit. Bulk-cleared and CSV export buttons in the page header. Razor `TransactionsController` and `TransfersController` page actions now 302-redirect to the SPA. See spec: `docs/superpowers/specs/2026-04-30-movements-crud.md`. Plans: `docs/superpowers/plans/2026-04-30-movements-crud-plan-{1,2,3}-*.md`.
    - Pending: Per-table search & saved searches (own brainstorm).
-   - Pending: Full Transactions/Transfers/LiabilityPayments CRUD (Index/Edit/Delete).
 7. Accounts + Categories + Budgets + Recurring Transactions — management screens
 8. Reports + Import/Export — complex, lower frequency
 9. Settings + Sessions + Support — lowest frequency; includes saved searches management
