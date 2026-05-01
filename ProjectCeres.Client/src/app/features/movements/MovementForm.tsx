@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -92,9 +99,14 @@ function Field({
   return (
     <div className="space-y-1.5">
       {htmlFor ? (
-        <Label htmlFor={htmlFor}>{label}</Label>
+        <Label
+          htmlFor={htmlFor}
+          className="text-sm font-medium tracking-wide text-foreground/80"
+        >
+          {label}
+        </Label>
       ) : (
-        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">
+        <div className="flex items-center gap-2 text-sm font-medium tracking-wide text-foreground/80 select-none">
           {label}
         </div>
       )}
@@ -169,31 +181,41 @@ export function MovementForm({
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-4"
+        className="space-y-5"
         style={{ viewTransitionName: 'movement-form' }}
       >
-        {/* ── Shared fields ── */}
-        <Field label="Date" htmlFor="mf-date" error={errors.date}>
-          <Input
-            id="mf-date"
-            type="date"
-            value={values.date}
-            onChange={(e) => set('date', e.target.value)}
-          />
-        </Field>
-
-        <Field label="Amount" htmlFor="mf-amount" error={errors.amount}>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground w-6">{symbol}</span>
+        {/* ── Date + Amount: primary signals, side-by-side ── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Date" htmlFor="mf-date" error={errors.date}>
             <Input
-              id="mf-amount"
-              type="number"
-              step="0.01"
-              value={values.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              id="mf-date"
+              type="date"
+              value={values.date}
+              onChange={(e) => set('date', e.target.value)}
+              className="text-base font-medium"
             />
-          </div>
-        </Field>
+          </Field>
+
+          <Field label="Amount" htmlFor="mf-amount" error={errors.amount}>
+            <InputGroup>
+              {symbol && (
+                <InputGroupAddon align="inline-start">
+                  <InputGroupText className="text-base font-medium text-muted-foreground">
+                    {symbol}
+                  </InputGroupText>
+                </InputGroupAddon>
+              )}
+              <InputGroupInput
+                id="mf-amount"
+                type="number"
+                step="0.01"
+                value={values.amount}
+                onChange={(e) => set('amount', e.target.value)}
+                className="text-base font-medium"
+              />
+            </InputGroup>
+          </Field>
+        </div>
 
         {/* ── Type-specific fields ── */}
         {type === 'Transaction' && (
@@ -272,27 +294,56 @@ export function MovementForm({
 
         <Separator className="my-2" />
 
-        <Field label="Cleared">
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={values.isCleared}
-              onCheckedChange={(checked) => set('isCleared', checked)}
-              aria-label="Cleared"
-            />
-            <span className="text-sm text-foreground">
-              {values.isCleared ? 'Cleared' : 'Uncleared'}
-            </span>
+        {/* ── Status row: distinct from data fields ── */}
+        <div className="flex items-start justify-between gap-4 rounded-md border border-border bg-muted/30 p-4">
+          <div className="flex items-start gap-3">
+            <div
+              className={
+                values.isCleared
+                  ? 'mt-0.5 text-success'
+                  : 'mt-0.5 text-muted-foreground'
+              }
+              aria-hidden="true"
+            >
+              {values.isCleared ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <Clock className="h-5 w-5" />
+              )}
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium tracking-wide text-foreground/80">
+                Status
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {values.isCleared
+                  ? 'Cleared the bank.'
+                  : "Hasn't cleared the bank yet."}
+              </p>
+            </div>
           </div>
-        </Field>
+          <Switch
+            checked={values.isCleared}
+            onCheckedChange={(checked) => set('isCleared', checked)}
+            aria-label="Cleared"
+          />
+        </div>
 
-        {/* ── Footer ── */}
-        <div className="flex items-center justify-between pt-2">
-          {/* Danger zone: Delete in edit mode */}
+        {/* ── Footer band ── */}
+        <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
           <div>
             {mode === 'edit' && onDelete && (
               <AlertDialog>
                 <AlertDialogTrigger
-                  render={<Button type="button" variant="destructive">Delete</Button>}
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      Delete
+                    </Button>
+                  }
                 />
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -314,7 +365,6 @@ export function MovementForm({
             )}
           </div>
 
-          {/* Primary actions */}
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
