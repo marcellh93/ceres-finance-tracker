@@ -29,9 +29,12 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var reportService = new ReportService(db);
         var netWorth = await reportService.GetNetWorthAsync();
 
-        // Pending reminders: active recurring transactions whose NextDueDate <= today.
+        // Pending reminders: active recurring transactions whose NextDueDate
+        // falls within the next 7 days (or is already overdue). The dashboard's
+        // "Reminders" card shows this same window.
+        var imminentCutoff = today.AddDays(7);
         var pendingCount = await db.RecurringTransactions
-            .CountAsync(r => r.IsActive && r.NextDueDate <= today);
+            .CountAsync(r => r.IsActive && r.NextDueDate <= imminentCutoff);
 
         return new DashboardData(
             NetWorth:              netWorth,

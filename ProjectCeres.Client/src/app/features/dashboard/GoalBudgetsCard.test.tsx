@@ -20,9 +20,9 @@ describe('GoalBudgetsCard', () => {
     expect(screen.getByText('Goal Budgets')).toBeDefined();
   });
 
-  it('renders a "View all →" link to /budgets/goals', () => {
+  it('renders a "View all →" link to /budgets?type=goal', () => {
     render(<MemoryRouter><GoalBudgetsCard /></MemoryRouter>);
     const link = screen.getByRole('link', { name: /view all/i });
-    expect(link.getAttribute('href')).toBe('/budgets/goals');
+    expect(link.getAttribute('href')).toBe('/budgets?type=goal');
   });
 });

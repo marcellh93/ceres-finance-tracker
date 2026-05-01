@@ -20,9 +20,9 @@ describe('CategoryBudgetsCard', () => {
     expect(screen.getByText('Category Budgets')).toBeDefined();
   });
 
-  it('renders a "View all →" link to /budgets/categories', () => {
+  it('renders a "View all →" link to /budgets?type=category', () => {
     render(<MemoryRouter><CategoryBudgetsCard /></MemoryRouter>);
     const link = screen.getByRole('link', { name: /view all/i });
-    expect(link.getAttribute('href')).toBe('/budgets/categories');
+    expect(link.getAttribute('href')).toBe('/budgets?type=category');
   });
 });

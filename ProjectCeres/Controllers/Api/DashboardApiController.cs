@@ -41,6 +41,41 @@ public class DashboardApiController(
         return Ok(summary);
     }
 
+    [HttpGet("reminders/upcoming")]
+    public async Task<IActionResult> GetUpcomingReminders([FromQuery] int limit = 5, [FromQuery] int days = 7)
+    {
+        if (limit < 1) limit = 1;
+        if (limit > 50) limit = 50;
+        if (days < 0) days = 0;
+
+        var today  = DateOnly.FromDateTime(DateTime.Today);
+        var cutoff = today.AddDays(days);
+
+        var query = db.RecurringTransactions
+            .AsNoTracking()
+            .Where(r => r.IsActive && r.NextDueDate <= cutoff)
+            .Include(r => r.Account).ThenInclude(a => a.Currency);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderBy(r => r.NextDueDate)
+            .ThenBy(r => r.Name)
+            .Take(limit)
+            .Select(r => new
+            {
+                id              = r.Id,
+                name            = r.Name,
+                nextDueDate     = r.NextDueDate,
+                estimatedAmount = r.EstimatedAmount,
+                currencySymbol  = r.Account.Currency.Symbol,
+                accountName     = r.Account.Name
+            })
+            .ToListAsync();
+
+        return Ok(new { totalCount, items });
+    }
+
     [HttpGet("category-budgets")]
     public async Task<IActionResult> GetCategoryBudgets()
     {

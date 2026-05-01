@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react';
+import { CalendarClock, Hourglass, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -65,7 +65,27 @@ function PanelLabel({ children, tooltip }: { children: string; tooltip?: string 
   );
 }
 
-function PanelEmpty({ children }: { children: string }) {
+function PanelEmpty({
+  icon,
+  children,
+}: {
+  icon?: React.ReactNode;
+  children: string;
+}) {
+  // When an icon is provided, render a centered visual block to fill the
+  // panel's empty space. Without an icon, fall back to the compact muted-text
+  // form (used by panels whose data is more like an inline note than an
+  // empty card).
+  if (icon) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 min-h-[100px] py-2 text-center">
+        <div className="text-muted-foreground" aria-hidden="true">
+          {icon}
+        </div>
+        <p className="text-xs text-muted-foreground max-w-[14rem]">{children}</p>
+      </div>
+    );
+  }
   return <div className="text-xs italic text-muted-foreground">{children}</div>;
 }
 
@@ -143,7 +163,9 @@ function RunwayPanel({ data }: { data: HealthDto }) {
     <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel tooltip="How many months your savings would last if you stopped earning. Net worth ÷ average monthly expenses over the last 6 months.">Runway</PanelLabel>
       {data.runwayMonths === null ? (
-        <PanelEmpty>Needs 6 months of expense history</PanelEmpty>
+        <PanelEmpty icon={<Hourglass className="h-8 w-8" />}>
+          Needs 6 months of expense history
+        </PanelEmpty>
       ) : (
         <>
           <Numeric className={`text-2xl font-bold ${runwayClass(data.runwayMonths)}`}>
@@ -167,7 +189,9 @@ function IncomeDeltaPanel({ data }: { data: HealthDto }) {
     <div className="lg:border-l lg:border-border lg:pl-6">
       <PanelLabel tooltip="Your income this period compared to your 6-month average. Period uses your configured budget cycle start day.">Income vs. Avg</PanelLabel>
       {data.incomeDeltaPercent === null ? (
-        <PanelEmpty>Needs 6 months of income history</PanelEmpty>
+        <PanelEmpty icon={<CalendarClock className="h-8 w-8" />}>
+          Needs 6 months of income history
+        </PanelEmpty>
       ) : (
         <>
           <Numeric className={`text-2xl font-bold ${incomeDeltaClass(data.incomeDeltaPercent)}`}>

@@ -7,7 +7,7 @@ export function GoalBudgetsCard() {
     <Card>
       <CardHeader className="flex flex-row items-baseline justify-between">
         <CardTitle>Goal Budgets</CardTitle>
-        <Link to="/budgets/goals" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/budgets?type=goal" className="text-sm text-muted-foreground hover:text-foreground">
           View all →
         </Link>
       </CardHeader>

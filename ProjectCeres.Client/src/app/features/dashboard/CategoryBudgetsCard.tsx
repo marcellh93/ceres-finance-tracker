@@ -7,7 +7,7 @@ export function CategoryBudgetsCard() {
     <Card>
       <CardHeader className="flex flex-row items-baseline justify-between">
         <CardTitle>Category Budgets</CardTitle>
-        <Link to="/budgets/categories" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/budgets?type=category" className="text-sm text-muted-foreground hover:text-foreground">
           View all →
         </Link>
       </CardHeader>
