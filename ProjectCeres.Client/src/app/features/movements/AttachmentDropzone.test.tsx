@@ -190,7 +190,7 @@ describe('AttachmentDropzone', () => {
     expect(screen.getByText('receipt.pdf')).toBeInTheDocument();
   });
 
-  it('pendingFile prop on mount triggers an immediate upload and toast.success', async () => {
+  it('pendingFiles prop on mount triggers immediate uploads and toast.success', async () => {
     vi.mocked(uploadAttachment).mockResolvedValue(newAttachment);
     const file = makeFile('pending.png');
     render(
@@ -198,7 +198,7 @@ describe('AttachmentDropzone', () => {
         parentType="Transaction"
         parentId="tx1"
         initialAttachments={[]}
-        pendingFile={file}
+        pendingFiles={[file]}
       />,
     );
 
@@ -207,6 +207,25 @@ describe('AttachmentDropzone', () => {
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalled();
+    });
+  });
+
+  it('pendingFiles with multiple files uploads each one', async () => {
+    vi.mocked(uploadAttachment).mockResolvedValue(newAttachment);
+    const f1 = makeFile('p1.png');
+    const f2 = makeFile('p2.png');
+    render(
+      <AttachmentDropzone
+        parentType="Transaction"
+        parentId="tx1"
+        initialAttachments={[]}
+        pendingFiles={[f1, f2]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(uploadAttachment).toHaveBeenCalledWith('Transaction', 'tx1', f1);
+      expect(uploadAttachment).toHaveBeenCalledWith('Transaction', 'tx1', f2);
     });
   });
 
@@ -230,5 +249,93 @@ describe('AttachmentDropzone', () => {
     });
     expect(screen.getByText('one.png')).toBeInTheDocument();
     expect(screen.getByText('two.png')).toBeInTheDocument();
+  });
+
+  // ── create mode ──
+
+  it('create mode: picking a file buffers it locally — no upload call', async () => {
+    const onPendingChange = vi.fn();
+    render(
+      <AttachmentDropzone
+        mode="create"
+        parentType="Transaction"
+        onPendingChange={onPendingChange}
+      />,
+    );
+
+    const f1 = makeFile('buf1.png');
+    const input = screen.getByTestId('attachment-file-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [f1] } });
+
+    expect(uploadAttachment).not.toHaveBeenCalled();
+    expect(screen.getByText('buf1.png')).toBeInTheDocument();
+    expect(screen.getByText(/pending upload/i)).toBeInTheDocument();
+    expect(onPendingChange).toHaveBeenCalled();
+    const last = onPendingChange.mock.calls[onPendingChange.mock.calls.length - 1][0];
+    expect(last).toEqual([f1]);
+  });
+
+  it('create mode: picking multiple files buffers them all and fires onPendingChange', async () => {
+    const onPendingChange = vi.fn();
+    render(
+      <AttachmentDropzone
+        mode="create"
+        parentType="Transaction"
+        onPendingChange={onPendingChange}
+      />,
+    );
+
+    const f1 = makeFile('a.png');
+    const f2 = makeFile('b.png');
+    const input = screen.getByTestId('attachment-file-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [f1, f2] } });
+
+    expect(uploadAttachment).not.toHaveBeenCalled();
+    expect(screen.getByText('a.png')).toBeInTheDocument();
+    expect(screen.getByText('b.png')).toBeInTheDocument();
+    const last = onPendingChange.mock.calls[onPendingChange.mock.calls.length - 1][0];
+    expect(last).toEqual([f1, f2]);
+  });
+
+  it('create mode: removing a buffered file is local — no AlertDialog, no network', async () => {
+    const onPendingChange = vi.fn();
+    render(
+      <AttachmentDropzone
+        mode="create"
+        parentType="Transaction"
+        onPendingChange={onPendingChange}
+      />,
+    );
+
+    const f1 = makeFile('buf1.png');
+    const input = screen.getByTestId('attachment-file-input') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [f1] } });
+
+    expect(screen.getByText('buf1.png')).toBeInTheDocument();
+
+    const removeBtn = screen.getByRole('button', { name: /remove pending file buf1\.png/i });
+    fireEvent.click(removeBtn);
+
+    expect(screen.queryByText('Delete this attachment?')).not.toBeInTheDocument();
+    expect(deleteAttachment).not.toHaveBeenCalled();
+    expect(screen.queryByText('buf1.png')).not.toBeInTheDocument();
+    const last = onPendingChange.mock.calls[onPendingChange.mock.calls.length - 1][0];
+    expect(last).toEqual([]);
+  });
+
+  it('create mode: pendingFiles prop is ignored (no auto-upload)', async () => {
+    const f = makeFile('ignore-me.png');
+    render(
+      <AttachmentDropzone
+        mode="create"
+        parentType="Transaction"
+        pendingFiles={[f]}
+      />,
+    );
+
+    // Wait a tick — should remain not-called.
+    await waitFor(() => {
+      expect(uploadAttachment).not.toHaveBeenCalled();
+    });
   });
 });

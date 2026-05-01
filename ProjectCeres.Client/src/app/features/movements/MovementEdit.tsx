@@ -87,15 +87,17 @@ function MovementEditInner({
   const location = useLocation();
   const { refetch } = useOutletContext<{ refetch: () => void }>();
 
-  // Capture pendingAttachment from location.state ONCE on mount, then clear it.
-  // Hard refresh of the same URL must not try to re-upload a file no longer in memory.
-  const pendingFileRef = useRef<File | null>(
-    (location.state as { pendingAttachment?: File } | null)?.pendingAttachment ?? null,
+  // Capture pendingAttachments from location.state ONCE on mount, then clear it.
+  // Hard refresh of the same URL must not try to re-upload files no longer in memory.
+  const pendingFilesRef = useRef<File[]>(
+    (location.state as { pendingAttachments?: File[] } | null)?.pendingAttachments ?? [],
   );
-  const [pendingFile] = useState<File | null>(pendingFileRef.current);
+  const [pendingFiles] = useState<File[]>(pendingFilesRef.current);
 
   useEffect(() => {
-    if ((location.state as { pendingAttachment?: File } | null)?.pendingAttachment) {
+    const stateFiles = (location.state as { pendingAttachments?: File[] } | null)
+      ?.pendingAttachments;
+    if (stateFiles && stateFiles.length > 0) {
       navigate(location.pathname + location.search, { replace: true, state: {} });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -269,10 +271,12 @@ function MovementEditInner({
       />
       {showDropzone && (
         <AttachmentDropzone
+          mode="edit"
           parentType={movementType as 'Transaction' | 'Transfer'}
           parentId={id}
           initialAttachments={dropzoneInitialAttachments}
-          pendingFile={pendingFile}
+          pendingFiles={pendingFiles}
+          className="mx-auto max-w-3xl"
         />
       )}
     </div>

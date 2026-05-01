@@ -14,14 +14,15 @@ vi.mock('./AttachmentDropzone', () => ({
   AttachmentDropzone: vi.fn((props: {
     parentType: string;
     parentId: string;
-    pendingFile?: File | null;
+    pendingFiles?: File[];
     initialAttachments: Array<{ id: string }>;
   }) => (
     <div
       data-testid="dropzone"
       data-parent-type={props.parentType}
       data-parent-id={props.parentId}
-      data-pending-file={props.pendingFile?.name ?? ''}
+      data-pending-files={(props.pendingFiles ?? []).map((f) => f.name).join(',')}
+      data-pending-count={(props.pendingFiles ?? []).length}
       data-initial-count={props.initialAttachments.length}
     />
   )),
@@ -322,23 +323,24 @@ describe('MovementEdit', () => {
     expect(dz.dataset.initialCount).toBe('0');
   });
 
-  it('Test 8: pendingAttachment from location.state is passed to dropzone as pendingFile', async () => {
+  it('Test 8: pendingAttachments[] from location.state is passed to dropzone as pendingFiles', async () => {
     discriminatorType = 'Transaction';
     const file = new File(['hello'], 'pending.txt', { type: 'text/plain' });
-    renderAt('/movements/abc-123/edit', { pendingAttachment: file });
+    renderAt('/movements/abc-123/edit', { pendingAttachments: [file] });
 
     await waitFor(() => {
       expect(screen.getByTestId('dropzone')).toBeInTheDocument();
     });
 
     const dz = screen.getByTestId('dropzone');
-    expect(dz.dataset.pendingFile).toBe('pending.txt');
+    expect(dz.dataset.pendingFiles).toBe('pending.txt');
+    expect(dz.dataset.pendingCount).toBe('1');
   });
 
   it('Test 9: location state is cleared after mount', async () => {
     discriminatorType = 'Transaction';
     const file = new File(['hello'], 'pending.txt', { type: 'text/plain' });
-    renderAt('/movements/abc-123/edit', { pendingAttachment: file });
+    renderAt('/movements/abc-123/edit', { pendingAttachments: [file] });
 
     await waitFor(() => {
       expect(screen.getByTestId('dropzone')).toBeInTheDocument();
@@ -346,9 +348,9 @@ describe('MovementEdit', () => {
 
     await waitFor(() => {
       const probe = screen.getByTestId('probe-state');
-      // After clear, state should be {} (or at least no pendingAttachment)
+      // After clear, state should be {} (or at least no pendingAttachments)
       const parsed = probe.textContent ? JSON.parse(probe.textContent) : null;
-      expect(parsed?.pendingAttachment).toBeUndefined();
+      expect(parsed?.pendingAttachments).toBeUndefined();
     });
   });
 

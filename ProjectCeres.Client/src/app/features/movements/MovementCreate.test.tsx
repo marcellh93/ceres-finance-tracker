@@ -15,6 +15,30 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
+// ── Mock AttachmentDropzone — capture props so tests can drive onPendingChange ──
+const lastDropzoneProps: { current: null | {
+  mode?: string;
+  parentType?: string;
+  onPendingChange?: (files: File[]) => void;
+} } = { current: null };
+
+vi.mock('./AttachmentDropzone', () => ({
+  AttachmentDropzone: (props: {
+    mode?: string;
+    parentType?: string;
+    onPendingChange?: (files: File[]) => void;
+  }) => {
+    lastDropzoneProps.current = props;
+    return (
+      <div
+        data-testid="dropzone"
+        data-mode={props.mode}
+        data-parent-type={props.parentType}
+      />
+    );
+  },
+}));
+
 // ── Mock fetch ──
 const mockFetch = vi.fn();
 
@@ -48,6 +72,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.resetAllMocks();
   navigateMock.mockReset();
+  lastDropzoneProps.current = null;
 });
 
 // ── Route helpers ──
@@ -198,39 +223,37 @@ describe('MovementCreate', () => {
 
   // ── Task 5: Pending attachment hand-off ──
 
-  it('Test 6: Attach receipt trigger is present and clicking it does not call any upload API', async () => {
+  it('Test 6: AttachmentDropzone is rendered in create mode and no upload API was hit', async () => {
     renderAt('/movements/new?type=transaction');
 
     await waitFor(() => {
       expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
     });
 
-    const trigger = screen.getByRole('button', { name: /attach receipt/i });
-    expect(trigger).toBeInTheDocument();
-
-    fireEvent.click(trigger);
+    const dz = await screen.findByTestId('dropzone');
+    expect(dz.dataset.mode).toBe('create');
+    expect(dz.dataset.parentType).toBe('Transaction');
 
     // No upload endpoints should have been hit. Only accounts + categories fetches.
     const calledUrls = mockFetch.mock.calls.map((c) => c[0] as string);
     expect(calledUrls.some((u) => u.includes('/attachments'))).toBe(false);
   });
 
-  it('Test 7: Picking a file then submitting → navigate carries pendingAttachment', async () => {
+  it('Test 7: Picking files via dropzone then submitting → navigate carries pendingAttachments[]', async () => {
     mockTransactionCreate('new-id');
 
-    const { container } = renderAt('/movements/new?type=transaction');
+    renderAt('/movements/new?type=transaction');
 
     await waitFor(() => {
       expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
     });
 
-    const file = new File(['hello'], 'receipt.pdf', { type: 'application/pdf' });
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-    expect(fileInput).toBeTruthy();
-    fireEvent.change(fileInput, { target: { files: [file] } });
+    // Wait for dropzone mount and capture its onPendingChange.
+    await screen.findByTestId('dropzone');
+    expect(lastDropzoneProps.current?.onPendingChange).toBeTruthy();
 
-    // Filename should be visible after picking
-    expect(screen.getByText(/receipt\.pdf/i)).toBeInTheDocument();
+    const file = new File(['hello'], 'receipt.pdf', { type: 'application/pdf' });
+    lastDropzoneProps.current!.onPendingChange!([file]);
 
     fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
@@ -240,13 +263,13 @@ describe('MovementCreate', () => {
         '/movements/new-id/edit?created=1',
         expect.objectContaining({
           replace: true,
-          state: { pendingAttachment: file },
+          state: { pendingAttachments: [file] },
         }),
       );
     });
   });
 
-  it('Test 8: Successful save with no file → navigate state has no pendingAttachment', async () => {
+  it('Test 8: Successful save with no file → navigate state has no pendingAttachments', async () => {
     mockTransactionCreate('new-id');
 
     renderAt('/movements/new?type=transaction');
@@ -269,10 +292,9 @@ describe('MovementCreate', () => {
       (c) => typeof c[0] === 'string' && (c[0] as string).startsWith('/movements/new-id/edit'),
     );
     expect(editCall).toBeTruthy();
-    const opts = editCall![1] as { state?: { pendingAttachment?: File } } | undefined;
-    // State should be undefined OR not contain pendingAttachment
+    const opts = editCall![1] as { state?: { pendingAttachments?: File[] } } | undefined;
     if (opts?.state) {
-      expect(opts.state.pendingAttachment).toBeUndefined();
+      expect(opts.state.pendingAttachments).toBeUndefined();
     } else {
       expect(opts?.state).toBeUndefined();
     }

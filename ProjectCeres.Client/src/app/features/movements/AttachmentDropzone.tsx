@@ -20,13 +20,25 @@ import {
 } from './movement-attachments';
 
 type AttachmentDropzoneProps = {
+  mode?: 'create' | 'edit';
   parentType: AttachmentParentType;
-  parentId: string;
-  initialAttachments: AttachmentDto[];
-  /** Optional file to auto-upload on mount (the Create→Edit hand-off). */
-  pendingFile?: File | null;
-  /** Called whenever the attachment list changes (added/removed). */
+  /** Required for 'edit' mode (uploads target this id). Ignored in 'create' mode. */
+  parentId?: string;
+  initialAttachments?: AttachmentDto[];
+  /**
+   * 'edit' mode: optional list of files to auto-upload on mount (the
+   * Create→Edit hand-off). Each file is uploaded once and the array is
+   * processed only on the first render (subsequent prop changes are ignored).
+   */
+  pendingFiles?: File[];
+  /** 'edit' mode: fired whenever the persisted attachment list changes. */
   onChange?: (attachments: AttachmentDto[]) => void;
+  /** 'create' mode: fired whenever the buffered file list changes. */
+  onPendingChange?: (files: File[]) => void;
+  title?: string;
+  description?: string;
+  /** Outer container class — lets the parent decide max-width / spacing. */
+  className?: string;
 };
 
 type PendingUpload = {
@@ -57,11 +69,16 @@ function makeTempId(): string {
 }
 
 export function AttachmentDropzone({
+  mode = 'edit',
   parentType,
   parentId,
-  initialAttachments,
-  pendingFile,
+  initialAttachments = [],
+  pendingFiles,
   onChange,
+  onPendingChange,
+  title = 'Receipts',
+  description,
+  className,
 }: AttachmentDropzoneProps) {
   // Defensive runtime guard — see component contract.
   if ((parentType as string) === 'LiabilityPayment') {
@@ -70,16 +87,31 @@ export function AttachmentDropzone({
 
   const [attachments, setAttachments] = useState<AttachmentDto[]>(initialAttachments);
   const [pending, setPending] = useState<PendingUpload[]>([]);
+  const [buffered, setBuffered] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const pendingFileHandledRef = useRef(false);
+  const pendingFilesHandledRef = useRef(false);
+
+  const resolvedDescription =
+    description ??
+    (mode === 'create'
+      ? "We'll upload them after you save."
+      : 'Drop files here to add them.');
 
   function notifyChange(next: AttachmentDto[]) {
     onChange?.(next);
   }
 
+  function notifyPending(next: File[]) {
+    onPendingChange?.(next);
+  }
+
   async function uploadOne(file: File, options?: { announceToast?: boolean }) {
+    if (!parentId) {
+      // Should never happen in edit mode (parentId is required), but guard.
+      return;
+    }
     const tempId = makeTempId();
     setPending((prev) => [
       ...prev,
@@ -106,17 +138,36 @@ export function AttachmentDropzone({
   function handleFiles(files: FileList | File[] | null | undefined) {
     if (!files) return;
     const list = Array.from(files);
+    if (mode === 'create') {
+      setBuffered((prev) => {
+        const next = [...prev, ...list];
+        notifyPending(next);
+        return next;
+      });
+      return;
+    }
     for (const file of list) {
       void uploadOne(file);
     }
   }
 
-  // pendingFile auto-upload (run once on mount).
+  function removeBufferedAt(index: number) {
+    setBuffered((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      notifyPending(next);
+      return next;
+    });
+  }
+
+  // pendingFiles auto-upload (run once on mount, edit mode only).
   useEffect(() => {
-    if (pendingFileHandledRef.current) return;
-    if (!pendingFile) return;
-    pendingFileHandledRef.current = true;
-    void uploadOne(pendingFile, { announceToast: true });
+    if (pendingFilesHandledRef.current) return;
+    if (mode !== 'edit') return;
+    if (!pendingFiles || pendingFiles.length === 0) return;
+    pendingFilesHandledRef.current = true;
+    for (const file of pendingFiles) {
+      void uploadOne(file, { announceToast: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -139,8 +190,23 @@ export function AttachmentDropzone({
     })();
   }
 
+  const containerClass = [
+    'rounded-lg border border-border bg-card p-4 space-y-3',
+    className ?? '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const showList =
+    attachments.length > 0 || pending.length > 0 || buffered.length > 0;
+
   return (
-    <div className="space-y-3">
+    <div className={containerClass}>
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground">{resolvedDescription}</p>
+      </div>
+
       {pending.length > 0 && (
         <div className="rounded-md border border-dashed border-primary/50 bg-primary/5 px-3 py-2 text-sm text-primary">
           Uploading {pending.length} {pending.length === 1 ? 'file' : 'files'}…
@@ -196,7 +262,7 @@ export function AttachmentDropzone({
         />
       </div>
 
-      {(attachments.length > 0 || pending.length > 0) && (
+      {showList && (
         <ul className="divide-y rounded-md border">
           {attachments.map((a) => (
             <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
@@ -228,6 +294,28 @@ export function AttachmentDropzone({
                   {formatSize(p.sizeBytes)} · Uploading…
                 </div>
               </div>
+            </li>
+          ))}
+          {buffered.map((f, idx) => (
+            <li
+              key={`${f.name}-${idx}`}
+              className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{f.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatSize(f.size)} · Pending upload
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove pending file ${f.name}`}
+                onClick={() => removeBufferedAt(idx)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </li>
           ))}
         </ul>
