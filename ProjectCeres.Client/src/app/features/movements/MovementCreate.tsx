@@ -44,6 +44,16 @@ export function MovementCreate() {
   const { data: accounts } = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
   const { data: categories } = useApi<CategoryOptionDto[]>(CATEGORIES_ACTIVE_URL);
 
+  // Narrow account options to the active currency (the tab the user came
+  // from). Mixing currencies inside a single movement is rejected by the
+  // server (transfers must share a currency, liability payments too) and
+  // a transaction can only sit in one account, so showing other-currency
+  // accounts in the picker is just noise.
+  const activeCurrency = searchParams.get('currency');
+  const narrowedAccounts = (accounts ?? []).filter(
+    (a) => !activeCurrency || a.currencyCode === activeCurrency,
+  );
+
   const initialValues = useMemo<MovementFormValues>(
     () => ({
       date: new Date().toISOString().slice(0, 10),
@@ -175,7 +185,7 @@ export function MovementCreate() {
         type={movementType}
         mode="create"
         initialValues={initialValues}
-        accounts={accounts ?? []}
+        accounts={narrowedAccounts}
         categories={categories ?? []}
         onSubmit={onSubmit}
         onCancel={() => navigate('/movements')}

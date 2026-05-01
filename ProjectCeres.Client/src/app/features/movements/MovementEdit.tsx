@@ -115,6 +115,26 @@ function MovementEditInner({
   const { data: accounts } = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
   const { data: categories } = useApi<CategoryOptionDto[]>(CATEGORIES_ACTIVE_URL);
 
+  // Narrow account options to the entity's currency. Transactions live in a
+  // single account, transfers/liability payments enforce same-currency on
+  // both sides — showing other-currency accounts is misleading and would
+  // produce a 422 on submit.
+  const entityCurrency = useMemo<string | null>(() => {
+    if (!typedData || !accounts) return null;
+    const drivingAccountId =
+      movementType === 'Transaction'
+        ? (typedData as TransactionEditDto).accountId
+        : movementType === 'Transfer'
+          ? (typedData as TransferEditDto).sourceAccountId
+          : (typedData as LiabilityPaymentEditDto).assetAccountId;
+    return accounts.find((a) => a.id === drivingAccountId)?.currencyCode ?? null;
+  }, [typedData, accounts, movementType]);
+
+  const narrowedAccounts = useMemo(
+    () => (accounts ?? []).filter((a) => !entityCurrency || a.currencyCode === entityCurrency),
+    [accounts, entityCurrency],
+  );
+
   const initialValues = useMemo<MovementFormValues | null>(() => {
     if (!typedData) return null;
     if (movementType === 'Transaction') {
@@ -241,7 +261,7 @@ function MovementEditInner({
         type={movementType}
         mode="edit"
         initialValues={initialValues}
-        accounts={accounts ?? []}
+        accounts={narrowedAccounts}
         categories={categories ?? []}
         onSubmit={onSubmit}
         onDelete={onDelete}

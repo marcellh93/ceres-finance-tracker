@@ -26,6 +26,12 @@ function buildUrl(params: URLSearchParams, activeCurrency: string | null): strin
   return search ? `${MOVEMENTS_URL}?${search}` : MOVEMENTS_URL;
 }
 
+function buildNewMovementUrl(type: string, activeCurrency: string | null): string {
+  return activeCurrency
+    ? `new?type=${type}&currency=${activeCurrency}`
+    : `new?type=${type}`;
+}
+
 export function MovementsLayout() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
@@ -81,21 +87,21 @@ export function MovementsLayout() {
             />
             <DropdownMenuContent align="end" sideOffset={8} className="min-w-[12rem] p-1.5">
               <DropdownMenuItem
-                onClick={() => navigate('new?type=transaction')}
+                onClick={() => navigate(buildNewMovementUrl('transaction', activeCurrency))}
                 className="gap-2.5 px-3 py-2 transition-colors"
               >
                 <Receipt className="h-4 w-4 text-muted-foreground" />
                 <span>Transaction</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => navigate('new?type=transfer')}
+                onClick={() => navigate(buildNewMovementUrl('transfer', activeCurrency))}
                 className="gap-2.5 px-3 py-2 transition-colors"
               >
                 <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
                 <span>Transfer</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => navigate('new?type=liabilitypayment')}
+                onClick={() => navigate(buildNewMovementUrl('liabilitypayment', activeCurrency))}
                 className="gap-2.5 px-3 py-2 transition-colors"
               >
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
