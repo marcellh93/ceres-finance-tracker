@@ -26,7 +26,7 @@ describe('Sidebar', () => {
     renderSidebar();
     const expectedLabels = [
       // Activity
-      'Movements', 'Transactions', 'Transfers', 'Review',
+      'Movements', 'Review',
       // Money
       'Accounts', 'Categories', 'Budgets',
       // Tools
@@ -50,10 +50,10 @@ describe('Sidebar', () => {
   });
 
   it('marks the active route with aria-current="page"', () => {
-    renderSidebar('/transactions');
-    const active = screen.getByRole('link', { name: 'Transactions' });
+    renderSidebar('/movements');
+    const active = screen.getByRole('link', { name: 'Movements' });
     expect(active.getAttribute('aria-current')).toBe('page');
-    const inactive = screen.getByRole('link', { name: 'Movements' });
+    const inactive = screen.getByRole('link', { name: 'Review' });
     expect(inactive.getAttribute('aria-current')).toBeNull();
   });
 

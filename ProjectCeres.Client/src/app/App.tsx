@@ -13,8 +13,6 @@ import { Review } from './pages/Review';
 import { Security } from './pages/Security';
 import { Settings } from './pages/Settings';
 import { Support } from './pages/Support';
-import { Transactions } from './pages/Transactions';
-import { Transfers } from './pages/Transfers';
 import { MovementCreate } from './features/movements/MovementCreate';
 import { MovementEdit } from './features/movements/MovementEdit';
 import { MovementsLayout } from './features/movements/MovementsLayout';
@@ -28,8 +26,6 @@ export function App() {
           <Route path="new" element={<MovementCreate />} />
           <Route path=":id/edit" element={<MovementEdit />} />
         </Route>
-        <Route path="transactions" element={<Transactions />} />
-        <Route path="transfers" element={<Transfers />} />
         <Route path="review" element={<Review />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="categories" element={<Categories />} />

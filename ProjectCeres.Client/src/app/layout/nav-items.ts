@@ -1,11 +1,9 @@
 import {
-  ArrowLeftRight,
   BarChart3,
   Inbox,
   Landmark,
   LayoutList,
   LifeBuoy,
-  Receipt,
   Repeat,
   Settings as SettingsIcon,
   Tags,
@@ -33,10 +31,8 @@ export const navGroups: NavGroup[] = [
   {
     label: 'Activity',
     items: [
-      { to: '/movements',    label: 'Movements',    icon: LayoutList },
-      { to: '/transactions', label: 'Transactions', icon: Receipt },
-      { to: '/transfers',    label: 'Transfers',    icon: ArrowLeftRight },
-      { to: '/review',       label: 'Review',       icon: Inbox },
+      { to: '/movements', label: 'Movements', icon: LayoutList },
+      { to: '/review',    label: 'Review',    icon: Inbox },
     ],
   },
   {

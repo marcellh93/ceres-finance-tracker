@@ -6,8 +6,6 @@ import { App } from './App';
 const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/',             expectedHeading: 'Dashboard' },
   { path: '/movements',    expectedHeading: 'Movements' },
-  { path: '/transactions', expectedHeading: 'Transactions' },
-  { path: '/transfers',    expectedHeading: 'Transfers' },
   { path: '/review',       expectedHeading: 'Review' },
   { path: '/accounts',     expectedHeading: 'Accounts' },
   { path: '/categories',   expectedHeading: 'Categories' },
