@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeftRight, CreditCard, Receipt } from 'lucide-react';
 import { MovementForm, type MovementFormValues } from './MovementForm';
 import {
   ACCOUNTS_ACTIVE_URL,
@@ -16,8 +15,6 @@ import {
 import { parseValidationErrors } from './movement-validation';
 import { useApi } from '../../lib/use-api';
 
-// ── URL param helpers ──
-
 function urlToMovementType(t: string | null): MovementType | null {
   if (t === 'transaction') return 'Transaction';
   if (t === 'transfer') return 'Transfer';
@@ -25,50 +22,19 @@ function urlToMovementType(t: string | null): MovementType | null {
   return null;
 }
 
-// ── Type Picker ──
-
-type PickerCard = {
-  urlValue: string;
-  label: string;
-  icon: React.ReactNode;
-};
-
-function TypePicker({ onSelect }: { onSelect: (urlValue: string) => void }) {
-  const cards: PickerCard[] = [
-    { urlValue: 'transaction', label: 'Transaction', icon: <Receipt className="h-6 w-6" /> },
-    { urlValue: 'transfer', label: 'Transfer', icon: <ArrowLeftRight className="h-6 w-6" /> },
-    { urlValue: 'liabilitypayment', label: 'Liability Payment', icon: <CreditCard className="h-6 w-6" /> },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">What would you like to add?</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {cards.map((card) => (
-          <button
-            key={card.urlValue}
-            type="button"
-            onClick={() => onSelect(card.urlValue)}
-            className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {card.icon}
-            <span className="font-medium">{card.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── MovementCreate ──
-
 export function MovementCreate() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { refetch } = useOutletContext<{ refetch: () => void }>();
 
   const typeParam = searchParams.get('type');
   const movementType = urlToMovementType(typeParam);
+
+  // No type in URL → bounce back to the list. The `+ New` dropdown is the only
+  // entry point and it always sets ?type=…; a bare /movements/new visit is invalid.
+  useEffect(() => {
+    if (!movementType) navigate('/movements', { replace: true });
+  }, [movementType, navigate]);
 
   const { data: accounts } = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
   const { data: categories } = useApi<CategoryOptionDto[]>(CATEGORIES_ACTIVE_URL);
@@ -90,14 +56,6 @@ export function MovementCreate() {
     }),
     [],
   );
-
-  function handlePickType(urlValue: string) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('type', urlValue);
-      return next;
-    });
-  }
 
   async function onSubmit(
     values: MovementFormValues,
@@ -145,9 +103,9 @@ export function MovementCreate() {
     });
 
     if (response.status === 201) {
-      const created = (await response.json()) as { id: string };
+      toast.success('Created.');
       refetch();
-      navigate(`/movements/${created.id}/edit?created=1`, { replace: true });
+      navigate('/movements');
       return { ok: true };
     }
 
@@ -160,10 +118,7 @@ export function MovementCreate() {
     return { ok: false, errors: { _form: 'Network or server error.' } };
   }
 
-  // If no type selected, show the picker
-  if (!movementType) {
-    return <TypePicker onSelect={handlePickType} />;
-  }
+  if (!movementType) return null;
 
   return (
     <MovementForm

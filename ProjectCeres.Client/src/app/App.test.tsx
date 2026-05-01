@@ -35,14 +35,14 @@ describe('App routes', () => {
     });
   }
 
-  it('renders the Movement Create page at /movements/new', () => {
+  it('renders the Movement Create page at /movements/new?type=transaction', () => {
     render(
-      <MemoryRouter initialEntries={['/movements/new']}>
+      <MemoryRouter initialEntries={['/movements/new?type=transaction']}>
         <App />
       </MemoryRouter>,
     );
-    // The type-picker is the landing state for /movements/new (no ?type= query)
-    expect(screen.getByRole('button', { name: /transaction/i })).toBeDefined();
+    // MovementCreate renders the form when ?type= is set; Save is the form's primary action.
+    expect(screen.getByRole('button', { name: /save/i })).toBeDefined();
   });
 
   it('renders the Movement Edit page at /movements/:id/edit', () => {

@@ -134,6 +134,11 @@ describe('MovementEdit', () => {
       expect(toast.success).toHaveBeenCalledWith('Saved.');
     });
 
+    // Navigates back to the list view after save
+    await waitFor(() => {
+      expect(screen.getByTestId('list-page')).toBeInTheDocument();
+    });
+
     // Verify PUT was called
     const putCalls = mockFetch.mock.calls.filter(
       ([url, init]: [string, RequestInit]) =>
@@ -203,11 +208,4 @@ describe('MovementEdit', () => {
     });
   });
 
-  it('Test 5: ?created=1 → Created toast shown on mount', async () => {
-    renderAt('/movements/abc-123/edit?created=1');
-
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Created.');
-    });
-  });
 });

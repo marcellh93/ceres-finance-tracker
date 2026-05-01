@@ -55,8 +55,8 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/movements" element={<OutletShim />}>
+          <Route index element={<div data-testid="list-page">LIST</div>} />
           <Route path="new" element={<MovementCreate />} />
-          <Route path=":id/edit" element={<div data-testid="edit-page">EDIT</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -66,41 +66,32 @@ function renderAt(path: string) {
 // ── Tests ──
 
 describe('MovementCreate', () => {
-  it('Test 1: renders 3-card picker at /movements/new (no ?type= query)', () => {
+  it('Test 1: bounces to /movements when ?type= is missing (no picker)', async () => {
     renderAt('/movements/new');
-
-    // Three cards for the three movement types
-    expect(screen.getByRole('button', { name: /transaction/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /transfer/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /liability payment/i })).toBeInTheDocument();
-  });
-
-  it('Test 2: clicking Transaction card updates URL to ?type=transaction', async () => {
-    renderAt('/movements/new');
-
-    fireEvent.click(screen.getByRole('button', { name: /transaction/i }));
-
-    // After click, the form should appear (URL updated → MovementForm rendered)
-    // The date field is present in MovementForm
     await waitFor(() => {
-      expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
+      expect(screen.getByTestId('list-page')).toBeInTheDocument();
     });
   });
 
-  it('Test 3: with ?type=transaction, renders MovementForm with a Transaction-specific field', async () => {
+  it('Test 2: with ?type=transaction, renders MovementForm with a Transaction-specific field', async () => {
     renderAt('/movements/new?type=transaction');
 
-    // Account combobox is Transaction-specific
     await waitFor(() => {
       expect(screen.getByText(/select account/i)).toBeInTheDocument();
     });
-    // Date field
     expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
-    // No picker cards
-    expect(screen.queryByRole('button', { name: /^transaction$/i })).not.toBeInTheDocument();
   });
 
-  it('Test 4: successful POST → navigates to /movements/<id>/edit?created=1', async () => {
+  it('Test 3: with ?type=transfer, renders source/destination account fields', async () => {
+    renderAt('/movements/new?type=transfer');
+
+    await waitFor(() => {
+      expect(screen.getByText(/select source/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/select destination/i)).toBeInTheDocument();
+  });
+
+  it('Test 4: successful POST → navigates back to /movements (list view)', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/accounts/active') {
         return Promise.resolve({
@@ -142,9 +133,9 @@ describe('MovementCreate', () => {
     // Submit
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
-    // Navigates to edit page
+    // Navigates back to the list view
     await waitFor(() => {
-      expect(screen.getByTestId('edit-page')).toBeInTheDocument();
+      expect(screen.getByTestId('list-page')).toBeInTheDocument();
     });
   });
 

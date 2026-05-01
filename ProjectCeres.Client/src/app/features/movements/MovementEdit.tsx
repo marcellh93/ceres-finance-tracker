@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MovementForm, type MovementFormValues } from './MovementForm';
 import {
@@ -84,7 +84,6 @@ function MovementEditInner({
 }) {
   const navigate = useNavigate();
   const { refetch } = useOutletContext<{ refetch: () => void }>();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const typedUrl =
     movementType === 'Transaction'
@@ -99,22 +98,6 @@ function MovementEditInner({
 
   const { data: accounts } = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
   const { data: categories } = useApi<CategoryOptionDto[]>(CATEGORIES_ACTIVE_URL);
-
-  // ?created=1 toast — run once on mount
-  useEffect(() => {
-    if (searchParams.get('created') === '1') {
-      toast.success('Created.');
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete('created');
-          return next;
-        },
-        { replace: true },
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const initialValues = useMemo<MovementFormValues | null>(() => {
     if (!typedData) return null;
@@ -175,6 +158,8 @@ function MovementEditInner({
 
     if (response.status === 204) {
       toast.success('Saved.');
+      refetch();
+      navigate('/movements');
       return { ok: true };
     }
 
