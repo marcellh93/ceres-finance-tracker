@@ -74,3 +74,101 @@ export type CategoryOptionDto = {
 export type ServerValidationProblem = {
   errors?: Record<string, string[]>;
 };
+
+// ---------- Typed CRUD endpoints (Plan 1 server work) ----------
+
+export const TRANSACTION_BY_ID_URL      = (id: string) => `/api/transactions/${id}`;
+export const TRANSFER_BY_ID_URL         = (id: string) => `/api/transfers/${id}`;
+export const LIABILITY_PAYMENT_BY_ID_URL = (id: string) => `/api/liability-payments/${id}`;
+
+export const MOVEMENT_TYPE_URL = (id: string) => `/api/movements/${id}`;
+
+// ---------- Edit DTOs (responses for GET /:id) ----------
+
+export type TransactionEditDto = {
+  id: string;
+  date: string;
+  amount: number;
+  accountId: string;
+  categoryId: string;
+  description: string | null;
+  isCleared: boolean;
+  attachments: AttachmentDto[];
+};
+
+export type TransferEditDto = {
+  id: string;
+  date: string;
+  amount: number;
+  sourceAccountId: string;
+  destAccountId: string;
+  description: string | null;
+  isCleared: boolean;
+  attachments: AttachmentDto[];
+};
+
+export type LiabilityPaymentEditDto = {
+  id: string;
+  date: string;
+  amount: number;
+  assetAccountId: string;
+  liabilityAccountId: string;
+  description: string | null;
+  isCleared: boolean;
+};
+
+export type AttachmentDto = {
+  id: string;
+  fileName: string;
+  sizeBytes: number;
+  contentType: string;
+  uploadedAt: string;
+};
+
+export type MovementTypeDto = {
+  id: string;
+  movementType: MovementType;
+};
+
+// ---------- Update request bodies (PUT /:id) ----------
+
+export type UpdateTransactionRequest = {
+  date: string;
+  amount: number;
+  accountId: string;
+  categoryId: string;
+  description: string | null;
+  isCleared: boolean;
+  budgetId: string | null;
+  needsReview: boolean;
+};
+
+export type UpdateTransferRequest = {
+  date: string;
+  amount: number;
+  sourceAccountId: string;
+  destAccountId: string;
+  description: string | null;
+  isCleared: boolean;
+};
+
+export type UpdateLiabilityPaymentRequest = {
+  date: string;
+  amount: number;
+  assetAccountId: string;
+  liabilityAccountId: string;
+  description: string | null;
+  isCleared: boolean;
+};
+
+// ---------- Project's standard error envelope ----------
+// (See docs/api-contract.md — supersedes the ProblemDetails-shaped parser
+// used by QuickAddModal for the legacy endpoints.)
+
+export type ApiErrorEnvelope = {
+  error: {
+    code: string;
+    message: string;
+    details: Array<{ field?: string; message: string }>;
+  };
+};

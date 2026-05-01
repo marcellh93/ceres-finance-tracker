@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MovementsFilterBar } from './MovementsFilterBar';
+import { MovementsFilterBar, buildTypeFilterParams } from './MovementsFilterBar';
 
 const mockFetch = vi.fn();
 
@@ -65,5 +65,55 @@ describe('MovementsFilterBar', () => {
     await waitFor(() => {
       expect(getSearch()).toBe('');
     });
+  });
+});
+
+describe('MovementsFilterBar — type filter', () => {
+  it('shows "All" text in trigger when no type param is set', () => {
+    renderBar('/movements');
+    expect(screen.getByText('All')).toBeInTheDocument();
+  });
+
+  it('shows "Transactions" in trigger when ?type=transaction', () => {
+    renderBar('/movements?type=transaction');
+    expect(screen.getByText('Transactions')).toBeInTheDocument();
+  });
+
+  it('shows "Transfers" in trigger when ?type=transfer', () => {
+    renderBar('/movements?type=transfer');
+    expect(screen.getByText('Transfers')).toBeInTheDocument();
+  });
+
+  it('shows "Liability payments" in trigger when ?type=liabilitypayment', () => {
+    renderBar('/movements?type=liabilitypayment');
+    expect(screen.getByText('Liability payments')).toBeInTheDocument();
+  });
+
+  it('renders the Clear button when only ?type is set', async () => {
+    renderBar('/movements?type=transaction');
+    expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument();
+  });
+});
+
+describe('buildTypeFilterParams', () => {
+  it('sets type param and removes page', () => {
+    const prev = new URLSearchParams('page=2&q=hello');
+    const result = buildTypeFilterParams(prev, 'transaction');
+    expect(result.get('type')).toBe('transaction');
+    expect(result.has('page')).toBe(false);
+    expect(result.get('q')).toBe('hello');
+  });
+
+  it('removes type param when value is null (All selected)', () => {
+    const prev = new URLSearchParams('type=transfer&page=3');
+    const result = buildTypeFilterParams(prev, null);
+    expect(result.has('type')).toBe(false);
+    expect(result.has('page')).toBe(false);
+  });
+
+  it('does not mutate the original URLSearchParams', () => {
+    const prev = new URLSearchParams('type=transfer');
+    buildTypeFilterParams(prev, null);
+    expect(prev.get('type')).toBe('transfer');
   });
 });

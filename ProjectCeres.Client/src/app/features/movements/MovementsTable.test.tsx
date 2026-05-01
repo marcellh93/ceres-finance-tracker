@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { MovementsTable } from './MovementsTable';
 import type { MovementListItemDto } from './movements-api';
@@ -26,9 +27,17 @@ const items: MovementListItemDto[] = [
   },
 ];
 
+function renderTable(onRefetch = vi.fn()) {
+  render(
+    <MemoryRouter>
+      <MovementsTable items={items} onRefetch={onRefetch} />
+    </MemoryRouter>,
+  );
+}
+
 describe('MovementsTable', () => {
   it('renders all rows with badges', () => {
-    render(<MovementsTable items={items} />);
+    renderTable();
     expect(screen.getByText('Transaction')).toBeInTheDocument();
     expect(screen.getByText('Transfer')).toBeInTheDocument();
     expect(screen.getByText('Liability Payment')).toBeInTheDocument();
@@ -37,12 +46,18 @@ describe('MovementsTable', () => {
   });
 
   it('renders transfer arrow between source and destination', () => {
-    render(<MovementsTable items={items} />);
+    renderTable();
     expect(screen.getByText(/Checking.*→.*Savings/)).toBeInTheDocument();
   });
 
   it('renders liability payment arrow between asset and liability', () => {
-    render(<MovementsTable items={items} />);
+    renderTable();
     expect(screen.getByText(/Checking.*→.*Credit Card/)).toBeInTheDocument();
+  });
+
+  it('renders a row-actions trigger button for each row', () => {
+    renderTable();
+    const triggers = screen.getAllByRole('button', { name: /row actions/i });
+    expect(triggers).toHaveLength(items.length);
   });
 });

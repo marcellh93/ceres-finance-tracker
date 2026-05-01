@@ -34,4 +34,24 @@ describe('App routes', () => {
       expect(heading).toBeDefined();
     });
   }
+
+  it('renders the Movement Create page at /movements/new?type=transaction', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements/new?type=transaction']}>
+        <App />
+      </MemoryRouter>,
+    );
+    // MovementCreate renders the form when ?type= is set; Save is the form's primary action.
+    expect(screen.getByRole('button', { name: /save/i })).toBeDefined();
+  });
+
+  it('renders the Movement Edit page at /movements/:id/edit', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements/some-id/edit']}>
+        <App />
+      </MemoryRouter>,
+    );
+    // MovementEdit fetches the discriminator on mount; the loading state renders first
+    expect(screen.getByText(/loading…/i)).toBeDefined();
+  });
 });

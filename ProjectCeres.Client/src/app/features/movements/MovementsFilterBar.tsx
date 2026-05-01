@@ -7,6 +7,15 @@ import { useApi } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
 import { ACCOUNTS_ACTIVE_URL, type AccountOptionDto } from './movements-api';
 import { AccountCombobox } from '../../components/AccountCombobox';
+import { TypeFilterCombobox, type TypeFilterValue } from './TypeFilterCombobox';
+
+export function buildTypeFilterParams(prev: URLSearchParams, value: string | null): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  if (value) next.set('type', value);
+  else next.delete('type');
+  next.delete('page');
+  return next;
+}
 
 export function MovementsFilterBar() {
   const [params, setParams] = useSearchParams();
@@ -34,7 +43,7 @@ export function MovementsFilterBar() {
     setParams(next, { replace: true });
   }
 
-  const hasFilters = ['q', 'accountId', 'from', 'to'].some((k) => params.get(k));
+  const hasFilters = ['q', 'accountId', 'from', 'to', 'type'].some((k) => params.get(k));
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -54,6 +63,16 @@ export function MovementsFilterBar() {
           value={params.get('accountId')}
           onChange={(id) => setParam('accountId', id)}
           placeholder="All accounts"
+        />
+      </div>
+      <div className="space-y-1.5 sm:w-44">
+        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Type</div>
+        <TypeFilterCombobox
+          id="mov-type"
+          value={(params.get('type') as TypeFilterValue | null) ?? 'all'}
+          onChange={(v) => {
+            setParams(buildTypeFilterParams(params, v === 'all' ? null : v), { replace: true });
+          }}
         />
       </div>
       <div className="space-y-1.5">
