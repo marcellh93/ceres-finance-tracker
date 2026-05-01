@@ -139,17 +139,17 @@ export function MovementCreate() {
 
   if (!movementType) return null;
 
+  const dropzone = movementType !== 'LiabilityPayment' ? (
+    <AttachmentDropzone
+      mode="create"
+      parentType={movementType as 'Transaction' | 'Transfer'}
+      onPendingChange={setPendingAttachments}
+      embedded
+    />
+  ) : null;
+
   return (
     <div className="space-y-6">
-      {movementType !== 'LiabilityPayment' && (
-        <AttachmentDropzone
-          mode="create"
-          parentType={movementType as 'Transaction' | 'Transfer'}
-          onPendingChange={setPendingAttachments}
-          className="mx-auto max-w-3xl"
-        />
-      )}
-
       <MovementForm
         type={movementType}
         mode="create"
@@ -158,6 +158,7 @@ export function MovementCreate() {
         categories={categories ?? []}
         onSubmit={onSubmit}
         onCancel={() => navigate('/movements')}
+        attachmentsSlot={dropzone}
       />
     </div>
   );

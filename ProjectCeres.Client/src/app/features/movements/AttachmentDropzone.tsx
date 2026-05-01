@@ -39,6 +39,12 @@ type AttachmentDropzoneProps = {
   description?: string;
   /** Outer container class — lets the parent decide max-width / spacing. */
   className?: string;
+  /**
+   * When true, the component renders without its own card chrome (no
+   * border, no bg-card, no padding) so it can sit inside another card
+   * such as MovementForm without nested-card visual noise.
+   */
+  embedded?: boolean;
 };
 
 type PendingUpload = {
@@ -78,6 +84,7 @@ export function AttachmentDropzone({
   title = 'Receipts',
   description,
   className,
+  embedded = false,
 }: AttachmentDropzoneProps) {
   // Defensive runtime guard — see component contract.
   if ((parentType as string) === 'LiabilityPayment') {
@@ -188,7 +195,9 @@ export function AttachmentDropzone({
   }
 
   const containerClass = [
-    'rounded-lg border border-border bg-card p-4 space-y-3',
+    embedded
+      ? 'space-y-3'
+      : 'rounded-lg border border-border bg-card p-4 space-y-3',
     className ?? '',
   ]
     .filter(Boolean)
@@ -260,7 +269,7 @@ export function AttachmentDropzone({
       </div>
 
       {showList && (
-        <ul className="divide-y rounded-md border">
+        <ul className="divide-y rounded-md border max-h-72 overflow-y-auto">
           {attachments.map((a) => {
             const uploadedAt = formatDate(a.uploadedAt);
             return (

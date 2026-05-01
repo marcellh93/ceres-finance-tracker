@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CheckCheck, Download } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -110,21 +111,25 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <Button
-        variant="outline"
-        className="gap-2"
-        render={
-          <a
-            href={exportHref}
-            download
-            rel="noopener"
-            onClick={handleExportClick}
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </a>
-        }
-      />
+      {/*
+        Plain <a download> (NOT wrapped in base-ui Button). base-ui's
+        useButton hook merges its own onClick handlers and adds button
+        machinery via mergeProps; that interferes with the browser
+        treating the click as a first-class navigation gesture, which
+        is what fires the macOS / Chromium download-flying animation.
+        Styled via buttonVariants directly so the visual matches the
+        Mark visible cleared button.
+      */}
+      <a
+        href={exportHref}
+        download
+        rel="noopener"
+        onClick={handleExportClick}
+        className={cn(buttonVariants({ variant: 'outline' }), 'gap-2 no-underline')}
+      >
+        <Download className="h-4 w-4" />
+        Export CSV
+      </a>
 
 
       <AlertDialog open={open} onOpenChange={setOpen}>

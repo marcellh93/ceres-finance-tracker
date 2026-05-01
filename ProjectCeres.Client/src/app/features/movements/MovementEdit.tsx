@@ -257,18 +257,19 @@ function MovementEditInner({
         ? (typedData as TransferEditDto).attachments ?? []
         : [];
 
+  const dropzone = showDropzone ? (
+    <AttachmentDropzone
+      mode="edit"
+      parentType={movementType as 'Transaction' | 'Transfer'}
+      parentId={id}
+      initialAttachments={dropzoneInitialAttachments}
+      pendingFiles={pendingFiles}
+      embedded
+    />
+  ) : null;
+
   return (
     <div className="space-y-6">
-      {showDropzone && (
-        <AttachmentDropzone
-          mode="edit"
-          parentType={movementType as 'Transaction' | 'Transfer'}
-          parentId={id}
-          initialAttachments={dropzoneInitialAttachments}
-          pendingFiles={pendingFiles}
-          className="mx-auto max-w-3xl"
-        />
-      )}
       <MovementForm
         type={movementType}
         mode="edit"
@@ -278,6 +279,7 @@ function MovementEditInner({
         onSubmit={onSubmit}
         onDelete={onDelete}
         onCancel={() => navigate(buildMovementsListPath(initialValues, accounts ?? []))}
+        attachmentsSlot={dropzone}
       />
     </div>
   );

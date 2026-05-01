@@ -65,6 +65,14 @@ export type MovementFormProps = {
   onCancel: () => void;
   /** Edit mode only — renders the danger-zone Delete button. */
   onDelete?: () => void;
+  /**
+   * Optional slot rendered as the last section inside the form, right
+   * after Description and before the Status block. Used for the
+   * Receipts/AttachmentDropzone so the file list lives inside the form's
+   * own scroll context instead of pushing the form around when many
+   * files are attached.
+   */
+  attachmentsSlot?: React.ReactNode;
 };
 
 // ---------- helpers ----------
@@ -138,6 +146,7 @@ export function MovementForm({
   onSubmit,
   onCancel,
   onDelete,
+  attachmentsSlot,
 }: MovementFormProps) {
   const [values, setValues] = useState<MovementFormValues>(initialValues);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -208,6 +217,23 @@ export function MovementForm({
     e.preventDefault();
     setSubmitting(true);
     setErrors({});
+
+    // Client-side guard: a transfer must move money between two different
+    // accounts. Caught before the network round-trip so the user gets
+    // immediate feedback. Server enforces the same rule in TransferService.
+    if (
+      type === 'Transfer' &&
+      values.sourceAccountId &&
+      values.destAccountId &&
+      values.sourceAccountId === values.destAccountId
+    ) {
+      setErrors({
+        destAccountId: 'Destination must be different from the source account.',
+      });
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const result = await onSubmit(values);
       if (!result.ok) {
@@ -223,9 +249,12 @@ export function MovementForm({
 
   // Render the Amount input — or a Skeleton while settings load,
   // since the field's behavior depends on the user's number format.
+  // The Skeleton carries the id so the Amount label's htmlFor stays valid
+  // during the loading window (otherwise the browser flags an
+  // unresolved <label for=…>).
   const amountInput =
     numberFormat === undefined ? (
-      <Skeleton className="h-8 w-full" />
+      <Skeleton id="mf-amount" className="h-8 w-full" />
     ) : (
       <InputGroup>
         {symbol && (
@@ -266,6 +295,11 @@ export function MovementForm({
       );
     }
     if (type === 'Transfer') {
+      // Source and destination must be different accounts. Each combobox
+      // hides the OTHER field's currently-selected account so the user
+      // can't pick the same one twice. The server enforces the same rule
+      // (TransferService.ValidateSourceAndDestDifferent), this is just
+      // belt-and-braces UX.
       return (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Source account" error={errors.sourceAccountId}>
@@ -274,6 +308,7 @@ export function MovementForm({
               value={values.sourceAccountId}
               onChange={(id) => set('sourceAccountId', id)}
               placeholder="Select source"
+              filter={(a) => a.id !== values.destAccountId}
             />
           </Field>
           <Field label="Destination account" error={errors.destAccountId}>
@@ -282,6 +317,7 @@ export function MovementForm({
               value={values.destAccountId}
               onChange={(id) => set('destAccountId', id)}
               placeholder="Select destination"
+              filter={(a) => a.id !== values.sourceAccountId}
             />
           </Field>
         </div>
@@ -372,6 +408,8 @@ export function MovementForm({
             onChange={(e) => set('description', e.target.value)}
           />
         </Field>
+
+        {attachmentsSlot}
 
         <Separator className="my-2" />
 

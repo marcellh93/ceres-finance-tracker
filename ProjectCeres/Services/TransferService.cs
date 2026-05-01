@@ -23,6 +23,7 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
 
     public async Task<Transfer> CreateAsync(TransferCreateViewModel vm)
     {
+        ValidateSourceAndDestDifferent(vm.SourceAccountId!.Value, vm.DestAccountId!.Value);
         await ValidateSameCurrencyAsync(vm.SourceAccountId!.Value, vm.DestAccountId!.Value);
         await ValidateNotBeforeOpeningBalanceAsync(vm.SourceAccountId!.Value, vm.DestAccountId!.Value, vm.Date);
 
@@ -47,6 +48,7 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
         var transfer = await db.Transfers.FindAsync(vm.Id)
             ?? throw new InvalidOperationException($"Transfer {vm.Id} not found.");
 
+        ValidateSourceAndDestDifferent(vm.SourceAccountId!.Value, vm.DestAccountId!.Value);
         await ValidateSameCurrencyAsync(vm.SourceAccountId!.Value, vm.DestAccountId!.Value);
         await ValidateNotBeforeOpeningBalanceAsync(vm.SourceAccountId!.Value, vm.DestAccountId!.Value, vm.Date);
 
@@ -85,6 +87,12 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
             query = query.Where(t => t.SourceAccount.Currency.Code == currency);
         var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.IsCleared, true));
         return rowsAffected;
+    }
+
+    private static void ValidateSourceAndDestDifferent(Guid sourceId, Guid destId)
+    {
+        if (sourceId == destId)
+            throw new InvalidOperationException("Source and destination accounts must be different.");
     }
 
     private async Task ValidateNotBeforeOpeningBalanceAsync(Guid sourceId, Guid destId, DateOnly date)
