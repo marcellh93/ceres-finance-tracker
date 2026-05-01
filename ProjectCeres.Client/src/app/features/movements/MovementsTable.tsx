@@ -4,6 +4,7 @@ import { MovementClearedToggle } from './MovementClearedToggle';
 import { MovementRowMenu } from './MovementRowMenu';
 import type { MovementListItemDto, MovementType } from './movements-api';
 import { formatNumberForDisplay } from '../../lib/amount-format';
+import { formatDate } from '../../lib/date-format';
 import { useSettings } from '../../lib/use-settings';
 
 type Props = { items: MovementListItemDto[]; onRefetch: () => void };
@@ -14,16 +15,14 @@ const typeLabel: Record<MovementType, string> = {
   LiabilityPayment: 'Liability Payment',
 };
 
-function formatDate(yyyyMmDd: string): string {
-  const [y, m, d] = yyyyMmDd.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString();
-}
-
 function amountColor(item: MovementListItemDto): string {
   if (item.movementType === 'Transaction') {
     if (item.categoryTypeName === 'Income') return 'text-success';
     if (item.categoryTypeName === 'Expense') return 'text-destructive';
+    return 'text-foreground';
   }
+  if (item.movementType === 'Transfer') return 'text-chart-6';
+  if (item.movementType === 'LiabilityPayment') return 'text-chart-7';
   return 'text-foreground';
 }
 
@@ -32,6 +31,7 @@ export function MovementsTable({ items, onRefetch }: Props) {
   // Fall back to period_decimal until settings load — same default the
   // useSettings error path uses.
   const numberFormat = settings.data?.numberFormat ?? 'period_decimal';
+  const dateFormat = settings.data?.dateFormat;
 
   return (
     <div className="rounded-md border border-border overflow-x-auto">
@@ -55,7 +55,7 @@ export function MovementsTable({ items, onRefetch }: Props) {
               className="border-t border-border"
               style={{ viewTransitionName: `movement-row-${item.id}` }}
             >
-              <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.date)}</td>
+              <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.date, dateFormat)}</td>
               <td className="px-3 py-2">
                 {item.movementType === 'Transaction' && (
                   <Badge variant="info">{typeLabel.Transaction}</Badge>
