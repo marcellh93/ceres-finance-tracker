@@ -9,5 +9,6 @@ public interface IMovementExportService
         DateOnly? from,
         DateOnly? to,
         string? q,
-        MovementType? type);
+        MovementType? type,
+        string? currency);
 }

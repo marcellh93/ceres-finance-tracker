@@ -25,6 +25,7 @@ public class MovementsApiController(
         [FromQuery] DateOnly? from = null,
         [FromQuery] DateOnly? to = null,
         [FromQuery] string? type = null,
+        [FromQuery] string? currency = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
@@ -37,8 +38,8 @@ public class MovementsApiController(
 
         var offset = (page - 1) * pageSize;
 
-        var items = await movementService.GetRecentAsync(accountId, from, to, pageSize, offset, q, typedFilter);
-        var total = await movementService.CountAsync(accountId, from, to, q, typedFilter);
+        var items = await movementService.GetRecentAsync(accountId, from, to, pageSize, offset, q, typedFilter, currency);
+        var total = await movementService.CountAsync(accountId, from, to, q, typedFilter, currency);
 
         var dtoItems = items.Select(MapToDto).ToList();
 
@@ -89,11 +90,11 @@ public class MovementsApiController(
 
         var total = 0;
         if (typedFilter is null or MovementType.Transaction)
-            total += await transactionService.BulkMarkClearedAsync(request.From, request.To, request.AccountId);
+            total += await transactionService.BulkMarkClearedAsync(request.From, request.To, request.AccountId, request.Currency);
         if (typedFilter is null or MovementType.Transfer)
-            total += await transferService.BulkMarkClearedAsync(request.From, request.To, request.AccountId);
+            total += await transferService.BulkMarkClearedAsync(request.From, request.To, request.AccountId, request.Currency);
         if (typedFilter is null or MovementType.LiabilityPayment)
-            total += await liabilityPaymentService.BulkMarkClearedAsync(request.From, request.To, request.AccountId);
+            total += await liabilityPaymentService.BulkMarkClearedAsync(request.From, request.To, request.AccountId, request.Currency);
 
         return Ok(new { cleared = total });
     }
@@ -122,12 +123,13 @@ public class MovementsApiController(
         [FromQuery] Guid? accountId = null,
         [FromQuery] DateOnly? from = null,
         [FromQuery] DateOnly? to = null,
-        [FromQuery] string? type = null)
+        [FromQuery] string? type = null,
+        [FromQuery] string? currency = null)
     {
         var (typedFilter, error) = ParseType(type);
         if (error is not null) return error;
 
-        var csv = await exportService.BuildCsvAsync(accountId, from, to, q, typedFilter);
+        var csv = await exportService.BuildCsvAsync(accountId, from, to, q, typedFilter, currency);
 
         // UTF-8 BOM so Excel/Numbers on macOS render the € symbol (and other
         // multibyte glyphs) correctly instead of misinterpreting the file as MacRoman.
@@ -137,14 +139,17 @@ public class MovementsApiController(
         var accountName = accountId is { } id
             ? await db.Accounts.Where(a => a.Id == id).Select(a => a.Name).FirstOrDefaultAsync()
             : null;
-        var fileName = BuildExportFileName(accountName, type, from, to);
+        var fileName = BuildExportFileName(accountName, type, from, to, currency);
 
         return File(bytes, "text/csv; charset=utf-8", fileName);
     }
 
-    private static string BuildExportFileName(string? accountName, string? type, DateOnly? from, DateOnly? to)
+    private static string BuildExportFileName(string? accountName, string? type, DateOnly? from, DateOnly? to, string? currency)
     {
         var parts = new List<string> { "movements" };
+
+        if (!string.IsNullOrWhiteSpace(currency))
+            parts.Add(currency.ToLowerInvariant());
 
         if (!string.IsNullOrWhiteSpace(type))
         {

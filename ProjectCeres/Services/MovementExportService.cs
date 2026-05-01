@@ -11,10 +11,11 @@ public class MovementExportService(IMovementService movementService) : IMovement
         DateOnly? from,
         DateOnly? to,
         string? q,
-        MovementType? type)
+        MovementType? type,
+        string? currency)
     {
         // Pull the entire matching set; no pagination.
-        var rows = await movementService.GetRecentAsync(accountId, from, to, int.MaxValue, 0, q, type);
+        var rows = await movementService.GetRecentAsync(accountId, from, to, int.MaxValue, 0, q, type, currency);
 
         var sb = new StringBuilder();
         sb.AppendLine("Date,Type,Amount,Currency,Account,Counterparty,Category,Description,Cleared");

@@ -21,16 +21,17 @@ public class MovementService : IMovementService
         int limit = 50,
         int offset = 0,
         string? q = null,
-        MovementType? type = null)
+        MovementType? type = null,
+        string? currency = null)
     {
         var transactions = type is null or MovementType.Transaction
-            ? await QueryTransactions(accountId, from, to, q)
+            ? await QueryTransactions(accountId, from, to, q, currency)
             : new List<MovementListItemViewModel>();
         var transfers = type is null or MovementType.Transfer
-            ? await QueryTransfers(accountId, from, to, q)
+            ? await QueryTransfers(accountId, from, to, q, currency)
             : new List<MovementListItemViewModel>();
         var payments = type is null or MovementType.LiabilityPayment
-            ? await QueryLiabilityPayments(accountId, from, to, q)
+            ? await QueryLiabilityPayments(accountId, from, to, q, currency)
             : new List<MovementListItemViewModel>();
 
         return transactions
@@ -48,14 +49,15 @@ public class MovementService : IMovementService
         DateOnly? from = null,
         DateOnly? to = null,
         string? q = null,
-        MovementType? type = null)
+        MovementType? type = null,
+        string? currency = null)
     {
         var t = type is null or MovementType.Transaction
-            ? (await QueryTransactions(accountId, from, to, q)).Count : 0;
+            ? (await QueryTransactions(accountId, from, to, q, currency)).Count : 0;
         var tr = type is null or MovementType.Transfer
-            ? (await QueryTransfers(accountId, from, to, q)).Count : 0;
+            ? (await QueryTransfers(accountId, from, to, q, currency)).Count : 0;
         var lp = type is null or MovementType.LiabilityPayment
-            ? (await QueryLiabilityPayments(accountId, from, to, q)).Count : 0;
+            ? (await QueryLiabilityPayments(accountId, from, to, q, currency)).Count : 0;
         return t + tr + lp;
     }
 
@@ -72,7 +74,7 @@ public class MovementService : IMovementService
     // -------------------------------------------------------------------------
 
     private async Task<List<MovementListItemViewModel>> QueryTransactions(
-        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
+        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null, string? currency = null)
     {
         var query = _db.Transactions
             .Include(t => t.Account).ThenInclude(a => a.Currency)
@@ -85,6 +87,8 @@ public class MovementService : IMovementService
             query = query.Where(t => t.Date >= from.Value);
         if (to.HasValue)
             query = query.Where(t => t.Date <= to.Value);
+        if (!string.IsNullOrWhiteSpace(currency))
+            query = query.Where(t => t.Account.Currency.Code == currency);
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(t =>
                 EF.Functions.ILike(t.Description ?? "", $"%{q}%") ||
@@ -109,7 +113,7 @@ public class MovementService : IMovementService
     }
 
     private async Task<List<MovementListItemViewModel>> QueryTransfers(
-        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
+        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null, string? currency = null)
     {
         var query = _db.Transfers
             .Include(t => t.SourceAccount).ThenInclude(a => a.Currency)
@@ -122,6 +126,8 @@ public class MovementService : IMovementService
             query = query.Where(t => t.Date >= from.Value);
         if (to.HasValue)
             query = query.Where(t => t.Date <= to.Value);
+        if (!string.IsNullOrWhiteSpace(currency))
+            query = query.Where(t => t.SourceAccount.Currency.Code == currency);
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(t => EF.Functions.ILike(t.Description ?? "", $"%{q}%"));
 
@@ -143,7 +149,7 @@ public class MovementService : IMovementService
     }
 
     private async Task<List<MovementListItemViewModel>> QueryLiabilityPayments(
-        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
+        Guid? accountId, DateOnly? from, DateOnly? to, string? q = null, string? currency = null)
     {
         var query = _db.LiabilityPayments
             .Include(p => p.AssetAccount).ThenInclude(a => a.Currency)
@@ -156,6 +162,8 @@ public class MovementService : IMovementService
             query = query.Where(p => p.Date >= from.Value);
         if (to.HasValue)
             query = query.Where(p => p.Date <= to.Value);
+        if (!string.IsNullOrWhiteSpace(currency))
+            query = query.Where(p => p.AssetAccount.Currency.Code == currency);
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(p => EF.Functions.ILike(p.Description ?? "", $"%{q}%"));
 

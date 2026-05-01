@@ -256,13 +256,15 @@ public class TransactionService(
         await db.SaveChangesAsync();
     }
 
-    public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null)
+    public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null, string? currency = null)
     {
         var query = db.Transactions
             .Where(t => t.Date >= from && t.Date <= to && !t.Category.IsSystem && !t.IsCleared);
 
         if (accountId.HasValue)
             query = query.Where(t => t.AccountId == accountId.Value);
+        if (!string.IsNullOrWhiteSpace(currency))
+            query = query.Where(t => t.Account.Currency.Code == currency);
 
         var rowsAffected = await query.ExecuteUpdateAsync(s => s.SetProperty(t => t.IsCleared, true));
         return rowsAffected;

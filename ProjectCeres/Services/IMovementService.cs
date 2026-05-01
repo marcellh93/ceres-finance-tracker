@@ -12,14 +12,16 @@ public interface IMovementService
         int limit = 50,
         int offset = 0,
         string? q = null,
-        MovementType? type = null);
+        MovementType? type = null,
+        string? currency = null);
 
     Task<int> CountAsync(
         Guid? accountId = null,
         DateOnly? from = null,
         DateOnly? to = null,
         string? q = null,
-        MovementType? type = null);
+        MovementType? type = null,
+        string? currency = null);
 
     Task<MovementType?> GetTypeAsync(Guid id);
 }

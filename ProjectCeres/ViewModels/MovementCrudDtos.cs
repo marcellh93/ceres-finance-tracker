@@ -121,4 +121,6 @@ public class BulkClearedRequest
     public Guid?  AccountId { get; set; }
     /// <summary>"transaction" | "transfer" | "liabilitypayment" | null (all).</summary>
     public string? Type { get; set; }
+    /// <summary>ISO currency code (e.g. "EUR"). Narrows the bulk update to that currency.</summary>
+    public string? Currency { get; set; }
 }
