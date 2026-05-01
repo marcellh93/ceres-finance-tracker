@@ -165,7 +165,9 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
         decimal laterBills = laterRecurring.Sum(r => r.EstimatedAmount ?? 0m);
 
-        // Budget reserve = SUM(MAX(0, limit − actual spend this month)) per active CategoryBudget.
+        // Budget reserve = SUM(MAX(0, limit − actual spend this PERIOD)) per active CategoryBudget.
+        // Uses BudgetPeriod helper so the cycle respects Settings.BudgetPeriodStartDay,
+        // not the calendar month.
         var activeBudgets = await db.CategoryBudgets
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
             .ToListAsync();
@@ -173,10 +175,15 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         decimal budgetReserve = 0m;
         if (activeBudgets.Count > 0)
         {
+            var settings = await db.Settings.FirstOrDefaultAsync()
+                ?? throw new InvalidOperationException("Settings row missing.");
+            var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
+            var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+
             var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
             var actualSpendByCategory = await db.Transactions
-                .Where(t => t.Date >= firstDay
-                         && t.Date <= today
+                .Where(t => t.Date >= periodStart
+                         && t.Date <= periodEnd
                          && budgetCategoryIds.Contains(t.CategoryId)
                          && t.Account.CurrencyId == currencyId)
                 .GroupBy(t => t.CategoryId)
