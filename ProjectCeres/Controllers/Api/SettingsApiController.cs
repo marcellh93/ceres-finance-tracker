@@ -13,10 +13,11 @@ public class SettingsApiController(ISettingsService settingsService) : Controlle
     {
         var settings = await settingsService.GetAsync();
         var dto = new SettingsDto(
-            NumberFormat:          settings.NumberFormat,
-            DateFormat:            settings.DateFormat,
-            DefaultCurrencyCode:   settings.DefaultCurrency.Code,
-            DefaultCurrencySymbol: settings.DefaultCurrency.Symbol);
+            NumberFormat:           settings.NumberFormat,
+            DateFormat:             settings.DateFormat,
+            DefaultCurrencyCode:    settings.DefaultCurrency.Code,
+            DefaultCurrencySymbol:  settings.DefaultCurrency.Symbol,
+            BudgetPeriodStartDay:   settings.BudgetPeriodStartDay);
         return Ok(dto);
     }
 }

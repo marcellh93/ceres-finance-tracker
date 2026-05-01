@@ -15,9 +15,10 @@ public class SettingsController(ISettingsService settingsService, AppDbContext d
 
         var vm = new SettingsEditViewModel
         {
-            NumberFormat      = settings.NumberFormat,
-            DateFormat        = settings.DateFormat,
-            DefaultCurrencyId = settings.DefaultCurrencyId
+            NumberFormat         = settings.NumberFormat,
+            DateFormat           = settings.DateFormat,
+            DefaultCurrencyId    = settings.DefaultCurrencyId,
+            BudgetPeriodStartDay = settings.BudgetPeriodStartDay
         };
 
         await PopulateViewBagAsync();

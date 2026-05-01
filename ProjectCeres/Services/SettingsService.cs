@@ -29,15 +29,18 @@ public class SettingsService(AppDbContext db) : ISettingsService
         var isNew    = existing is null;
         var settings = existing ?? CreateDefaults();
 
-        settings.NumberFormat      = vm.NumberFormat;
-        settings.DateFormat        = vm.DateFormat;
-        settings.DefaultCurrencyId = vm.DefaultCurrencyId!.Value;
+        settings.NumberFormat         = vm.NumberFormat;
+        settings.DateFormat           = vm.DateFormat;
+        settings.DefaultCurrencyId    = vm.DefaultCurrencyId!.Value;
+        settings.BudgetPeriodStartDay = ClampStartDay(vm.BudgetPeriodStartDay);
 
         if (isNew)
             db.Settings.Add(settings);
 
         await db.SaveChangesAsync();
     }
+
+    private static int ClampStartDay(int value) => value < 1 ? 1 : value > 31 ? 31 : value;
 
     public async Task EnsureExistsAsync()
     {
@@ -50,9 +53,10 @@ public class SettingsService(AppDbContext db) : ISettingsService
 
     private static Settings CreateDefaults() => new()
     {
-        Id                = 1,
-        NumberFormat      = "comma_decimal",
-        DateFormat        = "DD/MM/YYYY",
-        DefaultCurrencyId = 1
+        Id                   = 1,
+        NumberFormat         = "comma_decimal",
+        DateFormat           = "DD/MM/YYYY",
+        DefaultCurrencyId    = 1,
+        BudgetPeriodStartDay = 1
     };
 }

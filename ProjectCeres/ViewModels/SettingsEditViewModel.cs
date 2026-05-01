@@ -15,4 +15,8 @@ public class SettingsEditViewModel
 [Required(ErrorMessage = "Please select a default currency.")]
     [Display(Name = "Default Currency")]
     public int? DefaultCurrencyId { get; set; }
+
+    [Range(1, 31, ErrorMessage = "Budget period start day must be between 1 and 31.")]
+    [Display(Name = "Budget Period Start Day")]
+    public int BudgetPeriodStartDay { get; set; } = 1;
 }
