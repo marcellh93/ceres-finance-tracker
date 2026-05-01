@@ -1,0 +1,87 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MovementsBulkActions } from './MovementsBulkActions';
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+const mockFetch = vi.fn();
+
+function renderAt(search: string, totalCount = 5, onAfterBulk = vi.fn()) {
+  return render(
+    <MemoryRouter initialEntries={[`/movements${search}`]}>
+      <MovementsBulkActions totalCount={totalCount} onAfterBulk={onAfterBulk} />
+    </MemoryRouter>,
+  );
+}
+
+beforeEach(() => {
+  global.fetch = mockFetch as unknown as typeof fetch;
+  Object.defineProperty(window, 'location', {
+    writable: true,
+    value: { href: '' },
+  });
+});
+
+afterEach(() => {
+  vi.resetAllMocks();
+});
+
+describe('MovementsBulkActions', () => {
+  it('renders both buttons', () => {
+    renderAt('');
+    expect(screen.getByRole('button', { name: /mark visible cleared/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument();
+  });
+
+  it('disables Mark visible cleared when neither from nor to is in URL params', () => {
+    renderAt('');
+    expect(screen.getByRole('button', { name: /mark visible cleared/i })).toBeDisabled();
+  });
+
+  it('enables Mark visible cleared when at least one date is set; click opens dialog with count', async () => {
+    renderAt('?from=2026-01-01', 7);
+    const btn = screen.getByRole('button', { name: /mark visible cleared/i });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    await waitFor(() => {
+      expect(screen.getByText(/mark 7 movements as cleared\?/i)).toBeInTheDocument();
+    });
+  });
+
+  it('confirming the dialog POSTs to /api/movements/bulk-cleared with the correct body including type', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ cleared: 3 }) });
+    const onAfterBulk = vi.fn();
+    renderAt('?from=2026-01-01&to=2026-01-31&type=transfer&accountId=acc-1', 3, onAfterBulk);
+
+    fireEvent.click(screen.getByRole('button', { name: /mark visible cleared/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^mark cleared$/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^mark cleared$/i }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/movements/bulk-cleared',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    const init = mockFetch.mock.calls[0][1];
+    const body = JSON.parse((init?.body as string) ?? '{}');
+    expect(body).toEqual({
+      from: '2026-01-01',
+      to: '2026-01-31',
+      accountId: 'acc-1',
+      type: 'transfer',
+    });
+    await waitFor(() => expect(onAfterBulk).toHaveBeenCalled());
+  });
+
+  it('Export CSV click sets window.location.href to the export URL with current search', () => {
+    renderAt('?from=2026-01-01&type=transaction');
+    fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
+    expect(window.location.href).toBe('/api/movements/export.csv?from=2026-01-01&type=transaction');
+  });
+});
