@@ -1,219 +1,29 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using ProjectCeres.Data;
 using ProjectCeres.Services;
-using ProjectCeres.ViewModels;
-using ProjectCeres.Models;
 
 namespace ProjectCeres.Controllers;
 
-public class TransfersController(ITransferService transferService, AppDbContext db, IFileAttachmentService attachmentService) : Controller
+public class TransfersController(ITransferService transferService) : Controller
 {
-    public async Task<IActionResult> Index()
-    {
-        var transfers = await transferService.GetAllAsync();
-        return View(transfers);
-    }
+    [HttpGet]
+    public IActionResult Index() => Redirect("/app/movements");
 
-    public async Task<IActionResult> Create()
-    {
-        await PopulateViewBagAsync();
-        return View(new TransferCreateViewModel());
-    }
+    [HttpGet]
+    public IActionResult Create() => Redirect("/app/movements/new?type=transfer");
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(TransferCreateViewModel vm)
-    {
-        if (!ModelState.IsValid)
-        {
-            await PopulateViewBagAsync();
-            return View(vm);
-        }
+    [HttpGet]
+    public IActionResult Edit(Guid id) => Redirect($"/app/movements/{id}/edit");
 
-        if (vm.Attachments is { Count: > 0 })
-        {
-            foreach (var file in vm.Attachments)
-            {
-                try { await attachmentService.ValidateAsync(file); }
-                catch (InvalidOperationException ex)
-                {
-                    ModelState.AddModelError(nameof(vm.Attachments), ex.Message);
-                    await PopulateViewBagAsync();
-                    return View(vm);
-                }
-            }
-        }
-
-        try
-        {
-            var newTransfer = await transferService.CreateAsync(vm);
-
-            if (vm.Attachments is { Count: > 0 })
-            {
-                foreach (var file in vm.Attachments)
-                {
-                    try { await attachmentService.UploadForTransferAsync(newTransfer.Id, file); }
-                    catch (InvalidOperationException ex)
-                    {
-                        TempData["ErrorMessage"] = $"Transfer saved, but '{file.FileName}' could not be uploaded: {ex.Message}";
-                    }
-                }
-            }
-
-            TempData["SuccessMessage"] = "Transfer recorded.";
-            return RedirectToAction(nameof(Index));
-        }
-        catch (InvalidOperationException ex)
-        {
-            ModelState.AddModelError(string.Empty, ex.Message);
-            await PopulateViewBagAsync();
-            return View(vm);
-        }
-    }
-
-    public async Task<IActionResult> Edit(Guid id, string? returnUrl = null)
-    {
-        var transfer = await transferService.GetByIdAsync(id);
-        if (transfer is null) return NotFound();
-
-        var vm = new TransferEditViewModel
-        {
-            Id              = transfer.Id,
-            Date            = transfer.Date,
-            Amount          = transfer.Amount,
-            SourceAccountId = transfer.SourceAccountId,
-            DestAccountId   = transfer.DestAccountId,
-            Description     = transfer.Description,
-            IsCleared       = transfer.IsCleared
-        };
-
-        ViewBag.ReturnUrl   = returnUrl;
-        ViewBag.Attachments = await db.TransferAttachments
-            .Where(a => a.TransferId == id)
-            .OrderBy(a => a.UploadedAt)
-            .ToListAsync();
-        await PopulateViewBagAsync();
-        return View(vm);
-    }
+    [HttpGet]
+    public IActionResult Delete(Guid id) => Redirect($"/app/movements/{id}/edit");
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(TransferEditViewModel vm, string? returnUrl = null)
-    {
-        if (!ModelState.IsValid)
-        {
-            ViewBag.ReturnUrl   = returnUrl;
-            ViewBag.Attachments = await db.TransferAttachments
-                .Where(a => a.TransferId == vm.Id)
-                .OrderBy(a => a.UploadedAt)
-                .ToListAsync();
-            await PopulateViewBagAsync();
-            return View(vm);
-        }
-
-        if (vm.Attachments is { Count: > 0 })
-        {
-            foreach (var file in vm.Attachments)
-            {
-                try { await attachmentService.ValidateAsync(file); }
-                catch (InvalidOperationException ex)
-                {
-                    ModelState.AddModelError(nameof(vm.Attachments), ex.Message);
-                    ViewBag.ReturnUrl = returnUrl;
-                    ViewBag.Attachments = await db.TransferAttachments
-                        .Where(a => a.TransferId == vm.Id)
-                        .OrderBy(a => a.UploadedAt)
-                        .ToListAsync();
-                    await PopulateViewBagAsync();
-                    return View(vm);
-                }
-            }
-        }
-
-        try
-        {
-            await transferService.UpdateAsync(vm);
-
-            if (vm.Attachments is { Count: > 0 })
-            {
-                foreach (var file in vm.Attachments)
-                {
-                    try { await attachmentService.UploadForTransferAsync(vm.Id, file); }
-                    catch (InvalidOperationException ex)
-                    {
-                        TempData["ErrorMessage"] = $"Transfer saved, but '{file.FileName}' could not be uploaded: {ex.Message}";
-                    }
-                }
-            }
-
-            TempData["SuccessMessage"] = "Transfer updated.";
-
-            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-                return Redirect(returnUrl);
-
-            return RedirectToAction(nameof(Index));
-        }
-        catch (InvalidOperationException ex)
-        {
-            ModelState.AddModelError(string.Empty, ex.Message);
-            ViewBag.ReturnUrl   = returnUrl;
-            ViewBag.Attachments = await db.TransferAttachments
-                .Where(a => a.TransferId == vm.Id)
-                .OrderBy(a => a.UploadedAt)
-                .ToListAsync();
-            await PopulateViewBagAsync();
-            return View(vm);
-        }
-    }
-
-    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null)
-    {
-        var transfer = await transferService.GetByIdAsync(id);
-        if (transfer is null) return NotFound();
-        ViewBag.ReturnUrl = returnUrl;
-        return View(transfer);
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id, string? returnUrl = null, string _ = "")
-    {
-        try
-        {
-            await transferService.DeleteAsync(id);
-            TempData["SuccessMessage"] = "Transfer deleted.";
-        }
-        catch (InvalidOperationException ex)
-        {
-            TempData["ErrorMessage"] = ex.Message;
-        }
-
-        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-            return Redirect(returnUrl);
-
-        return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
+    [Obsolete("Use PATCH /api/movements/{id}/cleared")]
     public async Task<IActionResult> ToggleCleared(Guid id, bool cleared)
     {
         try { await transferService.MarkClearedAsync(id, cleared); }
         catch (InvalidOperationException ex) { TempData["ErrorMessage"] = ex.Message; }
         return RedirectToAction(nameof(Index));
-    }
-
-    private async Task PopulateViewBagAsync()
-    {
-        var accounts = await db.Accounts
-            .Where(a => a.IsActive)
-            .Include(a => a.Currency)
-            .OrderBy(a => a.Name)
-            .ToListAsync();
-
-        ViewBag.SourceAccounts = new SelectList(accounts, "Id", "Name");
-        ViewBag.DestAccounts   = new SelectList(accounts, "Id", "Name");
     }
 }
