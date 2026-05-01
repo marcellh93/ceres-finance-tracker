@@ -263,6 +263,11 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var netWorth = totalAssets - totalLiabilities;
 
         // Average monthly expenses over last 6 full calendar months.
+        // Require all 6 calendar months in the window to have at least one
+        // expense transaction. With fewer months of history, dividing by 6
+        // understates the burn rate (e.g., 1 month of €1250 spend reported as
+        // €209/mo) and produces a falsely optimistic runway. Better to show
+        // "needs 6 months of history" than mislead.
         var expenseTransactions = await db.Transactions
             .Where(t => t.Date >= sixStart
                      && t.Date <= sixEnd
@@ -272,6 +277,14 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
 
         if (expenseTransactions.Count == 0)
+            return (null, null);
+
+        var monthsWithExpenses = expenseTransactions
+            .Select(t => new { t.Date.Year, t.Date.Month })
+            .Distinct()
+            .Count();
+
+        if (monthsWithExpenses < 6)
             return (null, null);
 
         var totalExpenses = expenseTransactions.Sum(t => t.Amount);
@@ -315,6 +328,11 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 
         // Prior 6 full calendar months income.
+        // Require all 6 calendar months to have at least one income transaction.
+        // With fewer months of history, comparing a partial current period
+        // against an under-sampled average produces nonsense (e.g., 1 month of
+        // €2000 income reported as €333/mo average, then "this period" sees €0
+        // and reads as -100%). Better to show "needs 6 months of history."
         var priorIncomeTransactions = await db.Transactions
             .Where(t => t.Date >= sixStart
                      && t.Date <= sixEnd
@@ -324,6 +342,14 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
 
         if (priorIncomeTransactions.Count == 0)
+            return (currentPeriodIncome, null, null);
+
+        var monthsWithIncome = priorIncomeTransactions
+            .Select(t => new { t.Date.Year, t.Date.Month })
+            .Distinct()
+            .Count();
+
+        if (monthsWithIncome < 6)
             return (currentPeriodIncome, null, null);
 
         var rollingAverage = priorIncomeTransactions.Sum(t => t.Amount) / 6m;
