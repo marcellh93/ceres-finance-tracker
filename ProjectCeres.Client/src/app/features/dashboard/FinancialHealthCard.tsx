@@ -1,5 +1,7 @@
+import { Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Numeric } from '@/components/Numeric';
 import { EquationRow } from '@/components/EquationRow';
 import { useApi } from '../../lib/use-api';
@@ -37,10 +39,28 @@ export function FinancialHealthCard() {
   );
 }
 
-function PanelLabel({ children }: { children: string }) {
+function PanelLabel({ children, tooltip }: { children: string; tooltip?: string }) {
   return (
-    <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
-      {children}
+    <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
+      <span>{children}</span>
+      {tooltip && (
+        <TooltipProvider delay={200}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={`About ${children}`}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Info className="h-3 w-3" />
+                </button>
+              }
+            />
+            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 }
@@ -52,7 +72,7 @@ function PanelEmpty({ children }: { children: string }) {
 function SpendablePanel({ data }: { data: HealthDto }) {
   return (
     <div>
-      <PanelLabel>Spendable Balance</PanelLabel>
+      <PanelLabel tooltip="What's free to spend right now after accounting for upcoming bills and your category budgets.">Spendable Balance</PanelLabel>
       {data.availableToday === null ? (
         <PanelEmpty>No asset accounts found</PanelEmpty>
       ) : (
@@ -121,7 +141,7 @@ function RunwayPanel({ data }: { data: HealthDto }) {
   const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
-      <PanelLabel>Runway</PanelLabel>
+      <PanelLabel tooltip="How many months your savings would last if you stopped earning. Net worth ÷ average monthly expenses over the last 6 months.">Runway</PanelLabel>
       {data.runwayMonths === null ? (
         <PanelEmpty>Needs 6 months of expense history</PanelEmpty>
       ) : (
@@ -145,7 +165,7 @@ function IncomeDeltaPanel({ data }: { data: HealthDto }) {
   const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
-      <PanelLabel>Income vs. Avg</PanelLabel>
+      <PanelLabel tooltip="Your income this period compared to your 6-month average. Period uses your configured budget cycle start day.">Income vs. Avg</PanelLabel>
       {data.incomeDeltaPercent === null ? (
         <PanelEmpty>Needs 6 months of income history</PanelEmpty>
       ) : (
@@ -156,7 +176,7 @@ function IncomeDeltaPanel({ data }: { data: HealthDto }) {
           {data.currentMonthIncome != null && data.rollingAverageIncome != null && (
             <div className="mt-1 text-xs text-muted-foreground">
               <Numeric>{sym} {data.currentMonthIncome.toFixed(0)}</Numeric>
-              {' vs '}
+              {' this period vs '}
               <Numeric>{sym} {data.rollingAverageIncome.toFixed(0)}</Numeric>
               {' avg'}
             </div>
@@ -171,7 +191,7 @@ function BurnRatePanel({ data }: { data: HealthDto }) {
   const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
-      <PanelLabel>Budget Burn Rate</PanelLabel>
+      <PanelLabel tooltip="How much of your active category budgets you've spent in the current period.">Budget Burn Rate</PanelLabel>
       {data.budgetBurnRate === null ? (
         <PanelEmpty>No active category budgets</PanelEmpty>
       ) : (

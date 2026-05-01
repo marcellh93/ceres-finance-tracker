@@ -285,28 +285,36 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
     /// <summary>
     /// Income metrics:
-    ///   rollingAverage  = avg monthly income over last 6 full months
-    ///   currentMonth    = income so far this calendar month
-    ///   deltaPercent    = (currentMonth − rollingAverage) / rollingAverage
+    ///   currentPeriodIncome = income for the period containing today, per Settings.BudgetPeriodStartDay
+    ///   rollingAverage      = avg monthly income over last 6 full CALENDAR months (not period-aligned)
+    ///   deltaPercent        = (currentPeriodIncome − rollingAverage) / rollingAverage
     /// All values are null if no income exists in the prior 6 months (rollingAverage = 0).
     /// </summary>
     private async Task<(decimal? currentMonth, decimal? rollingAverage, decimal? deltaPercent)> GetIncomeMetricsAsync(int currencyId)
     {
-        var today    = DateOnly.FromDateTime(DateTime.Today);
-        var mtdFrom  = new DateOnly(today.Year, today.Month, 1);
-        var sixStart = mtdFrom.AddMonths(-6);
-        var sixEnd   = mtdFrom.AddDays(-1);
+        var today = DateOnly.FromDateTime(DateTime.Today);
 
-        // Current month income.
-        var currentMonthIncome = await db.Transactions
-            .Where(t => t.Date >= mtdFrom
+        // "Current period" follows the user's configured budget cycle.
+        var settings = await db.Settings.FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("Settings row missing.");
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
+        var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+
+        // 6-month rolling average uses calendar months — averaging needs equal-length samples.
+        var calendarMtdFrom = new DateOnly(today.Year, today.Month, 1);
+        var sixStart = calendarMtdFrom.AddMonths(-6);
+        var sixEnd   = calendarMtdFrom.AddDays(-1);
+
+        // Current period income (covers periodStart through today).
+        var currentPeriodIncome = await db.Transactions
+            .Where(t => t.Date >= periodStart
                      && t.Date <= today
                      && t.Account.CurrencyId == currencyId
                      && t.Category.CategoryType.Name == "Income"
                      && !t.Category.IsSystem)
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 
-        // Prior 6 full months income.
+        // Prior 6 full calendar months income.
         var priorIncomeTransactions = await db.Transactions
             .Where(t => t.Date >= sixStart
                      && t.Date <= sixEnd
@@ -316,16 +324,16 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .ToListAsync();
 
         if (priorIncomeTransactions.Count == 0)
-            return (currentMonthIncome, null, null);
+            return (currentPeriodIncome, null, null);
 
         var rollingAverage = priorIncomeTransactions.Sum(t => t.Amount) / 6m;
 
         if (rollingAverage == 0m)
-            return (currentMonthIncome, 0m, null);
+            return (currentPeriodIncome, 0m, null);
 
-        var deltaPercent = (currentMonthIncome - rollingAverage) / rollingAverage;
+        var deltaPercent = (currentPeriodIncome - rollingAverage) / rollingAverage;
 
-        return (currentMonthIncome, rollingAverage, deltaPercent);
+        return (currentPeriodIncome, rollingAverage, deltaPercent);
     }
 
     /// <summary>
@@ -335,8 +343,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
     /// </summary>
     private async Task<(decimal? burnRate, decimal? spent, decimal? totalLimit)> GetBudgetBurnRateAsync(int currencyId)
     {
-        var today   = DateOnly.FromDateTime(DateTime.Today);
-        var mtdFrom = new DateOnly(today.Year, today.Month, 1);
+        var today = DateOnly.FromDateTime(DateTime.Today);
 
         var activeBudgets = await db.CategoryBudgets
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
@@ -349,12 +356,16 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         if (totalLimit == 0m)
             return (null, null, null);
 
-        // Actual spend this month across all active budget categories.
+        var settings = await db.Settings.FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("Settings row missing.");
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
+        var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+
         var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
 
         var actualSpend = await db.Transactions
-            .Where(t => t.Date >= mtdFrom
-                     && t.Date <= today
+            .Where(t => t.Date >= periodStart
+                     && t.Date <= periodEnd
                      && budgetCategoryIds.Contains(t.CategoryId)
                      && t.Account.CurrencyId == currencyId)
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
