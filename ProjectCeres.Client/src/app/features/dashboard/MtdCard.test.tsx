@@ -20,9 +20,10 @@ describe('MtdCard', () => {
   it('renders income with success color, expenses with destructive color', async () => {
     (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(mockSummary(3200, 1850.45, 0.4217));
     render(<MtdCard />);
-    const income = await screen.findByText(/3200/);
+    // useSettings falls back to 'period_decimal' (US format) without explicit mock.
+    const income = await screen.findByText(/3,200/);
     expect(income.className).toContain('text-success');
-    const expenses = screen.getByText(/1850/);
+    const expenses = screen.getByText(/1,850/);
     expect(expenses.className).toContain('text-destructive');
   });
 

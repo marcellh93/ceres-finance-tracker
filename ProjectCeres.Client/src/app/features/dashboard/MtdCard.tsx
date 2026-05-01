@@ -5,6 +5,8 @@ import { StatTile } from '@/components/StatTile';
 import { Tile } from '@/components/Tile';
 import { useApi } from '../../lib/use-api';
 import { CardError } from '../../components/CardError';
+import { formatNumberForDisplay } from '../../lib/amount-format';
+import { useSettings } from '../../lib/use-settings';
 import { SUMMARY_URL, type SummaryDto } from './api';
 
 function formatPercent(fraction: number): string {
@@ -13,6 +15,8 @@ function formatPercent(fraction: number): string {
 
 export function MtdCard() {
   const { data, error, loading, refetch } = useApi<SummaryDto>(SUMMARY_URL);
+  const settings = useSettings();
+  const numberFormat = settings.data?.numberFormat ?? 'period_decimal';
 
   return (
     <Card>
@@ -37,8 +41,8 @@ export function MtdCard() {
               <StatTile
                 label="Income"
                 value={
-                  <Numeric className="text-2xl text-success">
-                    {data.mtd.currencySymbol} {data.mtd.income.toFixed(2)}
+                  <Numeric className="text-xl text-success whitespace-nowrap">
+                    {data.mtd.currencySymbol} {formatNumberForDisplay(data.mtd.income, numberFormat)}
                   </Numeric>
                 }
               />
@@ -47,8 +51,8 @@ export function MtdCard() {
               <StatTile
                 label="Expenses"
                 value={
-                  <Numeric className="text-2xl text-destructive">
-                    {data.mtd.currencySymbol} {data.mtd.expenses.toFixed(2)}
+                  <Numeric className="text-xl text-destructive whitespace-nowrap">
+                    {data.mtd.currencySymbol} {formatNumberForDisplay(data.mtd.expenses, numberFormat)}
                   </Numeric>
                 }
               />
@@ -56,7 +60,7 @@ export function MtdCard() {
             <Tile>
               <StatTile
                 label="Savings Rate"
-                value={<Numeric className="text-2xl">{formatPercent(data.mtd.savingsRate)}</Numeric>}
+                value={<Numeric className="text-xl whitespace-nowrap">{formatPercent(data.mtd.savingsRate)}</Numeric>}
               />
             </Tile>
           </dl>
