@@ -70,7 +70,19 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
   }
 
   function handleExport() {
-    window.location.href = MOVEMENTS_EXPORT_CSV_URL(searchParams.toString());
+    // A hidden <a download> click (instead of window.location.href) keeps the
+    // current tab on /app/movements and lets the browser fire its native
+    // download chrome — including the macOS flying-file animation toward the
+    // Downloads icon. Empty `download` attr = let the server's
+    // Content-Disposition filename win.
+    const anchor = document.createElement('a');
+    anchor.href = MOVEMENTS_EXPORT_CSV_URL(searchParams.toString());
+    anchor.download = '';
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    toast.success('Exporting movements…');
   }
 
   return (

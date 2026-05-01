@@ -54,7 +54,7 @@ public class MovementExportService(IMovementService movementService) : IMovement
             sb.Append(Csv(counterparty)).Append(',');
             sb.Append(Csv(category)).Append(',');
             sb.Append(Csv(r.Description ?? "")).Append(',');
-            sb.AppendLine(r.IsCleared ? "true" : "false");
+            sb.AppendLine(r.IsCleared ? "Cleared" : "Pending");
         }
         return sb.ToString();
     }

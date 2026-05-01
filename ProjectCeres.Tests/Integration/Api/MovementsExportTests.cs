@@ -48,9 +48,40 @@ public class MovementsExportTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/movements/export.csv?from=2026-04-01&to=2026-04-30&type=transaction");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+        response.Content.Headers.ContentType.CharSet.Should().Be("utf-8");
 
-        var body = await response.Content.ReadAsStringAsync();
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        // UTF-8 BOM (EF BB BF) so Excel/Numbers on macOS render multibyte glyphs correctly.
+        bytes.Take(3).Should().Equal(new byte[] { 0xEF, 0xBB, 0xBF });
+
+        var body = System.Text.Encoding.UTF8.GetString(bytes);
         body.Should().Contain("Date,Type,Amount");
         body.Should().Contain("\"row,with,commas\"");
+        body.Should().NotContain(",true");
+        body.Should().NotContain(",false");
+    }
+
+    [Fact]
+    public async Task Export_FilenameIncludesTypeAndDateRange()
+    {
+        var response = await _client.GetAsync("/api/movements/export.csv?from=2026-04-01&to=2026-04-30&type=transaction");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var disposition = response.Content.Headers.ContentDisposition;
+        disposition.Should().NotBeNull();
+        var fileName = disposition!.FileNameStar ?? disposition.FileName?.Trim('"');
+        fileName.Should().Be("movements_transactions_2026-04-01_2026-04-30.csv");
+    }
+
+    [Fact]
+    public async Task Export_FilenameWithoutFiltersUsesTodayDate()
+    {
+        var response = await _client.GetAsync("/api/movements/export.csv");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var disposition = response.Content.Headers.ContentDisposition;
+        disposition.Should().NotBeNull();
+        var fileName = disposition!.FileNameStar ?? disposition.FileName?.Trim('"');
+        fileName.Should().StartWith("movements_").And.EndWith(".csv");
     }
 }

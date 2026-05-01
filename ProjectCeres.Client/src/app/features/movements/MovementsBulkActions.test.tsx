@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsBulkActions } from './MovementsBulkActions';
+import { toast } from 'sonner';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -19,10 +20,6 @@ function renderAt(search: string, totalCount = 5, onAfterBulk = vi.fn()) {
 
 beforeEach(() => {
   global.fetch = mockFetch as unknown as typeof fetch;
-  Object.defineProperty(window, 'location', {
-    writable: true,
-    value: { href: '' },
-  });
 });
 
 afterEach(() => {
@@ -79,9 +76,25 @@ describe('MovementsBulkActions', () => {
     await waitFor(() => expect(onAfterBulk).toHaveBeenCalled());
   });
 
-  it('Export CSV click sets window.location.href to the export URL with current search', () => {
-    renderAt('?from=2026-01-01&type=transaction');
-    fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
-    expect(window.location.href).toBe('/api/movements/export.csv?from=2026-01-01&type=transaction');
+  it('Export CSV click triggers a hidden anchor download with the current search and shows a toast', () => {
+    const clickedAnchors: HTMLAnchorElement[] = [];
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      clickedAnchors.push(this);
+    };
+
+    try {
+      renderAt('?from=2026-01-01&type=transaction');
+      fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
+
+      expect(clickedAnchors).toHaveLength(1);
+      expect(clickedAnchors[0].getAttribute('href')).toBe(
+        '/api/movements/export.csv?from=2026-01-01&type=transaction',
+      );
+      expect(clickedAnchors[0].hasAttribute('download')).toBe(true);
+      expect(toast.success).toHaveBeenCalledWith('Exporting movements…');
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
   });
 });

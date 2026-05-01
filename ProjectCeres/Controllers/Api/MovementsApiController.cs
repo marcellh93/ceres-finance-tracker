@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
@@ -11,7 +13,8 @@ public class MovementsApiController(
     ITransactionService transactionService,
     ITransferService transferService,
     ILiabilityPaymentService liabilityPaymentService,
-    IMovementExportService exportService) : ControllerBase
+    IMovementExportService exportService,
+    AppDbContext db) : ControllerBase
 {
     public record ClearRequest(string Type, bool Cleared);
 
@@ -125,8 +128,61 @@ public class MovementsApiController(
         if (error is not null) return error;
 
         var csv = await exportService.BuildCsvAsync(accountId, from, to, q, typedFilter);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
-        return File(bytes, "text/csv", "movements.csv");
+
+        // UTF-8 BOM so Excel/Numbers on macOS render the € symbol (and other
+        // multibyte glyphs) correctly instead of misinterpreting the file as MacRoman.
+        var utf8 = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
+        var bytes = utf8.GetPreamble().Concat(utf8.GetBytes(csv)).ToArray();
+
+        var accountName = accountId is { } id
+            ? await db.Accounts.Where(a => a.Id == id).Select(a => a.Name).FirstOrDefaultAsync()
+            : null;
+        var fileName = BuildExportFileName(accountName, type, from, to);
+
+        return File(bytes, "text/csv; charset=utf-8", fileName);
+    }
+
+    private static string BuildExportFileName(string? accountName, string? type, DateOnly? from, DateOnly? to)
+    {
+        var parts = new List<string> { "movements" };
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var typeLabel = type.ToLowerInvariant() switch
+            {
+                "transaction"      => "transactions",
+                "transfer"         => "transfers",
+                "liabilitypayment" => "liability-payments",
+                _                  => null
+            };
+            if (typeLabel is not null) parts.Add(typeLabel);
+        }
+
+        if (!string.IsNullOrWhiteSpace(accountName))
+            parts.Add(Slugify(accountName));
+
+        if (from is { } f && to is { } t)
+            parts.Add($"{f:yyyy-MM-dd}_{t:yyyy-MM-dd}");
+        else if (from is { } fOnly)
+            parts.Add($"from-{fOnly:yyyy-MM-dd}");
+        else if (to is { } tOnly)
+            parts.Add($"to-{tOnly:yyyy-MM-dd}");
+        else
+            parts.Add(DateTime.Today.ToString("yyyy-MM-dd"));
+
+        return string.Join("_", parts) + ".csv";
+    }
+
+    private static string Slugify(string input)
+    {
+        var lower = input.ToLowerInvariant();
+        var chars = lower.Select(c =>
+            char.IsLetterOrDigit(c) ? c :
+            (c == ' ' || c == '-' || c == '_') ? '-' :
+            '\0').Where(c => c != '\0').ToArray();
+        var slug = new string(chars).Trim('-');
+        while (slug.Contains("--")) slug = slug.Replace("--", "-");
+        return string.IsNullOrEmpty(slug) ? "account" : slug;
     }
 
     private static MovementListItemDto MapToDto(MovementListItemViewModel m)
