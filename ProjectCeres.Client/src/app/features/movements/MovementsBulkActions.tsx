@@ -44,7 +44,7 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
   const type = parseType(searchParams.get('type'));
   const currency = searchParams.get('currency');
 
-  const bulkDisabled = !from && !to;
+  const noDateFilter = !from && !to;
   const noun = totalCount === 1 ? 'movement' : 'movements';
 
   async function handleConfirm() {
@@ -75,15 +75,22 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
     // A hidden <a download> click (instead of window.location.href) keeps the
     // current tab on /app/movements and lets the browser fire its native
     // download chrome — including the macOS flying-file animation toward the
-    // Downloads icon. Empty `download` attr = let the server's
-    // Content-Disposition filename win.
+    // Downloads icon. The animation tracks the anchor's screen position, so
+    // we can't remove the element synchronously; that kills the animation
+    // mid-flight. We leave it in place and clean up on a 2-second timer,
+    // which is well after the browser has captured the visual.
     const anchor = document.createElement('a');
     anchor.href = MOVEMENTS_EXPORT_CSV_URL(searchParams.toString());
     anchor.download = '';
     anchor.rel = 'noopener';
+    anchor.style.position = 'fixed';
+    anchor.style.opacity = '0';
+    anchor.style.pointerEvents = 'none';
     document.body.appendChild(anchor);
     anchor.click();
-    document.body.removeChild(anchor);
+    setTimeout(() => {
+      if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
+    }, 2000);
     toast.success('Exporting movements…');
   }
 
@@ -93,8 +100,6 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
         type="button"
         variant="outline"
         onClick={() => setOpen(true)}
-        disabled={bulkDisabled}
-        title={bulkDisabled ? 'Set a date range first to enable bulk actions' : undefined}
         className="gap-2"
       >
         <CheckCheck className="h-4 w-4" />
@@ -117,7 +122,9 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
               Mark {totalCount} {noun} as cleared?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Movements matching the active filter will be marked cleared. This cannot be undone in bulk.
+              {noDateFilter
+                ? `You haven't filtered by date. This will mark every ${currency ? `${currency} ` : ''}movement in the table as cleared. This cannot be undone in bulk.`
+                : 'Movements matching the active filter will be marked cleared. This cannot be undone in bulk.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

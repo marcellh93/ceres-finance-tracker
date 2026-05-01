@@ -33,18 +33,25 @@ describe('MovementsBulkActions', () => {
     expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument();
   });
 
-  it('disables Mark visible cleared when neither from nor to is in URL params', () => {
-    renderAt('');
-    expect(screen.getByRole('button', { name: /mark visible cleared/i })).toBeDisabled();
-  });
-
-  it('enables Mark visible cleared when at least one date is set; click opens dialog with count', async () => {
-    renderAt('?from=2026-01-01', 7);
+  it('Mark visible cleared is enabled even with no date filter; opens dialog with warning copy', async () => {
+    renderAt('?currency=EUR', 12);
     const btn = screen.getByRole('button', { name: /mark visible cleared/i });
     expect(btn).not.toBeDisabled();
     fireEvent.click(btn);
     await waitFor(() => {
+      expect(screen.getByText(/mark 12 movements as cleared\?/i)).toBeInTheDocument();
+      expect(screen.getByText(/haven't filtered by date/i)).toBeInTheDocument();
+      expect(screen.getByText(/every EUR movement/i)).toBeInTheDocument();
+    });
+  });
+
+  it('Mark visible cleared with date filter shows the standard "matching the active filter" copy', async () => {
+    renderAt('?from=2026-01-01', 7);
+    const btn = screen.getByRole('button', { name: /mark visible cleared/i });
+    fireEvent.click(btn);
+    await waitFor(() => {
       expect(screen.getByText(/mark 7 movements as cleared\?/i)).toBeInTheDocument();
+      expect(screen.getByText(/matching the active filter/i)).toBeInTheDocument();
     });
   });
 
