@@ -1,6 +1,47 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementForm, type MovementFormValues } from './MovementForm';
+import type { GoalBudgetListItemDto } from '../budgets/budgets-api';
+
+// Per-test goal-budget fixture; tests can override before rendering.
+let SPENDING_GOALS: GoalBudgetListItemDto[] = [];
+
+const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+  const url = typeof input === 'string' ? input : input.toString();
+  if (url === '/api/goal-budgets?type=spending&includeArchived=true') {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => SPENDING_GOALS,
+    } as Response;
+  }
+  return { ok: true, status: 200, json: async () => [] } as Response;
+});
+
+beforeEach(() => {
+  SPENDING_GOALS = [];
+  mockFetch.mockClear();
+  global.fetch = mockFetch as unknown as typeof fetch;
+});
+
+function makeGoal(overrides: Partial<GoalBudgetListItemDto> = {}): GoalBudgetListItemDto {
+  return {
+    id: 'g1',
+    name: 'Trip',
+    goalType: 'Spending',
+    currencyCode: 'EUR',
+    currencySymbol: '€',
+    targetAmount: 1000,
+    startDate: '2026-01-01',
+    endDate: null,
+    description: null,
+    isActive: true,
+    linkedAccountId: null,
+    linkedAccountName: null,
+    progress: 0,
+    ...overrides,
+  };
+}
 
 // Stub the settings hook so format-aware fields render synchronously in tests.
 // The hook's own behavior is exercised in use-settings.test.ts.
@@ -354,5 +395,90 @@ describe('MovementForm', () => {
     const submitted = submit.mock.calls[0][0] as MovementFormValues;
     // Wire format is period decimal regardless of display format.
     expect(submitted.amount).toBe('1234.56');
+  });
+
+  it('Test 13: Budget picker NOT rendered when no Spending Goals match the account currency', async () => {
+    SPENDING_GOALS = [];
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={{ ...emptyValues, accountId: 'a1' }}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={noopCancel}
+      />,
+    );
+    // Wait for the goal-budgets fetch to resolve before asserting absence.
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/goal-budgets?type=spending&includeArchived=true',
+        expect.anything(),
+      );
+    });
+    expect(screen.queryByLabelText(/budget \(optional\)/i)).not.toBeInTheDocument();
+  });
+
+  it('Test 14: Budget picker IS rendered when ≥1 active matching goal exists', async () => {
+    SPENDING_GOALS = [makeGoal({ id: 'g1', name: 'Trip', currencyCode: 'EUR', isActive: true })];
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={{ ...emptyValues, accountId: 'a1' }}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={noopCancel}
+      />,
+    );
+    const select = (await screen.findByLabelText(/budget \(optional\)/i)) as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Trip' })).toBeInTheDocument();
+  });
+
+  it('Test 15: Selecting a goal updates values.budgetId on submit', async () => {
+    SPENDING_GOALS = [makeGoal({ id: 'g1', name: 'Trip', currencyCode: 'EUR', isActive: true })];
+    const submit = vi.fn().mockResolvedValue({ ok: true as const });
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={{ ...emptyValues, accountId: 'a1' }}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={submit}
+        onCancel={noopCancel}
+      />,
+    );
+    const select = (await screen.findByLabelText(/budget \(optional\)/i)) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'g1' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    const submitted = submit.mock.calls[0][0] as MovementFormValues;
+    expect(submitted.budgetId).toBe('g1');
+  });
+
+  it('Test 16: Edit mode shows the currently-tagged archived goal with "(archived)" suffix', async () => {
+    SPENDING_GOALS = [
+      makeGoal({ id: 'g-archived', name: 'Old Trip', currencyCode: 'EUR', isActive: false }),
+    ];
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="edit"
+        initialValues={{ ...emptyValues, accountId: 'a1', budgetId: 'g-archived' }}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={noopCancel}
+      />,
+    );
+    const select = (await screen.findByLabelText(/budget \(optional\)/i)) as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Old Trip \(archived\)/ })).toBeInTheDocument();
   });
 });

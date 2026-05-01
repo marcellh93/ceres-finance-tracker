@@ -35,7 +35,9 @@ import {
   type NumberFormat,
 } from '../../lib/amount-format';
 import { useSettings } from '../../lib/use-settings';
+import { useApi } from '../../lib/use-api';
 import type { AccountOptionDto, CategoryOptionDto, MovementType } from './movements-api';
+import type { GoalBudgetListItemDto } from '../budgets/budgets-api';
 import { MOVEMENT_TYPE_FORM_HELPER, MOVEMENT_TYPE_NOUN } from './movement-type-display';
 
 export type MovementFormValues = {
@@ -150,6 +152,12 @@ export function MovementForm({
   const settings = useSettings();
   const numberFormat: NumberFormat | undefined = settings.data?.numberFormat;
 
+  // Spending-Goal picker data — only consumed by the Transaction variant.
+  // Fetched unconditionally so the hook order stays stable across renders.
+  const { data: goalBudgets } = useApi<GoalBudgetListItemDto[]>(
+    '/api/goal-budgets?type=spending&includeArchived=true',
+  );
+
   // ── Amount field display state ──
   // values.amount is the *wire* format (JS-number string, period decimal).
   // displayAmount is what the user sees: raw while focused, grouped on blur.
@@ -241,6 +249,18 @@ export function MovementForm({
   }
 
   const symbol = selectedAccountSymbol(type, values, accounts);
+
+  // Spending-Goal picker visibility: only Transactions can be tagged with a
+  // goal budget, the goal must be in the same currency as the selected
+  // account, and we surface archived goals only when the form is already
+  // pointing at one (so the link isn't silently broken on Edit).
+  const accountCurrencyCode =
+    accounts.find((a) => a.id === values.accountId)?.currencyCode ?? null;
+  const matchingGoals = (goalBudgets ?? []).filter((g) => {
+    if (g.currencyCode !== accountCurrencyCode) return false;
+    return g.isActive || g.id === values.budgetId;
+  });
+  const showBudgetPicker = type === 'Transaction' && matchingGoals.length > 0;
 
   // Render the Amount input — or a Skeleton while settings load,
   // since the field's behavior depends on the user's number format.
@@ -382,6 +402,25 @@ export function MovementForm({
               onChange={(id) => set('categoryId', id)}
               placeholder="Select category"
             />
+          </Field>
+        )}
+
+        {showBudgetPicker && (
+          <Field label="Budget (optional)" htmlFor="mf-budget">
+            <select
+              id="mf-budget"
+              value={values.budgetId ?? ''}
+              onChange={(e) => set('budgetId', e.target.value || null)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="">None</option>
+              {matchingGoals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                  {!g.isActive ? ' (archived)' : ''}
+                </option>
+              ))}
+            </select>
           </Field>
         )}
 
