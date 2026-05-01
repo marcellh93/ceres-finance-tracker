@@ -172,3 +172,30 @@ export type ApiErrorEnvelope = {
     details: Array<{ field?: string; message: string }>;
   };
 };
+
+// ---------- Attachment endpoints (Plan 1 server work) ----------
+
+export const TRANSACTION_ATTACHMENTS_URL = (transactionId: string) =>
+  `/api/transactions/${transactionId}/attachments`;
+export const TRANSFER_ATTACHMENTS_URL = (transferId: string) =>
+  `/api/transfers/${transferId}/attachments`;
+
+export const TRANSACTION_ATTACHMENT_BY_ID_URL = (attachmentId: string) =>
+  `/api/transactions/attachments/${attachmentId}`;
+export const TRANSFER_ATTACHMENT_BY_ID_URL = (attachmentId: string) =>
+  `/api/transfers/attachments/${attachmentId}`;
+
+// ---------- Bulk-cleared and export ----------
+
+export const MOVEMENTS_BULK_CLEARED_URL = '/api/movements/bulk-cleared';
+export const MOVEMENTS_EXPORT_CSV_URL   = (search: string) =>
+  search ? `/api/movements/export.csv?${search}` : '/api/movements/export.csv';
+
+export type BulkClearedRequest = {
+  from: string;            // "yyyy-MM-dd"
+  to: string;              // "yyyy-MM-dd"
+  accountId?: string | null;
+  type?: 'transaction' | 'transfer' | 'liabilitypayment' | null;
+};
+
+export type BulkClearedResponse = { cleared: number };
