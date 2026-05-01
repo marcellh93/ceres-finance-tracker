@@ -146,7 +146,7 @@ public class MovementService : IMovementService
         Guid? accountId, DateOnly? from, DateOnly? to, string? q = null)
     {
         var query = _db.LiabilityPayments
-            .Include(p => p.AssetAccount)
+            .Include(p => p.AssetAccount).ThenInclude(a => a.Currency)
             .Include(p => p.LiabilityAccount)
             .AsQueryable();
 
@@ -165,6 +165,7 @@ public class MovementService : IMovementService
             MovementType         = MovementType.LiabilityPayment,
             Date                 = p.Date,
             Amount               = p.Amount,
+            CurrencySymbol       = p.AssetAccount.Currency.Symbol,
             Description          = p.Description,
             IsCleared            = p.IsCleared,
             CreatedAt            = p.CreatedAt,
