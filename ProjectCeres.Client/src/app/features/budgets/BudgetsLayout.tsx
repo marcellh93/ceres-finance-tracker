@@ -11,6 +11,12 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { CardError } from '../../components/CardError';
 import { CategoryBudgetsTable } from './CategoryBudgetsTable';
 import { GoalBudgetsTable } from './GoalBudgetsTable';
@@ -49,7 +55,7 @@ export function BudgetsLayout() {
 
   if (childActive) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <Outlet context={{ refetch: () => { categoryQuery.refetch(); goalQuery.refetch(); } }} />
       </div>
     );
@@ -69,7 +75,7 @@ export function BudgetsLayout() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Budgets
@@ -77,38 +83,66 @@ export function BudgetsLayout() {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button className="gap-2">
+              <Button
+                className="gap-2 transition-colors hover:bg-primary/90 data-[popup-open]:bg-primary/90"
+              >
                 <Plus className="h-4 w-4" />
                 New
-                <ChevronDown className="h-4 w-4 opacity-70" />
+                <ChevronDown className="h-4 w-4 opacity-70 transition-transform duration-200 group-data-[popup-open]/button:rotate-180" />
               </Button>
             }
           />
           <DropdownMenuContent align="end" sideOffset={8} className="min-w-[14rem] p-1.5">
-            <DropdownMenuItem
-              onClick={() => navigate('new?type=category')}
-              title="A monthly cap on spending in a specific category (e.g., €600/month on groceries)."
-              className="gap-2.5 px-3 py-2"
-            >
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span>Category Budget</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigate('new?type=spending')}
-              title="Track money you're spending toward a target (e.g., a trip, a renovation). Tagged transactions count toward progress."
-              className="gap-2.5 px-3 py-2"
-            >
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-              <span>Spending Goal</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigate('new?type=savings')}
-              title="Track money accumulated in a designated account (e.g., emergency fund). Progress = current account balance."
-              className="gap-2.5 px-3 py-2"
-            >
-              <PiggyBank className="h-4 w-4 text-muted-foreground" />
-              <span>Savings Goal</span>
-            </DropdownMenuItem>
+            <TooltipProvider delay={200}>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuItem
+                      onClick={() => navigate('new?type=category')}
+                      className="gap-2.5 px-3 py-2 transition-colors"
+                    >
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <span>Category Budget</span>
+                    </DropdownMenuItem>
+                  }
+                />
+                <TooltipContent side="left" sideOffset={12}>
+                  A monthly cap on spending in a specific category (e.g., €600/month on groceries).
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuItem
+                      onClick={() => navigate('new?type=spending')}
+                      className="gap-2.5 px-3 py-2 transition-colors"
+                    >
+                      <Trophy className="h-4 w-4 text-muted-foreground" />
+                      <span>Spending Goal</span>
+                    </DropdownMenuItem>
+                  }
+                />
+                <TooltipContent side="left" sideOffset={12}>
+                  Track money you're spending toward a target (e.g., a trip, a renovation). Tagged transactions count toward progress.
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <DropdownMenuItem
+                      onClick={() => navigate('new?type=savings')}
+                      className="gap-2.5 px-3 py-2 transition-colors"
+                    >
+                      <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                      <span>Savings Goal</span>
+                    </DropdownMenuItem>
+                  }
+                />
+                <TooltipContent side="left" sideOffset={12}>
+                  Track money accumulated in a designated account (e.g., emergency fund). Progress = current account balance.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

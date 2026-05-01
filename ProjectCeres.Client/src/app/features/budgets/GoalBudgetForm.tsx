@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/input-group';
 import { AccountCombobox } from '@/app/components/AccountCombobox';
 import { CurrencyCombobox } from '@/components/CurrencyCombobox';
+import { DatePickerField } from '@/components/DatePickerField';
 import {
   ACCOUNTS_ACTIVE_URL,
   type AccountOptionDto,
@@ -216,21 +217,20 @@ export function GoalBudgetForm({ mode, goalType, initialValues, onSubmit, onCanc
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="gb-start">Start date</Label>
-            <Input
+            <DatePickerField
               id="gb-start"
-              type="date"
-              value={values.startDate}
-              onChange={(e) => set('startDate', e.target.value)}
+              hideClear
+              value={values.startDate || null}
+              onChange={(v) => set('startDate', v ?? '')}
             />
             {errors.startDate && <p className="text-xs text-destructive">{errors.startDate}</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="gb-end">End date</Label>
-            <Input
+            <DatePickerField
               id="gb-end"
-              type="date"
-              value={values.endDate ?? ''}
-              onChange={(e) => set('endDate', e.target.value || null)}
+              value={values.endDate}
+              onChange={(v) => set('endDate', v)}
             />
             {errors.endDate && <p className="text-xs text-destructive">{errors.endDate}</p>}
           </div>
