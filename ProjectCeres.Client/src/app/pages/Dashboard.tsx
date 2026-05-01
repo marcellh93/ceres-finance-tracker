@@ -14,7 +14,7 @@ export function Dashboard() {
   useEffect(() => { headingRef.current?.focus(); }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <h1
         ref={headingRef}
         tabIndex={-1}
