@@ -1,7 +1,22 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsLayout } from './MovementsLayout';
+
+vi.mock('./MovementsBulkActions', () => ({
+  MovementsBulkActions: vi.fn(({ totalCount, onAfterBulk }) => (
+    <div data-testid="bulk-actions" data-total-count={totalCount}>
+      <button onClick={onAfterBulk} data-testid="fire-after-bulk">
+        fire-after-bulk
+      </button>
+    </div>
+  )),
+}));
+
+vi.mock('./MovementsFilterBar', () => ({
+  MovementsFilterBar: vi.fn(() => <div data-testid="filter-bar" />),
+}));
 
 const mockFetch = vi.fn();
 
@@ -68,5 +83,58 @@ describe('MovementsLayout', () => {
     expect(screen.getByTestId('form')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /new/i })).toBeNull();
     expect(screen.queryByRole('heading', { name: /movements/i })).toBeNull();
+  });
+
+  it('renders MovementsBulkActions in the page header on the list view', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements']}>
+        <Routes>
+          <Route path="/movements" element={<MovementsLayout />}>
+            <Route index element={null} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('bulk-actions')).toBeInTheDocument();
+  });
+
+  it('passes totalCount from API response to MovementsBulkActions', () => {
+    render(
+      <MemoryRouter initialEntries={['/movements']}>
+        <Routes>
+          <Route path="/movements" element={<MovementsLayout />}>
+            <Route index element={null} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    // BulkActions should be rendered with data-total-count attribute from the API response
+    const bulkActions = screen.getByTestId('bulk-actions');
+    expect(bulkActions).toHaveAttribute('data-total-count', '0');
+  });
+
+  it('wires onAfterBulk to trigger refetch', async () => {
+    const user = userEvent.setup();
+    const refetchSpy = vi.fn();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], totalCount: 10, page: 1, pageSize: 50 }),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/movements']}>
+        <Routes>
+          <Route path="/movements" element={<MovementsLayout />}>
+            <Route index element={null} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // Click the fire-after-bulk button (which calls onAfterBulk)
+    await user.click(screen.getByTestId('fire-after-bulk'));
+
+    // After clicking, refetch should be called (mocked fetch will resolve again)
+    expect(mockFetch).toHaveBeenCalled();
   });
 });

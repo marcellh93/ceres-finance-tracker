@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardError } from '../../components/CardError';
+import { MovementsBulkActions } from './MovementsBulkActions';
 import { MovementsFilterBar } from './MovementsFilterBar';
 import { MovementsPagination } from './MovementsPagination';
 import { MovementsTable } from './MovementsTable';
@@ -48,42 +49,45 @@ export function MovementsLayout() {
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Movements
         </h1>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                className="gap-2 transition-colors hover:bg-primary/90 data-[popup-open]:bg-primary/90"
+        <div className="flex items-center gap-2">
+          <MovementsBulkActions totalCount={data?.totalCount ?? 0} onAfterBulk={refetch} />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  className="gap-2 transition-colors hover:bg-primary/90 data-[popup-open]:bg-primary/90"
+                >
+                  <Plus className="h-4 w-4" />
+                  New
+                  <ChevronDown className="h-4 w-4 opacity-70 transition-transform duration-200 group-data-[popup-open]/button:rotate-180" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" sideOffset={8} className="min-w-[12rem] p-1.5">
+              <DropdownMenuItem
+                onClick={() => navigate('new?type=transaction')}
+                className="gap-2.5 px-3 py-2 transition-colors"
               >
-                <Plus className="h-4 w-4" />
-                New
-                <ChevronDown className="h-4 w-4 opacity-70 transition-transform duration-200 group-data-[popup-open]/button:rotate-180" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" sideOffset={8} className="min-w-[12rem] p-1.5">
-            <DropdownMenuItem
-              onClick={() => navigate('new?type=transaction')}
-              className="gap-2.5 px-3 py-2 transition-colors"
-            >
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-              <span>Transaction</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigate('new?type=transfer')}
-              className="gap-2.5 px-3 py-2 transition-colors"
-            >
-              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-              <span>Transfer</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigate('new?type=liabilitypayment')}
-              className="gap-2.5 px-3 py-2 transition-colors"
-            >
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span>Liability Payment</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+                <span>Transaction</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => navigate('new?type=transfer')}
+                className="gap-2.5 px-3 py-2 transition-colors"
+              >
+                <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                <span>Transfer</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => navigate('new?type=liabilitypayment')}
+                className="gap-2.5 px-3 py-2 transition-colors"
+              >
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <span>Liability Payment</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <MovementsFilterBar />
