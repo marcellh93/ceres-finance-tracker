@@ -72,8 +72,27 @@ describe('MovementsBulkActions', () => {
       to: '2026-01-31',
       accountId: 'acc-1',
       type: 'transfer',
+      currency: null,
     });
     await waitFor(() => expect(onAfterBulk).toHaveBeenCalled());
+  });
+
+  it('includes currency in the bulk POST body when ?currency is in URL params', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ cleared: 1 }) });
+    renderAt('?from=2026-01-01&to=2026-01-31&currency=EUR');
+
+    fireEvent.click(screen.getByRole('button', { name: /mark visible cleared/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^mark cleared$/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^mark cleared$/i }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+    const init = mockFetch.mock.calls[0][1];
+    const body = JSON.parse((init?.body as string) ?? '{}');
+    expect(body.currency).toBe('EUR');
   });
 
   it('Export CSV click triggers a hidden anchor download with the current search and shows a toast', () => {

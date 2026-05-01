@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsLayout } from './MovementsLayout';
+import { __resetSettingsForTests } from '../../lib/use-settings';
 
 vi.mock('./MovementsBulkActions', () => ({
   MovementsBulkActions: vi.fn(({ totalCount, onAfterBulk }) => (
@@ -21,14 +22,35 @@ vi.mock('./MovementsFilterBar', () => ({
 const mockFetch = vi.fn();
 
 beforeEach(() => {
+  __resetSettingsForTests();
+  window.localStorage.clear();
   global.fetch = mockFetch as unknown as typeof fetch;
-  mockFetch.mockResolvedValue({
-    ok: true,
-    json: async () => ({ items: [], totalCount: 0, page: 1, pageSize: 50 }),
+  mockFetch.mockImplementation((url: string) => {
+    if (url.startsWith('/api/accounts/active')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+    if (url.startsWith('/api/settings')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          numberFormat: 'period_decimal',
+          dateFormat: 'DD/MM/YYYY',
+          defaultCurrencyCode: 'EUR',
+          defaultCurrencySymbol: '€',
+        }),
+      });
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [], totalCount: 0, page: 1, pageSize: 50 }),
+    });
   });
 });
 
-afterEach(() => { vi.resetAllMocks(); });
+afterEach(() => {
+  vi.resetAllMocks();
+  window.localStorage.clear();
+});
 
 describe('MovementsLayout', () => {
   it('renders the Movements heading and the list area', () => {
@@ -111,6 +133,92 @@ describe('MovementsLayout', () => {
     // BulkActions should be rendered with data-total-count attribute from the API response
     const bulkActions = screen.getByTestId('bulk-actions');
     expect(bulkActions).toHaveAttribute('data-total-count', '0');
+  });
+
+  it('renders the currency tab strip when the user has 2+ currencies', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/accounts/active')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'a1', name: 'EUR', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
+            { id: 'a2', name: 'USD', currencyCode: 'USD', currencySymbol: '$', accountTypeName: 'Asset' },
+          ],
+        });
+      }
+      if (url.startsWith('/api/settings')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            numberFormat: 'period_decimal',
+            dateFormat: 'DD/MM/YYYY',
+            defaultCurrencyCode: 'EUR',
+            defaultCurrencySymbol: '€',
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ items: [], totalCount: 0, page: 1, pageSize: 50 }),
+      });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/movements?currency=EUR']}>
+        <Routes>
+          <Route path="/movements" element={<MovementsLayout />}>
+            <Route index element={null} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(screen.getByRole('tab', { name: 'EUR' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'USD' })).toBeInTheDocument();
+  });
+
+  it('hides the currency tab strip when the user has only one currency', async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/accounts/active')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'a1', name: 'EUR', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
+          ],
+        });
+      }
+      if (url.startsWith('/api/settings')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            numberFormat: 'period_decimal',
+            dateFormat: 'DD/MM/YYYY',
+            defaultCurrencyCode: 'EUR',
+            defaultCurrencySymbol: '€',
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ items: [], totalCount: 0, page: 1, pageSize: 50 }),
+      });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/movements']}>
+        <Routes>
+          <Route path="/movements" element={<MovementsLayout />}>
+            <Route index element={null} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // Wait for the heading then assert no tabs.
+    expect(screen.getByRole('heading', { name: /movements/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tab')).toBeNull();
   });
 
   it('wires onAfterBulk to trigger refetch', async () => {

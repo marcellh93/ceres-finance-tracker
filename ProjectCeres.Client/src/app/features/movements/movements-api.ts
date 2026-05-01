@@ -196,6 +196,7 @@ export type BulkClearedRequest = {
   to: string;              // "yyyy-MM-dd"
   accountId?: string | null;
   type?: 'transaction' | 'transfer' | 'liabilitypayment' | null;
+  currency?: string | null;
 };
 
 export type BulkClearedResponse = { cleared: number };

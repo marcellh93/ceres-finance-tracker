@@ -21,6 +21,14 @@ export function MovementsFilterBar() {
   const [params, setParams] = useSearchParams();
   const { data: accounts } = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
 
+  // The currency tab strip drives the active currency. Narrow the Account
+  // dropdown to accounts in that currency so the user can't pick something
+  // that the list-fetch would silently filter out.
+  const activeCurrency = params.get('currency');
+  const filteredAccounts = activeCurrency && accounts
+    ? accounts.filter((a) => a.currencyCode === activeCurrency)
+    : accounts;
+
   // Local search input state — debounced before pushing to URL
   const [searchInput, setSearchInput] = useState(params.get('q') ?? '');
   const debouncedSearch = useDebounced(searchInput, 300);
@@ -59,7 +67,7 @@ export function MovementsFilterBar() {
       <div className="space-y-1.5 sm:w-56">
         <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Account</div>
         <AccountCombobox
-          accounts={accounts ?? []}
+          accounts={filteredAccounts ?? []}
           value={params.get('accountId')}
           onChange={(id) => setParam('accountId', id)}
           placeholder="All accounts"

@@ -11,14 +11,18 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardError } from '../../components/CardError';
 import { MovementsBulkActions } from './MovementsBulkActions';
+import { MovementsCurrencyTabs } from './MovementsCurrencyTabs';
 import { MovementsFilterBar } from './MovementsFilterBar';
 import { MovementsPagination } from './MovementsPagination';
 import { MovementsTable } from './MovementsTable';
 import { MOVEMENTS_URL, type MovementsPageDto } from './movements-api';
 import { useApi } from '../../lib/use-api';
+import { useActiveCurrency } from './use-active-currency';
 
-function buildUrl(params: URLSearchParams): string {
-  const search = params.toString();
+function buildUrl(params: URLSearchParams, activeCurrency: string | null): string {
+  const next = new URLSearchParams(params);
+  if (activeCurrency) next.set('currency', activeCurrency);
+  const search = next.toString();
   return search ? `${MOVEMENTS_URL}?${search}` : MOVEMENTS_URL;
 }
 
@@ -27,7 +31,19 @@ export function MovementsLayout() {
   useEffect(() => { headingRef.current?.focus(); }, []);
 
   const [params] = useSearchParams();
-  const url = buildUrl(params);
+  const {
+    availableCurrencies,
+    activeCurrency,
+    loading: currencyLoading,
+    accounts,
+  } = useActiveCurrency();
+
+  // Defer the list fetch until the currency has been resolved AND we know
+  // whether the user has any accounts at all — otherwise we'd flash a list
+  // of mixed-currency rows for one render before the filter snaps in.
+  const hasAccounts = accounts.length > 0;
+  const currencyReady = !currencyLoading && (!hasAccounts || activeCurrency !== null);
+  const url = buildUrl(params, hasAccounts ? activeCurrency : null);
   const { data, error, loading, refetch } = useApi<MovementsPageDto>(url);
 
   const navigate = useNavigate();
@@ -90,14 +106,19 @@ export function MovementsLayout() {
         </div>
       </div>
 
+      <MovementsCurrencyTabs
+        availableCurrencies={availableCurrencies}
+        activeCurrency={activeCurrency}
+      />
+
       <MovementsFilterBar />
 
-      {loading && <Skeleton className="h-[400px] w-full" />}
-      {error && <CardError section="Movements" onRetry={refetch} />}
-      {data && data.items.length === 0 && (
+      {(!currencyReady || loading) && <Skeleton className="h-[400px] w-full" />}
+      {currencyReady && error && <CardError section="Movements" onRetry={refetch} />}
+      {currencyReady && data && data.items.length === 0 && (
         <p className="text-sm text-muted-foreground">No movements found.</p>
       )}
-      {data && data.items.length > 0 && (
+      {currencyReady && data && data.items.length > 0 && (
         <>
           <MovementsTable items={data.items} onRefetch={refetch} />
           <MovementsPagination totalCount={data.totalCount} pageSize={data.pageSize} />

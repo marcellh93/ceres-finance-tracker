@@ -42,6 +42,7 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
   const to = searchParams.get('to') ?? '';
   const accountId = searchParams.get('accountId');
   const type = parseType(searchParams.get('type'));
+  const currency = searchParams.get('currency');
 
   const bulkDisabled = !from && !to;
   const noun = totalCount === 1 ? 'movement' : 'movements';
@@ -52,6 +53,7 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
       to,
       accountId: accountId ?? null,
       type: type ?? null,
+      currency: currency ?? null,
     };
     const response = await fetch(MOVEMENTS_BULK_CLEARED_URL, {
       method: 'POST',
