@@ -259,16 +259,6 @@ function MovementEditInner({
 
   return (
     <div className="space-y-6">
-      <MovementForm
-        type={movementType}
-        mode="edit"
-        initialValues={initialValues}
-        accounts={narrowedAccounts}
-        categories={categories ?? []}
-        onSubmit={onSubmit}
-        onDelete={onDelete}
-        onCancel={() => navigate(buildMovementsListPath(initialValues, accounts ?? []))}
-      />
       {showDropzone && (
         <AttachmentDropzone
           mode="edit"
@@ -279,6 +269,16 @@ function MovementEditInner({
           className="mx-auto max-w-3xl"
         />
       )}
+      <MovementForm
+        type={movementType}
+        mode="edit"
+        initialValues={initialValues}
+        accounts={narrowedAccounts}
+        categories={categories ?? []}
+        onSubmit={onSubmit}
+        onDelete={onDelete}
+        onCancel={() => navigate(buildMovementsListPath(initialValues, accounts ?? []))}
+      />
     </div>
   );
 }

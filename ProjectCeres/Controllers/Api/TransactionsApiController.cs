@@ -135,7 +135,8 @@ public class TransactionsApiController(
                 id          = saved.Id,
                 fileName    = saved.FileName,
                 sizeBytes   = saved.FileSizeBytes,
-                contentType = saved.ContentType
+                contentType = saved.ContentType,
+                uploadedAt  = saved.UploadedAt
             });
         }
         catch (InvalidOperationException ex)

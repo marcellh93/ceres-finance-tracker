@@ -14,6 +14,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   MOVEMENTS_BULK_CLEARED_URL,
   MOVEMENTS_EXPORT_CSV_URL,
   type BulkClearedRequest,
@@ -71,49 +77,55 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
     toast.error("Couldn't mark as cleared.");
   }
 
-  function handleExport() {
-    // A hidden <a download> click (instead of window.location.href) keeps the
-    // current tab on /app/movements and lets the browser fire its native
-    // download chrome — including the macOS flying-file animation toward the
-    // Downloads icon. The animation tracks the anchor's screen position, so
-    // we can't remove the element synchronously; that kills the animation
-    // mid-flight. We leave it in place and clean up on a 2-second timer,
-    // which is well after the browser has captured the visual.
-    const anchor = document.createElement('a');
-    anchor.href = MOVEMENTS_EXPORT_CSV_URL(searchParams.toString());
-    anchor.download = '';
-    anchor.rel = 'noopener';
-    anchor.style.position = 'fixed';
-    anchor.style.opacity = '0';
-    anchor.style.pointerEvents = 'none';
-    document.body.appendChild(anchor);
-    anchor.click();
-    setTimeout(() => {
-      if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
-    }, 2000);
+  // The Export CSV button renders as a real <a download> so the click is a
+  // first-class user gesture — the browser fires its full native download
+  // chrome, including the macOS flying-file animation from the button
+  // toward the Downloads icon. Programmatic .click() on a synthesised
+  // anchor doesn't reliably fire that animation in Safari/Chrome; rendering
+  // an actual visible <a> does.
+  const exportHref = MOVEMENTS_EXPORT_CSV_URL(searchParams.toString());
+  function handleExportClick() {
     toast.success('Exporting movements…');
   }
 
   return (
     <div className="flex items-center gap-2">
+      <TooltipProvider delay={300}>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(true)}
+                className="gap-2"
+              >
+                <CheckCheck className="h-4 w-4" />
+                Mark visible cleared
+              </Button>
+            }
+          />
+          <TooltipContent>
+            Marks every movement currently visible in the table as cleared (reconciled with your bank statement).
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <Button
-        type="button"
         variant="outline"
-        onClick={() => setOpen(true)}
         className="gap-2"
-      >
-        <CheckCheck className="h-4 w-4" />
-        Mark visible cleared
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={handleExport}
-        className="gap-2"
-      >
-        <Download className="h-4 w-4" />
-        Export CSV
-      </Button>
+        render={
+          <a
+            href={exportHref}
+            download
+            rel="noopener"
+            onClick={handleExportClick}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </a>
+        }
+      />
+
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>

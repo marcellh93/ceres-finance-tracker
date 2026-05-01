@@ -53,12 +53,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString();
-  } catch {
-    return iso;
-  }
+function formatDate(iso: string | undefined | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString();
 }
 
 function makeTempId(): string {
@@ -139,11 +138,11 @@ export function AttachmentDropzone({
     if (!files) return;
     const list = Array.from(files);
     if (mode === 'create') {
-      setBuffered((prev) => {
-        const next = [...prev, ...list];
-        notifyPending(next);
-        return next;
-      });
+      // Compute outside the reducer so we can also notify the parent without
+      // calling setState during a different component's render.
+      const next = [...buffered, ...list];
+      setBuffered(next);
+      notifyPending(next);
       return;
     }
     for (const file of list) {
@@ -152,11 +151,9 @@ export function AttachmentDropzone({
   }
 
   function removeBufferedAt(index: number) {
-    setBuffered((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      notifyPending(next);
-      return next;
-    });
+    const next = buffered.filter((_, i) => i !== index);
+    setBuffered(next);
+    notifyPending(next);
   }
 
   // pendingFiles auto-upload (run once on mount, edit mode only).
@@ -264,25 +261,29 @@ export function AttachmentDropzone({
 
       {showList && (
         <ul className="divide-y rounded-md border">
-          {attachments.map((a) => (
-            <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{a.fileName}</div>
-                <div className="text-xs text-muted-foreground">
-                  {formatSize(a.sizeBytes)} · {formatDate(a.uploadedAt)}
+          {attachments.map((a) => {
+            const uploadedAt = formatDate(a.uploadedAt);
+            return (
+              <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{a.fileName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatSize(a.sizeBytes)}{uploadedAt ? ` · ${uploadedAt}` : ''}
+                  </div>
                 </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Delete attachment ${a.fileName}`}
-                onClick={() => setConfirmDeleteId(a.id)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </li>
-          ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete attachment ${a.fileName}`}
+                  onClick={() => setConfirmDeleteId(a.id)}
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </li>
+            );
+          })}
           {pending.map((p) => (
             <li
               key={p.tempId}
@@ -313,6 +314,7 @@ export function AttachmentDropzone({
                 size="icon"
                 aria-label={`Remove pending file ${f.name}`}
                 onClick={() => removeBufferedAt(idx)}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               >
                 <X className="h-4 w-4" />
               </Button>

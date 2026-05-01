@@ -30,7 +30,7 @@ describe('MovementsBulkActions', () => {
   it('renders both buttons', () => {
     renderAt('');
     expect(screen.getByRole('button', { name: /mark visible cleared/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /export csv/i })).toBeInTheDocument();
   });
 
   it('Mark visible cleared is enabled even with no date filter; opens dialog with warning copy', async () => {
@@ -102,25 +102,18 @@ describe('MovementsBulkActions', () => {
     expect(body.currency).toBe('EUR');
   });
 
-  it('Export CSV click triggers a hidden anchor download with the current search and shows a toast', () => {
-    const clickedAnchors: HTMLAnchorElement[] = [];
-    const originalClick = HTMLAnchorElement.prototype.click;
-    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
-      clickedAnchors.push(this);
-    };
+  it('Export CSV renders as a real <a download> with the current search and toasts on click', () => {
+    renderAt('?from=2026-01-01&type=transaction');
 
-    try {
-      renderAt('?from=2026-01-01&type=transaction');
-      fireEvent.click(screen.getByRole('button', { name: /export csv/i }));
+    const link = screen.getByRole('link', { name: /export csv/i });
+    expect(link).toBeInTheDocument();
+    expect(link.getAttribute('href')).toBe(
+      '/api/movements/export.csv?from=2026-01-01&type=transaction',
+    );
+    expect(link.hasAttribute('download')).toBe(true);
 
-      expect(clickedAnchors).toHaveLength(1);
-      expect(clickedAnchors[0].getAttribute('href')).toBe(
-        '/api/movements/export.csv?from=2026-01-01&type=transaction',
-      );
-      expect(clickedAnchors[0].hasAttribute('download')).toBe(true);
-      expect(toast.success).toHaveBeenCalledWith('Exporting movements…');
-    } finally {
-      HTMLAnchorElement.prototype.click = originalClick;
-    }
+    // Prevent the test environment from following the link.
+    fireEvent.click(link, { preventDefault: () => undefined });
+    expect(toast.success).toHaveBeenCalledWith('Exporting movements…');
   });
 });
