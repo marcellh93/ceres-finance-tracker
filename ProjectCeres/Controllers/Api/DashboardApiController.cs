@@ -44,13 +44,15 @@ public class DashboardApiController(
     [HttpGet("category-budgets")]
     public async Task<IActionResult> GetCategoryBudgets()
     {
-        var budgets = await categoryBudgetService.GetAllAsync(includeInactive: false);
-        var now = DateTime.Today;
+        var budgets  = await categoryBudgetService.GetAllAsync(includeInactive: false);
+        var settings = await settingsService.GetAsync();
+        var today    = DateOnly.FromDateTime(DateTime.Today);
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
 
         var result = new List<object>();
         foreach (var budget in budgets)
         {
-            var spent = await categoryBudgetService.GetActualSpendAsync(budget.Id, now.Year, now.Month);
+            var spent = await categoryBudgetService.GetActualSpendAsync(budget.Id, year, month);
             var percentUsed = budget.LimitAmount == 0m
                 ? 0m
                 : Math.Round(spent / budget.LimitAmount * 100m, 2);

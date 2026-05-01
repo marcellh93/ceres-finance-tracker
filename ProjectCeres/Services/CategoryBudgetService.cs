@@ -83,15 +83,18 @@ public class CategoryBudgetService(AppDbContext db) : ICategoryBudgetService
         var budget = await db.CategoryBudgets.FindAsync(id)
             ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
 
-        var firstDay = new DateOnly(year, month, 1);
-        var lastDay  = firstDay.AddMonths(1).AddDays(-1);
+        var settings = await db.Settings.FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("Settings row missing.");
+
+        var (periodStart, periodEnd) =
+            BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
 
         return await db.Transactions
             .Where(t =>
                 t.CategoryId == budget.CategoryId &&
                 t.Account.CurrencyId == budget.CurrencyId &&
-                t.Date >= firstDay &&
-                t.Date <= lastDay)
+                t.Date >= periodStart &&
+                t.Date <= periodEnd)
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
     }
 }
