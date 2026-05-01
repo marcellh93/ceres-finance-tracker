@@ -134,7 +134,17 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
 
 
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
+        {/*
+          finalFocus={false} on the Popup tells base-ui's dialog primitive
+          NOT to return focus to the trigger button on close. Without this,
+          the returned focus is treated by the shadcn Tooltip as a hover
+          (focus and hover share the same open trigger), so the tooltip
+          re-appears and sits on screen until the user clicks somewhere
+          else. With finalFocus={false}, focus falls back to <body>.
+          Keyboard users who want to act again can Tab back to the button;
+          the tooltip will appear correctly on that focus.
+        */}
+        <AlertDialogContent finalFocus={false}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               Mark {totalCount} {noun} as cleared?
