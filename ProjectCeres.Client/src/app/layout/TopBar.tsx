@@ -1,5 +1,6 @@
 import { Bell, Menu, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AvatarMenu } from './AvatarMenu';
 import { BrandMark } from './BrandMark';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 640px)');
+  const location = useLocation();
+  const onMovements = /^\/movements(\/|$)/.test(location.pathname);
 
   useKeyboardShortcut('mod+k', () => setSearchOpen((o) => !o));
 
@@ -69,14 +72,16 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       <div className="flex items-center gap-1">
         {isDesktop && (
           <>
-            <Button
-              variant="default"
-              size="icon"
-              onClick={() => setQuickAddOpen(true)}
-              aria-label="Quick add"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            {!onMovements && (
+              <Button
+                variant="default"
+                size="icon"
+                onClick={() => setQuickAddOpen(true)}
+                aria-label="Quick add"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
             <NotificationsButton />
           </>
         )}
