@@ -7,7 +7,7 @@ namespace ProjectCeres.Services;
 
 public class CategoryBudgetService(AppDbContext db) : ICategoryBudgetService
 {
-    public async Task<IEnumerable<CategoryBudget>> GetAllAsync(bool includeInactive = false)
+    public async Task<IEnumerable<CategoryBudget>> GetAllAsync(bool includeInactive = false, string? currency = null)
     {
         var query = db.CategoryBudgets
             .Include(cb => cb.Category).ThenInclude(c => c.CategoryType)
@@ -16,6 +16,9 @@ public class CategoryBudgetService(AppDbContext db) : ICategoryBudgetService
 
         if (!includeInactive)
             query = query.Where(cb => cb.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(currency))
+            query = query.Where(cb => cb.Currency.Code == currency);
 
         return await query.OrderBy(cb => cb.Category.Name).ToListAsync();
     }
@@ -37,14 +40,12 @@ public class CategoryBudgetService(AppDbContext db) : ICategoryBudgetService
             throw new InvalidOperationException(
                 "CategoryBudget can only be applied to Expense categories.");
 
-        var duplicateExists = await db.CategoryBudgets.AnyAsync(cb =>
+        var existing = await db.CategoryBudgets.FirstOrDefaultAsync(cb =>
             cb.CategoryId == vm.CategoryId &&
-            cb.CurrencyId == vm.CurrencyId &&
-            cb.IsActive);
+            cb.CurrencyId == vm.CurrencyId);
 
-        if (duplicateExists)
-            throw new InvalidOperationException(
-                "An active budget already exists for this category and currency.");
+        if (existing is not null)
+            throw new DuplicateBudgetException(existing.Id, existing.IsActive);
 
         var budget = new CategoryBudget
         {
@@ -75,6 +76,25 @@ public class CategoryBudgetService(AppDbContext db) : ICategoryBudgetService
             ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
 
         budget.IsActive = false;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task ReactivateAsync(Guid id)
+    {
+        var budget = await db.CategoryBudgets.FindAsync(id)
+            ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
+
+        if (budget.IsActive) return;
+
+        var conflict = await db.CategoryBudgets.FirstOrDefaultAsync(cb =>
+            cb.CategoryId == budget.CategoryId &&
+            cb.CurrencyId == budget.CurrencyId &&
+            cb.IsActive);
+
+        if (conflict is not null)
+            throw new DuplicateBudgetException(conflict.Id, true);
+
+        budget.IsActive = true;
         await db.SaveChangesAsync();
     }
 

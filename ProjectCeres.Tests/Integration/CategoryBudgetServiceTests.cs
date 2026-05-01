@@ -2,6 +2,7 @@ using FluentAssertions;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
+using Xunit;
 
 namespace ProjectCeres.Tests.Integration;
 
@@ -83,13 +84,14 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
     [Fact]
     public async Task CreateAsync_WhenActiveBudgetAlreadyExistsForSameCategoryAndCurrency_Throws()
     {
-        await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        var existing = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
 
         var act = async () => await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
 
         await act.Should()
-            .ThrowAsync<InvalidOperationException>()
-            .WithMessage("*active*");
+            .ThrowAsync<DuplicateBudgetException>()
+            .WithMessage("*category and currency already exists*")
+            .Where(e => e.ExistingBudgetId == existing.Id && e.ExistingIsActive);
     }
 
     [Fact]
@@ -100,6 +102,19 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
         var act = async () => await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 2);
 
         await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenInactiveBudgetExistsForSameCategoryAndCurrency_Throws()
+    {
+        var existing = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        await _service.DeactivateAsync(existing.Id);
+
+        var act = async () => await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+
+        await act.Should()
+            .ThrowAsync<DuplicateBudgetException>()
+            .Where(e => e.ExistingBudgetId == existing.Id && !e.ExistingIsActive);
     }
 
     [Fact]
@@ -243,6 +258,66 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
+    // ReactivateAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ReactivateAsync_SetsIsActiveTrue()
+    {
+        var budget = await CreateBudgetAsync();
+        await _service.DeactivateAsync(budget.Id);
+
+        await _service.ReactivateAsync(budget.Id);
+
+        var reloaded = await _fixture.Db.CategoryBudgets.FindAsync(budget.Id);
+        reloaded!.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReactivateAsync_ThrowsWhenNotFound()
+    {
+        var act = async () => await _service.ReactivateAsync(Guid.NewGuid());
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task ReactivateAsync_ReturnsEarlyWhenAlreadyActive()
+    {
+        var budget = await CreateBudgetAsync();
+
+        await _service.ReactivateAsync(budget.Id);
+
+        var reloaded = await _fixture.Db.CategoryBudgets.FindAsync(budget.Id);
+        reloaded!.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ReactivateAsync_ThrowsDuplicateBudgetException_WhenAnotherActiveBudgetExistsForSameCategoryAndCurrency()
+    {
+        var first = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        await _service.DeactivateAsync(first.Id);
+
+        // Create a different active budget for the same (Housing, EUR) category/currency
+        // We use a separate test budget that hasn't been deactivated
+        var another = await _fixture.Db.CategoryBudgets.AddAsync(new CategoryBudget
+        {
+            Id = Guid.NewGuid(),
+            CategoryId = HousingCategoryId,
+            CurrencyId = 1,
+            LimitAmount = 200m,
+            IsActive = true
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var act = async () => await _service.ReactivateAsync(first.Id);
+
+        await act.Should()
+            .ThrowAsync<DuplicateBudgetException>()
+            .Where(e => e.ExistingBudgetId == another.Entity.Id && e.ExistingIsActive);
+    }
+
+    // -------------------------------------------------------------------------
     // GetAllAsync
     // -------------------------------------------------------------------------
 
@@ -270,5 +345,20 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
 
         results.Should().Contain(b => b.Id == active.Id);
         results.Should().Contain(b => b.Id == inactive.Id);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_Currency_FiltersOnCurrencyCode()
+    {
+        var eurBudget = await CreateBudgetAsync(categoryId: HousingCategoryId, currencyId: 1);
+        var usdBudget = await CreateBudgetAsync(categoryId: GroceriesCategoryId, currencyId: 2);
+
+        var eurResults = (await _service.GetAllAsync(currency: "EUR")).ToList();
+        var usdResults = (await _service.GetAllAsync(currency: "USD")).ToList();
+
+        eurResults.Should().Contain(b => b.Id == eurBudget.Id);
+        eurResults.Should().NotContain(b => b.Id == usdBudget.Id);
+        usdResults.Should().Contain(b => b.Id == usdBudget.Id);
+        usdResults.Should().NotContain(b => b.Id == eurBudget.Id);
     }
 }
