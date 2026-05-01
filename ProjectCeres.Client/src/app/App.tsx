@@ -13,6 +13,8 @@ import { Review } from './pages/Review';
 import { Security } from './pages/Security';
 import { Settings } from './pages/Settings';
 import { Support } from './pages/Support';
+import { BudgetCreate } from './features/budgets/BudgetCreate';
+import { BudgetEdit } from './features/budgets/BudgetEdit';
 import { MovementCreate } from './features/movements/MovementCreate';
 import { MovementEdit } from './features/movements/MovementEdit';
 import { MovementsLayout } from './features/movements/MovementsLayout';
@@ -29,7 +31,10 @@ export function App() {
         <Route path="review" element={<Review />} />
         <Route path="accounts" element={<Accounts />} />
         <Route path="categories" element={<Categories />} />
-        <Route path="budgets" element={<Budgets />} />
+        <Route path="budgets" element={<Budgets />}>
+          <Route path="new" element={<BudgetCreate />} />
+          <Route path=":id/edit" element={<BudgetEdit />} />
+        </Route>
         <Route path="recurring" element={<Recurring />} />
         <Route path="import" element={<Import />} />
         <Route path="reports" element={<Reports />} />

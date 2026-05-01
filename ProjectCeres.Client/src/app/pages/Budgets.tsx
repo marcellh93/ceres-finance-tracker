@@ -1,10 +1,5 @@
-import { PagePlaceholder } from '../components/PagePlaceholder';
+import { BudgetsLayout } from '../features/budgets/BudgetsLayout';
 
 export function Budgets() {
-  return (
-    <PagePlaceholder
-      title="Budgets"
-      description="The Budgets page will land in a follow-up plan."
-    />
-  );
+  return <BudgetsLayout />;
 }

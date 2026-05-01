@@ -1,0 +1,155 @@
+import { useEffect, useRef } from 'react';
+import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronDown, CreditCard, PiggyBank, Plus, Trophy } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CardError } from '../../components/CardError';
+import { CategoryBudgetsTable } from './CategoryBudgetsTable';
+import { GoalBudgetsTable } from './GoalBudgetsTable';
+import {
+  CATEGORY_BUDGETS_URL,
+  GOAL_BUDGETS_URL,
+  type CategoryBudgetListItemDto,
+  type GoalBudgetListItemDto,
+} from './budgets-api';
+import { useApi } from '../../lib/use-api';
+
+type Tab = 'category' | 'goal';
+
+function buildListUrl(base: string, includeArchived: boolean): string {
+  return includeArchived ? `${base}?includeArchived=true` : base;
+}
+
+export function BudgetsLayout() {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { headingRef.current?.focus(); }, []);
+
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+
+  const onCreate = !!useMatch('/budgets/new');
+  const onEdit   = !!useMatch('/budgets/:id/edit');
+  const childActive = onCreate || onEdit;
+
+  // Always fire both queries so they're warm when the user switches tabs.
+  // (Acceptable cost for an internal beta — two small JSON fetches.)
+  const includeArchived = params.get('includeArchived') === 'true';
+  const tab = (params.get('type') ?? 'category') as Tab;
+
+  const categoryQuery = useApi<CategoryBudgetListItemDto[]>(buildListUrl(CATEGORY_BUDGETS_URL, includeArchived));
+  const goalQuery     = useApi<GoalBudgetListItemDto[]>(buildListUrl(GOAL_BUDGETS_URL, includeArchived));
+
+  if (childActive) {
+    return (
+      <div className="space-y-6">
+        <Outlet context={{ refetch: () => { categoryQuery.refetch(); goalQuery.refetch(); } }} />
+      </div>
+    );
+  }
+
+  function setTab(next: Tab) {
+    const p = new URLSearchParams(params);
+    p.set('type', next);
+    setParams(p, { replace: true });
+  }
+
+  function setIncludeArchived(checked: boolean) {
+    const p = new URLSearchParams(params);
+    if (checked) p.set('includeArchived', 'true');
+    else p.delete('includeArchived');
+    setParams(p, { replace: true });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
+          Budgets
+        </h1>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New
+                <ChevronDown className="h-4 w-4 opacity-70" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" sideOffset={8} className="min-w-[14rem] p-1.5">
+            <DropdownMenuItem
+              onClick={() => navigate('new?type=category')}
+              title="A monthly cap on spending in a specific category (e.g., €600/month on groceries)."
+              className="gap-2.5 px-3 py-2"
+            >
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <span>Category Budget</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('new?type=spending')}
+              title="Track money you're spending toward a target (e.g., a trip, a renovation). Tagged transactions count toward progress."
+              className="gap-2.5 px-3 py-2"
+            >
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+              <span>Spending Goal</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate('new?type=savings')}
+              title="Track money accumulated in a designated account (e.g., emergency fund). Progress = current account balance."
+              className="gap-2.5 px-3 py-2"
+            >
+              <PiggyBank className="h-4 w-4 text-muted-foreground" />
+              <span>Savings Goal</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <TabsList>
+          <TabsTrigger value="category">Category Budgets</TabsTrigger>
+          <TabsTrigger value="goal">Goal Budgets</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex items-center gap-2">
+        <Switch checked={includeArchived} onCheckedChange={setIncludeArchived} id="show-archived" />
+        <label htmlFor="show-archived" className="text-sm select-none">Show archived</label>
+      </div>
+
+      {tab === 'category' && (
+        <>
+          {categoryQuery.loading && <Skeleton className="h-[300px] w-full" />}
+          {categoryQuery.error && <CardError section="Category Budgets" onRetry={categoryQuery.refetch} />}
+          {categoryQuery.data && categoryQuery.data.length === 0 && (
+            <p className="text-sm text-muted-foreground">No category budgets.</p>
+          )}
+          {categoryQuery.data && categoryQuery.data.length > 0 && (
+            <CategoryBudgetsTable items={categoryQuery.data} onChanged={categoryQuery.refetch} />
+          )}
+        </>
+      )}
+
+      {tab === 'goal' && (
+        <>
+          {goalQuery.loading && <Skeleton className="h-[300px] w-full" />}
+          {goalQuery.error && <CardError section="Goal Budgets" onRetry={goalQuery.refetch} />}
+          {goalQuery.data && goalQuery.data.length === 0 && (
+            <p className="text-sm text-muted-foreground">No goal budgets.</p>
+          )}
+          {goalQuery.data && goalQuery.data.length > 0 && (
+            <GoalBudgetsTable items={goalQuery.data} onChanged={goalQuery.refetch} />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
