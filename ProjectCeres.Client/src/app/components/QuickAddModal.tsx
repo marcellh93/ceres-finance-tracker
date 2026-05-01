@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountCombobox } from './AccountCombobox';
 import { CategoryCombobox } from './CategoryCombobox';
+import { DatePickerField } from '../../components/DatePickerField';
 import {
   ACCOUNTS_ACTIVE_URL,
   CATEGORIES_ACTIVE_URL,
@@ -177,7 +178,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
 
           <TabsContent value="transaction" className="space-y-3 pt-3">
             <Field label="Date" htmlFor="qa-date" error={errors.date}>
-              <Input id="qa-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DatePickerField id="qa-date" value={date || null} onChange={(v) => setDate(v ?? '')} hideClear />
             </Field>
             <Field label="Amount" htmlFor="qa-amount" error={errors.amount}>
               <div className="flex items-center gap-2">
@@ -198,7 +199,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
 
           <TabsContent value="transfer" className="space-y-3 pt-3">
             <Field label="Date" htmlFor="qa-tr-date" error={errors.date}>
-              <Input id="qa-tr-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DatePickerField id="qa-tr-date" value={date || null} onChange={(v) => setDate(v ?? '')} hideClear />
             </Field>
             <Field label="Amount" htmlFor="qa-tr-amount" error={errors.amount}>
               <div className="flex items-center gap-2">
@@ -219,7 +220,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
 
           <TabsContent value="liabilityPayment" className="space-y-3 pt-3">
             <Field label="Date" htmlFor="qa-lp-date" error={errors.date}>
-              <Input id="qa-lp-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DatePickerField id="qa-lp-date" value={date || null} onChange={(v) => setDate(v ?? '')} hideClear />
             </Field>
             <Field label="Amount" htmlFor="qa-lp-amount" error={errors.amount}>
               <div className="flex items-center gap-2">

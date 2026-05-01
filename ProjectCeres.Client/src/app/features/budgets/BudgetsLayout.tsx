@@ -55,7 +55,7 @@ export function BudgetsLayout() {
 
   if (childActive) {
     return (
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6">
         <Outlet context={{ refetch: () => { categoryQuery.refetch(); goalQuery.refetch(); } }} />
       </div>
     );
@@ -75,7 +75,7 @@ export function BudgetsLayout() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Budgets

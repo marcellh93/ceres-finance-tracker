@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { CategoryCombobox } from '../../components/CategoryCombobox';
+import { DatePickerField } from '../../../components/DatePickerField';
 import {
   amountPlaceholder,
   formatAmountForDisplay,
@@ -427,12 +428,11 @@ export function MovementForm({
         {/* ── Date + Amount ── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Date" htmlFor="mf-date" error={errors.date}>
-            <Input
+            <DatePickerField
               id="mf-date"
-              type="date"
-              value={values.date}
-              onChange={(e) => set('date', e.target.value)}
-              className="text-base font-medium"
+              value={values.date || null}
+              onChange={(v) => set('date', v ?? '')}
+              hideClear
             />
           </Field>
 
