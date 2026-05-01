@@ -144,7 +144,11 @@ export function MovementForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        style={{ viewTransitionName: 'movement-form' }}
+      >
         {/* ── Shared fields ── */}
         <Field label="Date" htmlFor="mf-date" error={errors.date}>
           <Input

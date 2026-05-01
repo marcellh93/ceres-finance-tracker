@@ -43,7 +43,11 @@ export function MovementsTable({ items, onRefetch }: Props) {
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={`${item.movementType}-${item.id}`} className="border-t border-border">
+            <tr
+              key={`${item.movementType}-${item.id}`}
+              className="border-t border-border"
+              style={{ viewTransitionName: `movement-row-${item.id}` }}
+            >
               <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.date)}</td>
               <td className="px-3 py-2">
                 {item.movementType === 'Transaction' && (
