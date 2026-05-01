@@ -91,7 +91,7 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
 
   return (
     <div className="flex items-center gap-2">
-      <TooltipProvider delay={300}>
+      <TooltipProvider delay={0}>
         <Tooltip>
           <TooltipTrigger
             render={
