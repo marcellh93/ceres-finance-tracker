@@ -107,7 +107,7 @@ public class CategoryBudgetService(AppDbContext db) : ICategoryBudgetService
             ?? throw new InvalidOperationException("Settings row missing.");
 
         var (periodStart, periodEnd) =
-            BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+            BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         return await db.Transactions
             .Where(t =>

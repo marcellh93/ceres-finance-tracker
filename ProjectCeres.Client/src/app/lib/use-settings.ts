@@ -5,7 +5,7 @@ export type AppSettings = {
   dateFormat: string;
   defaultCurrencyCode: string;
   defaultCurrencySymbol: string;
-  budgetPeriodStartDay: number;
+  periodStartDay: number;
 };
 
 export type UseSettingsResult = {
@@ -18,7 +18,7 @@ const FALLBACK: AppSettings = {
   dateFormat: 'DD/MM/YYYY',
   defaultCurrencyCode: '',
   defaultCurrencySymbol: '',
-  budgetPeriodStartDay: 1,
+  periodStartDay: 1,
 };
 
 /**

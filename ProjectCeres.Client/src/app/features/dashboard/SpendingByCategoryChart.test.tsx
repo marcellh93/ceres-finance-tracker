@@ -12,7 +12,7 @@ describe('SpendingByCategoryChart', () => {
     mockFetch.mockReturnValue(new Promise(() => {}));
     render(<SpendingByCategoryChart />);
     expect(screen.getByText('Spending by Category')).toBeInTheDocument();
-    expect(screen.getByText('This month')).toBeInTheDocument();
+    expect(screen.getByText('This period')).toBeInTheDocument();
   });
 
   it('renders empty state when slices is []', async () => {

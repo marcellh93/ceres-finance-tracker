@@ -82,7 +82,7 @@ public class DashboardApiController(
         var budgets  = await categoryBudgetService.GetAllAsync(includeInactive: false);
         var settings = await settingsService.GetAsync();
         var today    = DateOnly.FromDateTime(DateTime.Today);
-        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
 
         var result = new List<object>();
         foreach (var budget in budgets)
@@ -257,10 +257,11 @@ public class DashboardApiController(
         var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
 
         var today = DateOnly.FromDateTime(DateTime.Today);
-        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
+        var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         var transactions = await db.Transactions
-            .Where(t => t.Date >= monthStart && t.Date <= today &&
+            .Where(t => t.Date >= periodStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId &&
                         t.Category.CategoryType.Name == "Expense" &&
                         !t.Category.IsSystem)

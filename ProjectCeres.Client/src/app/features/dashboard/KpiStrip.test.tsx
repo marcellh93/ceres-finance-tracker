@@ -22,7 +22,7 @@ describe('KpiStrip', () => {
   it('renders all three KPI cards in order', async () => {
     render(<MemoryRouter><KpiStrip /></MemoryRouter>);
     const netWorthTitle = await screen.findByText('Net Worth');
-    const mtdTitle = screen.getByText('Month to Date');
+    const mtdTitle = screen.getByText('Cycle to Date');
     const remindersTitle = screen.getByText('Reminders');
     expect(netWorthTitle).toBeDefined();
     expect(mtdTitle).toBeDefined();

@@ -2,7 +2,7 @@ namespace ProjectCeres.Services;
 
 /// <summary>
 /// Pure helper for budget-period boundary math driven by
-/// <c>Settings.BudgetPeriodStartDay</c>. See spec §5.2 / §5.3 for the rule:
+/// <c>Settings.PeriodStartDay</c>. See spec §5.2 / §5.3 for the rule:
 /// for shorter months, the start day falls back to the month's last day;
 /// the period whose end falls in (year, month) is named after that month.
 /// </summary>

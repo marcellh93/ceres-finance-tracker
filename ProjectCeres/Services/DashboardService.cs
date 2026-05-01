@@ -12,9 +12,10 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var currency   = settings.DefaultCurrency;
 
         var today = DateOnly.FromDateTime(DateTime.Today);
-        var mtdFrom = new DateOnly(today.Year, today.Month, 1);
+        var (mtdYear, mtdMonth) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
+        var (mtdFrom, _) = BudgetPeriod.GetBoundsForMonth(mtdYear, mtdMonth, settings.PeriodStartDay);
 
-        // MTD transactions for the default currency.
+        // MTD ("Cycle to Date") transactions for the default currency, scoped to the user's period.
         var mtdTransactions = await db.Transactions
             .Where(t => t.Date >= mtdFrom && t.Date <= today && t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Category)
@@ -169,7 +170,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         decimal laterBills = laterRecurring.Sum(r => r.EstimatedAmount ?? 0m);
 
         // Budget reserve = SUM(MAX(0, limit − actual spend this PERIOD)) per active CategoryBudget.
-        // Uses BudgetPeriod helper so the cycle respects Settings.BudgetPeriodStartDay,
+        // Uses BudgetPeriod helper so the cycle respects Settings.PeriodStartDay,
         // not the calendar month.
         var activeBudgets = await db.CategoryBudgets
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
@@ -180,8 +181,8 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         {
             var settings = await db.Settings.FirstOrDefaultAsync()
                 ?? throw new InvalidOperationException("Settings row missing.");
-            var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
-            var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+            var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
+            var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
             var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
             var actualSpendByCategory = await db.Transactions
@@ -301,7 +302,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
     /// <summary>
     /// Income metrics:
-    ///   currentPeriodIncome = income for the period containing today, per Settings.BudgetPeriodStartDay
+    ///   currentPeriodIncome = income for the period containing today, per Settings.PeriodStartDay
     ///   rollingAverage      = avg monthly income over last 6 full CALENDAR months (not period-aligned)
     ///   deltaPercent        = (currentPeriodIncome − rollingAverage) / rollingAverage
     /// All values are null if no income exists in the prior 6 months (rollingAverage = 0).
@@ -313,8 +314,8 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         // "Current period" follows the user's configured budget cycle.
         var settings = await db.Settings.FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Settings row missing.");
-        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
-        var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
+        var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         // 6-month rolling average uses calendar months — averaging needs equal-length samples.
         var calendarMtdFrom = new DateOnly(today.Year, today.Month, 1);
@@ -387,8 +388,8 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         var settings = await db.Settings.FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Settings row missing.");
-        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
-        var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
+        var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
 

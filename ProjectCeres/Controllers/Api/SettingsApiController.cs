@@ -17,7 +17,7 @@ public class SettingsApiController(ISettingsService settingsService) : Controlle
             DateFormat:             settings.DateFormat,
             DefaultCurrencyCode:    settings.DefaultCurrency.Code,
             DefaultCurrencySymbol:  settings.DefaultCurrency.Symbol,
-            BudgetPeriodStartDay:   settings.BudgetPeriodStartDay);
+            PeriodStartDay:         settings.PeriodStartDay);
         return Ok(dto);
     }
 }

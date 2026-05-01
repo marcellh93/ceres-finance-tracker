@@ -380,7 +380,7 @@ Returned by `POST /api/category-budgets` and `PATCH /api/category-budgets/{id}/r
 | RecurringTransactions | CRUD + list | Templates only; confirming a reminder creates a Transaction |
 | Reports | GET only (generated on demand) | Net Worth, Income/Expense, Expense Breakdown, Transaction History |
 | Attachments | Upload (POST), download (GET), delete | Scoped to a Transaction |
-| Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3; includes `BudgetPeriodStartDay`, notification preferences |
+| Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3; includes `PeriodStartDay`, notification preferences |
 | Notifications | GET (list preferences), PATCH (update preferences) | Controls: weekly digest opt-in, new session alert opt-out, Safe to Spend alert |
 | DataExport | POST (request export), GET (download by token) | Async: POST returns `202 Accepted` with a job ID; user notified by email when ready; download link is time-limited (24 h) and authenticated |
 | AuditLog | GET (list, paginated) | User's own audit log entries only — no delete endpoint |

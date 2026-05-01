@@ -187,7 +187,7 @@ function IncomeDeltaPanel({ data }: { data: HealthDto }) {
   const sym = data.currencySymbol;
   return (
     <div className="lg:border-l lg:border-border lg:pl-6">
-      <PanelLabel tooltip="Your income this period compared to your 6-month average. Period uses your configured budget cycle start day.">Income vs. Avg</PanelLabel>
+      <PanelLabel tooltip="Your income this period compared to your 6-month average. Period uses your configured monthly cycle.">Income vs. Avg</PanelLabel>
       {data.incomeDeltaPercent === null ? (
         <PanelEmpty icon={<CalendarClock className="h-8 w-8" />}>
           Needs 6 months of income history

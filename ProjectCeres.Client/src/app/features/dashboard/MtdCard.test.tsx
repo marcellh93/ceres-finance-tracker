@@ -35,7 +35,7 @@ describe('MtdCard', () => {
   it('renders empty-state copy when income and expenses are both 0', async () => {
     (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(mockSummary(0, 0, 0));
     render(<MtdCard />);
-    expect(await screen.findByText(/no transactions this month/i)).toBeDefined();
+    expect(await screen.findByText(/no transactions this period/i)).toBeDefined();
   });
 
   it('renders error + retry on fetch failure', async () => {

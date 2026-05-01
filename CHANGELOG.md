@@ -91,6 +91,11 @@
 
 #### Changed
 
+**Settings / Dashboard cycle math**
+- Renamed `Settings.BudgetPeriodStartDay` to `Settings.PeriodStartDay` to reflect that it now drives every monthly view (Cycle to Date, Spending by Category, Income vs. Avg, Budget periods, etc.), not just budgets. UI label is now "Monthly cycle start day."
+- "Month to Date" dashboard card renamed to "Cycle to Date" — its window now follows the user's configured monthly cycle, not strict calendar months.
+- "Spending by Category" dashboard card subtitle is now "This period" (was "This month") and respects the configured cycle.
+
 **Dashboard**
 - `CategoryBudgetBars` and `GoalBudgetBars` refactored to render bare body without owning Card chrome (parent owns chrome)
 - `CardTitle` accessibility upgrade: `<div>` → `<h3>` with `font-semibold`

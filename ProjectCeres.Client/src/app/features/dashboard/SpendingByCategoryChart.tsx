@@ -18,7 +18,7 @@ export function SpendingByCategoryChart() {
     <Card>
       <CardHeader>
         <CardTitle>Spending by Category</CardTitle>
-        <p className="text-xs text-muted-foreground">This month</p>
+        <p className="text-xs text-muted-foreground">This period</p>
       </CardHeader>
       <CardContent>
         {loading && <Skeleton className="h-[220px] w-full" />}

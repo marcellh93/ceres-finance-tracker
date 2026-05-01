@@ -32,8 +32,8 @@ public class CategoryBudgetsSpendApiTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var settings = await db.Settings.FirstAsync();
-        _originalStartDay = settings.BudgetPeriodStartDay;
-        settings.BudgetPeriodStartDay = 25;
+        _originalStartDay = settings.PeriodStartDay;
+        settings.PeriodStartDay = 25;
         await db.SaveChangesAsync();
     }
 
@@ -50,7 +50,7 @@ public class CategoryBudgetsSpendApiTests : IAsyncLifetime
         if (_originalStartDay.HasValue)
         {
             var settings = await db.Settings.FirstAsync();
-            settings.BudgetPeriodStartDay = _originalStartDay.Value;
+            settings.PeriodStartDay = _originalStartDay.Value;
             await db.SaveChangesAsync();
         }
     }

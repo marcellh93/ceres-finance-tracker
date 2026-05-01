@@ -32,7 +32,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
         settings.NumberFormat         = vm.NumberFormat;
         settings.DateFormat           = vm.DateFormat;
         settings.DefaultCurrencyId    = vm.DefaultCurrencyId!.Value;
-        settings.BudgetPeriodStartDay = ClampStartDay(vm.BudgetPeriodStartDay);
+        settings.PeriodStartDay       = ClampStartDay(vm.PeriodStartDay);
 
         if (isNew)
             db.Settings.Add(settings);
@@ -57,6 +57,6 @@ public class SettingsService(AppDbContext db) : ISettingsService
         NumberFormat         = "comma_decimal",
         DateFormat           = "DD/MM/YYYY",
         DefaultCurrencyId    = 1,
-        BudgetPeriodStartDay = 1
+        PeriodStartDay       = 1
     };
 }

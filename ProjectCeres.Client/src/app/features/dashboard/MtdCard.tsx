@@ -17,7 +17,7 @@ export function MtdCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Month to Date</CardTitle>
+        <CardTitle>Cycle to Date</CardTitle>
       </CardHeader>
       <CardContent>
         {loading && (
@@ -27,9 +27,9 @@ export function MtdCard() {
             <Skeleton className="h-5 w-32" />
           </div>
         )}
-        {error && <CardError section="Month to Date" onRetry={refetch} />}
+        {error && <CardError section="Cycle to Date" onRetry={refetch} />}
         {data && data.mtd.income === 0 && data.mtd.expenses === 0 && (
-          <p className="text-sm text-muted-foreground">No transactions this month yet.</p>
+          <p className="text-sm text-muted-foreground">No transactions this period yet.</p>
         )}
         {data && (data.mtd.income !== 0 || data.mtd.expenses !== 0) && (
           <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -18,8 +18,8 @@ public class CategoryBudgetsApiController(
         var budgets  = await categoryBudgetService.GetAllAsync(includeInactive: includeArchived, currency: currency);
         var settings = await settingsService.GetAsync();
         var today    = DateOnly.FromDateTime(DateTime.Today);
-        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.BudgetPeriodStartDay);
-        var (_, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+        var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
+        var (_, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         var dtos = new List<CategoryBudgetListItemDto>();
         foreach (var b in budgets)
@@ -160,7 +160,7 @@ public class CategoryBudgetsApiController(
         if (existing is null) return NotFound();
 
         var settings = await settingsService.GetAsync();
-        var (start, end) = BudgetPeriod.GetBoundsForMonth(year, month, settings.BudgetPeriodStartDay);
+        var (start, end) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
         var spent = await categoryBudgetService.GetActualSpendAsync(id, year, month);
 
         return new CategoryBudgetSpendDto(spent, start, end);

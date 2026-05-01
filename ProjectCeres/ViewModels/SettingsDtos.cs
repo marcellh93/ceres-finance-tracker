@@ -10,4 +10,4 @@ public record SettingsDto(
     string DateFormat,
     string DefaultCurrencyCode,
     string DefaultCurrencySymbol,
-    int    BudgetPeriodStartDay);
+    int    PeriodStartDay);

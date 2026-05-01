@@ -18,7 +18,7 @@ public class SettingsController(ISettingsService settingsService, AppDbContext d
             NumberFormat         = settings.NumberFormat,
             DateFormat           = settings.DateFormat,
             DefaultCurrencyId    = settings.DefaultCurrencyId,
-            BudgetPeriodStartDay = settings.BudgetPeriodStartDay
+            PeriodStartDay       = settings.PeriodStartDay
         };
 
         await PopulateViewBagAsync();
