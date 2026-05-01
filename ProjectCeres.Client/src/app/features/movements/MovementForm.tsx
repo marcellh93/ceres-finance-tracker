@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
@@ -24,6 +25,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { CategoryCombobox } from '../../components/CategoryCombobox';
+import {
+  amountPlaceholder,
+  formatAmountForDisplay,
+  formatNumberForDisplay,
+  parseAmountToNumber,
+  sanitizeAmountInput,
+  stripThousandSeparators,
+  type NumberFormat,
+} from '../../lib/amount-format';
+import { useSettings } from '../../lib/use-settings';
 import type { AccountOptionDto, CategoryOptionDto, MovementType } from './movements-api';
 
 export type MovementFormValues = {
@@ -132,6 +143,15 @@ export function MovementForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const settings = useSettings();
+  const numberFormat: NumberFormat | undefined = settings.data?.numberFormat;
+
+  // ── Amount field display state ──
+  // values.amount is the *wire* format (JS-number string, period decimal).
+  // displayAmount is what the user sees: raw while focused, grouped on blur.
+  const [displayAmount, setDisplayAmount] = useState('');
+  const [amountFocused, setAmountFocused] = useState(false);
+
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
 
@@ -141,8 +161,47 @@ export function MovementForm({
     setErrors({});
   }, [initialValues]);
 
+  // Whenever the format becomes known or the wire value changes (e.g. Edit
+  // load), re-render the display to match the user's locale.
+  useEffect(() => {
+    if (!numberFormat) return;
+    if (amountFocused) return; // don't overwrite mid-edit
+    const wire = values.amount;
+    if (!wire) {
+      setDisplayAmount('');
+      return;
+    }
+    const asNumber = Number(wire);
+    setDisplayAmount(
+      Number.isFinite(asNumber) ? formatNumberForDisplay(asNumber, numberFormat) : '',
+    );
+  }, [values.amount, numberFormat, amountFocused]);
+
   function set<K extends keyof MovementFormValues>(key: K, value: MovementFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleAmountChange(input: string) {
+    if (!numberFormat) return;
+    const sanitized = sanitizeAmountInput(input, numberFormat);
+    setDisplayAmount(sanitized);
+    // Mirror to wire format so submit always has the right value.
+    const parsed = parseAmountToNumber(sanitized, numberFormat);
+    set('amount', Number.isFinite(parsed) ? String(parsed) : '');
+  }
+
+  function handleAmountFocus() {
+    if (!numberFormat) return;
+    setAmountFocused(true);
+    // Strip thousands separators so editing is easier.
+    setDisplayAmount(stripThousandSeparators(displayAmount, numberFormat));
+  }
+
+  function handleAmountBlur() {
+    if (!numberFormat) return;
+    setAmountFocused(false);
+    // Insert thousands separators for display.
+    setDisplayAmount(formatAmountForDisplay(displayAmount, numberFormat));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -162,8 +221,98 @@ export function MovementForm({
 
   const symbol = selectedAccountSymbol(type, values, accounts);
 
+  // Render the Amount input — or a Skeleton while settings load,
+  // since the field's behavior depends on the user's number format.
+  const amountInput =
+    numberFormat === undefined ? (
+      <Skeleton className="h-8 w-full" />
+    ) : (
+      <InputGroup>
+        {symbol && (
+          <InputGroupAddon align="inline-start">
+            <InputGroupText className="text-base font-medium text-muted-foreground">
+              {symbol}
+            </InputGroupText>
+          </InputGroupAddon>
+        )}
+        <InputGroupInput
+          id="mf-amount"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder={amountPlaceholder(numberFormat)}
+          value={displayAmount}
+          onChange={(e) => handleAmountChange(e.target.value)}
+          onFocus={handleAmountFocus}
+          onBlur={handleAmountBlur}
+          className="text-base font-medium"
+        />
+      </InputGroup>
+    );
+
+  // Type-specific account fields — extracted so they can render before the
+  // Date+Amount row (Account is the prerequisite for the currency symbol).
+  const accountFields = (() => {
+    if (type === 'Transaction') {
+      return (
+        <Field label="Account" error={errors.accountId}>
+          <AccountCombobox
+            accounts={accounts}
+            value={values.accountId}
+            onChange={(id) => set('accountId', id)}
+            placeholder="Select account"
+          />
+        </Field>
+      );
+    }
+    if (type === 'Transfer') {
+      return (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Source account" error={errors.sourceAccountId}>
+            <AccountCombobox
+              accounts={accounts}
+              value={values.sourceAccountId}
+              onChange={(id) => set('sourceAccountId', id)}
+              placeholder="Select source"
+            />
+          </Field>
+          <Field label="Destination account" error={errors.destAccountId}>
+            <AccountCombobox
+              accounts={accounts}
+              value={values.destAccountId}
+              onChange={(id) => set('destAccountId', id)}
+              placeholder="Select destination"
+            />
+          </Field>
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Asset account" error={errors.assetAccountId}>
+          <AccountCombobox
+            accounts={accounts}
+            value={values.assetAccountId}
+            onChange={(id) => set('assetAccountId', id)}
+            placeholder="Select asset account"
+            filter={(a) => a.accountTypeName !== 'Liability'}
+          />
+        </Field>
+        <Field label="Liability account" error={errors.liabilityAccountId}>
+          <AccountCombobox
+            accounts={accounts}
+            value={values.liabilityAccountId}
+            onChange={(id) => set('liabilityAccountId', id)}
+            placeholder="Select liability account"
+            filter={(a) => a.accountTypeName === 'Liability'}
+          />
+        </Field>
+      </div>
+    );
+  })();
+
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-6">
       <h1
         ref={headingRef}
         tabIndex={-1}
@@ -184,7 +333,21 @@ export function MovementForm({
         className="space-y-5"
         style={{ viewTransitionName: 'movement-form' }}
       >
-        {/* ── Date + Amount: primary signals, side-by-side ── */}
+        {/* ── Account fields first: they unlock the currency symbol on Amount ── */}
+        {accountFields}
+
+        {type === 'Transaction' && (
+          <Field label="Category" error={errors.categoryId}>
+            <CategoryCombobox
+              categories={categories}
+              value={values.categoryId}
+              onChange={(id) => set('categoryId', id)}
+              placeholder="Select category"
+            />
+          </Field>
+        )}
+
+        {/* ── Date + Amount ── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Date" htmlFor="mf-date" error={errors.date}>
             <Input
@@ -197,91 +360,9 @@ export function MovementForm({
           </Field>
 
           <Field label="Amount" htmlFor="mf-amount" error={errors.amount}>
-            <InputGroup>
-              {symbol && (
-                <InputGroupAddon align="inline-start">
-                  <InputGroupText className="text-base font-medium text-muted-foreground">
-                    {symbol}
-                  </InputGroupText>
-                </InputGroupAddon>
-              )}
-              <InputGroupInput
-                id="mf-amount"
-                type="number"
-                step="0.01"
-                value={values.amount}
-                onChange={(e) => set('amount', e.target.value)}
-                className="text-base font-medium"
-              />
-            </InputGroup>
+            {amountInput}
           </Field>
         </div>
-
-        {/* ── Type-specific fields ── */}
-        {type === 'Transaction' && (
-          <>
-            <Field label="Account" error={errors.accountId}>
-              <AccountCombobox
-                accounts={accounts}
-                value={values.accountId}
-                onChange={(id) => set('accountId', id)}
-                placeholder="Select account"
-              />
-            </Field>
-            <Field label="Category" error={errors.categoryId}>
-              <CategoryCombobox
-                categories={categories}
-                value={values.categoryId}
-                onChange={(id) => set('categoryId', id)}
-                placeholder="Select category"
-              />
-            </Field>
-          </>
-        )}
-
-        {type === 'Transfer' && (
-          <>
-            <Field label="Source account" error={errors.sourceAccountId}>
-              <AccountCombobox
-                accounts={accounts}
-                value={values.sourceAccountId}
-                onChange={(id) => set('sourceAccountId', id)}
-                placeholder="Select source"
-              />
-            </Field>
-            <Field label="Destination account" error={errors.destAccountId}>
-              <AccountCombobox
-                accounts={accounts}
-                value={values.destAccountId}
-                onChange={(id) => set('destAccountId', id)}
-                placeholder="Select destination"
-              />
-            </Field>
-          </>
-        )}
-
-        {type === 'LiabilityPayment' && (
-          <>
-            <Field label="Asset account" error={errors.assetAccountId}>
-              <AccountCombobox
-                accounts={accounts}
-                value={values.assetAccountId}
-                onChange={(id) => set('assetAccountId', id)}
-                placeholder="Select asset account"
-                filter={(a) => a.accountTypeName !== 'Liability'}
-              />
-            </Field>
-            <Field label="Liability account" error={errors.liabilityAccountId}>
-              <AccountCombobox
-                accounts={accounts}
-                value={values.liabilityAccountId}
-                onChange={(id) => set('liabilityAccountId', id)}
-                placeholder="Select liability account"
-                filter={(a) => a.accountTypeName === 'Liability'}
-              />
-            </Field>
-          </>
-        )}
 
         {/* ── Shared tail fields ── */}
         <Field label="Description" htmlFor="mf-desc" error={errors.description}>
@@ -294,14 +375,20 @@ export function MovementForm({
 
         <Separator className="my-2" />
 
-        {/* ── Status row: distinct from data fields ── */}
-        <div className="flex items-start justify-between gap-4 rounded-md border border-border bg-muted/30 p-4">
+        {/* ── Status row: distinct from data fields, color-shifts on cleared ── */}
+        <div
+          className={
+            'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors duration-200 ' +
+            (values.isCleared
+              ? 'border-success/30 bg-success/10'
+              : 'border-border bg-muted/30')
+          }
+        >
           <div className="flex items-start gap-3">
             <div
               className={
-                values.isCleared
-                  ? 'mt-0.5 text-success'
-                  : 'mt-0.5 text-muted-foreground'
+                'mt-0.5 transition-colors duration-200 ' +
+                (values.isCleared ? 'text-success' : 'text-muted-foreground')
               }
               aria-hidden="true"
             >
@@ -312,10 +399,20 @@ export function MovementForm({
               )}
             </div>
             <div className="space-y-0.5">
-              <div className="text-sm font-medium tracking-wide text-foreground/80">
+              <div
+                className={
+                  'text-sm font-medium tracking-wide transition-colors duration-200 ' +
+                  (values.isCleared ? 'text-success' : 'text-foreground/80')
+                }
+              >
                 Status
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p
+                className={
+                  'text-xs transition-colors duration-200 ' +
+                  (values.isCleared ? 'text-success/80' : 'text-muted-foreground')
+                }
+              >
                 {values.isCleared
                   ? 'Cleared the bank.'
                   : "Hasn't cleared the bank yet."}

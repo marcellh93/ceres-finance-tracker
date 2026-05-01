@@ -2,6 +2,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MovementForm, type MovementFormValues } from './MovementForm';
 
+// Stub the settings hook so format-aware fields render synchronously in tests.
+// The hook's own behavior is exercised in use-settings.test.ts.
+vi.mock('../../lib/use-settings', () => ({
+  useSettings: () => ({
+    data: {
+      numberFormat: 'period_decimal' as const,
+      dateFormat: 'MM/DD/YYYY',
+      defaultCurrencyCode: 'USD',
+      defaultCurrencySymbol: '$',
+    },
+    loading: false,
+  }),
+}));
+
 const emptyValues: MovementFormValues = {
   date: '2026-04-30',
   amount: '',
@@ -272,5 +286,73 @@ describe('MovementForm', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: /edit transaction/i }),
     ).toBeInTheDocument();
+  });
+
+  it('Test 10: Amount field uses the user format placeholder', () => {
+    // The mocked useSettings returns period_decimal at the top of this file.
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={() => {}}
+      />,
+    );
+    const amount = screen.getByLabelText(/amount/i) as HTMLInputElement;
+    expect(amount.placeholder).toBe('0.00');
+    expect(amount.getAttribute('inputmode')).toBe('decimal');
+    expect(amount.type).toBe('text');
+  });
+
+  it('Test 11: Amount field formats with thousands separators on blur', () => {
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={() => {}}
+      />,
+    );
+    const amount = screen.getByLabelText(/amount/i) as HTMLInputElement;
+    fireEvent.focus(amount);
+    fireEvent.change(amount, { target: { value: '1234.56' } });
+    expect(amount.value).toBe('1234.56');
+    fireEvent.blur(amount);
+    // period_decimal: thousand separator is comma
+    expect(amount.value).toBe('1,234.56');
+  });
+
+  it('Test 12: Amount field submits the wire (period-decimal) value', async () => {
+    const submit = vi
+      .fn()
+      .mockResolvedValue({ ok: true as const });
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={submit}
+        onCancel={() => {}}
+      />,
+    );
+    const amount = screen.getByLabelText(/amount/i) as HTMLInputElement;
+    fireEvent.focus(amount);
+    fireEvent.change(amount, { target: { value: '1234.56' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    const submitted = submit.mock.calls[0][0] as MovementFormValues;
+    // Wire format is period decimal regardless of display format.
+    expect(submitted.amount).toBe('1234.56');
   });
 });
