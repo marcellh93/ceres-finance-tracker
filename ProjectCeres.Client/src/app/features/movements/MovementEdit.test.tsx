@@ -150,6 +150,7 @@ function OutletShim() {
   return (
     <>
       <div data-testid="probe-state">{JSON.stringify(loc.state)}</div>
+      <div data-testid="probe-url">{loc.pathname + loc.search}</div>
       <Outlet context={{ refetch: refetchMock }} />
     </>
   );
@@ -348,6 +349,42 @@ describe('MovementEdit', () => {
       // After clear, state should be {} (or at least no pendingAttachment)
       const parsed = probe.textContent ? JSON.parse(probe.textContent) : null;
       expect(parsed?.pendingAttachment).toBeUndefined();
+    });
+  });
+
+  it('Save navigates back to /movements with the entity\'s currency code in the URL', async () => {
+    renderAt('/movements/abc-123/edit');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Saved.');
+    });
+
+    // The fixture account a1 has currencyCode: 'EUR' → URL should reflect it.
+    await waitFor(() => {
+      expect(screen.getByTestId('probe-url').textContent).toBe('/movements?currency=EUR');
+    });
+  });
+
+  it('Delete navigates back to /movements with the entity\'s currency code in the URL', async () => {
+    renderAt('/movements/abc-123/edit');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+    });
+
+    const deleteButtons = await screen.findAllByRole('button', { name: /delete/i });
+    fireEvent.click(deleteButtons[0]);
+    const confirmButtons = await screen.findAllByRole('button', { name: /delete/i });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('probe-url').textContent).toBe('/movements?currency=EUR');
     });
   });
 

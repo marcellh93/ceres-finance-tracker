@@ -175,7 +175,7 @@ function MovementEditInner({
     if (response.status === 204) {
       toast.success('Saved.');
       refetch();
-      navigate('/movements');
+      navigate(buildMovementsListPath(values, accounts ?? []));
       return { ok: true };
     }
 
@@ -201,11 +201,26 @@ function MovementEditInner({
     if (response.status === 204) {
       toast.success('Deleted.');
       refetch();
-      navigate('/movements');
+      navigate(buildMovementsListPath(initialValues, accounts ?? []));
       return;
     }
 
     toast.error("Couldn't delete.");
+  }
+
+  function buildMovementsListPath(
+    formValues: MovementFormValues | null,
+    accountList: AccountOptionDto[],
+  ): string {
+    if (!formValues) return '/movements';
+    const drivingAccountId =
+      movementType === 'Transaction'
+        ? formValues.accountId
+        : movementType === 'Transfer'
+          ? formValues.sourceAccountId
+          : formValues.assetAccountId;
+    const account = accountList.find((a) => a.id === drivingAccountId);
+    return account ? `/movements?currency=${account.currencyCode}` : '/movements';
   }
 
   if (typedLoading || !initialValues) {
@@ -230,7 +245,7 @@ function MovementEditInner({
         categories={categories ?? []}
         onSubmit={onSubmit}
         onDelete={onDelete}
-        onCancel={() => navigate('/movements')}
+        onCancel={() => navigate(buildMovementsListPath(initialValues, accounts ?? []))}
       />
       {showDropzone && (
         <AttachmentDropzone
