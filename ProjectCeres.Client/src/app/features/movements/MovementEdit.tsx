@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MovementForm, type MovementFormValues } from './MovementForm';
+import { AttachmentDropzone } from './AttachmentDropzone';
 import {
   ACCOUNTS_ACTIVE_URL,
   CATEGORIES_ACTIVE_URL,
@@ -83,7 +84,22 @@ function MovementEditInner({
   movementType: MovementType;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { refetch } = useOutletContext<{ refetch: () => void }>();
+
+  // Capture pendingAttachment from location.state ONCE on mount, then clear it.
+  // Hard refresh of the same URL must not try to re-upload a file no longer in memory.
+  const pendingFileRef = useRef<File | null>(
+    (location.state as { pendingAttachment?: File } | null)?.pendingAttachment ?? null,
+  );
+  const [pendingFile] = useState<File | null>(pendingFileRef.current);
+
+  useEffect(() => {
+    if ((location.state as { pendingAttachment?: File } | null)?.pendingAttachment) {
+      navigate(location.pathname + location.search, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const typedUrl =
     movementType === 'Transaction'
@@ -196,17 +212,35 @@ function MovementEditInner({
     return <div className="text-sm text-muted-foreground">Loading…</div>;
   }
 
+  const showDropzone = movementType !== 'LiabilityPayment';
+  const dropzoneInitialAttachments =
+    movementType === 'Transaction'
+      ? (typedData as TransactionEditDto).attachments ?? []
+      : movementType === 'Transfer'
+        ? (typedData as TransferEditDto).attachments ?? []
+        : [];
+
   return (
-    <MovementForm
-      type={movementType}
-      mode="edit"
-      initialValues={initialValues}
-      accounts={accounts ?? []}
-      categories={categories ?? []}
-      onSubmit={onSubmit}
-      onDelete={onDelete}
-      onCancel={() => navigate('/movements')}
-    />
+    <div className="space-y-6">
+      <MovementForm
+        type={movementType}
+        mode="edit"
+        initialValues={initialValues}
+        accounts={accounts ?? []}
+        categories={categories ?? []}
+        onSubmit={onSubmit}
+        onDelete={onDelete}
+        onCancel={() => navigate('/movements')}
+      />
+      {showDropzone && (
+        <AttachmentDropzone
+          parentType={movementType as 'Transaction' | 'Transfer'}
+          parentId={id}
+          initialAttachments={dropzoneInitialAttachments}
+          pendingFile={pendingFile}
+        />
+      )}
+    </div>
   );
 }
 

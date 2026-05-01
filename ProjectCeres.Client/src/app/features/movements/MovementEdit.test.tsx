@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Outlet, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Outlet, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { MovementEdit } from './MovementEdit';
 
 // ── Mock sonner ──
@@ -8,6 +8,24 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 import { toast } from 'sonner';
+
+// ── Mock AttachmentDropzone — assert props rather than render full DOM ──
+vi.mock('./AttachmentDropzone', () => ({
+  AttachmentDropzone: vi.fn((props: {
+    parentType: string;
+    parentId: string;
+    pendingFile?: File | null;
+    initialAttachments: Array<{ id: string }>;
+  }) => (
+    <div
+      data-testid="dropzone"
+      data-parent-type={props.parentType}
+      data-parent-id={props.parentId}
+      data-pending-file={props.pendingFile?.name ?? ''}
+      data-initial-count={props.initialAttachments.length}
+    />
+  )),
+}));
 
 // ── Mock fetch ──
 const mockFetch = vi.fn();
@@ -20,8 +38,39 @@ const TRANSACTION_DTO = {
   categoryId: 'c1',
   description: 'March salary',
   isCleared: true,
+  attachments: [
+    {
+      id: 'att-1',
+      fileName: 'receipt.pdf',
+      sizeBytes: 1234,
+      contentType: 'application/pdf',
+      uploadedAt: '2025-03-16T10:00:00Z',
+    },
+  ],
+};
+
+const TRANSFER_DTO = {
+  id: 'abc-123',
+  date: '2025-03-15',
+  amount: 100.0,
+  sourceAccountId: 'a1',
+  destAccountId: 'a2',
+  description: 'Move funds',
+  isCleared: false,
   attachments: [],
 };
+
+const LIABILITY_PAYMENT_DTO = {
+  id: 'abc-123',
+  date: '2025-03-15',
+  amount: 500.0,
+  assetAccountId: 'a1',
+  liabilityAccountId: 'a3',
+  description: 'Loan payment',
+  isCleared: true,
+};
+
+let discriminatorType: 'Transaction' | 'Transfer' | 'LiabilityPayment' = 'Transaction';
 
 function defaultFetchImpl(url: string, init?: RequestInit) {
   const method = (init?.method ?? 'GET').toUpperCase();
@@ -30,7 +79,7 @@ function defaultFetchImpl(url: string, init?: RequestInit) {
     return Promise.resolve({
       ok: true,
       status: 200,
-      json: async () => ({ id: 'abc-123', movementType: 'Transaction' }),
+      json: async () => ({ id: 'abc-123', movementType: discriminatorType }),
     });
   }
   if (method === 'GET' && url === '/api/transactions/abc-123') {
@@ -38,6 +87,20 @@ function defaultFetchImpl(url: string, init?: RequestInit) {
       ok: true,
       status: 200,
       json: async () => TRANSACTION_DTO,
+    });
+  }
+  if (method === 'GET' && url === '/api/transfers/abc-123') {
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => TRANSFER_DTO,
+    });
+  }
+  if (method === 'GET' && url === '/api/liability-payments/abc-123') {
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => LIABILITY_PAYMENT_DTO,
     });
   }
   if (method === 'GET' && url === '/api/accounts/active') {
@@ -71,6 +134,7 @@ function defaultFetchImpl(url: string, init?: RequestInit) {
 beforeEach(() => {
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(defaultFetchImpl);
+  discriminatorType = 'Transaction';
 });
 
 afterEach(() => {
@@ -82,12 +146,21 @@ afterEach(() => {
 const refetchMock = vi.fn();
 
 function OutletShim() {
-  return <Outlet context={{ refetch: refetchMock }} />;
+  const loc = useLocation();
+  return (
+    <>
+      <div data-testid="probe-state">{JSON.stringify(loc.state)}</div>
+      <Outlet context={{ refetch: refetchMock }} />
+    </>
+  );
 }
 
-function renderAt(path: string) {
+function renderAt(
+  path: string,
+  state?: unknown,
+) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[{ pathname: path, state }]}>
       <Routes>
         <Route path="/movements" element={<OutletShim />}>
           <Route path="new" element={<div data-testid="create-page">CREATE</div>} />
@@ -205,6 +278,76 @@ describe('MovementEdit', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/must be > 0/i)).toBeInTheDocument();
+    });
+  });
+
+  it('Test 5: dropzone NOT rendered when entity is a LiabilityPayment', async () => {
+    discriminatorType = 'LiabilityPayment';
+    renderAt('/movements/abc-123/edit');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('dropzone')).not.toBeInTheDocument();
+  });
+
+  it('Test 6: dropzone IS rendered when entity is a Transaction', async () => {
+    discriminatorType = 'Transaction';
+    renderAt('/movements/abc-123/edit');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dropzone')).toBeInTheDocument();
+    });
+
+    const dz = screen.getByTestId('dropzone');
+    expect(dz.dataset.parentType).toBe('Transaction');
+    expect(dz.dataset.parentId).toBe('abc-123');
+    // initialAttachments sourced from loaded DTO (TRANSACTION_DTO has 1)
+    expect(dz.dataset.initialCount).toBe('1');
+  });
+
+  it('Test 7: dropzone IS rendered when entity is a Transfer', async () => {
+    discriminatorType = 'Transfer';
+    renderAt('/movements/abc-123/edit');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dropzone')).toBeInTheDocument();
+    });
+
+    const dz = screen.getByTestId('dropzone');
+    expect(dz.dataset.parentType).toBe('Transfer');
+    expect(dz.dataset.parentId).toBe('abc-123');
+    expect(dz.dataset.initialCount).toBe('0');
+  });
+
+  it('Test 8: pendingAttachment from location.state is passed to dropzone as pendingFile', async () => {
+    discriminatorType = 'Transaction';
+    const file = new File(['hello'], 'pending.txt', { type: 'text/plain' });
+    renderAt('/movements/abc-123/edit', { pendingAttachment: file });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dropzone')).toBeInTheDocument();
+    });
+
+    const dz = screen.getByTestId('dropzone');
+    expect(dz.dataset.pendingFile).toBe('pending.txt');
+  });
+
+  it('Test 9: location state is cleared after mount', async () => {
+    discriminatorType = 'Transaction';
+    const file = new File(['hello'], 'pending.txt', { type: 'text/plain' });
+    renderAt('/movements/abc-123/edit', { pendingAttachment: file });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dropzone')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const probe = screen.getByTestId('probe-state');
+      // After clear, state should be {} (or at least no pendingAttachment)
+      const parsed = probe.textContent ? JSON.parse(probe.textContent) : null;
+      expect(parsed?.pendingAttachment).toBeUndefined();
     });
   });
 
