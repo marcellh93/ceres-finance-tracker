@@ -208,4 +208,69 @@ describe('MovementForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onCancel).toHaveBeenCalledOnce();
   });
+
+  it('Test 8: Create mode heading reads "New <type>"', () => {
+    const { rerender } = render(
+      <MovementForm
+        type="Transaction"
+        mode="create"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: /new transaction/i }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <MovementForm
+        type="Transfer"
+        mode="create"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: /new transfer/i }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <MovementForm
+        type="LiabilityPayment"
+        mode="create"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: /new liability payment/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('Test 9: Edit mode heading reads "Edit <type>"', () => {
+    render(
+      <MovementForm
+        type="Transaction"
+        mode="edit"
+        initialValues={emptyValues}
+        accounts={accounts}
+        categories={categories}
+        onSubmit={noopSubmit}
+        onCancel={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: /edit transaction/i }),
+    ).toBeInTheDocument();
+  });
 });

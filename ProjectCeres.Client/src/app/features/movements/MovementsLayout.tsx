@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -54,6 +54,7 @@ export function MovementsLayout() {
               <Button>
                 <Plus className="h-4 w-4" />
                 New
+                <ChevronDown className="h-4 w-4 opacity-70" />
               </Button>
             }
           />

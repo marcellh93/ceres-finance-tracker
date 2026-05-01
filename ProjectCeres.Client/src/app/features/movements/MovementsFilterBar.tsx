@@ -3,17 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useApi } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
 import { ACCOUNTS_ACTIVE_URL, type AccountOptionDto } from './movements-api';
 import { AccountCombobox } from '../../components/AccountCombobox';
+import { TypeFilterCombobox, type TypeFilterValue } from './TypeFilterCombobox';
 
 export function buildTypeFilterParams(prev: URLSearchParams, value: string | null): URLSearchParams {
   const next = new URLSearchParams(prev);
@@ -22,13 +16,6 @@ export function buildTypeFilterParams(prev: URLSearchParams, value: string | nul
   next.delete('page');
   return next;
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  all: 'All',
-  transaction: 'Transactions',
-  transfer: 'Transfers',
-  liabilitypayment: 'Liability payments',
-};
 
 export function MovementsFilterBar() {
   const [params, setParams] = useSearchParams();
@@ -79,25 +66,14 @@ export function MovementsFilterBar() {
         />
       </div>
       <div className="space-y-1.5 sm:w-44">
-        <Label htmlFor="mov-type">Type</Label>
-        <Select
-          value={params.get('type') ?? 'all'}
-          onValueChange={(v) => {
+        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Type</div>
+        <TypeFilterCombobox
+          id="mov-type"
+          value={(params.get('type') as TypeFilterValue | null) ?? 'all'}
+          onChange={(v) => {
             setParams(buildTypeFilterParams(params, v === 'all' ? null : v), { replace: true });
           }}
-        >
-          <SelectTrigger id="mov-type" className="w-full">
-            <SelectValue>
-              {(v: string | null) => TYPE_LABELS[v ?? 'all'] ?? 'All'}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="transaction">Transactions</SelectItem>
-            <SelectItem value="transfer">Transfers</SelectItem>
-            <SelectItem value="liabilitypayment">Liability payments</SelectItem>
-          </SelectContent>
-        </Select>
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="mov-from">From</Label>

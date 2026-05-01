@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
@@ -49,6 +50,17 @@ export type MovementFormProps = {
 };
 
 // ---------- helpers ----------
+
+const TYPE_NOUN: Record<MovementType, string> = {
+  Transaction: 'transaction',
+  Transfer: 'transfer',
+  LiabilityPayment: 'liability payment',
+};
+
+function formTitle(type: MovementType, mode: 'create' | 'edit'): string {
+  const verb = mode === 'create' ? 'New' : 'Edit';
+  return `${verb} ${TYPE_NOUN[type]}`;
+}
 
 function selectedAccountSymbol(
   type: MovementType,
@@ -108,6 +120,9 @@ export function MovementForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { headingRef.current?.focus(); }, []);
+
   // Sync when initialValues reference changes (e.g. data loaded by parent)
   useEffect(() => {
     setValues(initialValues);
@@ -136,7 +151,15 @@ export function MovementForm({
   const symbol = selectedAccountSymbol(type, values, accounts);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-3xl font-semibold outline-none"
+      >
+        {formTitle(type, mode)}
+      </h1>
+
       {/* _form banner */}
       {errors._form && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -246,6 +269,8 @@ export function MovementForm({
             onChange={(e) => set('description', e.target.value)}
           />
         </Field>
+
+        <Separator className="my-2" />
 
         <Field label="Cleared">
           <div className="flex items-center gap-3">
