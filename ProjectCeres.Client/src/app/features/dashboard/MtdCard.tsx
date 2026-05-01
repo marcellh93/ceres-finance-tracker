@@ -36,7 +36,7 @@ export function MtdCard() {
           <p className="text-sm text-muted-foreground">No transactions this period yet.</p>
         )}
         {data && (data.mtd.income !== 0 || data.mtd.expenses !== 0) && (
-          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Tile>
               <StatTile
                 label="Income"
@@ -57,7 +57,7 @@ export function MtdCard() {
                 }
               />
             </Tile>
-            <Tile>
+            <Tile className="sm:col-span-2">
               <StatTile
                 label="Savings Rate"
                 value={<Numeric className="text-xl whitespace-nowrap">{formatPercent(data.mtd.savingsRate)}</Numeric>}
