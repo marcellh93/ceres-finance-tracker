@@ -74,7 +74,12 @@ export function BudgetCreate() {
           existingBudgetId: env.error.existingBudgetId,
           existingIsActive: env.error.existingIsActive,
         });
-        return { ok: false, errors: { _form: env.error.message } } as const;
+        // Return an empty errors map. The conflict prompt rendered above the
+        // form is the actionable surface — also surfacing the same message in
+        // the form's _form banner just stacks two banners saying the same
+        // thing. The form's submit button stays enabled so the user can fix
+        // the picker and try again, or click "Edit it instead" to bail out.
+        return { ok: false, errors: {} } as const;
       }
 
       if (response.status === 422) {
