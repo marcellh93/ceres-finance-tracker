@@ -102,7 +102,7 @@ describe('MovementsBulkActions', () => {
     expect(body.currency).toBe('EUR');
   });
 
-  it('Export CSV renders as a real <a download> with the current search and toasts on click', () => {
+  it('Export CSV renders as a plain <a> with the current search and toasts on click', () => {
     renderAt('?from=2026-01-01&type=transaction');
 
     const link = screen.getByRole('link', { name: /export csv/i });
@@ -110,7 +110,6 @@ describe('MovementsBulkActions', () => {
     expect(link.getAttribute('href')).toBe(
       '/api/movements/export.csv?from=2026-01-01&type=transaction',
     );
-    expect(link.hasAttribute('download')).toBe(true);
 
     // Prevent the test environment from following the link.
     fireEvent.click(link, { preventDefault: () => undefined });

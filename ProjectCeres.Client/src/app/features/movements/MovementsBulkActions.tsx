@@ -112,17 +112,18 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
         </Tooltip>
       </TooltipProvider>
       {/*
-        Plain <a download> (NOT wrapped in base-ui Button). base-ui's
-        useButton hook merges its own onClick handlers and adds button
-        machinery via mergeProps; that interferes with the browser
-        treating the click as a first-class navigation gesture, which
-        is what fires the macOS / Chromium download-flying animation.
-        Styled via buttonVariants directly so the visual matches the
-        Mark visible cleared button.
+        Plain <a> (NOT wrapped in base-ui Button — that hook merges click
+        handlers via mergeProps which suppresses the browser's native
+        download UX). The server returns Content-Disposition: attachment,
+        so the browser will treat this as a download regardless of
+        whether the <a> carries the `download` attribute. We deliberately
+        omit `download` here: in some Chromium-based browsers (Arc),
+        an explicit `download` attribute is treated as 'silent-save' and
+        skips the genie animation that fires for browser-initiated
+        downloads driven purely by Content-Disposition.
       */}
       <a
         href={exportHref}
-        download
         rel="noopener"
         onClick={handleExportClick}
         className={cn(buttonVariants({ variant: 'outline' }), 'gap-2 no-underline')}
