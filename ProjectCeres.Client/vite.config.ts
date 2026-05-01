@@ -13,7 +13,16 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'https://localhost:7001',
+      '/api': {
+        target: 'https://localhost:7001',
+        // The .NET dev server uses a self-signed certificate. Without
+        // `secure: false`, the proxy intermittently fails the first request
+        // with `Failed to fetch` (TLS verification rejects the cert before
+        // the kernel-level TCP socket is reused). `changeOrigin` rewrites
+        // the Host header so Kestrel routes the proxied request correctly.
+        secure: false,
+        changeOrigin: true,
+      },
     },
     strictPort: true,
   },
