@@ -266,7 +266,7 @@ describe('MovementForm', () => {
       />,
     );
     expect(
-      screen.getByRole('heading', { level: 1, name: /new liability payment/i }),
+      screen.getByRole('heading', { level: 1, name: /new debt payment/i }),
     ).toBeInTheDocument();
   });
 

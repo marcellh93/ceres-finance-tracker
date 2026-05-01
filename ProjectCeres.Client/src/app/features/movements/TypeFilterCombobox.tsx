@@ -4,14 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { MOVEMENT_TYPE_LABEL_PLURAL } from './movement-type-display';
 
 export type TypeFilterValue = 'all' | 'transaction' | 'transfer' | 'liabilitypayment';
 
 const OPTIONS: Array<{ value: TypeFilterValue; label: string }> = [
   { value: 'all', label: 'All' },
-  { value: 'transaction', label: 'Transactions' },
-  { value: 'transfer', label: 'Transfers' },
-  { value: 'liabilitypayment', label: 'Liability payments' },
+  { value: 'transaction', label: MOVEMENT_TYPE_LABEL_PLURAL.Transaction },
+  { value: 'transfer', label: MOVEMENT_TYPE_LABEL_PLURAL.Transfer },
+  { value: 'liabilitypayment', label: MOVEMENT_TYPE_LABEL_PLURAL.LiabilityPayment },
 ];
 
 type Props = {

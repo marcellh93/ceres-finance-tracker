@@ -75,9 +75,9 @@ describe('MovementsFilterBar — type filter', () => {
     expect(screen.getByText('Transfers')).toBeInTheDocument();
   });
 
-  it('shows "Liability payments" in trigger when ?type=liabilitypayment', () => {
+  it('shows "Debt Payments" in trigger when ?type=liabilitypayment', () => {
     renderBar('/movements?type=liabilitypayment');
-    expect(screen.getByText('Liability payments')).toBeInTheDocument();
+    expect(screen.getByText('Debt Payments')).toBeInTheDocument();
   });
 
   it('renders the Clear button when only ?type is set', async () => {

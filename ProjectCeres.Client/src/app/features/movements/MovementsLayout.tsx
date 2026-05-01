@@ -9,6 +9,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { CardError } from '../../components/CardError';
 import { MovementsBulkActions } from './MovementsBulkActions';
 import { MovementsCurrencyTabs } from './MovementsCurrencyTabs';
@@ -16,6 +22,7 @@ import { MovementsFilterBar } from './MovementsFilterBar';
 import { MovementsPagination } from './MovementsPagination';
 import { MovementsTable } from './MovementsTable';
 import { MOVEMENTS_URL, type MovementsPageDto } from './movements-api';
+import { MOVEMENT_TYPE_HINT, MOVEMENT_TYPE_LABEL } from './movement-type-display';
 import { useApi } from '../../lib/use-api';
 import { useActiveCurrency } from './use-active-currency';
 
@@ -85,28 +92,57 @@ export function MovementsLayout() {
                 </Button>
               }
             />
-            <DropdownMenuContent align="end" sideOffset={8} className="min-w-[12rem] p-1.5">
-              <DropdownMenuItem
-                onClick={() => navigate(buildNewMovementUrl('transaction', activeCurrency))}
-                className="gap-2.5 px-3 py-2 transition-colors"
-              >
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-                <span>Transaction</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate(buildNewMovementUrl('transfer', activeCurrency))}
-                className="gap-2.5 px-3 py-2 transition-colors"
-              >
-                <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-                <span>Transfer</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate(buildNewMovementUrl('liabilitypayment', activeCurrency))}
-                className="gap-2.5 px-3 py-2 transition-colors"
-              >
-                <CreditCard className="h-4 w-4 text-muted-foreground" />
-                <span>Liability Payment</span>
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" sideOffset={8} className="min-w-[14rem] p-1.5">
+              <TooltipProvider delay={200}>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <DropdownMenuItem
+                        onClick={() => navigate(buildNewMovementUrl('transaction', activeCurrency))}
+                        className="gap-2.5 px-3 py-2 transition-colors"
+                      >
+                        <Receipt className="h-4 w-4 text-muted-foreground" />
+                        <span>{MOVEMENT_TYPE_LABEL.Transaction}</span>
+                      </DropdownMenuItem>
+                    }
+                  />
+                  <TooltipContent side="left" sideOffset={12}>
+                    {MOVEMENT_TYPE_HINT.Transaction}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <DropdownMenuItem
+                        onClick={() => navigate(buildNewMovementUrl('transfer', activeCurrency))}
+                        className="gap-2.5 px-3 py-2 transition-colors"
+                      >
+                        <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                        <span>{MOVEMENT_TYPE_LABEL.Transfer}</span>
+                      </DropdownMenuItem>
+                    }
+                  />
+                  <TooltipContent side="left" sideOffset={12}>
+                    {MOVEMENT_TYPE_HINT.Transfer}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <DropdownMenuItem
+                        onClick={() => navigate(buildNewMovementUrl('liabilitypayment', activeCurrency))}
+                        className="gap-2.5 px-3 py-2 transition-colors"
+                      >
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                        <span>{MOVEMENT_TYPE_LABEL.LiabilityPayment}</span>
+                      </DropdownMenuItem>
+                    }
+                  />
+                  <TooltipContent side="left" sideOffset={12}>
+                    {MOVEMENT_TYPE_HINT.LiabilityPayment}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

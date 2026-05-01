@@ -172,7 +172,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="transaction">Transaction</TabsTrigger>
             <TabsTrigger value="transfer">Transfer</TabsTrigger>
-            <TabsTrigger value="liabilityPayment">Liability Payment</TabsTrigger>
+            <TabsTrigger value="liabilityPayment">Debt Payment</TabsTrigger>
           </TabsList>
 
           <TabsContent value="transaction" className="space-y-3 pt-3">

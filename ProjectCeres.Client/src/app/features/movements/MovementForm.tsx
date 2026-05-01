@@ -36,6 +36,7 @@ import {
 } from '../../lib/amount-format';
 import { useSettings } from '../../lib/use-settings';
 import type { AccountOptionDto, CategoryOptionDto, MovementType } from './movements-api';
+import { MOVEMENT_TYPE_FORM_HELPER, MOVEMENT_TYPE_NOUN } from './movement-type-display';
 
 export type MovementFormValues = {
   date: string;
@@ -77,15 +78,9 @@ export type MovementFormProps = {
 
 // ---------- helpers ----------
 
-const TYPE_NOUN: Record<MovementType, string> = {
-  Transaction: 'transaction',
-  Transfer: 'transfer',
-  LiabilityPayment: 'liability payment',
-};
-
 function formTitle(type: MovementType, mode: 'create' | 'edit'): string {
   const verb = mode === 'create' ? 'New' : 'Edit';
-  return `${verb} ${TYPE_NOUN[type]}`;
+  return `${verb} ${MOVEMENT_TYPE_NOUN[type]}`;
 }
 
 function selectedAccountSymbol(
@@ -349,13 +344,20 @@ export function MovementForm({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1
-        ref={headingRef}
-        tabIndex={-1}
-        className="text-3xl font-semibold outline-none"
-      >
-        {formTitle(type, mode)}
-      </h1>
+      <div className="space-y-1">
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-3xl font-semibold outline-none"
+        >
+          {formTitle(type, mode)}
+        </h1>
+        {mode === 'create' && (
+          <p className="text-sm text-muted-foreground">
+            {MOVEMENT_TYPE_FORM_HELPER[type]}
+          </p>
+        )}
+      </div>
 
       {/* _form banner */}
       {errors._form && (

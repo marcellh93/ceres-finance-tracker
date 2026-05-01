@@ -44,7 +44,7 @@ describe('QuickAddModal', () => {
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: /transaction/i })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /transfer/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /liability payment/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /debt payment/i })).toBeInTheDocument();
     });
   });
 
@@ -85,9 +85,9 @@ describe('QuickAddModal', () => {
     expect(screen.queryByText(/^category$/i)).not.toBeInTheDocument();
   });
 
-  it('Liability Payment tab filters destination to liability accounts', async () => {
+  it('Debt Payment tab filters destination to liability accounts', async () => {
     render(<QuickAddModal open={true} onOpenChange={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('tab', { name: /liability payment/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /debt payment/i }));
 
     // Destination combobox should only show liability accounts (Credit Card)
     fireEvent.click(screen.getAllByRole('combobox')[1]);

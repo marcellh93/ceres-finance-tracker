@@ -40,7 +40,7 @@ describe('MovementsTable', () => {
     renderTable();
     expect(screen.getByText('Transaction')).toBeInTheDocument();
     expect(screen.getByText('Transfer')).toBeInTheDocument();
-    expect(screen.getByText('Liability Payment')).toBeInTheDocument();
+    expect(screen.getByText('Debt Payment')).toBeInTheDocument();
     expect(screen.getByText('Rent')).toBeInTheDocument();
     expect(screen.getByText('Move savings')).toBeInTheDocument();
   });

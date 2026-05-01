@@ -2,18 +2,13 @@ import { Badge } from '@/components/ui/badge';
 import { Numeric } from '@/components/Numeric';
 import { MovementClearedToggle } from './MovementClearedToggle';
 import { MovementRowMenu } from './MovementRowMenu';
-import type { MovementListItemDto, MovementType } from './movements-api';
+import type { MovementListItemDto } from './movements-api';
+import { MOVEMENT_TYPE_LABEL } from './movement-type-display';
 import { formatNumberForDisplay } from '../../lib/amount-format';
 import { formatDate } from '../../lib/date-format';
 import { useSettings } from '../../lib/use-settings';
 
 type Props = { items: MovementListItemDto[]; onRefetch: () => void };
-
-const typeLabel: Record<MovementType, string> = {
-  Transaction: 'Transaction',
-  Transfer: 'Transfer',
-  LiabilityPayment: 'Liability Payment',
-};
 
 function amountColor(item: MovementListItemDto): string {
   if (item.movementType === 'Transaction') {
@@ -58,13 +53,13 @@ export function MovementsTable({ items, onRefetch }: Props) {
               <td className="px-3 py-2 whitespace-nowrap">{formatDate(item.date, dateFormat)}</td>
               <td className="px-3 py-2">
                 {item.movementType === 'Transaction' && (
-                  <Badge variant="info">{typeLabel.Transaction}</Badge>
+                  <Badge variant="info">{MOVEMENT_TYPE_LABEL.Transaction}</Badge>
                 )}
                 {item.movementType === 'Transfer' && (
-                  <Badge className="bg-chart-6/10 text-chart-6">{typeLabel.Transfer}</Badge>
+                  <Badge className="bg-chart-6/10 text-chart-6">{MOVEMENT_TYPE_LABEL.Transfer}</Badge>
                 )}
                 {item.movementType === 'LiabilityPayment' && (
-                  <Badge className="bg-chart-7/10 text-chart-7">{typeLabel.LiabilityPayment}</Badge>
+                  <Badge className="bg-chart-7/10 text-chart-7">{MOVEMENT_TYPE_LABEL.LiabilityPayment}</Badge>
                 )}
               </td>
               <td className="px-3 py-2">

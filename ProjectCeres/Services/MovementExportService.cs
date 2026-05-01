@@ -26,7 +26,7 @@ public class MovementExportService(IMovementService movementService) : IMovement
             {
                 MovementType.Transaction      => "Transaction",
                 MovementType.Transfer         => "Transfer",
-                MovementType.LiabilityPayment => "Liability payment",
+                MovementType.LiabilityPayment => "Debt Payment",
                 _ => "?"
             };
 
