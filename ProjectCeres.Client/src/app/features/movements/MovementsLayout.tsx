@@ -29,7 +29,7 @@ export function MovementsLayout() {
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Movements
         </h1>
-        <Button render={<Link to="new" />}>
+        <Button render={<Link to="new" />} nativeButton={false}>
           <Plus className="h-4 w-4" />
           New
         </Button>

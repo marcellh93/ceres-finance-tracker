@@ -54,8 +54,9 @@ describe('MovementsLayout', () => {
         </Routes>
       </MemoryRouter>,
     );
-    const link = screen.getByRole('link', { name: /new/i });
-    // The relative `to="new"` resolves to "/movements/new" against the parent route
+    // Button renders as an <a role="button"> via base-ui slot composition.
+    // The relative `to="new"` resolves to "/movements/new" against the parent route.
+    const link = screen.getByRole('button', { name: /new/i });
     expect(link.getAttribute('href')).toBe('/movements/new');
   });
 });
