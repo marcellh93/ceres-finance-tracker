@@ -3,6 +3,8 @@ import { Numeric } from '@/components/Numeric';
 import { MovementClearedToggle } from './MovementClearedToggle';
 import { MovementRowMenu } from './MovementRowMenu';
 import type { MovementListItemDto, MovementType } from './movements-api';
+import { formatNumberForDisplay } from '../../lib/amount-format';
+import { useSettings } from '../../lib/use-settings';
 
 type Props = { items: MovementListItemDto[]; onRefetch: () => void };
 
@@ -26,6 +28,11 @@ function amountColor(item: MovementListItemDto): string {
 }
 
 export function MovementsTable({ items, onRefetch }: Props) {
+  const settings = useSettings();
+  // Fall back to period_decimal until settings load — same default the
+  // useSettings error path uses.
+  const numberFormat = settings.data?.numberFormat ?? 'period_decimal';
+
   return (
     <div className="rounded-md border border-border overflow-x-auto">
       <table className="w-full text-sm">
@@ -71,7 +78,7 @@ export function MovementsTable({ items, onRefetch }: Props) {
               <td className="px-3 py-2">{item.description ?? '—'}</td>
               <td className="px-3 py-2 text-right whitespace-nowrap">
                 <Numeric className={amountColor(item)}>
-                  {item.currencySymbol} {item.amount.toFixed(2)}
+                  {item.currencySymbol} {formatNumberForDisplay(item.amount, numberFormat)}
                 </Numeric>
               </td>
               <td className="px-3 py-2">
