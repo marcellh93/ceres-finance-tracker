@@ -8,6 +8,13 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+// ── Mock useNavigate so we can assert destination + state ──
+const navigateMock = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
 // ── Mock fetch ──
 const mockFetch = vi.fn();
 
@@ -40,6 +47,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.resetAllMocks();
+  navigateMock.mockReset();
 });
 
 // ── Route helpers ──
@@ -63,13 +71,43 @@ function renderAt(path: string) {
   );
 }
 
+// Helper: configure fetch to return a 201 with given id for transactions create.
+function mockTransactionCreate(newId: string) {
+  mockFetch.mockImplementation((url: string) => {
+    if (url === '/api/accounts/active') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => [
+          { id: 'a1', name: 'Checking', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
+        ],
+      });
+    }
+    if (url === '/api/categories/active') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => [
+          { id: 'c1', name: 'Salary', categoryTypeName: 'Income' },
+        ],
+      });
+    }
+    if (url === '/api/transactions') {
+      return Promise.resolve({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: newId }),
+      });
+    }
+    return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+  });
+}
+
 // ── Tests ──
 
 describe('MovementCreate', () => {
   it('Test 1: bounces to /movements when ?type= is missing (no picker)', async () => {
     renderAt('/movements/new');
     await waitFor(() => {
-      expect(screen.getByTestId('list-page')).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledWith('/movements', { replace: true });
     });
   });
 
@@ -91,51 +129,23 @@ describe('MovementCreate', () => {
     expect(screen.getByText(/select destination/i)).toBeInTheDocument();
   });
 
-  it('Test 4: successful POST → navigates back to /movements (list view)', async () => {
-    mockFetch.mockImplementation((url: string) => {
-      if (url === '/api/accounts/active') {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [
-            { id: 'a1', name: 'Checking', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
-          ],
-        });
-      }
-      if (url === '/api/categories/active') {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [
-            { id: 'c1', name: 'Salary', categoryTypeName: 'Income' },
-          ],
-        });
-      }
-      if (url === '/api/transactions') {
-        return Promise.resolve({
-          ok: true,
-          status: 201,
-          json: async () => ({ id: 'new-id' }),
-        });
-      }
-      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
-    });
+  it('Test 4: successful POST → navigates to /movements/:id/edit?created=1', async () => {
+    mockTransactionCreate('new-id');
 
     renderAt('/movements/new?type=transaction');
 
-    // Wait for form to render with accounts/categories loaded
     await waitFor(() => {
       expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
     });
 
-    // Fill in required fields
-    const amountInput = screen.getByLabelText(/amount/i);
-    fireEvent.change(amountInput, { target: { value: '100' } });
-
-    // Submit
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
-    // Navigates back to the list view
     await waitFor(() => {
-      expect(screen.getByTestId('list-page')).toBeInTheDocument();
+      expect(navigateMock).toHaveBeenCalledWith(
+        '/movements/new-id/edit?created=1',
+        expect.objectContaining({ replace: true }),
+      );
     });
   });
 
@@ -179,11 +189,92 @@ describe('MovementCreate', () => {
       expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
     });
 
-    // Submit without filling fields
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/must be greater than zero/i)).toBeInTheDocument();
     });
+  });
+
+  // ── Task 5: Pending attachment hand-off ──
+
+  it('Test 6: Attach receipt trigger is present and clicking it does not call any upload API', async () => {
+    renderAt('/movements/new?type=transaction');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
+    });
+
+    const trigger = screen.getByRole('button', { name: /attach receipt/i });
+    expect(trigger).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+
+    // No upload endpoints should have been hit. Only accounts + categories fetches.
+    const calledUrls = mockFetch.mock.calls.map((c) => c[0] as string);
+    expect(calledUrls.some((u) => u.includes('/attachments'))).toBe(false);
+  });
+
+  it('Test 7: Picking a file then submitting → navigate carries pendingAttachment', async () => {
+    mockTransactionCreate('new-id');
+
+    const { container } = renderAt('/movements/new?type=transaction');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
+    });
+
+    const file = new File(['hello'], 'receipt.pdf', { type: 'application/pdf' });
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    // Filename should be visible after picking
+    expect(screen.getByText(/receipt\.pdf/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith(
+        '/movements/new-id/edit?created=1',
+        expect.objectContaining({
+          replace: true,
+          state: { pendingAttachment: file },
+        }),
+      );
+    });
+  });
+
+  it('Test 8: Successful save with no file → navigate state has no pendingAttachment', async () => {
+    mockTransactionCreate('new-id');
+
+    renderAt('/movements/new?type=transaction');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/date/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith(
+        '/movements/new-id/edit?created=1',
+        expect.objectContaining({ replace: true }),
+      );
+    });
+
+    const editCall = navigateMock.mock.calls.find(
+      (c) => typeof c[0] === 'string' && (c[0] as string).startsWith('/movements/new-id/edit'),
+    );
+    expect(editCall).toBeTruthy();
+    const opts = editCall![1] as { state?: { pendingAttachment?: File } } | undefined;
+    // State should be undefined OR not contain pendingAttachment
+    if (opts?.state) {
+      expect(opts.state.pendingAttachment).toBeUndefined();
+    } else {
+      expect(opts?.state).toBeUndefined();
+    }
   });
 });
