@@ -44,19 +44,10 @@ function renderBar(initial = '/movements') {
 }
 
 describe('MovementsFilterBar', () => {
-  it('renders the search input and date inputs', () => {
+  it('renders the search input and date range picker', () => {
     renderBar();
     expect(screen.getByPlaceholderText(/search description or category/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/from/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/to/i)).toBeInTheDocument();
-  });
-
-  it('updates the URL when the from date changes', async () => {
-    const getSearch = renderBar();
-    fireEvent.change(screen.getByLabelText(/from/i), { target: { value: '2026-04-01' } });
-    await waitFor(() => {
-      expect(getSearch()).toContain('from=2026-04-01');
-    });
+    expect(screen.getByRole('button', { name: /date range/i })).toBeInTheDocument();
   });
 
   it('clears all params when "Clear" is clicked', async () => {

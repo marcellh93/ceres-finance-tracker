@@ -8,6 +8,7 @@ import { useDebounced } from '../../lib/use-debounced';
 import { ACCOUNTS_ACTIVE_URL, type AccountOptionDto } from './movements-api';
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { TypeFilterCombobox, type TypeFilterValue } from './TypeFilterCombobox';
+import { MovementsDateRangePicker } from './MovementsDateRangePicker';
 
 export function buildTypeFilterParams(prev: URLSearchParams, value: string | null): URLSearchParams {
   const next = new URLSearchParams(prev);
@@ -84,22 +85,8 @@ export function MovementsFilterBar() {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="mov-from">From</Label>
-        <Input
-          id="mov-from"
-          type="date"
-          value={params.get('from') ?? ''}
-          onChange={(e) => setParam('from', e.target.value || null)}
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="mov-to">To</Label>
-        <Input
-          id="mov-to"
-          type="date"
-          value={params.get('to') ?? ''}
-          onChange={(e) => setParam('to', e.target.value || null)}
-        />
+        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Date</div>
+        <MovementsDateRangePicker />
       </div>
       {hasFilters && (
         <Button
