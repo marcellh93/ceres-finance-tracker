@@ -6,7 +6,7 @@ function mockSummary(netWorth: Array<{ currencyCode: string; currencySymbol: str
   return new Response(
     JSON.stringify({
       netWorth,
-      mtd: { currencyCode: 'EUR', currencySymbol: '€', income: 0, expenses: 0, savingsRate: 0 },
+      mtd: { currencyCode: 'EUR', currencySymbol: '€', income: 0, expenses: 0, savingsRate: 0, priorPeriodIncome: null, priorPeriodExpenses: null, priorPeriodSavingsRate: null },
       remindersDueCount: 0,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },

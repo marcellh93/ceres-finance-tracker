@@ -13,12 +13,17 @@ public record DashboardSummaryDto(
     int RemindersDueCount);
 
 /// <summary>
-/// Month-to-date income, expenses, and savings rate.
-/// SavingsRate is a fraction (0–1), not a percentage. The client formats for display.
+/// Cycle-to-date income, expenses, and savings rate, plus the FULL prior-period
+/// totals for the comparison line on the Cycle to Date card.
+/// SavingsRate is a fraction (0–1), not a percentage — the client formats for display.
+/// Prior values are null when no prior-period data exists yet (first period of usage).
 /// </summary>
 public record MtdSummary(
     string CurrencyCode,
     string CurrencySymbol,
     decimal Income,
     decimal Expenses,
-    decimal SavingsRate);
+    decimal SavingsRate,
+    decimal? PriorPeriodIncome,
+    decimal? PriorPeriodExpenses,
+    decimal? PriorPeriodSavingsRate);

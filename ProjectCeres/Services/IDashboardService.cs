@@ -5,6 +5,9 @@ public record DashboardData(
     decimal MtdIncome,
     decimal MtdExpenses,
     decimal SavingsRate,
+    decimal? PriorPeriodIncome,
+    decimal? PriorPeriodExpenses,
+    decimal? PriorPeriodSavingsRate,
     int PendingRemindersCount,
     string CurrencyCode,
     string CurrencySymbol);

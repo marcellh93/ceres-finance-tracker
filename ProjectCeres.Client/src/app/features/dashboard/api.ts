@@ -45,6 +45,10 @@ export type MtdSummary = {
   expenses: number;
   /** Fraction (0–1), not a percentage. */
   savingsRate: number;
+  /** FULL prior-period totals — null when no prior-period data exists yet. */
+  priorPeriodIncome: number | null;
+  priorPeriodExpenses: number | null;
+  priorPeriodSavingsRate: number | null;
 };
 
 export type SummaryDto = {

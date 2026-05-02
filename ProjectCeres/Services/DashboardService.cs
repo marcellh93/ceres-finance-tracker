@@ -26,6 +26,56 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var mtdExpenses = mtdTransactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
         var savingsRate = mtdIncome > 0 ? (mtdIncome - mtdExpenses) / mtdIncome : 0;
 
+        // Prior FULL period totals — for the "vs last period" comparison line on
+        // the Cycle to Date card. We only render comparisons when the prior
+        // period was a COMPLETE recording cycle (i.e., the user was already
+        // tracking transactions in this currency before the prior period began).
+        // Otherwise the prior period is partial-by-omission and produces
+        // misleading comparisons (e.g., a savings rate of −22000% when prior
+        // income was €0.41 of stray data).
+        //
+        // The "earliest transaction in this currency" check intentionally lets
+        // legitimate gap-periods through (e.g., job loss → €0 income last
+        // period → "vs €0 last period" reads as a meaningful "you're earning
+        // again" signal).
+        decimal? priorIncome      = null;
+        decimal? priorExpenses    = null;
+        decimal? priorSavingsRate = null;
+
+        var (priorYear, priorMonth) = (mtdMonth == 1)
+            ? (mtdYear - 1, 12)
+            : (mtdYear, mtdMonth - 1);
+        var (priorStart, priorEnd) = BudgetPeriod.GetBoundsForMonth(priorYear, priorMonth, settings.PeriodStartDay);
+
+        var earliestTxnInCurrency = await db.Transactions
+            .Where(t => t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
+            .OrderBy(t => t.Date)
+            .Select(t => (DateOnly?)t.Date)
+            .FirstOrDefaultAsync();
+
+        var priorIsCompleteCycle = earliestTxnInCurrency.HasValue
+                                && earliestTxnInCurrency.Value <= priorStart;
+
+        if (priorIsCompleteCycle)
+        {
+            var priorTransactions = await db.Transactions
+                .Where(t => t.Date >= priorStart && t.Date <= priorEnd
+                         && t.Account.CurrencyId == currencyId
+                         && !t.Category.IsSystem)
+                .Include(t => t.Category)
+                    .ThenInclude(c => c.CategoryType)
+                .ToListAsync();
+
+            priorIncome   = priorTransactions.Where(t => t.Category.CategoryType.Name == "Income").Sum(t => t.Amount);
+            priorExpenses = priorTransactions.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
+
+            // Savings-rate comparison is suppressed when prior income is 0 to
+            // avoid divide-by-zero / nonsense percentages. Income, Expenses, and
+            // Net Flow comparisons still render in that case.
+            if (priorIncome.Value > 0)
+                priorSavingsRate = (priorIncome.Value - priorExpenses.Value) / priorIncome.Value;
+        }
+
         // Net worth across all currencies.
         var reportService = new ReportService(db);
         var netWorth = await reportService.GetNetWorthAsync();
@@ -38,13 +88,16 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
             .CountAsync(r => r.IsActive && r.NextDueDate <= imminentCutoff);
 
         return new DashboardData(
-            NetWorth:              netWorth,
-            MtdIncome:             mtdIncome,
-            MtdExpenses:           mtdExpenses,
-            SavingsRate:           savingsRate,
-            PendingRemindersCount: pendingCount,
-            CurrencyCode:          currency.Code,
-            CurrencySymbol:        currency.Symbol);
+            NetWorth:                netWorth,
+            MtdIncome:               mtdIncome,
+            MtdExpenses:             mtdExpenses,
+            SavingsRate:             savingsRate,
+            PriorPeriodIncome:       priorIncome,
+            PriorPeriodExpenses:     priorExpenses,
+            PriorPeriodSavingsRate:  priorSavingsRate,
+            PendingRemindersCount:   pendingCount,
+            CurrencyCode:            currency.Code,
+            CurrencySymbol:          currency.Symbol);
     }
 
     public async Task<HealthSnapshotData> GetHealthSnapshotAsync()

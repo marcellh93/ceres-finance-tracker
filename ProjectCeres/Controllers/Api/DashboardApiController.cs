@@ -31,11 +31,14 @@ public class DashboardApiController(
         var summary = new DashboardSummaryDto(
             NetWorth: data.NetWorth,
             Mtd: new MtdSummary(
-                CurrencyCode:   data.CurrencyCode,
-                CurrencySymbol: data.CurrencySymbol,
-                Income:         data.MtdIncome,
-                Expenses:       data.MtdExpenses,
-                SavingsRate:    data.SavingsRate),
+                CurrencyCode:           data.CurrencyCode,
+                CurrencySymbol:         data.CurrencySymbol,
+                Income:                 data.MtdIncome,
+                Expenses:               data.MtdExpenses,
+                SavingsRate:            data.SavingsRate,
+                PriorPeriodIncome:      data.PriorPeriodIncome,
+                PriorPeriodExpenses:    data.PriorPeriodExpenses,
+                PriorPeriodSavingsRate: data.PriorPeriodSavingsRate),
             RemindersDueCount: data.PendingRemindersCount);
 
         return Ok(summary);

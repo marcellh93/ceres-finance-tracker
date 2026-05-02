@@ -9,7 +9,7 @@ describe('KpiStrip', () => {
       new Response(
         JSON.stringify({
           netWorth: [{ currencyCode: 'EUR', currencySymbol: '€', assets: 100, liabilities: 0, netWorth: 100 }],
-          mtd: { currencyCode: 'EUR', currencySymbol: '€', income: 100, expenses: 50, savingsRate: 0.5 },
+          mtd: { currencyCode: 'EUR', currencySymbol: '€', income: 100, expenses: 50, savingsRate: 0.5, priorPeriodIncome: null, priorPeriodExpenses: null, priorPeriodSavingsRate: null },
           remindersDueCount: 0,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
