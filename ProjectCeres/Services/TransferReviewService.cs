@@ -116,4 +116,57 @@ public class TransferReviewService(
         staged.ResolvedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
     }
+
+    // -------------------------------------------------------------------------
+    // API surface (Result-returning).
+    // -------------------------------------------------------------------------
+
+    public async Task<Result> TryLinkToExistingAsync(Guid stagedId, Guid otherAccountId)
+    {
+        if (!await db.ImportStagedTransfers.Owned(user).AnyAsync(s => s.Id == stagedId))
+            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
+        if (!await db.Accounts.Owned(user).AnyAsync(a => a.Id == otherAccountId))
+            return Result.Fail("INVALID_ACCOUNT", "The other account does not exist.");
+        try
+        {
+            await LinkToExistingAsync(stagedId, otherAccountId);
+            return Result.Ok();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
+    }
+
+    public async Task<Result> TryCreateAsTransferAsync(Guid stagedId, Guid otherAccountId)
+    {
+        if (!await db.ImportStagedTransfers.Owned(user).AnyAsync(s => s.Id == stagedId))
+            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
+        if (!await db.Accounts.Owned(user).AnyAsync(a => a.Id == otherAccountId))
+            return Result.Fail("INVALID_ACCOUNT", "The other account does not exist.");
+        try
+        {
+            await CreateAsTransferAsync(stagedId, otherAccountId);
+            return Result.Ok();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
+    }
+
+    public async Task<Result> TryDismissAsTransactionAsync(Guid stagedId)
+    {
+        if (!await db.ImportStagedTransfers.Owned(user).AnyAsync(s => s.Id == stagedId))
+            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
+        try
+        {
+            await DismissAsTransactionAsync(stagedId);
+            return Result.Ok();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
+    }
 }
