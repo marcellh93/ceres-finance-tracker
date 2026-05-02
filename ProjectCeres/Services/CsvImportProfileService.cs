@@ -89,6 +89,68 @@ public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : 
         await db.SaveChangesAsync();
     }
 
+    // -------------------------------------------------------------------------
+    // API surface (Result-returning).
+    // -------------------------------------------------------------------------
+
+    public async Task<Result<Guid>> TryCreateAsync(string name, ImportFormat format, ImportColumnMappings mappings)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return Result<Guid>.Fail("VALIDATION_ERROR", "Name is required.");
+        if (trimmed.Length > 100)
+            return Result<Guid>.Fail("VALIDATION_ERROR", "Name cannot exceed 100 characters.");
+
+        var profile = new ImportProfile
+        {
+            Id             = Guid.NewGuid(),
+            Name           = trimmed,
+            Format         = format,
+            SheetName      = mappings.SheetName,
+            ColumnMappings = JsonSerializer.Serialize(mappings),
+            CreatedAt      = DateTime.UtcNow
+        };
+        db.ImportProfiles.Add(profile);
+        await db.SaveChangesAsync();
+        return Result<Guid>.Ok(profile.Id);
+    }
+
+    public async Task<Result> TryUpdateAsync(Guid id, string name, ImportColumnMappings mappings)
+    {
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id);
+        if (profile is null) return Result.Fail("NOT_FOUND", "Import profile not found.");
+
+        var trimmed = (name ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return Result.Fail("VALIDATION_ERROR", "Name is required.");
+        if (trimmed.Length > 100)
+            return Result.Fail("VALIDATION_ERROR", "Name cannot exceed 100 characters.");
+
+        profile.Name           = trimmed;
+        profile.SheetName      = mappings.SheetName;
+        profile.ColumnMappings = JsonSerializer.Serialize(mappings);
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
+
+    public async Task<Result> TryDeleteAsync(Guid id)
+    {
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id);
+        if (profile is null) return Result.Fail("NOT_FOUND", "Import profile not found.");
+        profile.DeletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
+
+    public async Task<Result> TryRecoverAsync(Guid id)
+    {
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id);
+        if (profile is null) return Result.Fail("NOT_FOUND", "Import profile not found.");
+        profile.DeletedAt = null;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
+
     private static ImportProfileViewModel ToViewModel(ImportProfile p) => new()
     {
         Id        = p.Id,
