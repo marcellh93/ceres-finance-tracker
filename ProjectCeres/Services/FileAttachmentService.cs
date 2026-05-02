@@ -3,12 +3,13 @@ using MimeDetective.Definitions;
 using MimeDetective.Engine;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Services;
 
-public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : IFileAttachmentService
+public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICurrentUserAccessor user) : IFileAttachmentService
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
     private const int  MaxFilesPerTransaction = 10;
@@ -51,6 +52,11 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
         if (file.Length > MaxFileSizeBytes)
             throw new InvalidOperationException("File exceeds the 10 MB limit.");
 
+        // Ownership gate: parent transaction must belong to the current user.
+        var parentExists = await db.Transactions.Owned(user).AnyAsync(t => t.Id == transactionId);
+        if (!parentExists)
+            throw new InvalidOperationException($"Transaction {transactionId} not found.");
+
         var existingCount = await db.TransactionAttachments
             .CountAsync(a => a.TransactionId == transactionId);
         if (existingCount >= MaxFilesPerTransaction)
@@ -90,7 +96,9 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
 
     public async Task<(byte[] Data, string ContentType, string FileName)> GetAsync(Guid attachmentId)
     {
-        var attachment = await db.TransactionAttachments.FindAsync(attachmentId)
+        var attachment = await db.TransactionAttachments
+            .Where(a => a.Id == attachmentId && a.Transaction.UserId == user.UserId)
+            .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
         var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
@@ -109,7 +117,9 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
 
     public async Task DeleteAsync(Guid attachmentId)
     {
-        var attachment = await db.TransactionAttachments.FindAsync(attachmentId)
+        var attachment = await db.TransactionAttachments
+            .Where(a => a.Id == attachmentId && a.Transaction.UserId == user.UserId)
+            .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
         var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
@@ -126,6 +136,10 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
             throw new InvalidOperationException("Uploaded file is empty.");
         if (file.Length > MaxFileSizeBytes)
             throw new InvalidOperationException("File exceeds the 10 MB limit.");
+
+        var parentExists = await db.Transfers.Owned(user).AnyAsync(t => t.Id == transferId);
+        if (!parentExists)
+            throw new InvalidOperationException($"Transfer {transferId} not found.");
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
@@ -159,7 +173,9 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
 
     public async Task<(byte[] Data, string ContentType, string FileName)> GetTransferAttachmentAsync(Guid attachmentId)
     {
-        var attachment = await db.TransferAttachments.FindAsync(attachmentId)
+        var attachment = await db.TransferAttachments
+            .Where(a => a.Id == attachmentId && a.Transfer.UserId == user.UserId)
+            .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
         var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
@@ -177,7 +193,9 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env) : I
 
     public async Task DeleteTransferAttachmentAsync(Guid attachmentId)
     {
-        var attachment = await db.TransferAttachments.FindAsync(attachmentId)
+        var attachment = await db.TransferAttachments
+            .Where(a => a.Id == attachmentId && a.Transfer.UserId == user.UserId)
+            .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
         var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);

@@ -76,6 +76,23 @@ var currentUserId = Guid.Parse(
 
 Alternatively, pass `currentUserId` as a parameter to service methods from the controller. The controller retrieves it from `User.FindFirstValue(ClaimTypes.NameIdentifier)`. Either pattern is acceptable; consistency matters more than the specific approach.
 
+### Background processes and non-HTTP contexts (open hazard)
+
+The current pre-auth `SingleUserAccessor` always returns a sentinel and works in any context. Once Phase 3 wires an `HttpContextAccessor`-backed implementation, **any code path that runs outside an HTTP request** will resolve `HttpContext` as `null` — reading `UserId` will throw or silently fall back to a default. That is a real footgun for:
+
+- **Scheduled jobs / cron-like background tasks** (e.g. recurring-reminder advance, retention sweeps, GDPR purge jobs)
+- **CLI commands and `dotnet ef` operations** invoked at deployment time
+- **Application startup hooks** (e.g. `ISettingsService.EnsureExistsAsync` is called at `Program.cs` boot time today — it works because the sentinel accessor is context-free, but the auth-aware one is not)
+
+**Required fix at auth time:** introduce a separate scoped registration for non-HTTP contexts that explicitly identifies the caller. Two acceptable shapes:
+
+1. **`SystemUserAccessor`** — returns a fixed "system" user id. Background jobs that legitimately operate across all users (cleanup, retention) use this and combine it with explicit per-user iteration. Reading user-scoped data without an explicit user id should throw, not silently default.
+2. **`AmbiguousUserAccessor`** — throws on any read. Forces background jobs to be explicit about who they're acting for; safer default when the right answer is "always per-user."
+
+Whichever shape is chosen, the auth-aware `HttpContext`-backed accessor should also throw on a `null` HttpContext rather than returning `Guid.Empty` — silent defaults are how IDOR sneaks in.
+
+This caveat is tracked here so it is not lost between now and the auth batch. Audit every `IHostedService`, `IStartupFilter`, `Program.cs` boot hook, and `dotnet ef` command-line tool registration before shipping auth.
+
 ### Services to audit for Phase 3
 
 Every method in these services that performs a query by ID must be updated:

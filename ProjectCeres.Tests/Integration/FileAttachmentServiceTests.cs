@@ -41,7 +41,7 @@ public class FileAttachmentServiceTests : IAsyncLifetime
         var env = new Mock<IWebHostEnvironment>();
         env.Setup(e => e.ContentRootPath).Returns(_tempRoot);
 
-        _service = new FileAttachmentService(_fixture.Db, env.Object);
+        _service = new FileAttachmentService(_fixture.Db, env.Object, new SingleUserAccessor());
 
         // Create a real transaction to attach files to.
         var account = new Account
