@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -27,7 +28,7 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db);
+        var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
         var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
         _transactionService         = new TransactionService(

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
@@ -33,8 +34,8 @@ public class DashboardServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db);
-        var settingsService = new SettingsService(_fixture.Db);
+        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
+        var settingsService = new SettingsService(_fixture.Db, new SingleUserAccessor());
         _service = new DashboardService(_fixture.Db, settingsService);
 
         // Ensure settings row exists (required by DashboardService).

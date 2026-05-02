@@ -33,4 +33,89 @@ public class SettingsApiTests(TestWebApplicationFactory factory)
         body.TryGetProperty("defaultCurrencySymbol", out var symbol).Should().BeTrue();
         symbol.GetString().Should().NotBeNullOrEmpty();
     }
+
+    [Fact]
+    public async Task Patch_updates_settings_and_persists()
+    {
+        // Snapshot the current state so we can restore.
+        var before = await _client.GetFromJsonAsync<JsonElement>("/api/settings");
+        var beforeNumberFormat = before.GetProperty("numberFormat").GetString()!;
+        var beforeDateFormat   = before.GetProperty("dateFormat").GetString()!;
+        var beforePeriodStart  = before.GetProperty("periodStartDay").GetInt32();
+        var beforeCurrencyCode = before.GetProperty("defaultCurrencyCode").GetString()!;
+
+        try
+        {
+            var res = await _client.PatchAsJsonAsync("/api/settings", new
+            {
+                numberFormat      = "period_decimal",
+                dateFormat        = "YYYY-MM-DD",
+                defaultCurrencyId = 2,
+                periodStartDay    = 15
+            });
+            res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+            var after = await _client.GetFromJsonAsync<JsonElement>("/api/settings");
+            after.GetProperty("numberFormat").GetString().Should().Be("period_decimal");
+            after.GetProperty("dateFormat").GetString().Should().Be("YYYY-MM-DD");
+            after.GetProperty("periodStartDay").GetInt32().Should().Be(15);
+            after.GetProperty("defaultCurrencyCode").GetString().Should().Be("USD");
+        }
+        finally
+        {
+            // Restore. CurrencyId mapping: EUR=1, USD=2, GBP=3, COP=4, ARS=5, VED=6.
+            var currencyId = beforeCurrencyCode switch
+            {
+                "EUR" => 1, "USD" => 2, "GBP" => 3, "COP" => 4, "ARS" => 5, "VED" => 6, _ => 1
+            };
+            await _client.PatchAsJsonAsync("/api/settings", new
+            {
+                numberFormat      = beforeNumberFormat,
+                dateFormat        = beforeDateFormat,
+                defaultCurrencyId = currencyId,
+                periodStartDay    = beforePeriodStart
+            });
+        }
+    }
+
+    [Fact]
+    public async Task Patch_returns_422_on_invalid_format()
+    {
+        var res = await _client.PatchAsJsonAsync("/api/settings", new
+        {
+            numberFormat      = "spanish_decimal",
+            dateFormat        = "YYYY-MM-DD",
+            defaultCurrencyId = 1,
+            periodStartDay    = 1
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Patch_returns_422_on_unknown_currency()
+    {
+        var res = await _client.PatchAsJsonAsync("/api/settings", new
+        {
+            numberFormat      = "comma_decimal",
+            dateFormat        = "DD/MM/YYYY",
+            defaultCurrencyId = 999,
+            periodStartDay    = 1
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await res.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("INVALID_CURRENCY");
+    }
+
+    [Fact]
+    public async Task Patch_returns_422_on_period_start_day_out_of_range()
+    {
+        var res = await _client.PatchAsJsonAsync("/api/settings", new
+        {
+            numberFormat      = "comma_decimal",
+            dateFormat        = "DD/MM/YYYY",
+            defaultCurrencyId = 1,
+            periodStartDay    = 32
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
 }

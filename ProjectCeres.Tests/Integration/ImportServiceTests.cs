@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -31,7 +32,7 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db);
+        var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
         var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
         var transactionService      = new TransactionService(

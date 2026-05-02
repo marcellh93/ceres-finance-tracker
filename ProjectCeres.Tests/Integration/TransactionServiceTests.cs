@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using ProjectCeres.Models;
@@ -33,7 +34,7 @@ public class TransactionServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db);
+        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
         var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService);
         var attachmentService = new Mock<IFileAttachmentService>().Object;
         _service = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService);

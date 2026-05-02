@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -25,7 +26,7 @@ public class LiabilityPaymentServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db);
+        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
         _service = new LiabilityPaymentService(_fixture.Db, _accountService);
     }
 

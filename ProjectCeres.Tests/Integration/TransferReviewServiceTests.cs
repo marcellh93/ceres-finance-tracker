@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
@@ -19,7 +20,7 @@ public class TransferReviewServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db);
+        var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
         var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
         var attachmentMock          = new Mock<IFileAttachmentService>().Object;
         var transactionService      = new TransactionService(

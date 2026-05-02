@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class AccountService(AppDbContext db) : IAccountService
+public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccountService
 {
     // Opening Balance category is seeded with this known Guid (see AppDbContext seed data).
     private static readonly Guid OpeningBalanceCategoryId = new("20000000-0000-0000-0000-000000000001");
@@ -46,6 +47,7 @@ public class AccountService(AppDbContext db) : IAccountService
             InterestRate           = vm.InterestRate,
             IsActive               = true,
             ExcludeFromSpendable   = accountType?.Name == "Liability" ? false : vm.ExcludeFromSpendable,
+            UserId                 = user.UserId,
         };
 
         db.Accounts.Add(account);
@@ -60,7 +62,8 @@ public class AccountService(AppDbContext db) : IAccountService
                 Description = "Opening Balance",
                 AccountId   = account.Id,
                 CategoryId  = OpeningBalanceCategoryId,
-                CreatedAt   = DateTime.UtcNow
+                CreatedAt   = DateTime.UtcNow,
+                UserId      = user.UserId,
             });
         }
 
@@ -103,6 +106,7 @@ public class AccountService(AppDbContext db) : IAccountService
             db.Transactions.Add(new Transaction
             {
                 Id          = Guid.NewGuid(),
+                UserId      = user.UserId,
                 Date        = vm.OpeningBalanceDate,
                 Amount      = Math.Abs(vm.OpeningBalance),
                 Description = "Opening Balance",
@@ -325,5 +329,129 @@ public class AccountService(AppDbContext db) : IAccountService
             CurrencySymbol = account.Currency.Symbol,
             Entries        = allEntries
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // API surface (Result-returning).
+    // -------------------------------------------------------------------------
+
+    public async Task<Result<Account>> TryCreateAsync(CreateAccountRequest request)
+    {
+        var accountType = await db.AccountTypes.FindAsync(request.AccountTypeId!.Value);
+        if (accountType is null)
+            return Result<Account>.Fail(AccountPolicies.InvalidAccountTypeCode, "The selected account type does not exist.");
+
+        var currencyExists = await db.Currencies.AnyAsync(c => c.Id == request.CurrencyId!.Value);
+        if (!currencyExists)
+            return Result<Account>.Fail(AccountPolicies.InvalidCurrencyCode, "The selected currency does not exist.");
+
+        if (accountType.Name == "Liability")
+        {
+            var policy = AccountPolicies.ValidateLiabilityRepayment(request.LiabilityRepaymentType, request.InterestRate);
+            if (!policy.IsSuccess)
+                return Result<Account>.Fail(policy.Error!.Value.Code, policy.Error!.Value.Message);
+        }
+
+        var account = new Account
+        {
+            Id                     = Guid.NewGuid(),
+            Name                   = request.Name.Trim(),
+            AccountTypeId          = request.AccountTypeId!.Value,
+            CurrencyId             = request.CurrencyId!.Value,
+            Description            = request.Description,
+            LiabilityRepaymentType = request.LiabilityRepaymentType,
+            InterestRate           = request.InterestRate,
+            IsActive               = true,
+            ExcludeFromSpendable   = accountType.Name == "Liability" ? false : request.ExcludeFromSpendable,
+            UserId                 = user.UserId,
+        };
+        db.Accounts.Add(account);
+
+        if (request.OpeningBalance != 0)
+        {
+            db.Transactions.Add(new Transaction
+            {
+                Id          = Guid.NewGuid(),
+                Date        = request.OpeningBalanceDate,
+                Amount      = Math.Abs(request.OpeningBalance),
+                Description = "Opening Balance",
+                AccountId   = account.Id,
+                CategoryId  = OpeningBalanceCategoryId,
+                CreatedAt   = DateTime.UtcNow,
+                UserId      = user.UserId,
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var fresh = await db.Accounts
+            .Include(a => a.AccountType)
+            .Include(a => a.Currency)
+            .FirstAsync(a => a.Id == account.Id);
+        return Result<Account>.Ok(fresh);
+    }
+
+    public async Task<Result<Account>> TryUpdateAsync(Guid id, UpdateAccountRequest request)
+    {
+        var account = await db.Accounts
+            .Include(a => a.AccountType)
+            .Include(a => a.Currency)
+            .Owned(user)
+            .FirstOrDefaultAsync(a => a.Id == id);
+        if (account is null) return Result<Account>.Fail("NOT_FOUND", "Account not found.");
+
+        if (account.AccountType.Name == "Liability")
+        {
+            var policy = AccountPolicies.ValidateLiabilityRepayment(request.LiabilityRepaymentType, request.InterestRate);
+            if (!policy.IsSuccess)
+                return Result<Account>.Fail(policy.Error!.Value.Code, policy.Error!.Value.Message);
+        }
+
+        account.Name                   = request.Name.Trim();
+        account.Description            = request.Description;
+        account.LiabilityRepaymentType = request.LiabilityRepaymentType;
+        account.InterestRate           = request.InterestRate;
+        account.ExcludeFromSpendable   = account.AccountType.Name == "Liability" ? false : request.ExcludeFromSpendable;
+
+        // Manage the opening balance transaction (system-managed).
+        var existingOb = await db.Transactions
+            .Owned(user)
+            .FirstOrDefaultAsync(t => t.AccountId == id && t.CategoryId == OpeningBalanceCategoryId);
+
+        if (existingOb is not null)
+        {
+            if (request.OpeningBalance == 0) db.Transactions.Remove(existingOb);
+            else
+            {
+                existingOb.Amount = Math.Abs(request.OpeningBalance);
+                existingOb.Date   = request.OpeningBalanceDate;
+            }
+        }
+        else if (request.OpeningBalance != 0)
+        {
+            db.Transactions.Add(new Transaction
+            {
+                Id          = Guid.NewGuid(),
+                Date        = request.OpeningBalanceDate,
+                Amount      = Math.Abs(request.OpeningBalance),
+                Description = "Opening Balance",
+                AccountId   = id,
+                CategoryId  = OpeningBalanceCategoryId,
+                CreatedAt   = DateTime.UtcNow,
+                UserId      = user.UserId,
+            });
+        }
+
+        await db.SaveChangesAsync();
+        return Result<Account>.Ok(account);
+    }
+
+    public async Task<Result> TryDeactivateAsync(Guid id)
+    {
+        var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == id);
+        if (account is null) return Result.Fail("NOT_FOUND", "Account not found.");
+        account.IsActive = false;
+        await db.SaveChangesAsync();
+        return Result.Ok();
     }
 }

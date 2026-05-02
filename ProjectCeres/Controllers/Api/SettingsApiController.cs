@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ProjectCeres.Common;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
@@ -20,4 +21,22 @@ public class SettingsApiController(ISettingsService settingsService) : Controlle
             PeriodStartDay:         settings.PeriodStartDay);
         return Ok(dto);
     }
+
+    [HttpPatch]
+    public async Task<IActionResult> Update([FromBody] UpdateSettingsRequest request)
+    {
+        var result = await settingsService.TryUpdateAsync(request);
+        if (result.IsSuccess) return NoContent();
+        var error = result.Error!.Value;
+        return error.Code switch
+        {
+            "INVALID_CURRENCY" => UnprocessableEntity(Envelope(error)),
+            _                  => UnprocessableEntity(Envelope(error)),
+        };
+    }
+
+    private static object Envelope(ResultError error) => new
+    {
+        error = new { code = error.Code, message = error.Message, details = Array.Empty<object>() }
+    };
 }

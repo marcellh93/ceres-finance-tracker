@@ -1,3 +1,4 @@
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
@@ -19,4 +20,9 @@ public interface IAccountService
     Task<DateOnly?> GetOpeningBalanceDateAsync(Guid id);
     /// <summary>Returns all ledger entries for an account in chronological order with a running balance.</summary>
     Task<AccountLedgerViewModel?> GetLedgerAsync(Guid id);
+
+    // API surface (Result-returning).
+    Task<Result<Account>> TryCreateAsync(CreateAccountRequest request);
+    Task<Result<Account>> TryUpdateAsync(Guid id, UpdateAccountRequest request);
+    Task<Result> TryDeactivateAsync(Guid id);
 }

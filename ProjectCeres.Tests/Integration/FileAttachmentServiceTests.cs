@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Moq;
@@ -32,7 +33,7 @@ public class FileAttachmentServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db);
+        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
 
         _tempRoot = Path.Combine(Path.GetTempPath(), $"ceres-attach-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempRoot);
