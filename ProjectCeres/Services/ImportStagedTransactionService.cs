@@ -54,6 +54,36 @@ public class ImportStagedTransactionService(
         await db.SaveChangesAsync();
     }
 
+    public async Task<Result> TryConfirmAsync(Guid id)
+    {
+        if (!await db.ImportStagedTransactions.Owned(user).AnyAsync(s => s.Id == id))
+            return Result.Fail("NOT_FOUND", "Staged transaction not found.");
+        try
+        {
+            await ConfirmAsync(id);
+            return Result.Ok();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
+    }
+
+    public async Task<Result> TryDisputeAsync(Guid id)
+    {
+        if (!await db.ImportStagedTransactions.Owned(user).AnyAsync(s => s.Id == id))
+            return Result.Fail("NOT_FOUND", "Staged transaction not found.");
+        try
+        {
+            await DisputeAsync(id);
+            return Result.Ok();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
+    }
+
     public async Task DisputeAsync(Guid id)
     {
         var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id)
