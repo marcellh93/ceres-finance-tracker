@@ -31,23 +31,6 @@ public class SettingsService(AppDbContext db, ICurrentUserAccessor user) : ISett
         return settings;
     }
 
-    public async Task UpdateAsync(SettingsEditViewModel vm)
-    {
-        var existing = await db.Settings.Owned(user).FirstOrDefaultAsync();
-        var isNew    = existing is null;
-        var settings = existing ?? CreateDefaults(user.UserId);
-
-        settings.NumberFormat         = vm.NumberFormat;
-        settings.DateFormat           = vm.DateFormat;
-        settings.DefaultCurrencyId    = vm.DefaultCurrencyId!.Value;
-        settings.PeriodStartDay       = ClampStartDay(vm.PeriodStartDay);
-
-        if (isNew)
-            db.Settings.Add(settings);
-
-        await db.SaveChangesAsync();
-    }
-
     public async Task<Result> TryUpdateAsync(UpdateSettingsRequest request)
     {
         var currencyExists = await db.Currencies.AnyAsync(c => c.Id == request.DefaultCurrencyId!.Value);

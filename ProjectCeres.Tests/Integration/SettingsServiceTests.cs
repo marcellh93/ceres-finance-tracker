@@ -1,7 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
 using ProjectCeres.Services;
-using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Tests.Integration;
 
@@ -92,49 +91,4 @@ public class SettingsServiceTests : IAsyncLifetime
         settings.DefaultCurrencyId.Should().Be(1);
     }
 
-    // -------------------------------------------------------------------------
-    // UpdateAsync
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task UpdateAsync_ChangesAllFields()
-    {
-        await _service.UpdateAsync(new SettingsEditViewModel
-        {
-            NumberFormat      = "period_decimal",
-            DateFormat        = "MM/DD/YYYY",
-            DefaultCurrencyId = 2   // USD
-        });
-
-        var reloaded = _fixture.Db.Settings.FirstOrDefault();
-        reloaded.Should().NotBeNull();
-        reloaded!.NumberFormat.Should().Be("period_decimal");
-        reloaded.DateFormat.Should().Be("MM/DD/YYYY");
-        reloaded.DefaultCurrencyId.Should().Be(2);
-    }
-
-    [Fact]
-    public async Task UpdateAsync_CreatesRow_WhenNoneExist()
-    {
-        var existing = _fixture.Db.Settings.FirstOrDefault();
-        if (existing is not null)
-        {
-            _fixture.Db.Settings.Remove(existing);
-            await _fixture.Db.SaveChangesAsync();
-        }
-
-        await _service.UpdateAsync(new SettingsEditViewModel
-        {
-            NumberFormat      = "period_decimal",
-            DateFormat        = "YYYY-MM-DD",
-            DefaultCurrencyId = 1
-        });
-
-        var count = _fixture.Db.Settings.Count();
-        count.Should().Be(1);
-
-        var saved = _fixture.Db.Settings.First();
-        saved.NumberFormat.Should().Be("period_decimal");
-        saved.DateFormat.Should().Be("YYYY-MM-DD");
-    }
 }

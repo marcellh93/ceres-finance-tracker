@@ -90,6 +90,21 @@ export function useSettings(): UseSettingsResult {
   return { data: cache.data, loading: cache.loading };
 }
 
+/**
+ * Force a refresh of the cached settings. Notifies every useSettings()
+ * subscriber when the new data arrives. Call this after PATCH /api/settings
+ * succeeds so the rest of the app picks up format/currency changes
+ * without a page reload.
+ *
+ * Does NOT clear cache.data first — old data stays visible for the ~50–100 ms
+ * the GET takes, avoiding a flash of empty state in every other component.
+ */
+export function refetchSettings(): Promise<void> {
+  cache.promise = null;     // clear the dedup so startFetch actually runs
+  cache.loading = false;
+  return startFetch();
+}
+
 /** Test-only helper. Clears the singleton cache between test cases. */
 export function __resetSettingsForTests(): void {
   cache = {

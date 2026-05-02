@@ -1,0 +1,141 @@
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useApi } from '../../lib/use-api';
+import { refetchSettings } from '../../lib/use-settings';
+import { SettingsForm } from './SettingsForm';
+import {
+  CURRENCIES_URL,
+  SETTINGS_URL,
+  type CurrencyOptionDto,
+  type SettingsDto,
+  type SettingsFormValues,
+  type UpdateSettingsRequest,
+} from './settings-api';
+
+export function SettingsPage() {
+  const settings = useApi<SettingsDto>(SETTINGS_URL);
+  const currencies = useApi<CurrencyOptionDto[]>(CURRENCIES_URL);
+
+  if (settings.loading || currencies.loading) {
+    return (
+      <PageShell>
+        <Card data-testid="settings-skeleton">
+          <CardHeader>
+            <CardTitle>Display preferences</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  if (settings.error || currencies.error || !settings.data || !currencies.data) {
+    return (
+      <PageShell>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              Couldn't load settings.
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4"
+              onClick={() => {
+                settings.refetch();
+                currencies.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  // Convert the SettingsDto (which carries the currency code/symbol for
+  // display) into form values (which carry the currency *id* for editing).
+  const initialValues: SettingsFormValues = {
+    numberFormat:      settings.data.numberFormat,
+    dateFormat:        settings.data.dateFormat,
+    defaultCurrencyId: currencies.data.find(
+                         (c) => c.code === settings.data!.defaultCurrencyCode,
+                       )?.id ?? currencies.data[0].id,
+    periodStartDay:    settings.data.periodStartDay,
+  };
+
+  async function handleSubmit(values: SettingsFormValues) {
+    const body: UpdateSettingsRequest = {
+      numberFormat:      values.numberFormat,
+      dateFormat:        values.dateFormat,
+      defaultCurrencyId: values.defaultCurrencyId,
+      periodStartDay:    values.periodStartDay,
+    };
+
+    try {
+      const response = await fetch(SETTINGS_URL, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        toast.error("Couldn't save. Try again.");
+        return { ok: false as const };
+      }
+
+      // Notify every other component using useSettings(). Fire-and-forget;
+      // we don't block the success toast on the cache settling.
+      void refetchSettings();
+      toast.success('Saved.');
+      return { ok: true as const };
+    } catch {
+      toast.error("Couldn't save. Try again.");
+      return { ok: false as const };
+    }
+  }
+
+  return (
+    <PageShell>
+      <Card>
+        <CardHeader>
+          <CardTitle>Display preferences</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SettingsForm
+            initialValues={initialValues}
+            currencies={currencies.data}
+            onSubmit={handleSubmit}
+          />
+        </CardContent>
+      </Card>
+    </PageShell>
+  );
+}
+
+/**
+ * Page shell matching the design-system grammar (Patterns page convention):
+ * `space-y-*` outer container, header with title + muted description, then
+ * the page's content sections as Cards.
+ */
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="space-y-8 max-w-2xl">
+      <header>
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <p className="mt-2 text-muted-foreground">
+          Customize how Project Ceres displays numbers, dates, and currency.
+        </p>
+      </header>
+      {children}
+    </div>
+  );
+}
