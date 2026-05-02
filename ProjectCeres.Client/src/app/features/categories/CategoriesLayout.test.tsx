@@ -134,10 +134,11 @@ describe('CategoriesLayout', () => {
     renderAt('/categories?type=income');
     await screen.findByText('Opening Balance');
     const allRowsRendered = screen.getAllByRole('row');
-    const names = allRowsRendered.slice(1).map((r) => within(r).getAllByRole('cell')[0]?.textContent);
+    const names = allRowsRendered.slice(1).map((r) => within(r).getAllByRole('cell')[0]?.textContent ?? '');
     const last = names[names.length - 1];
     const secondLast = names[names.length - 2];
-    expect([last, secondLast]).toEqual(expect.arrayContaining(['Opening Balance', 'Uncategorized Income']));
+    expect(last).toMatch(/Opening Balance|Uncategorized Income/);
+    expect(secondLast).toMatch(/Opening Balance|Uncategorized Income/);
   });
 
   it('GET error renders CardError with Retry', async () => {

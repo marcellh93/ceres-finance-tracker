@@ -58,25 +58,15 @@ describe('CategoryForm', () => {
     expect(trigger).not.toHaveAttribute('aria-expanded');
   });
 
-  it('Save and Reset are disabled when nothing has changed (Edit)', () => {
+  it('Save is disabled when nothing has changed (Edit)', () => {
     renderForm({ mode: 'edit' });
     expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /reset/i })).toBeDisabled();
   });
 
-  it('Save and Reset enable when Name changes', () => {
+  it('Save enables when Name changes', () => {
     renderForm({ mode: 'edit' });
     fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Food' } });
     expect(screen.getByRole('button', { name: /save/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /reset/i })).toBeEnabled();
-  });
-
-  it('Reset restores values to the snapshot and re-disables the buttons', () => {
-    renderForm({ mode: 'edit' });
-    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Food' } });
-    fireEvent.click(screen.getByRole('button', { name: /reset/i }));
-    expect(screen.getByLabelText(/name/i)).toHaveValue('Groceries');
-    expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
   });
 
   it('Save shows "Saving…" while onSubmit is pending', () => {

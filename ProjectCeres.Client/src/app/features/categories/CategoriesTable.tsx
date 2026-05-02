@@ -45,7 +45,6 @@ export function CategoriesTable({ rows, onChanged }: Props) {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead className="w-32">Lifestyle</TableHead>
-            <TableHead className="w-32" />
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
@@ -57,14 +56,9 @@ export function CategoriesTable({ rows, onChanged }: Props) {
                 key={row.id}
                 className={!row.isActive ? 'opacity-60' : undefined}
               >
-                <TableCell className="text-sm">{row.name}</TableCell>
-                <TableCell>
-                  {row.lifestyleTag ? (
-                    <Badge variant="secondary">{row.lifestyleTag}</Badge>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
+                <TableCell className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>{row.name}</span>
                     {locked ? (
                       <Tooltip>
                         <TooltipTrigger
@@ -87,6 +81,11 @@ export function CategoriesTable({ rows, onChanged }: Props) {
                       <Badge variant="secondary">Archived</Badge>
                     ) : null}
                   </div>
+                </TableCell>
+                <TableCell>
+                  {row.lifestyleTag ? (
+                    <Badge variant="secondary">{row.lifestyleTag}</Badge>
+                  ) : null}
                 </TableCell>
                 <TableCell>
                   {locked ? null : (

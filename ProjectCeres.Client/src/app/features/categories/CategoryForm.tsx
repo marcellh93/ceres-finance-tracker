@@ -72,11 +72,6 @@ export function CategoryForm({ mode, initialValues, categoryTypes, onSubmit }: P
     }
   }
 
-  function handleReset() {
-    if (submitting) return;
-    setValues(snapshot);
-  }
-
   const selectedType = categoryTypes.find((t) => t.id === values.categoryTypeId);
   const selectedLifestyleLabel =
     LIFESTYLE_OPTIONS.find((o) => o.value === values.lifestyleTag)?.label ?? 'None';
@@ -153,14 +148,6 @@ export function CategoryForm({ mode, initialValues, categoryTypes, onSubmit }: P
         <div className="flex items-center gap-2 pt-2">
           <Button type="submit" disabled={!isDirty || submitting}>
             {submitting ? 'Saving…' : 'Save'}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleReset}
-            disabled={!isDirty || submitting}
-          >
-            Reset
           </Button>
         </div>
       </form>
