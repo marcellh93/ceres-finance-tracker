@@ -57,6 +57,9 @@
 | `MovementsController` | Index | **Migrated (2026-04-30).** Movements list is fully React at `/app/movements`. 302 redirect from `/Movements` → `/app/movements` is live; `Views/Movements/Index.cshtml` is deleted. |
 | `AttachmentsController` | Serve, Delete | File serving needs special handling: streaming response, `Content-Disposition: attachment` |
 | `HomeController` | Index | Deleted — replaced by React Router's root route |
+| `CsvImportProfilesController` | Index, Create, Edit, Delete, Recover | Phase 2 addition. Soft-delete with 90-day Recover window. |
+| `TransferReviewController` | Index + Link/CreateAsTransfer/DismissAsTransaction | Phase 2 addition. Stateful actions on `ImportStagedTransfer` rows. |
+| `ReconciliationReviewController` | Index | Phase 2 addition. Audit scope at port time. |
 
 ---
 

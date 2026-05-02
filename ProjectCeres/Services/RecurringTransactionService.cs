@@ -176,4 +176,132 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
             Frequency.Annual    => from.AddYears(1),
             _                   => from.AddMonths(1)
         };
+
+    // -------------------------------------------------------------------------
+    // API surface (Result-returning).
+    // -------------------------------------------------------------------------
+
+    public async Task<Result<RecurringTransaction>> TryCreateAsync(CreateRecurringTransactionRequest request)
+    {
+        if (!Enum.TryParse<Frequency>(request.Frequency, out var freq))
+            return Result<RecurringTransaction>.Fail("INVALID_FREQUENCY", $"Unknown frequency '{request.Frequency}'.");
+        if (!Enum.TryParse<ReminderBehaviour>(request.ReminderBehaviour, out var behaviour))
+            return Result<RecurringTransaction>.Fail("INVALID_REMINDER_BEHAVIOUR", $"Unknown reminder behaviour '{request.ReminderBehaviour}'.");
+
+        var accountOk = await db.Accounts.Owned(user).AnyAsync(a => a.Id == request.AccountId!.Value);
+        if (!accountOk)
+            return Result<RecurringTransaction>.Fail("INVALID_ACCOUNT", "The selected account does not exist.");
+
+        var categoryOk = await db.Categories.OwnedOrShared(user).AnyAsync(c => c.Id == request.CategoryId!.Value);
+        if (!categoryOk)
+            return Result<RecurringTransaction>.Fail("INVALID_CATEGORY", "The selected category does not exist.");
+
+        var reminder = new RecurringTransaction
+        {
+            Id                = Guid.NewGuid(),
+            UserId            = user.UserId,
+            Name              = request.Name.Trim(),
+            EstimatedAmount   = request.EstimatedAmount,
+            AccountId         = request.AccountId!.Value,
+            CategoryId        = request.CategoryId!.Value,
+            Frequency         = freq,
+            DayOfPeriod       = request.DayOfPeriod,
+            NextDueDate       = request.NextDueDate,
+            IsActive          = true,
+            ReminderBehaviour = behaviour
+        };
+
+        db.RecurringTransactions.Add(reminder);
+        await db.SaveChangesAsync();
+
+        var fresh = await db.RecurringTransactions
+            .Owned(user)
+            .Include(r => r.Account)
+            .Include(r => r.Category)
+            .FirstAsync(r => r.Id == reminder.Id);
+        return Result<RecurringTransaction>.Ok(fresh);
+    }
+
+    public async Task<Result<RecurringTransaction>> TryUpdateAsync(Guid id, UpdateRecurringTransactionRequest request)
+    {
+        if (!Enum.TryParse<Frequency>(request.Frequency, out var freq))
+            return Result<RecurringTransaction>.Fail("INVALID_FREQUENCY", $"Unknown frequency '{request.Frequency}'.");
+        if (!Enum.TryParse<ReminderBehaviour>(request.ReminderBehaviour, out var behaviour))
+            return Result<RecurringTransaction>.Fail("INVALID_REMINDER_BEHAVIOUR", $"Unknown reminder behaviour '{request.ReminderBehaviour}'.");
+
+        var reminder = await db.RecurringTransactions.Owned(user)
+            .Include(r => r.Account).Include(r => r.Category)
+            .FirstOrDefaultAsync(r => r.Id == id);
+        if (reminder is null)
+            return Result<RecurringTransaction>.Fail("NOT_FOUND", "Recurring transaction not found.");
+
+        var accountOk = await db.Accounts.Owned(user).AnyAsync(a => a.Id == request.AccountId!.Value);
+        if (!accountOk)
+            return Result<RecurringTransaction>.Fail("INVALID_ACCOUNT", "The selected account does not exist.");
+
+        var categoryOk = await db.Categories.OwnedOrShared(user).AnyAsync(c => c.Id == request.CategoryId!.Value);
+        if (!categoryOk)
+            return Result<RecurringTransaction>.Fail("INVALID_CATEGORY", "The selected category does not exist.");
+
+        reminder.Name              = request.Name.Trim();
+        reminder.EstimatedAmount   = request.EstimatedAmount;
+        reminder.AccountId         = request.AccountId!.Value;
+        reminder.CategoryId        = request.CategoryId!.Value;
+        reminder.Frequency         = freq;
+        reminder.DayOfPeriod       = request.DayOfPeriod;
+        reminder.NextDueDate       = request.NextDueDate;
+        reminder.ReminderBehaviour = behaviour;
+        await db.SaveChangesAsync();
+        return Result<RecurringTransaction>.Ok(reminder);
+    }
+
+    public async Task<Result> TryDeactivateAsync(Guid id)
+    {
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id);
+        if (reminder is null) return Result.Fail("NOT_FOUND", "Recurring transaction not found.");
+        reminder.IsActive = false;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
+
+    public async Task<Result<Transaction>> TryConfirmAsync(Guid id, ConfirmRecurringTransactionRequest request)
+    {
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id);
+        if (reminder is null) return Result<Transaction>.Fail("NOT_FOUND", "Recurring transaction not found.");
+
+        var openingDate = await accountService.GetOpeningBalanceDateAsync(reminder.AccountId);
+        if (openingDate.HasValue && request.Date < openingDate.Value)
+            return Result<Transaction>.Fail("DATE_BEFORE_OPENING_BALANCE",
+                $"This transaction cannot be dated before the opening balance date ({openingDate.Value:dd/MM/yyyy}).");
+
+        // ManualDate behaviour requires an explicit nextDueDate; surface that as a 422 instead of an exception.
+        if (reminder.ReminderBehaviour == ReminderBehaviour.ManualDate && request.NextDueDate is null)
+            return Result<Transaction>.Fail("NEXT_DUE_DATE_REQUIRED",
+                "Please set the next due date before confirming a ManualDate reminder.");
+
+        var transaction = new Transaction
+        {
+            Id          = Guid.NewGuid(),
+            UserId      = user.UserId,
+            Date        = request.Date,
+            Amount      = request.Amount,
+            Description = request.Description ?? reminder.Name,
+            AccountId   = reminder.AccountId,
+            CategoryId  = reminder.CategoryId,
+            CreatedAt   = DateTime.UtcNow
+        };
+        db.Transactions.Add(transaction);
+        reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: request.Date, nextDueDate: request.NextDueDate);
+        await db.SaveChangesAsync();
+        return Result<Transaction>.Ok(transaction);
+    }
+
+    public async Task<Result> TryDismissAsync(Guid id)
+    {
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id);
+        if (reminder is null) return Result.Fail("NOT_FOUND", "Recurring transaction not found.");
+        reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: null);
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
 }

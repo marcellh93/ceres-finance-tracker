@@ -1,3 +1,4 @@
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
@@ -5,6 +6,7 @@ namespace ProjectCeres.Services;
 
 public interface IRecurringTransactionService
 {
+    // Razor-era methods (throwing). Used by RecurringTransactionsController.
     Task<IEnumerable<RecurringTransaction>> GetAllAsync(bool includeInactive = false);
     Task<RecurringTransaction?> GetByIdAsync(Guid id);
     Task<RecurringTransaction> CreateAsync(RecurringTransactionCreateViewModel vm);
@@ -16,4 +18,11 @@ public interface IRecurringTransactionService
     Task DismissAsync(Guid id);
     /// <summary>Returns active reminders with NextDueDate within the given number of days from today.</summary>
     Task<IEnumerable<RecurringTransaction>> GetUpcomingAsync(int withinDays);
+
+    // API surface (Result-returning).
+    Task<Result<RecurringTransaction>> TryCreateAsync(CreateRecurringTransactionRequest request);
+    Task<Result<RecurringTransaction>> TryUpdateAsync(Guid id, UpdateRecurringTransactionRequest request);
+    Task<Result> TryDeactivateAsync(Guid id);
+    Task<Result<Transaction>> TryConfirmAsync(Guid id, ConfirmRecurringTransactionRequest request);
+    Task<Result> TryDismissAsync(Guid id);
 }
