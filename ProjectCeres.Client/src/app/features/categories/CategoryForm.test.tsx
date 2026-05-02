@@ -28,15 +28,17 @@ function renderForm(overrides?: {
   const mode = overrides?.mode ?? 'create';
   const initialValues = overrides?.initialValues ?? (mode === 'create' ? initialCreate : initialEdit);
   const onSubmit = overrides?.onSubmit ?? vi.fn().mockResolvedValue({ ok: true });
+  const onCancel = vi.fn();
   const utils = render(
     <CategoryForm
       mode={mode}
       initialValues={initialValues}
       categoryTypes={categoryTypes}
       onSubmit={onSubmit}
+      onCancel={onCancel}
     />,
   );
-  return { ...utils, onSubmit };
+  return { ...utils, onSubmit, onCancel };
 }
 
 describe('CategoryForm', () => {
@@ -56,6 +58,12 @@ describe('CategoryForm', () => {
     renderForm({ mode: 'edit' });
     const trigger = screen.getByLabelText(/type/i);
     expect(trigger).not.toHaveAttribute('aria-expanded');
+  });
+
+  it('Cancel calls onCancel', () => {
+    const { onCancel } = renderForm({ mode: 'edit' });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('Save is disabled when nothing has changed (Edit)', () => {

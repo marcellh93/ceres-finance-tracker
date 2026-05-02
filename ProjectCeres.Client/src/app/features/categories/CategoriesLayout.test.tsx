@@ -116,17 +116,17 @@ describe('CategoriesLayout', () => {
     expect(oldRow.className).toContain('opacity-60');
   });
 
-  it('system rows render the System badge and no row-actions menu', async () => {
+  it('system rows render the locked-system marker and no row-actions menu', async () => {
     renderAt('/categories?type=income');
     const systemRow = (await screen.findByText('Opening Balance')).closest('tr')!;
-    expect(within(systemRow).getByText('System')).toBeInTheDocument();
+    expect(within(systemRow).getByRole('button', { name: /system category/i })).toBeInTheDocument();
     expect(within(systemRow).queryByRole('button', { name: /row actions/i })).toBeNull();
   });
 
-  it('reserved Uncategorized rows are treated as system (badge + no menu)', async () => {
+  it('reserved Uncategorized rows are treated as system (locked marker + no menu)', async () => {
     renderAt('/categories?type=income');
     const uncatRow = (await screen.findByText('Uncategorized Income')).closest('tr')!;
-    expect(within(uncatRow).getByText('System')).toBeInTheDocument();
+    expect(within(uncatRow).getByRole('button', { name: /system category/i })).toBeInTheDocument();
     expect(within(uncatRow).queryByRole('button', { name: /row actions/i })).toBeNull();
   });
 

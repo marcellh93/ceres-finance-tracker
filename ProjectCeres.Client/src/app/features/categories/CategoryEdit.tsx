@@ -108,6 +108,7 @@ export function CategoryEdit() {
           initialValues={initialValues}
           categoryTypes={types.data}
           onSubmit={handleSubmit}
+          onCancel={() => navigate('/categories')}
         />
       </CardContent>
     </Card>

@@ -34,6 +34,7 @@ type Props = {
   initialValues: CategoryFormValues;
   categoryTypes: CategoryTypeDto[];
   onSubmit: (values: CategoryFormValues) => Promise<SubmitResult>;
+  onCancel: () => void;
 };
 
 const LIFESTYLE_OPTIONS: { value: LifestyleTag | null; label: string }[] = [
@@ -54,7 +55,7 @@ function shallowEqual(a: CategoryFormValues, b: CategoryFormValues): boolean {
   );
 }
 
-export function CategoryForm({ mode, initialValues, categoryTypes, onSubmit }: Props) {
+export function CategoryForm({ mode, initialValues, categoryTypes, onSubmit, onCancel }: Props) {
   const [snapshot, setSnapshot] = useState<CategoryFormValues>(initialValues);
   const [values, setValues] = useState<CategoryFormValues>(initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -148,6 +149,14 @@ export function CategoryForm({ mode, initialValues, categoryTypes, onSubmit }: P
         <div className="flex items-center gap-2 pt-2">
           <Button type="submit" disabled={!isDirty || submitting}>
             {submitting ? 'Saving…' : 'Save'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={submitting}
+          >
+            Cancel
           </Button>
         </div>
       </form>

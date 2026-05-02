@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -58,18 +58,17 @@ export function CategoriesTable({ rows, onChanged }: Props) {
               >
                 <TableCell className="text-sm">
                   <div className="flex items-center gap-2">
-                    <span>{row.name}</span>
                     {locked ? (
                       <Tooltip>
                         <TooltipTrigger
                           render={
-                            <Badge
-                              variant="outline"
-                              className="gap-1 cursor-help"
+                            <button
+                              type="button"
+                              aria-label="System category — locked"
+                              className="text-muted-foreground/70 hover:text-muted-foreground transition-colors cursor-help"
                             >
-                              System
-                              <Info className="h-3 w-3" aria-hidden="true" />
-                            </Badge>
+                              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
                           }
                         />
                         <TooltipContent className="max-w-xs">
@@ -77,6 +76,9 @@ export function CategoriesTable({ rows, onChanged }: Props) {
                         </TooltipContent>
                       </Tooltip>
                     ) : null}
+                    <span className={locked ? 'text-muted-foreground' : undefined}>
+                      {row.name}
+                    </span>
                     {!row.isActive ? (
                       <Badge variant="secondary">Archived</Badge>
                     ) : null}

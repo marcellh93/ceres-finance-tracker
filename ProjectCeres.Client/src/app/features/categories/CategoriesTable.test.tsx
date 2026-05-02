@@ -35,16 +35,16 @@ describe('CategoriesTable', () => {
     expect(screen.getByText('Opening Balance')).toBeInTheDocument();
   });
 
-  it('shows the System badge with tooltip text on isSystem rows', async () => {
+  it('shows the locked-system marker on isSystem rows', () => {
     renderTable();
-    const systemBadges = screen.getAllByText('System');
-    expect(systemBadges.length).toBeGreaterThanOrEqual(1);
+    const systemRow = screen.getByText('Opening Balance').closest('tr')!;
+    expect(within(systemRow).getByRole('button', { name: /system category/i })).toBeInTheDocument();
   });
 
-  it('shows the System badge on RESERVED_UNCATEGORIZED rows even when isSystem=false', () => {
+  it('shows the locked-system marker on RESERVED_UNCATEGORIZED rows even when isSystem=false', () => {
     renderTable();
     const uncategorizedRow = screen.getByText('Uncategorized Income').closest('tr')!;
-    expect(within(uncategorizedRow).getByText('System')).toBeInTheDocument();
+    expect(within(uncategorizedRow).getByRole('button', { name: /system category/i })).toBeInTheDocument();
   });
 
   it('shows the Archived badge on rows where isActive=false', () => {
