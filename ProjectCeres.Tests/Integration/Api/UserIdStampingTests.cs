@@ -165,26 +165,6 @@ public class UserIdStampingTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RazorCategoryService_CreateAsync_stamps_UserId()
-    {
-        // Razor's CreateAsync (throwing) is still wired to the Razor controller. This
-        // guards the path until the Razor controller is deleted in the SPA migration.
-        using var scope = _factory.Services.CreateScope();
-        var svc = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.ICategoryService>();
-        var created = await svc.CreateAsync(new ProjectCeres.ViewModels.CategoryCreateViewModel
-        {
-            Name           = $"StampedRazor-{Guid.NewGuid():N}",
-            CategoryTypeId = 2,
-            LifestyleTag   = null
-        });
-        _createdCategoryIds.Add(created.Id);
-
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var row = await db.Categories.AsNoTracking().FirstAsync(c => c.Id == created.Id);
-        row.UserId.Should().Be(Sentinel);
-    }
-
-    [Fact]
     public async Task RecurringTransactionService_CreateAsync_stamps_UserId()
     {
         using var scope = _factory.Services.CreateScope();

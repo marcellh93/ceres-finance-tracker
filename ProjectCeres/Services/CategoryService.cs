@@ -8,8 +8,6 @@ namespace ProjectCeres.Services;
 
 public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICategoryService
 {
-    private static bool IsReserved(Guid id) => CategoryPolicies.IsReserved(id);
-
     public async Task<IEnumerable<Category>> GetAllAsync(bool includeInactive = false)
     {
         var query = db.Categories
@@ -28,49 +26,6 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
             .OwnedOrShared(user)
             .Include(c => c.CategoryType)
             .FirstOrDefaultAsync(c => c.Id == id);
-
-    public async Task<Category> CreateAsync(CategoryCreateViewModel vm)
-    {
-        var category = new Category
-        {
-            Id             = Guid.NewGuid(),
-            Name           = vm.Name,
-            CategoryTypeId = vm.CategoryTypeId!.Value,
-            IsActive       = true,
-            IsSystem       = false,
-            LifestyleTag   = vm.LifestyleTag,
-            UserId         = user.UserId,
-        };
-
-        db.Categories.Add(category);
-        await db.SaveChangesAsync();
-        return category;
-    }
-
-    public async Task UpdateAsync(CategoryEditViewModel vm)
-    {
-        var category = await db.Categories.OwnedOrShared(user).FirstOrDefaultAsync(c => c.Id == vm.Id)
-            ?? throw new InvalidOperationException($"Category {vm.Id} not found.");
-
-        if (category.IsSystem || IsReserved(category.Id))
-            throw new InvalidOperationException("System categories cannot be modified.");
-
-        category.Name         = vm.Name;
-        category.LifestyleTag = vm.LifestyleTag;
-        await db.SaveChangesAsync();
-    }
-
-    public async Task DeactivateAsync(Guid id)
-    {
-        var category = await db.Categories.OwnedOrShared(user).FirstOrDefaultAsync(c => c.Id == id)
-            ?? throw new InvalidOperationException($"Category {id} not found.");
-
-        if (category.IsSystem || IsReserved(category.Id))
-            throw new InvalidOperationException("System categories cannot be modified.");
-
-        category.IsActive = false;
-        await db.SaveChangesAsync();
-    }
 
     // -------------------------------------------------------------------------
     // API surface (Result-returning).

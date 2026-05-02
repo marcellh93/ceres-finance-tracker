@@ -15,6 +15,8 @@ import { Settings } from './pages/Settings';
 import { Support } from './pages/Support';
 import { BudgetCreate } from './features/budgets/BudgetCreate';
 import { BudgetEdit } from './features/budgets/BudgetEdit';
+import { CategoryCreate } from './features/categories/CategoryCreate';
+import { CategoryEdit } from './features/categories/CategoryEdit';
 import { MovementCreate } from './features/movements/MovementCreate';
 import { MovementEdit } from './features/movements/MovementEdit';
 import { MovementsLayout } from './features/movements/MovementsLayout';
@@ -30,7 +32,10 @@ export function App() {
         </Route>
         <Route path="review" element={<Review />} />
         <Route path="accounts" element={<Accounts />} />
-        <Route path="categories" element={<Categories />} />
+        <Route path="categories" element={<Categories />}>
+          <Route path="new" element={<CategoryCreate />} />
+          <Route path=":id/edit" element={<CategoryEdit />} />
+        </Route>
         <Route path="budgets" element={<Budgets />}>
           <Route path="new" element={<BudgetCreate />} />
           <Route path=":id/edit" element={<BudgetEdit />} />
