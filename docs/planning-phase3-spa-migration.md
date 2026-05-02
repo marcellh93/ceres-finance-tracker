@@ -51,7 +51,7 @@
 | `BudgetsController` | Index, Create, Edit, Deactivate (×2 for Category + Goal) | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/budgets/*`. Razor views deleted. POST overloads removed entirely (the SPA POSTs JSON to the new `/api/category-budgets` and `/api/goal-budgets`). |
 | `CategoriesController` | Index, Create, Edit, Deactivate | — |
 | `RecurringTransactionsController` | Index, Create, Edit, Deactivate, Confirm, Dismiss | Confirm and Dismiss are stateful actions — design endpoint contract carefully |
-| `ReportsController` | Index + report views | Each report → `GET /api/reports/{type}` |
+| `ReportsController` | Index + 8 report views + 8 CSV exports | Each report → `GET /api/reports/{type}` with `?format=csv` for the export branch. SavedReport entity is `IUserOwned` and dormant; CRUD is a deliberate follow-up since neither the Razor app nor the API exposes it today. |
 | `SettingsController` | Edit | → `GET /api/settings` + `PATCH /api/settings` |
 | `DashboardController` | Index | **Migrated (2026-04-29).** Dashboard is fully React; data served by `DashboardApiController`. 302 redirect from `/Dashboard` → `/app/` is live; Razor dashboard view, partial, and controller deleted. |
 | `MovementsController` | Index | **Migrated (2026-04-30).** Movements list is fully React at `/app/movements`. 302 redirect from `/Movements` → `/app/movements` is live; `Views/Movements/Index.cshtml` is deleted. |
