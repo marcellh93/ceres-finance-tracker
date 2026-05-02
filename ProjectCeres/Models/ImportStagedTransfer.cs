@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Models;
 
-public class ImportStagedTransfer
+public class ImportStagedTransfer : IUserOwned
 {
     public Guid Id { get; set; }
+    public Guid UserId { get; set; }
     public DateTime ImportedAt { get; set; }
     public Guid AccountId { get; set; }
     public DateOnly RawDate { get; set; }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
@@ -7,13 +8,15 @@ namespace ProjectCeres.Services;
 
 public class ImportStagedTransactionService(
     AppDbContext db,
-    ITransactionService transactionService) : IImportStagedTransactionService
+    ITransactionService transactionService,
+    ICurrentUserAccessor user) : IImportStagedTransactionService
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
 
     public async Task<IReadOnlyList<ImportStagedTransaction>> GetPendingAsync() =>
         await db.ImportStagedTransactions
+            .Owned(user)
             .Include(s => s.Account)
             .Include(s => s.MatchedTransaction)
             .Where(s => s.Status == StagedTransactionStatus.Pending)
@@ -22,11 +25,12 @@ public class ImportStagedTransactionService(
 
     public async Task<int> GetPendingCountAsync() =>
         await db.ImportStagedTransactions
+            .Owned(user)
             .CountAsync(s => s.Status == StagedTransactionStatus.Pending);
 
     public async Task ConfirmAsync(Guid id)
     {
-        var staged = await db.ImportStagedTransactions.FindAsync(id)
+        var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id)
             ?? throw new InvalidOperationException($"Staged transaction {id} not found.");
 
         staged.Status     = StagedTransactionStatus.Confirmed;
@@ -37,6 +41,7 @@ public class ImportStagedTransactionService(
     public async Task ConfirmAllAsync()
     {
         var pending = await db.ImportStagedTransactions
+            .Owned(user)
             .Where(s => s.Status == StagedTransactionStatus.Pending)
             .ToListAsync();
 
@@ -51,7 +56,7 @@ public class ImportStagedTransactionService(
 
     public async Task DisputeAsync(Guid id)
     {
-        var staged = await db.ImportStagedTransactions.FindAsync(id)
+        var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id)
             ?? throw new InvalidOperationException($"Staged transaction {id} not found.");
 
         if (staged.MatchedTransactionId.HasValue)

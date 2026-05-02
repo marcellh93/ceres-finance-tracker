@@ -37,7 +37,7 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
         var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
 
-        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService);
+        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService, new SingleUserAccessor());
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
         _service = new ImportService(parserFactory, _fixture.Db, transactionService, stagedTransactionService: stagedTransactionService);
 

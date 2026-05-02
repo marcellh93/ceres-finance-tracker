@@ -1,13 +1,14 @@
 // ProjectCeres/Services/CsvImportProfileService.cs
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class ImportProfileService(AppDbContext db) : IImportProfileService
+public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : IImportProfileService
 {
     private static readonly JsonSerializerOptions JsonOpts =
         new() { PropertyNameCaseInsensitive = true };
@@ -15,6 +16,7 @@ public class ImportProfileService(AppDbContext db) : IImportProfileService
     public async Task<IEnumerable<ImportProfileViewModel>> GetAllActiveAsync()
     {
         var profiles = await db.ImportProfiles
+            .Owned(user)
             .Where(p => p.DeletedAt == null)
             .OrderBy(p => p.Name)
             .ToListAsync();
@@ -27,6 +29,7 @@ public class ImportProfileService(AppDbContext db) : IImportProfileService
         var cutoff = DateTime.UtcNow.AddDays(-90);
 
         var profiles = await db.ImportProfiles
+            .Owned(user)
             .Where(p => p.DeletedAt != null && p.DeletedAt > cutoff)
             .OrderByDescending(p => p.DeletedAt)
             .ToListAsync();
@@ -36,7 +39,7 @@ public class ImportProfileService(AppDbContext db) : IImportProfileService
 
     public async Task<ImportProfileViewModel?> GetByIdAsync(Guid id)
     {
-        var profile = await db.ImportProfiles.FindAsync(id);
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id);
         return profile is null ? null : ToViewModel(profile);
     }
 
@@ -59,7 +62,7 @@ public class ImportProfileService(AppDbContext db) : IImportProfileService
 
     public async Task UpdateAsync(Guid id, string name, ImportColumnMappings mappings)
     {
-        var profile = await db.ImportProfiles.FindAsync(id)
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new InvalidOperationException($"Import profile {id} not found.");
 
         profile.Name           = name;
@@ -70,7 +73,7 @@ public class ImportProfileService(AppDbContext db) : IImportProfileService
 
     public async Task DeleteAsync(Guid id)
     {
-        var profile = await db.ImportProfiles.FindAsync(id)
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new InvalidOperationException($"Import profile {id} not found.");
 
         profile.DeletedAt = DateTime.UtcNow;
@@ -79,7 +82,7 @@ public class ImportProfileService(AppDbContext db) : IImportProfileService
 
     public async Task RecoverAsync(Guid id)
     {
-        var profile = await db.ImportProfiles.FindAsync(id)
+        var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new InvalidOperationException($"Import profile {id} not found.");
 
         profile.DeletedAt = null;

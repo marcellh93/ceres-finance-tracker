@@ -52,7 +52,7 @@ public class ImportService(
 
         // Load exclusion patterns for transfer detection
         var exclusionPatterns = transferDetectionService is not null
-            ? await db.ImportTransferExclusions
+            ? await (user is not null ? db.ImportTransferExclusions.Owned(user) : db.ImportTransferExclusions)
                 .Select(e => e.DescriptionPattern)
                 .ToListAsync()
             : (IReadOnlyList<string>)[];

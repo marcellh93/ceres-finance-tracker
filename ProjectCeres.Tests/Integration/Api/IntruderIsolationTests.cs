@@ -370,6 +370,86 @@ public class IntruderIsolationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ImportProfileService_GetAllActiveAsync_excludes_intruder_profile()
+    {
+        Guid intruderProfileId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var profile = new ImportProfile
+            {
+                Id             = Guid.NewGuid(),
+                UserId         = _intruderUserId,
+                Name           = $"intruder-profile-{Guid.NewGuid():N}",
+                ColumnMappings = "{}",
+                Format         = ImportFormat.Csv,
+                CreatedAt      = DateTime.UtcNow,
+            };
+            db.ImportProfiles.Add(profile);
+            await db.SaveChangesAsync();
+            intruderProfileId = profile.Id;
+        }
+
+        try
+        {
+            using var scope = _factory.Services.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IImportProfileService>();
+            var rows = await svc.GetAllActiveAsync();
+            rows.Select(r => r.Id).Should().NotContain(intruderProfileId);
+        }
+        finally
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.ImportProfiles.Where(p => p.Id == intruderProfileId).ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ImportStagedTransactionService_GetPendingAsync_excludes_intruder_rows()
+    {
+        // Need a real account for the FK; create one owned by intruder.
+        var intruderAccount = await SeedIntruderAccountAsync("intruder-staged");
+        Guid intruderStagedId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var staged = new ImportStagedTransaction
+            {
+                Id             = Guid.NewGuid(),
+                UserId         = _intruderUserId,
+                ImportedAt     = DateTime.UtcNow,
+                AccountId      = intruderAccount.Id,
+                RawDate        = new DateOnly(2026, 4, 15),
+                RawAmount      = 50m,
+                RawDescription = "intruder-staged",
+                Status         = StagedTransactionStatus.Pending,
+            };
+            db.ImportStagedTransactions.Add(staged);
+            await db.SaveChangesAsync();
+            intruderStagedId = staged.Id;
+        }
+
+        try
+        {
+            using var scope = _factory.Services.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IImportStagedTransactionService>();
+            var pending = await svc.GetPendingAsync();
+            pending.Select(s => s.Id).Should().NotContain(intruderStagedId);
+
+            var count = await svc.GetPendingCountAsync();
+            count.Should().Be(pending.Count); // sanity: count and list agree
+        }
+        finally
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.ImportStagedTransactions.Where(s => s.Id == intruderStagedId).ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
     public async Task ReportService_NetWorth_does_not_include_intruder_account_balance()
     {
         // Liability + asset accounts are both summed by the net-worth report. A leaked

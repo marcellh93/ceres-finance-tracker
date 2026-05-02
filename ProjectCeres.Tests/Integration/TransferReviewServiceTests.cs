@@ -27,7 +27,7 @@ public class TransferReviewServiceTests : IAsyncLifetime
             _fixture.Db, accountService, liabilityPaymentService, attachmentMock, new SingleUserAccessor());
         var transferService         = new TransferService(_fixture.Db, accountService, new SingleUserAccessor());
 
-        _service = new TransferReviewService(_fixture.Db, transferService, transactionService);
+        _service = new TransferReviewService(_fixture.Db, transferService, transactionService, new SingleUserAccessor());
 
         var a = new Account { Id = Guid.NewGuid(), Name = "A", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var b = new Account { Id = Guid.NewGuid(), Name = "B", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

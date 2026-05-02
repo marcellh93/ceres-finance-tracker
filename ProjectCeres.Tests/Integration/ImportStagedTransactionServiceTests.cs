@@ -33,7 +33,7 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
         _transactionService         = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
 
-        _service = new ImportStagedTransactionService(_fixture.Db, _transactionService);
+        _service = new ImportStagedTransactionService(_fixture.Db, _transactionService, new SingleUserAccessor());
 
         var account = new Account
         {

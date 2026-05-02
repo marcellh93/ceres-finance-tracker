@@ -60,6 +60,12 @@ public class AppDbContext : DbContext
 
         // Settings is one row per user. The unique constraint is what makes that true.
         modelBuilder.Entity<Settings>().HasIndex(e => e.UserId).IsUnique();
+
+        // Import-pipeline tables.
+        modelBuilder.Entity<ImportProfile>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<ImportStagedTransaction>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<ImportStagedTransfer>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<ImportTransferExclusion>().HasIndex(e => e.UserId);
     }
 
     // -------------------------------------------------------------------------
@@ -227,7 +233,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ImportTransferExclusion>(entity =>
         {
             entity.ToTable("ImportTransferExclusions");
-            entity.HasIndex(e => e.DescriptionPattern).IsUnique();
+            // Uniqueness scoped per user — different users can independently exclude
+            // the same description pattern.
+            entity.HasIndex(e => new { e.UserId, e.DescriptionPattern }).IsUnique();
         });
     }
 
