@@ -21,6 +21,14 @@ const semantic: Swatch[] = [
   { token: 'info', label: 'Info', contrastAgainst: 'background' },
 ];
 
+const sidebar: Swatch[] = [
+  { token: 'sidebar', label: 'Sidebar surface', contrastAgainst: 'sidebar-foreground' },
+  { token: 'sidebar-primary', label: 'Active rail', contrastAgainst: 'sidebar-primary-foreground' },
+  { token: 'sidebar-accent', label: 'Hover/selected', contrastAgainst: 'sidebar-accent-foreground' },
+  { token: 'sidebar-border', label: 'Sidebar border' },
+  { token: 'sidebar-ring', label: 'Sidebar focus ring' },
+];
+
 export function Colors() {
   return (
     <div className="space-y-10">
@@ -47,6 +55,19 @@ export function Colors() {
       <section>
         <h2 className="mb-4 text-xl font-medium">Semantic</h2>
         <SwatchGrid swatches={semantic} />
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-xl font-medium">Sidebar</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          The App Shell sidebar uses a dedicated token group so future re-skins
+          can be tuned independently. The layout width{' '}
+          <code className="font-mono">--sidebar-w</code> (240px expanded, 56px
+          collapsed) is set as a custom property on <code>:root</code> and
+          toggled via the <code>sidebar-collapsed</code> class on{' '}
+          <code>&lt;html&gt;</code>.
+        </p>
+        <SwatchGrid swatches={sidebar} />
       </section>
     </div>
   );

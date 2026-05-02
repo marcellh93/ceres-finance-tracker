@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 
 interface ClearedBadgeProps {
   id: string
@@ -30,29 +31,23 @@ export function ClearedBadge({ id, type, isCleared: initialCleared, needsReview 
     }
   }
 
+  const { variant, Icon, label } = cleared
+    ? { variant: 'success' as const,   Icon: CheckCircle,   label: 'Cleared' }
+    : needsReview
+      ? { variant: 'warning' as const, Icon: AlertTriangle, label: 'Needs review' }
+      : { variant: 'secondary' as const, Icon: Clock,       label: 'Pending' }
+
   return (
     <button
       type="button"
       onClick={toggle}
       aria-label={cleared ? 'Mark as pending' : 'Mark as cleared'}
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {cleared ? (
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
-          <CheckCircle size={12} aria-hidden="true" />
-          Cleared
-        </span>
-      ) : needsReview ? (
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
-          <AlertTriangle size={12} aria-hidden="true" />
-          Needs review
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700">
-          <Clock size={12} aria-hidden="true" />
-          Pending
-        </span>
-      )}
+      <Badge variant={variant}>
+        <Icon size={12} aria-hidden="true" />
+        {label}
+      </Badge>
     </button>
   )
 }

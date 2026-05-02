@@ -14,11 +14,21 @@
 8. [The `<Numeric>` component](#the-numeric-component)
 9. [Status badges](#status-badges)
 10. [Layout primitives](#layout-primitives)
-11. [The `<CardError>` component](#the-carderror-component)
-12. [Toasts](#toasts)
-13. [Showcase route](#showcase-route)
-14. [Known browser console messages](#known-browser-console-messages)
-15. [Known limitations](#known-limitations)
+11. [App Shell](#app-shell)
+12. [Forms & validation](#forms--validation)
+13. [Combobox recipe](#combobox-recipe)
+14. [DatePickerField](#datepickerfield)
+15. [Money input](#money-input)
+16. [Delta / PriorComparison row](#delta--priorcomparison-row)
+17. [Tooltipped panel labels & empty states](#tooltipped-panel-labels--empty-states)
+18. [PagePlaceholder & route-change focus](#pageplaceholder--route-change-focus)
+19. [Status block (success / idle side panel)](#status-block-success--idle-side-panel)
+20. [AttachmentDropzone](#attachmentdropzone)
+21. [The `<CardError>` component](#the-carderror-component)
+22. [Toasts](#toasts)
+23. [Showcase route](#showcase-route)
+24. [Known browser console messages](#known-browser-console-messages)
+25. [Known limitations](#known-limitations)
 
 ---
 
@@ -41,8 +51,10 @@ The palette is defined in OKLCH for perceptual uniformity. Values land in two bl
 - **Primary:** Deep teal — distinctive (not the typical SaaS blue), reads as money/calm without being literal green.
 - **Success:** Emerald — used for income, positive deltas, "cleared" states.
 - **Destructive:** Rose — used for expense, delete actions, validation errors.
-- **Warning:** Amber.
+- **Warning:** Amber — used for "needs review" / pending states.
 - **Info:** Sky.
+- **Violet (chart-6):** Now load-bearing for **Transfer** rows in Movements (de facto semantic — see Chart palette below).
+- **Orange (chart-7):** Now load-bearing for **Liability Payment** rows in Movements (de facto semantic — see Chart palette below).
 
 | Token | Light (OKLCH) | Dark (OKLCH) | Purpose |
 |---|---|---|---|
@@ -64,9 +76,25 @@ The palette is defined in OKLCH for perceptual uniformity. Values land in two bl
 | `--success` | 0.620 0.180 150 | 0.720 0.170 150 | Income / positive |
 | `--warning` | 0.770 0.170 80 | 0.820 0.160 80 | Warning |
 | `--info` | 0.670 0.150 235 | 0.750 0.140 235 | Informational |
-| `--border` | 0.910 0.005 285 | rgba(255,255,255,0.10) | Borders |
-| `--input` | 0.910 0.005 285 | rgba(255,255,255,0.15) | Input borders |
+| `--border` | 0.910 0.005 285 | oklch(1 0 0 / 10%) | Borders |
+| `--input` | 0.910 0.005 285 | oklch(1 0 0 / 15%) | Input borders |
 | `--ring` | 0.520 0.110 195 | 0.770 0.130 180 | Focus ring |
+
+### Sidebar tokens
+
+The App Shell sidebar is themed with its own token group so that future re-skins (collapsed rail, mobile drawer) can be tuned without touching the main palette.
+
+| Token | Purpose |
+|---|---|
+| `--sidebar` | Sidebar surface |
+| `--sidebar-foreground` | Sidebar text |
+| `--sidebar-primary` | Active item bar / accent rail (matches `--primary`) |
+| `--sidebar-primary-foreground` | Text on the active rail |
+| `--sidebar-accent` | Hover/selected row tint |
+| `--sidebar-accent-foreground` | Text on the hover/selected row |
+| `--sidebar-border` | Divider between sidebar and main content |
+| `--sidebar-ring` | Focus ring inside the sidebar |
+| `--sidebar-w` | Layout width custom property — `240px` expanded, `56px` when `<html>` has the `sidebar-collapsed` class |
 
 Contrast ratios for every foreground/background pair are visible live on the `/design-system.html#/colors` page. Targets: WCAG AA (4.5:1 for body text, 3:1 for large text and UI components).
 
@@ -77,6 +105,8 @@ Contrast ratios for every foreground/background pair are visible live on the `/d
 **Two typefaces:**
 - **Inter** (`--font-sans`) — all UI text and prose. Variable font (`@fontsource-variable/inter`).
 - **IBM Plex Mono** (`--font-mono`) — currency, percentages, and dates in **tabular contexts only**. Static weight 400 only (`@fontsource/ibm-plex-mono`); see [Known limitations](#known-limitations).
+
+`--font-heading` is also exposed (currently aliased to `--font-sans`); reserved so that headings can later diverge from body without touching every component.
 
 **The rule for percentages:**
 - In **data contexts** (KPI cards, table cells, chart axes): use mono via `<Numeric>`.
@@ -91,7 +121,20 @@ The `<Numeric>` component (see below) is the enforcement mechanism — wrap any 
 ## Spacing, radius, shadow
 
 - **Spacing:** Tailwind defaults (4px increments). No custom scale.
-- **Radius:** `--radius: 0.625rem` (10px) is the base. Tailwind's `rounded-sm/md/lg/xl/2xl/3xl/4xl` derive from it.
+- **Radius:** `--radius: 0.625rem` (10px) is the base. The full scale is derived in `index.css` so retuning the base propagates everywhere:
+
+| Utility | Multiplier | At `--radius: 0.625rem` |
+|---|---|---|
+| `rounded-sm` | 0.6× | 0.375rem |
+| `rounded-md` | 0.8× | 0.5rem |
+| `rounded-lg` | 1.0× | 0.625rem |
+| `rounded-xl` | 1.4× | 0.875rem |
+| `rounded-2xl` | 1.8× | 1.125rem |
+| `rounded-3xl` | 2.2× | 1.375rem |
+| `rounded-4xl` | 2.6× | 1.625rem |
+
+`<Badge>` uses `rounded-4xl` for its pill shape; cards use `rounded-xl`; inputs and buttons use `rounded-md`.
+
 - **Shadow:** four steps — `shadow-sm`, `shadow`, `shadow-md`, `shadow-lg`. Dark-mode shadows are darker because they sit on dark surfaces. All four are aliased in `@theme inline` so the Tailwind utilities pick up the custom values.
 
 **Skeletons:** Match the rendered content's height to prevent layout shift. Common heights: `h-[220px]` for chart cards, `h-[400px]` for tables, `h-5 w-32` for individual text rows.
@@ -112,6 +155,17 @@ Components must reference these tokens via `transitionDuration: 'var(--motion-du
 
 Motion tokens are defined only on `:root` and intentionally not redefined on `.dark` — they don't change with theme.
 
+> **Status of the rule (2026-05-02):** the rule is aspirational — most existing components still use Tailwind literal durations (`duration-200`). New components should reference the tokens directly, and the existing literals are tracked for migration in a future cleanup pass. See [Known limitations](#known-limitations).
+
+### View transition naming
+
+The SPA uses CSS view transitions to smooth row-to-form navigation in feature flows. To keep slot names coherent, follow this convention:
+
+- **Per-row slot:** `<feature>-row-<id>` — e.g. `movement-row-${id}` on each `<tr>` in the Movements table.
+- **Per-form slot:** `<feature>-form` — e.g. `movement-form` on the Movements edit form root.
+
+A click on a row that opens the matching form cross-fades the bounding boxes; a click on a row that does *not* open a matching form falls back to the default page transition. New features should pick names following the same `<feature>-row-<id>` / `<feature>-form` shape so future grouping (e.g. shared element transitions across pages) keeps working.
+
 ---
 
 ## Chart palette
@@ -125,11 +179,13 @@ Eight qualitative colors (`--chart-1` through `--chart-8`), all WCAG AA against 
 | `--chart-3` | Sky | Sky | Info / secondary income |
 | `--chart-4` | Amber | Amber | Warning category |
 | `--chart-5` | Rose | Rose | Expense |
-| `--chart-6` | Violet | Violet | Variety |
-| `--chart-7` | Orange | Orange | Variety |
-| `--chart-8` | Slate-blue | Slate-blue | Neutral series |
+| `--chart-6` | Violet | Violet | **Transfer** (movement-type tint — see below) |
+| `--chart-7` | Orange | Orange | **Liability Payment** (movement-type tint — see below) |
+| `--chart-8` | Slate-blue | Slate-blue | Neutral series / variety |
 
 Always use the tokens via `var(--chart-N)`. Chart components should never hard-code colors.
+
+**Semi-semantic chart hues.** `--chart-6` and `--chart-7` started as qualitative variety colors but have settled into specific roles in Movements: violet for **Transfer**, orange for **Liability Payment**. Treat them as semi-semantic — fine to reuse in *charts* as variety, but if you tint a non-Transfer / non-LiabilityPayment row with chart-6/7 in the Movements table, you'll create a false signal. Use `chart-8` (slate-blue) for additional variety series before reaching back to 6/7.
 
 ---
 
@@ -143,12 +199,41 @@ Always use the tokens via `var(--chart-N)`. Chart components should never hard-c
 | `--ring` | Yes | Match primary |
 | `--accent` / `--accent-foreground` | Yes | Pale teal accent |
 | `--success` / `--warning` / `--info` | Added | Not in shadcn default |
+| `--sidebar*` (8 tokens) | Added | App Shell sidebar theming — see Color palette |
 | `--chart-1..8` | Yes (5 from shadcn, 6–8 added) | Brand-aligned palette |
 | `--shadow-*` | Added | shadcn relies on Tailwind defaults; we tune for both modes |
 | `--motion-*` | Added | Not in shadcn |
 | All other shadcn tokens | Left at defaults (zinc baseline) | Works with the brand |
 | `Button` cursor | Yes | Default shadcn Button has no cursor override; we apply `cursor-pointer` so all interactive buttons get the hand cursor on hover |
-| `Badge` variants | Extended | Added `success`, `warning`, `info` semantic variants (soft-tinted, matching the existing `destructive` recipe) |
+| `Badge` variants | Extended | Added `success`, `warning`, `info` semantic variants (soft-tinted, matching the existing `destructive` recipe), plus `ghost` and `link` for low-emphasis use |
+| `Switch` styling | Tuned | Custom CSS in `index.css` adapts the base-ui data attributes to the project palette |
+
+### Primitives in `src/components/ui/`
+
+`pnpm dlx shadcn add <component>` has been run for these — all live under `src/components/ui/` and consume the same tokens:
+
+`alert-dialog`, `avatar`, `badge`, `button`, `calendar`, `card`, `checkbox`, `command`, `dialog`, `dropdown-menu`, `input`, `input-group`, `kbd`, `label`, `navbar`, `popover`, `progress`, `radio-group`, `select`, `separator`, `sheet`, `skeleton`, `sonner`, `switch`, `table`, `tabs`, `textarea`, `tooltip`.
+
+**Notable additions during the SPA migration:**
+- **`InputGroup`** — input with prefix/suffix slots; used for the currency-symbol addon on the money input.
+- **`Kbd`** — keyboard-shortcut chip (e.g. `⌘K` in the TopBar search trigger).
+- **`Navbar`** — primitive used by the App Shell TopBar.
+- **`AlertDialog`** — the SPA's confirmation dialog standard. The legacy `<ConfirmDialog>` (`src/components/ConfirmDialog.tsx`) is a Razor-era artefact pending removal; do not use it for new work.
+
+### Sonner customization
+
+The Sonner toaster is themed via `index.css` so each toast type carries an appropriately tinted icon while keeping titles at the popover-foreground color for AA contrast:
+
+```css
+[data-sonner-toast][data-type='success'] [data-icon] { color: var(--success); }
+[data-sonner-toast][data-type='warning'] [data-icon] { color: var(--warning); }
+[data-sonner-toast][data-type='error']   [data-icon] { color: var(--destructive); }
+[data-sonner-toast][data-type='info']    [data-icon] { color: var(--info); }
+```
+
+If you add a new toast type or restyle Sonner, edit only this block — never override the toast surface or text colour at the call site.
+
+### base-ui vs. Radix
 
 The `base-nova` style uses `@base-ui/react` primitives, not Radix. The two have different APIs in places (e.g., the base-ui `Tooltip.Trigger` does not take an `asChild` prop). When porting shadcn snippets from elsewhere, check the primitive source under `src/components/ui/` to confirm the local API.
 
@@ -183,20 +268,32 @@ Use shadcn `<Badge>` for any small status indicator (cleared/pending state, aler
 | Variant | Background | Text | Use for |
 |---|---|---|---|
 | `default` | primary | primary-foreground | Brand accent (rare on data tables) |
-| `secondary` | secondary | secondary-foreground | Neutral metadata |
+| `secondary` | secondary | secondary-foreground | Neutral metadata, "Pending" cleared state |
 | `outline` | transparent | foreground | Quiet metadata |
 | `destructive` | destructive/10 | destructive | Errors, delete-confirmation tags |
 | `success` | success/10 | success | Cleared, paid, positive states |
-| `warning` | warning/10 | warning | Pending, attention-needed |
+| `warning` | warning/10 | warning | "Needs review", attention-needed |
 | `info` | info/10 | info | Informational tags |
+| `ghost` | transparent → muted on hover | foreground | Hover-revealed actions inside dense rows |
+| `link` | transparent | primary (underlined on hover) | Inline-link-styled tags |
 
 ```tsx
 <Badge variant="success">Cleared</Badge>
-<Badge variant="warning">Pending</Badge>
+<Badge variant="secondary">Pending</Badge>
+<Badge variant="warning">Needs review</Badge>
 <Badge variant="info">Transaction</Badge>
 ```
 
-**Chart palette colors are not statuses.** When you need a non-semantic tint to distinguish category-style values (e.g., the Movements page Type column uses `chart-6` violet for Transfer and `chart-7` orange for Liability Payment), opt out of variants and use className: `<Badge className="bg-chart-6/10 text-chart-6">Transfer</Badge>`. The explicit className signals "this is a deliberate non-semantic choice."
+### Tonal chip on chart hue (named recipe)
+
+When you need a tinted chip whose meaning is not in the semantic set above — typically a transaction-type tint — opt out of `variant` and apply the chart token directly:
+
+```tsx
+<Badge className="bg-chart-6/10 text-chart-6">Transfer</Badge>
+<Badge className="bg-chart-7/10 text-chart-7">Liability Payment</Badge>
+```
+
+The pattern is `bg-chart-N/10 text-chart-N`. This is the only blessed way to step outside the semantic variants; the explicit `className` signals "this tint is a deliberate non-semantic choice." Prefer adding a new semantic variant if you find yourself reaching for this in three or more unrelated places.
 
 For destructive operations (delete confirmations), prefer a confirmation dialog over a badge.
 
@@ -246,6 +343,642 @@ Muted background + rounded + padding. Use to visually group small numeric tiles 
 
 ---
 
+## App Shell
+
+`ProjectCeres.Client/src/app/layout/`
+
+The authenticated SPA renders inside a fixed grammar: a 3.5rem TopBar, a collapsible Sidebar (desktop) or Sheet-based drawer (mobile), and a scrollable main content area. Every routed page in `src/app/` mounts inside this shell — never break out of it.
+
+### Anatomy
+
+```
+AppLayout.tsx     ─ 3.5rem TopBar / 1fr content grid; mounts <Toaster />
+├── TopBar.tsx       ─ brand mark · search trigger (⌘K) · avatar menu
+├── Sidebar.tsx      ─ desktop nav, expand/collapse toggle
+├── MobileDrawer.tsx ─ Sheet-based sidebar at <640px
+├── BrandMark.tsx    ─ wordmark used in TopBar and Sidebar
+├── AvatarMenu.tsx   ─ shadcn DropdownMenu trigger
+└── nav-items.ts     ─ single source of truth for nav routes
+```
+
+### Layout grid
+
+`AppLayout.tsx` wraps everything in:
+
+```tsx
+<div className="grid h-screen grid-rows-[3.5rem_1fr] bg-background text-foreground">
+  <TopBar … />
+  <div
+    className="grid overflow-hidden"
+    style={{ gridTemplateColumns: isDesktop ? 'var(--sidebar-w, 240px) 1fr' : '1fr' }}
+  >
+    {isDesktop ? <Sidebar /> : <MobileDrawer … />}
+    <main id="main-content" className="overflow-y-auto p-6"><Outlet /></main>
+  </div>
+  <Toaster />
+</div>
+```
+
+The desktop split is driven by **`--sidebar-w`** (`240px` expanded, `56px` collapsed). The collapsed state is signalled by adding the `sidebar-collapsed` class to `<html>` — the CSS in `index.css` redefines `--sidebar-w` on that selector, which propagates to the grid through `var(--sidebar-w)`. A single click on the Sidebar toggle persists the preference via `lib/sidebar-storage.ts`.
+
+The breakpoint between desktop and mobile is **640px** (`useMediaQuery('(min-width: 640px)')`). Below that, the Sidebar is replaced with a Sheet drawer triggered from the TopBar hamburger.
+
+### Active-rail recipe
+
+The current route in the Sidebar is signalled by a 2px primary-color inset bar plus an accent background:
+
+```tsx
+className={cn(
+  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+  isActive
+    ? 'bg-accent text-accent-foreground shadow-[inset_2px_0_0_var(--primary)]'
+    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+)}
+```
+
+Use `shadow-[inset_2px_0_0_var(--primary)]` (not a left border) — the inset shadow does not affect the element's box and so does not cause active links to shift right.
+
+### TopBar search trigger
+
+The search affordance is a Button with a `<Kbd>` chip showing the platform-correct shortcut (`⌘K` on macOS, `Ctrl+K` elsewhere):
+
+```tsx
+<Button variant="outline" onClick={() => setSearchOpen(true)} className="gap-2">
+  <Search size={16} />
+  <span className="text-muted-foreground">Search…</span>
+  <Kbd>{isMac() ? '⌘K' : 'Ctrl+K'}</Kbd>
+</Button>
+```
+
+The Kbd primitive is documented under [shadcn/ui overrides](#shadcnui-overrides). Reuse this pattern for any global keyboard shortcut surfaced in the UI.
+
+### Skip link
+
+`AppLayout.tsx` registers a visually hidden "Skip to main content" link as its first child. It becomes visible on focus and is the only way a keyboard user can bypass the TopBar/Sidebar to reach the routed content. Don't remove it.
+
+---
+
+## Forms & validation
+
+Every form in the SPA renders against the project's 422 validation envelope — `{ error: { code: "VALIDATION_ERROR", details: [{ field, message }] } }`. Two pieces work together: a **Field wrapper** that pairs a label with its inline error, and a normalisation step that flattens the envelope into a `Record<string, string>` keyed by camelCase field name.
+
+### Field wrapper recipe
+
+The field-wrapper component is currently inlined in `QuickAddModal.tsx` (and again in `MovementForm.tsx` with minor variation). Treat the recipe below as canonical until a shared `<Field>` primitive lands:
+
+```tsx
+function Field({
+  label, htmlFor, error, children,
+}: { label: string; htmlFor?: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      {htmlFor ? (
+        <Label htmlFor={htmlFor}>{label}</Label>
+      ) : (
+        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">
+          {label}
+        </div>
+      )}
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+```
+
+Use `<Label htmlFor>` when the control accepts an `id` (Input, Textarea, native Select). Use the bare-div label form for composite controls without a single focusable target (Combobox, DatePickerField — they own their own focus).
+
+### Form-level error banner
+
+For errors that are not bound to a specific field — submit failures, optimistic-locking conflicts, server-side cross-field issues — use a banner above the form actions:
+
+```tsx
+{error && (
+  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+    {error}
+  </div>
+)}
+```
+
+The pairing is: per-field errors render inline next to the field; everything else renders in the banner. **Never** route a 422 (validation) failure to the banner if you have a field key — that hides the actionable detail under a generic message.
+
+### Normalising the 422 envelope
+
+The server returns `details` keyed by PascalCase field names matching the ViewModel. The SPA renders against camelCase. Flatten the envelope before passing to your `<Field>` rendering:
+
+```tsx
+function flattenErrors(envelope: { error: { details: { field: string; message: string }[] } }) {
+  return Object.fromEntries(
+    envelope.error.details.map((d) => [
+      d.field.charAt(0).toLowerCase() + d.field.slice(1),
+      d.message,
+    ])
+  );
+}
+
+const errors = flattenErrors(await response.json());
+// → { amount: "Must be greater than 0.", date: "Date is required." }
+```
+
+Then `errors.amount`, `errors.date`, etc. plug straight into the `<Field error>` prop.
+
+### When *not* to toast
+
+See the [422 carve-out](#the-422-carve-out--never-toast-a-validation-failure) under Toasts. Validation failures are inline-only.
+
+---
+
+## Combobox recipe
+
+`ProjectCeres.Client/src/app/components/AccountCombobox.tsx`
+`ProjectCeres.Client/src/app/components/CategoryCombobox.tsx`
+`ProjectCeres.Client/src/components/CurrencyCombobox.tsx`
+
+The canonical "searchable dropdown" recipe: shadcn `<Popover>` wrapping a `<Command>` palette, triggered by a full-width outline `<Button>` with a chevron affordance. Used three times today — Account, Category, Currency — and the next "pick one of N" flow should reuse this exact shape.
+
+```tsx
+<Popover open={open} onOpenChange={setOpen}>
+  <PopoverTrigger
+    render={
+      <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+        {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    }
+  />
+  <PopoverContent className="p-0" align="start">
+    <Command>
+      <CommandInput placeholder="Search accounts…" />
+      <CommandList>
+        <CommandEmpty>No accounts found.</CommandEmpty>
+        <CommandGroup>
+          {filtered.map((item) => (
+            <CommandItem key={item.id} value={item.name} onSelect={() => { onChange(item.id); setOpen(false); }}>
+              <Check className={cn('mr-2 h-4 w-4', value === item.id ? 'opacity-100' : 'opacity-0')} />
+              {item.name}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  </PopoverContent>
+</Popover>
+```
+
+**Conventions:**
+- Trigger button is `variant="outline"` with `role="combobox"` and `aria-expanded`.
+- Placeholder is rendered in `text-muted-foreground` so the unselected state is clearly distinct from a selected value.
+- Always include a `CommandEmpty` fallback ("No X found.") — never let the list be silently empty.
+- The `Check` icon is rendered for every row with `opacity-100` on the selected item and `opacity-0` otherwise (not conditionally rendered) — keeps row heights stable.
+- Right-aligned metadata (e.g. CategoryCombobox shows the category type) goes in a `text-muted-foreground` `<span>` after the label.
+
+**When to deviate:** if you need multi-select, use shadcn `<Command>` checkbox patterns rather than this recipe. If you need a non-searchable picker for a small fixed set (≤5 options), prefer a native `<Select>` or `<RadioGroup>`.
+
+---
+
+## DatePickerField
+
+`ProjectCeres.Client/src/components/DatePickerField.tsx`
+
+The canonical date input. A shadcn `<Popover>` triggered by an outline `<Button>` with a calendar icon, opening to a `<Calendar mode="single">`. Used by every form that captures a date — `MovementForm`, `QuickAddModal`, `MovementsFilterBar`, `GoalBudgetForm`.
+
+```tsx
+<DatePickerField
+  id="mf-date"
+  value={values.date}              // ISO yyyy-MM-dd or null
+  onChange={(d) => set('date', d)} // null when cleared
+  placeholder="Pick a date"
+/>
+```
+
+**Props:**
+
+- `value: string | null` — ISO `yyyy-MM-dd`, or `null` for empty.
+- `onChange: (next: string | null) => void` — receives ISO string on pick, `null` on clear.
+- `placeholder?: string` — defaults to `'Pick a date'`.
+- `id?: string` — forwarded to the trigger button so a `<Label htmlFor>` can target it.
+- `hideClear?: boolean` — set when the field is required, to suppress the in-popover Clear button.
+
+### Conventions
+
+- **Input/output is always ISO `yyyy-MM-dd`.** The component owns the timezone-safe conversion to/from `Date`. Don't pass JS `Date` objects through this component.
+- **Display format is locale-driven.** The trigger label calls `formatDate(value, dateFormat)` where `dateFormat` comes from `useSettings()` — a user with EU settings sees `02/05/2026`, a US user sees `05/02/2026`, both for the same ISO string `2026-05-02`.
+- **Empty state.** When `value` is `null`, the trigger renders the placeholder in `text-muted-foreground` so the unselected state matches the Combobox recipe.
+- **Clear footer.** Visible only when there is a value AND `hideClear` is not set. Renders inside a `border-t p-2` block so it visually separates from the calendar grid.
+
+### When *not* to use `DatePickerField`
+
+- **Date *ranges*** — use `MovementsDateRangePicker` or build a paired-input pattern; this component is single-day only.
+- **Time-of-day** — out of scope; the underlying value is `DateOnly` on the server.
+- **Read-only display of an existing date** — render `formatDate(value, dateFormat)` directly inside a `<Numeric>` cell or plain text. Don't disable the picker.
+
+---
+
+## Money input
+
+The money/currency input is a composite recipe, not a standalone component — it uses `<InputGroup>` for the currency-symbol addon and three `amount-format.ts` helpers to manage the raw/display/wire model. Every monetary field in the SPA follows this shape.
+
+### The raw / display / wire model
+
+A money field has three string forms, defined in `src/app/lib/amount-format.ts`:
+
+| Form | Example | When used |
+|---|---|---|
+| **raw** | `1234,56` | While the field is focused — digits + the user's decimal separator only |
+| **display** | `1.234,56` | While the field is blurred — raw with thousands separators inserted |
+| **wire** | `1234.56` | Crossing the network — JS number, period decimal |
+
+The user's chosen number format (stored in Settings) decides which separator is which: `comma_decimal` ⇒ `.` thousands / `,` decimal; `period_decimal` ⇒ `,` thousands / `.` decimal. Convert with the helpers — never substitute by hand.
+
+### Recipe
+
+```tsx
+const settings = useSettings();
+const numberFormat = settings.data?.numberFormat;
+const symbol = currency?.symbol;
+
+const amountInput =
+  numberFormat === undefined ? (
+    <Skeleton id="mf-amount" className="h-8 w-full" />
+  ) : (
+    <InputGroup>
+      {symbol && (
+        <InputGroupAddon align="inline-start">
+          <InputGroupText className="text-base font-medium text-muted-foreground">
+            {symbol}
+          </InputGroupText>
+        </InputGroupAddon>
+      )}
+      <InputGroupInput
+        id="mf-amount"
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        placeholder={amountPlaceholder(numberFormat)}
+        value={displayAmount}
+        onChange={(e) => handleAmountChange(e.target.value)}
+        onFocus={handleAmountFocus}
+        onBlur={handleAmountBlur}
+        className="text-base font-medium"
+      />
+    </InputGroup>
+  );
+```
+
+### Conventions
+
+- **`type="text"` with `inputMode="decimal"`**, never `type="number"`. `type="number"` strips trailing zeros, doesn't honour locale separators, and exposes a useless spinner control. `inputMode="decimal"` is the part that brings up the right mobile keyboard.
+- **Filter the keystroke.** `handleAmountChange` runs the new value through `sanitizeAmountInput(value, format)` — drops letters, normalises a wrongly-typed separator, blocks a second separator. Don't validate format; just refuse the bad keystroke.
+- **Format on blur, raw-only on focus.** `handleAmountFocus` strips thousands separators with `stripThousandSeparators`; `handleAmountBlur` re-applies them with `formatAmountForDisplay`. The user types digits + decimal; commas/periods appear when they leave the field.
+- **Skeleton while settings load.** The field's behaviour depends on `numberFormat`, so `displayAmount` cannot be parsed until settings arrive. Render a `<Skeleton id="mf-amount">` carrying the same `id` so the surrounding `<Label htmlFor="mf-amount">` stays valid through the loading window.
+- **Currency symbol via `<InputGroupAddon align="inline-start">`.** The symbol is a label, not part of the value — it lives in the addon, never in the input string. The addon's text style is `text-muted-foreground` so it doesn't compete with the typed amount.
+- **Wire conversion on submit.** Run `parseAmountToNumber(raw, format)` to get the JS number; send that. Reverse with `formatNumberForDisplay` when prefilling Edit forms.
+
+### When *not* to use this recipe
+
+- **Read-only money display** (KPI tiles, table cells, summary rows) — use `<Numeric>` with the value pre-formatted via `formatNumberForDisplay`. The input recipe is for *entry*, not *display*.
+- **Budget percentages, savings rates** — those are unitless ratios; render them directly as `${(fraction * 100).toFixed(1)}%`. The money recipe is currency-specific.
+
+---
+
+## Delta / PriorComparison row
+
+`ProjectCeres.Client/src/app/features/dashboard/MtdCard.tsx` (the `PriorComparison` helper, currently inlined).
+
+The dashboard's "vs last period" caption: an arrow icon plus a colour-coded delta line, with a polarity flag controlling whether *up* means *good* or *bad*. The pattern is generic enough to belong outside the MTD card — promote to a shared component when the second consumer arrives.
+
+```tsx
+<PriorComparison
+  current={data.mtd.income}
+  prior={data.mtd.priorPeriodIncome}
+  formatValue={(n) => formatMoney(n, sym, fmt)}
+  goodWhenUp={true}
+/>
+```
+
+### Polarity — the `goodWhenUp` flag
+
+Every metric has an implied "is more better?" answer:
+
+| Metric | `goodWhenUp` | Up colour | Down colour |
+|---|---|---|---|
+| Income | `true` | `text-success` | `text-destructive` |
+| Savings Rate | `true` | `text-success` | `text-destructive` |
+| Expenses | `false` | `text-destructive` | `text-success` |
+| Net Flow | depends — pass `true` if positive net flow is the goal | — | — |
+
+Always be explicit: pass `goodWhenUp` rather than letting the component guess from the metric name. A future "Days Until Payday" metric is `goodWhenUp={false}` (lower is better), and the rule generalises.
+
+### States
+
+- **`prior === null`** — render the muted *"No prior period to compare"* line. Don't render an arrow or a colour — there's nothing to compare against.
+- **`current === prior`** (flat) — render `Minus` icon in `text-muted-foreground`. Flat is neither good nor bad.
+- **`current > prior`** — `ArrowUp` icon, colour decided by `goodWhenUp`.
+- **`current < prior`** — `ArrowDown` icon, colour decided by `goodWhenUp`.
+
+### Anatomy
+
+```
+mt-1                          ← 4px gap below the value above
+flex items-center gap-1
+text-xs                        ← always xs — this is a caption, not a value
+text-{success|destructive|muted-foreground}
+
+  <Icon className="h-3 w-3" aria-hidden />
+  <span>vs €1,234.56 last period</span>
+```
+
+The `vs` prefix and `last period` suffix are part of the recipe — don't substitute "vs prior" or "last month" without a reason. The phrasing is calibrated against the dashboard's "Cycle to Date" framing.
+
+### When *not* to use this row
+
+- **For absolute change** (`+€500 from last period`) where the user does not need the prior value itself — render a single `<Numeric>` with sign + colour, no arrow row.
+- **For trends across multiple periods** — use a sparkline / chart, not a single delta caption.
+
+---
+
+## Tooltipped panel labels & empty states
+
+`ProjectCeres.Client/src/app/features/dashboard/FinancialHealthCard.tsx` (the `PanelLabel` and `PanelEmpty` helpers, currently inlined).
+
+The Financial Health card composes four equal-width panels — Spendable, Runway, Income Δ, Burn Rate — each with the same uppercase tracked label and the same two empty-state styles. The visual recipe is generic; promote to a shared component when a non-Health surface adopts it.
+
+### Panel label
+
+An uppercase, tracked, muted heading with an optional `?` info-tooltip:
+
+```tsx
+<PanelLabel tooltip="What's free to spend right now after upcoming bills.">
+  Spendable Balance
+</PanelLabel>
+```
+
+```tsx
+function PanelLabel({ children, tooltip }: { children: string; tooltip?: string }) {
+  return (
+    <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
+      <span>{children}</span>
+      {tooltip && (
+        <TooltipProvider delay={200}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={`About ${children}`}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Info className="h-3 w-3" />
+                </button>
+              }
+            />
+            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+```
+
+**Conventions:**
+
+- Class shape is fixed: `text-xs uppercase tracking-wider text-muted-foreground font-medium`. Don't substitute `text-sm` or drop the tracking — every panel label across the dashboard uses this exact recipe.
+- The Info button must be a real `<button>` with `aria-label="About {label}"`, not a styled `<span>`. Tooltips are not keyboard-reachable when triggered by non-button elements.
+- Tooltip content is capped at `max-w-xs` (320px) and uses `<TooltipProvider delay={200}>` to avoid flashing on hover-through.
+- The `?` glyph is `<Info className="h-3 w-3" />` from lucide-react — do not swap for a `(?)` text character or a different lucide icon.
+
+### Panel empty states
+
+Two distinct shapes — pick by *information density*, not aesthetics:
+
+**Visual block** (icon + caption, centred, fills the panel):
+
+```tsx
+<PanelEmpty icon={<Wallet className="h-6 w-6" />}>
+  No asset accounts found
+</PanelEmpty>
+```
+
+Used when the panel would otherwise be a large blank — gives the eye somewhere to land. Min-height is `100px` so the panel doesn't collapse.
+
+**Compact note** (italic muted text, inline):
+
+```tsx
+<PanelEmpty>Not enough history yet</PanelEmpty>
+```
+
+Used when the surrounding panel still has other content (a label, secondary captions) and the empty state is more like a side note than a missing block.
+
+```tsx
+function PanelEmpty({ icon, children }: { icon?: React.ReactNode; children: string }) {
+  if (icon) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 min-h-[100px] py-2 text-center">
+        <div className="text-muted-foreground" aria-hidden="true">{icon}</div>
+        <p className="text-xs text-muted-foreground max-w-[14rem]">{children}</p>
+      </div>
+    );
+  }
+  return <div className="text-xs italic text-muted-foreground">{children}</div>;
+}
+```
+
+**Decision rule:** if the panel has *no other content* in the empty state, use the visual block. If the empty state replaces only one sub-section, use the compact note.
+
+### When *not* to use these
+
+- **Card-level errors** — use `<CardError>`, not `PanelEmpty`. Errors are recoverable; empty states are not.
+- **Loading** — use `<Skeleton>` matching the loaded content's height, not an empty state.
+
+---
+
+## PagePlaceholder & route-change focus
+
+`ProjectCeres.Client/src/app/components/PagePlaceholder.tsx`
+
+The standard "this route exists but its real content lands in a later plan" surface. Used by every routed page that hasn't been implemented yet (Recurring, Reports, Profile, Security, Support).
+
+```tsx
+<PagePlaceholder
+  title="Reports"
+  description="This page will let you build reusable reports across your transactions."
+/>
+```
+
+**Props:** `title: string`, `description: string`. That's it — keep the surface deliberately uniform across placeholder routes so they read as "not yet" rather than "broken."
+
+### The route-change focus convention
+
+`PagePlaceholder` does one thing beyond the visible card: it focuses its `<h1>` on mount.
+
+```tsx
+const headingRef = useRef<HTMLHeadingElement>(null);
+useEffect(() => {
+  headingRef.current?.focus();
+}, []);
+
+return (
+  <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold outline-none">
+    {title}
+  </h1>
+);
+```
+
+`tabIndex={-1}` makes a non-interactive heading programmatically focusable; `outline-none` suppresses the focus ring (the visible focus signal is the route change itself, not a ring on the heading). Screen-reader users hear the new heading announced when the focus lands — without this, the SPA route change is silent and the user has to re-explore the page to find the new content.
+
+**The convention generalises.** Every routed page should focus its `<h1>` on mount, the same way. If you wire a new route up and the page already has a heading, mirror the `useRef` + `useEffect(() => headingRef.current?.focus(), [])` pattern. Skip it only when the route change immediately moves focus elsewhere by user intent (e.g. opens a modal in the routed page's first paint).
+
+---
+
+## Status block (success / idle side panel)
+
+`ProjectCeres.Client/src/app/features/movements/MovementForm.tsx` (the "Status row" block, currently inlined).
+
+A reusable side-panel recipe for *binary state with affordance*: an icon + heading + caption block whose colours swap when a Switch flips. Used today for the **Cleared** toggle on a transaction; will fit equally well for "Reconciled?", "Confirmed?", "Active?" surfaces in future features.
+
+```tsx
+<div
+  className={
+    'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors duration-200 ' +
+    (values.isCleared
+      ? 'border-success/30 bg-success/10'
+      : 'border-border bg-muted/30')
+  }
+>
+  <div className="flex items-start gap-3">
+    <div
+      className={
+        'mt-0.5 transition-colors duration-200 ' +
+        (values.isCleared ? 'text-success' : 'text-muted-foreground')
+      }
+      aria-hidden="true"
+    >
+      {values.isCleared ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+    </div>
+    <div className="space-y-0.5">
+      <div
+        className={
+          'text-sm font-medium tracking-wide transition-colors duration-200 ' +
+          (values.isCleared ? 'text-success' : 'text-foreground/80')
+        }
+      >
+        Status
+      </div>
+      <p
+        className={
+          'text-xs transition-colors duration-200 ' +
+          (values.isCleared ? 'text-success/80' : 'text-muted-foreground')
+        }
+      >
+        {values.isCleared ? 'Cleared the bank.' : "Hasn't cleared the bank yet."}
+      </p>
+    </div>
+  </div>
+  <Switch
+    checked={values.isCleared}
+    onCheckedChange={(checked) => set('isCleared', checked)}
+    aria-label="Cleared"
+  />
+</div>
+```
+
+### Conventions
+
+- **Colour pairing.** Active state uses `border-{semantic}/30 bg-{semantic}/10` for the surface and `text-{semantic}` for the icon and heading; idle state uses `border-border bg-muted/30` for the surface and `text-muted-foreground` / `text-foreground/80` for the text. Stick to this pairing — don't mix a primary surface with a destructive caption, etc.
+- **Icon swaps with state.** Pick two icons that signal the same axis (`CheckCircle2` ↔ `Clock` for done/not-done; could equally be `Lock` ↔ `Unlock` for sealed/open).
+- **Two text rows.** The bold heading is fixed-text ("Status", "Reconciliation", etc.). The caption changes wording with state, in plain past-tense for the "done" case ("Cleared the bank.") and present-imperfect for the "not yet" case ("Hasn't cleared the bank yet.").
+- **Affordance on the right.** A `<Switch>` lives flush-right; it's the only interactive thing in the block. Don't pair this recipe with a button — the affordance is *settings-like*, not *action-like*.
+- **`transition-colors duration-200`** is currently a literal; this is one of the components flagged for [migration to motion tokens](#motion).
+
+### When *not* to use this
+
+- **Three-state toggles** (e.g. Cleared / Pending / Needs review) — use a `<Badge>` or a segmented control; the binary surface-and-text swap won't carry the third state cleanly.
+- **Required fields** — this is a *settings* affordance, not a validation one. If the field must be answered before save, a checkbox with an error message is the right shape.
+
+---
+
+## AttachmentDropzone
+
+`ProjectCeres.Client/src/app/features/movements/AttachmentDropzone.tsx`
+
+The project's reusable file-upload surface. A dashed-border drop area with a focused-on-hover tinted state, an upload icon, a "Choose files" button (the click fallback for the hidden `<input type="file">`), a per-file list with delete buttons, and an `<AlertDialog>` confirmation flow for deletions.
+
+The visual recipe applies to any file-upload affordance — the CSV import flow already echoes the look. Reuse this component, or rebuild the look following the conventions below.
+
+### Recipe
+
+```tsx
+<div
+  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+  onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+  onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFiles(e.dataTransfer?.files); }}
+  className={[
+    'flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-6 text-center transition-colors',
+    isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/30',
+  ].join(' ')}
+>
+  <Upload className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+  <p className="text-sm text-muted-foreground">Drag &amp; drop files here, or</p>
+  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+    Choose files
+  </Button>
+  <input ref={fileInputRef} type="file" multiple className="hidden" onChange={…} />
+</div>
+```
+
+### Conventions
+
+- **Dashed border, never solid.** A solid border reads as a static panel; the dashed border is the universal "this is a drop target" affordance.
+- **Drag-state tint is `border-primary bg-primary/5`.** Subtle — not a heavy fill — so a grazing dragover doesn't flash bright.
+- **Idle border is `border-muted-foreground/30`.** The lighter tone reads as "available but quiet."
+- **Hidden native input + visible button.** The native `<input type="file">` is `className="hidden"` (and `tabIndex={-1}`); the visible affordance is a `Button variant="outline" size="sm"`. The button's `onClick` calls `fileInputRef.current?.click()`. Don't expose the native control directly — its default styling is platform-specific and ugly.
+- **Reset the input value after handling files.** `e.target.value = ''` after `handleFiles(e.target.files)` so the user can re-pick the same file (otherwise the `change` event won't fire on the second click).
+- **Pluralise the inline progress copy.** `Uploading {n} {n === 1 ? 'file' : 'files'}…` rendered in a `border-dashed border-primary/50 bg-primary/5 text-primary` banner above the dropzone. The dashed border on the banner echoes the dropzone's affordance.
+
+### Per-file list
+
+```tsx
+<ul className="divide-y rounded-md border max-h-72 overflow-y-auto">
+  {attachments.map((a) => (
+    <li className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">{a.fileName}</div>
+        <div className="text-xs text-muted-foreground">
+          {formatSize(a.sizeBytes)}{uploadedAt ? ` · ${uploadedAt}` : ''}
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={`Delete attachment ${a.fileName}`}
+        onClick={() => setConfirmDeleteId(a.id)}
+        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </li>
+  ))}
+</ul>
+```
+
+**Conventions:**
+
+- Filename uses `truncate` so long names ellipsis instead of wrapping; metadata sits below in `text-xs text-muted-foreground` separated by `·`.
+- The delete button starts as a quiet ghost icon (`text-muted-foreground`) and tints destructive *only on hover* (`hover:bg-destructive/10 hover:text-destructive`). This is the standard "destructive action lives quietly until you hover it" pattern.
+- Confirmation goes through shadcn `<AlertDialog>` — never a `confirm()` or a toast-and-undo. See [shadcn/ui overrides](#shadcnui-overrides).
+
+### Toast on completion
+
+After an auto-upload finishes, fire a single `toast.success('Attachment uploaded.')`. For partial-success batches (some files uploaded, some failed), fire one `toast.warning('Some attachments failed to upload.')` summarising — never one toast per file. See [Toasts](#toasts).
+
+### When *not* to use this surface
+
+- **Single-file picker for a one-off action** (e.g. CSV column-mapping preview) — a plain `<Button>` triggering the hidden input is enough; the dashed-border affordance is overkill for non-multi non-persistent uploads.
+- **Inline avatar/profile-picture upload** — use a focused circular dropzone with a preview, not the rectangular drop area.
+
+---
+
 ## The `<CardError>` component
 
 `ProjectCeres.Client/src/app/components/CardError.tsx`
@@ -271,8 +1004,30 @@ The SPA uses [Sonner](https://sonner.emilkowal.ski/) for toast notifications. A 
 
 - `toast.success('Saved.')` for successful operations
 - `toast.error("Couldn't update status.")` for failures
+- `toast.warning('Some attachments failed to upload.')` for partial / soft failures
+- `toast.info('Sync queued.')` for ambient status updates
+
+Each type carries a tinted icon via the per-type CSS in `index.css` (see [shadcn/ui overrides](#shadcnui-overrides)).
 
 Recommended message style: short, sentence-case, ends in a period. Past tense for completed actions ("Saved."), contraction-friendly for failures ("Couldn't save.").
+
+### The 422 carve-out — never toast a validation failure
+
+When the server returns **422 Unprocessable Entity** with the project's validation envelope (`{ error: { code: "VALIDATION_ERROR", details: [{ field, message }] } }`), do NOT raise a toast. Render each `details[].message` inline next to the field that caused it:
+
+```tsx
+<Field>
+  <Label>Amount</Label>
+  <Input … />
+  {errors.amount && <p className="text-xs text-destructive">{errors.amount}</p>}
+</Field>
+```
+
+Reason: a toast that says "Validation failed" tells the user nothing they can act on, and the correction is already keyed off the field they were editing. Toasts are for events that don't have a screen position to anchor to (a save that happened, an upload that failed in the background). See [Forms & validation](#forms--validation).
+
+Other carve-outs:
+- **Partial-success uploads** (some files succeeded, some failed): a single `toast.warning(...)` summarising the failure, not one toast per failed file.
+- **Auto-saves on field blur**: silent on success, `toast.error(...)` on failure.
 
 For destructive operations, prefer a confirmation dialog over a toast.
 
@@ -311,3 +1066,7 @@ These are accepted trade-offs in the current foundation. Track here so future wo
 - **IBM Plex Mono default subsets include cyrillic and vietnamese.** Adds ~50KB of font files unused in our locales (en/es). Defer until bundle size becomes an issue; the fix is to import specific subsets explicitly rather than the package default.
 
 - **Showcase contrast ratios are not displayed when tokens are defined as `oklch()`.** `getComputedStyle()` returns `oklch(...)` strings for CSS custom properties whose source value is OKLCH, and the WCAG contrast helper currently only parses `rgb()` / `rgba()`. The Colors and Charts swatches still render correctly (the page no longer crashes, and the rgb display row shows whatever the browser returned), but the "vs --foreground: X.XX : 1 (AA)" line is suppressed. Fix path: extend `parseRgb()` in `src/design-system/lib/contrast.ts` to handle OKLCH (either via `culori`/`colorjs.io` or a small inline OKLCH→sRGB conversion).
+
+- **Motion tokens are not yet enforced in older components.** Files like `MovementForm.tsx` still use Tailwind literal durations (`duration-200`) instead of `var(--motion-duration-base)`. The rule in [Motion](#motion) applies to new code; existing literals are tracked for a migration sweep. Don't introduce new literals.
+
+- **`<ConfirmDialog>` legacy primitive.** `src/components/ConfirmDialog.tsx` is a pre-SPA artefact that submits via a hidden form id. The SPA standard is shadcn `<AlertDialog>` used inline at the call site (see `AttachmentDropzone.tsx`, `MovementForm.tsx`). Don't add new consumers; the existing ones will be migrated.
