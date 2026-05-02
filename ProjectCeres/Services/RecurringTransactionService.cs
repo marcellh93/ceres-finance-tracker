@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class RecurringTransactionService(AppDbContext db, IAccountService accountService) : IRecurringTransactionService
+public class RecurringTransactionService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : IRecurringTransactionService
 {
     public async Task<IEnumerable<RecurringTransaction>> GetAllAsync(bool includeInactive = false)
     {
@@ -31,6 +32,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         var reminder = new RecurringTransaction
         {
             Id                = Guid.NewGuid(),
+            UserId            = user.UserId,
             Name              = vm.Name,
             EstimatedAmount   = vm.EstimatedAmount,
             AccountId         = vm.AccountId!.Value,
@@ -86,6 +88,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         var transaction = new Transaction
         {
             Id          = Guid.NewGuid(),
+            UserId      = user.UserId,
             Date        = date,
             Amount      = amount,
             Description = description ?? reminder.Name,

@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class TransferService(AppDbContext db, IAccountService accountService) : ITransferService
+public class TransferService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : ITransferService
 {
     public async Task<IEnumerable<Transfer>> GetAllAsync() =>
         await db.Transfers
@@ -30,6 +31,7 @@ public class TransferService(AppDbContext db, IAccountService accountService) : 
         var transfer = new Transfer
         {
             Id              = Guid.NewGuid(),
+            UserId          = user.UserId,
             Date            = vm.Date,
             Amount          = vm.Amount,
             SourceAccountId = vm.SourceAccountId!.Value,

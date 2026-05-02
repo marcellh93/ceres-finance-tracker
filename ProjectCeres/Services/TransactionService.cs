@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
@@ -9,7 +10,8 @@ public class TransactionService(
     AppDbContext db,
     IAccountService accountService,
     ILiabilityPaymentService liabilityPaymentService,
-    IFileAttachmentService attachmentService) : ITransactionService
+    IFileAttachmentService attachmentService,
+    ICurrentUserAccessor user) : ITransactionService
 {
     public async Task<IEnumerable<TransactionListItemViewModel>> GetRecentAsync(
         Guid? accountId = null,
@@ -177,6 +179,7 @@ public class TransactionService(
         var transaction = new Transaction
         {
             Id          = Guid.NewGuid(),
+            UserId      = user.UserId,
             Date        = vm.Date,
             Amount      = vm.Amount,
             Description = vm.Description,

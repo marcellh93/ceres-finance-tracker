@@ -21,11 +21,11 @@ public class TransferReviewServiceTests : IAsyncLifetime
         await _fixture.InitAsync();
 
         var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new SingleUserAccessor());
         var attachmentMock          = new Mock<IFileAttachmentService>().Object;
         var transactionService      = new TransactionService(
-            _fixture.Db, accountService, liabilityPaymentService, attachmentMock);
-        var transferService         = new TransferService(_fixture.Db, accountService);
+            _fixture.Db, accountService, liabilityPaymentService, attachmentMock, new SingleUserAccessor());
+        var transferService         = new TransferService(_fixture.Db, accountService, new SingleUserAccessor());
 
         _service = new TransferReviewService(_fixture.Db, transferService, transactionService);
 

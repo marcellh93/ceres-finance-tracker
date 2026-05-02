@@ -31,10 +31,10 @@ public class IsClearedTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new SingleUserAccessor());
         var attachmentService = new Mock<IFileAttachmentService>().Object;
-        _txService = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService);
-        _trService = new TransferService(_fixture.Db, _accountService);
+        _txService = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
+        _trService = new TransferService(_fixture.Db, _accountService, new SingleUserAccessor());
 
         var a1 = new Account { Id = Guid.NewGuid(), Name = $"IsCleared A1 {Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var a2 = new Account { Id = Guid.NewGuid(), Name = $"IsCleared A2 {Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

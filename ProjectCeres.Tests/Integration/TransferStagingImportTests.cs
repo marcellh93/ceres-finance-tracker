@@ -22,10 +22,9 @@ public class TransferStagingImportTests : IAsyncLifetime
         await _fixture.InitAsync();
 
         var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new SingleUserAccessor());
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
-        var transactionService      = new TransactionService(
-            _fixture.Db, accountService, liabilityPaymentService, attachmentService);
+        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
         var detectionService        = new TransferDetectionService();
 
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());

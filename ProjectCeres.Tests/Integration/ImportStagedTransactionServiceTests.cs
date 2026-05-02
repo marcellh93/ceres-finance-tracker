@@ -29,10 +29,9 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
         await _fixture.InitAsync();
 
         var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new SingleUserAccessor());
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
-        _transactionService         = new TransactionService(
-            _fixture.Db, accountService, liabilityPaymentService, attachmentService);
+        _transactionService         = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
 
         _service = new ImportStagedTransactionService(_fixture.Db, _transactionService);
 

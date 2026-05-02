@@ -35,7 +35,7 @@ public class ReportGeneratorTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService         = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _categoryBudgetService  = new CategoryBudgetService(_fixture.Db);
+        _categoryBudgetService  = new CategoryBudgetService(_fixture.Db, new SingleUserAccessor());
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

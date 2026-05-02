@@ -34,7 +34,7 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _service = new CategoryBudgetService(_fixture.Db);
+        _service = new CategoryBudgetService(_fixture.Db, new SingleUserAccessor());
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

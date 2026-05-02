@@ -36,7 +36,8 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
             CategoryTypeId = vm.CategoryTypeId!.Value,
             IsActive       = true,
             IsSystem       = false,
-            LifestyleTag   = vm.LifestyleTag
+            LifestyleTag   = vm.LifestyleTag,
+            UserId         = user.UserId,
         };
 
         db.Categories.Add(category);

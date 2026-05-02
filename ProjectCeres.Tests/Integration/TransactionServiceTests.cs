@@ -35,9 +35,9 @@ public class TransactionServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new SingleUserAccessor());
         var attachmentService = new Mock<IFileAttachmentService>().Object;
-        _service = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService);
+        _service = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
 
         // Create a reusable test account (Asset, EUR) with no opening balance so any date is valid.
         var account = new Account

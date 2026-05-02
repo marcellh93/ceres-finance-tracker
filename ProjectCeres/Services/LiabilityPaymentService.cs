@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class LiabilityPaymentService(AppDbContext db, IAccountService accountService) : ILiabilityPaymentService
+public class LiabilityPaymentService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : ILiabilityPaymentService
 {
     public async Task<LiabilityPayment?> GetByIdAsync(Guid id) =>
         await db.LiabilityPayments
@@ -20,6 +21,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
         var payment = new LiabilityPayment
         {
             Id                 = Guid.NewGuid(),
+            UserId             = user.UserId,
             Date               = vm.Date,
             Amount             = vm.Amount,
             AssetAccountId     = vm.AccountId!.Value,

@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class BudgetService(AppDbContext db, IAccountService accountService) : IBudgetService
+public class BudgetService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : IBudgetService
 {
     public async Task<IEnumerable<Budget>> GetAllAsync(
         bool includeInactive = false,
@@ -67,6 +68,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService) : IB
         var budget = new Budget
         {
             Id              = Guid.NewGuid(),
+            UserId          = user.UserId,
             Name            = vm.Name,
             TargetAmount    = vm.TargetAmount,
             CurrencyId      = currencyId,

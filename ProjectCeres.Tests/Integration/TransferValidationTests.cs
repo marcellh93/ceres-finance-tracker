@@ -25,7 +25,7 @@ public class TransferValidationTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _service = new TransferService(_fixture.Db, _accountService);
+        _service = new TransferService(_fixture.Db, _accountService, new SingleUserAccessor());
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();
