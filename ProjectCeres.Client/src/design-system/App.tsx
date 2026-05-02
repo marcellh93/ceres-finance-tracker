@@ -24,7 +24,7 @@ const sections = [
 
 export function App() {
   return (
-    <div className="grid min-h-screen grid-cols-[240px_1fr] bg-background text-foreground">
+    <div className="grid h-screen grid-cols-[240px_1fr] bg-background text-foreground">
       <aside className="border-r border-border p-6">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Ceres DS</h1>
