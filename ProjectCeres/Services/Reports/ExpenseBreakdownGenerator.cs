@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 
 namespace ProjectCeres.Services.Reports;
 
-public class ExpenseBreakdownGenerator(AppDbContext db) : IReportGenerator
+public class ExpenseBreakdownGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -16,6 +17,7 @@ public class ExpenseBreakdownGenerator(AppDbContext db) : IReportGenerator
             ?? throw new InvalidOperationException($"Currency {currencyId} not found.");
 
         var transactions = await db.Transactions
+            .Owned(user)
             .Where(t =>
                 t.Date >= from &&
                 t.Date <= to &&

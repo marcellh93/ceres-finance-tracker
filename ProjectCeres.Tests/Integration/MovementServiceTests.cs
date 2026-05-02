@@ -36,7 +36,7 @@ public class MovementServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _service = new MovementService(_fixture.Db);
+        _service = new MovementService(_fixture.Db, new SingleUserAccessor());
 
         _assetAccountId = await CreateAssetAccountAsync();
         _secondAssetAccountId = await CreateAssetAccountAsync();

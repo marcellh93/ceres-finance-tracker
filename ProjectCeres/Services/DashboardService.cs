@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services;
 
-public class DashboardService(AppDbContext db, ISettingsService settingsService) : IDashboardService
+public class DashboardService(AppDbContext db, ISettingsService settingsService, ICurrentUserAccessor user) : IDashboardService
 {
     public async Task<DashboardData> GetDashboardDataAsync()
     {
@@ -17,6 +18,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         // MTD ("Cycle to Date") transactions for the default currency, scoped to the user's period.
         var mtdTransactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= mtdFrom && t.Date <= today && t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Category)
                 .ThenInclude(c => c.CategoryType)
@@ -48,6 +50,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var (priorStart, priorEnd) = BudgetPeriod.GetBoundsForMonth(priorYear, priorMonth, settings.PeriodStartDay);
 
         var earliestTxnInCurrency = await db.Transactions
+            .Owned(user)
             .Where(t => t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .OrderBy(t => t.Date)
             .Select(t => (DateOnly?)t.Date)
@@ -59,6 +62,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         if (priorIsCompleteCycle)
         {
             var priorTransactions = await db.Transactions
+                .Owned(user)
                 .Where(t => t.Date >= priorStart && t.Date <= priorEnd
                          && t.Account.CurrencyId == currencyId
                          && !t.Category.IsSystem)
@@ -77,7 +81,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         }
 
         // Net worth across all currencies.
-        var reportService = new ReportService(db);
+        var reportService = new ReportService(db, user);
         var netWorth = await reportService.GetNetWorthAsync();
 
         // Pending reminders: active recurring transactions whose NextDueDate
@@ -85,6 +89,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         // "Reminders" card shows this same window.
         var imminentCutoff = today.AddDays(7);
         var pendingCount = await db.RecurringTransactions
+            .Owned(user)
             .CountAsync(r => r.IsActive && r.NextDueDate <= imminentCutoff);
 
         return new DashboardData(
@@ -156,6 +161,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         // Load active, non-excluded asset accounts with their transactions and category types.
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.IsActive
                      && a.CurrencyId == currencyId
                      && a.AccountType.Name == "Asset"
@@ -183,6 +189,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         // Subtract liability payments that source from these asset accounts.
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
         var liabilityPayments = await db.LiabilityPayments
+            .Owned(user)
             .AsNoTracking()
             .Where(p => accountIds.Contains(p.AssetAccountId))
             .ToListAsync();
@@ -190,9 +197,11 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         // Include transfers (cross-boundary transfers must be counted to match displayed balances).
         var transfersIn = await db.Transfers
+            .Owned(user)
             .Where(t => accountIds.Contains(t.DestAccountId))
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
         var transfersOut = await db.Transfers
+            .Owned(user)
             .Where(t => accountIds.Contains(t.SourceAccountId))
             .SumAsync(t => (decimal?)t.Amount) ?? 0m;
         liquid += transfersIn;
@@ -205,6 +214,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var imminentCutoff = today.AddDays(imminentWindowDays);
 
         var imminentRecurring = await db.RecurringTransactions
+            .Owned(user)
             .Where(r => r.IsActive
                      && r.EstimatedAmount != null
                      && r.NextDueDate >= firstDay
@@ -214,6 +224,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         decimal imminentBills = imminentRecurring.Sum(r => r.EstimatedAmount ?? 0m);
 
         var laterRecurring = await db.RecurringTransactions
+            .Owned(user)
             .Where(r => r.IsActive
                      && r.EstimatedAmount != null
                      && r.NextDueDate > imminentCutoff
@@ -226,19 +237,21 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         // Uses BudgetPeriod helper so the cycle respects Settings.PeriodStartDay,
         // not the calendar month.
         var activeBudgets = await db.CategoryBudgets
+            .Owned(user)
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
             .ToListAsync();
 
         decimal budgetReserve = 0m;
         if (activeBudgets.Count > 0)
         {
-            var settings = await db.Settings.FirstOrDefaultAsync()
+            var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
                 ?? throw new InvalidOperationException("Settings row missing.");
             var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
             var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
             var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
             var actualSpendByCategory = await db.Transactions
+                .Owned(user)
                 .Where(t => t.Date >= periodStart
                          && t.Date <= periodEnd
                          && budgetCategoryIds.Contains(t.CategoryId)
@@ -275,6 +288,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         // Load all active accounts for this currency with transactions and category types.
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.IsActive && a.CurrencyId == currencyId)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
@@ -284,6 +298,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
         var liabilityPayments = await db.LiabilityPayments
+            .Owned(user)
             .AsNoTracking()
             .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
             .ToListAsync();
@@ -326,6 +341,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         // €209/mo) and produces a falsely optimistic runway. Better to show
         // "needs 6 months of history" than mislead.
         var expenseTransactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= sixStart
                      && t.Date <= sixEnd
                      && t.Account.CurrencyId == currencyId
@@ -365,7 +381,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var today = DateOnly.FromDateTime(DateTime.Today);
 
         // "Current period" follows the user's configured budget cycle.
-        var settings = await db.Settings.FirstOrDefaultAsync()
+        var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Settings row missing.");
         var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
         var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
@@ -377,6 +393,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
 
         // Current period income (covers periodStart through today).
         var currentPeriodIncome = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= periodStart
                      && t.Date <= today
                      && t.Account.CurrencyId == currencyId
@@ -391,6 +408,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         // €2000 income reported as €333/mo average, then "this period" sees €0
         // and reads as -100%). Better to show "needs 6 months of history."
         var priorIncomeTransactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= sixStart
                      && t.Date <= sixEnd
                      && t.Account.CurrencyId == currencyId
@@ -429,6 +447,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var today = DateOnly.FromDateTime(DateTime.Today);
 
         var activeBudgets = await db.CategoryBudgets
+            .Owned(user)
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
             .ToListAsync();
 
@@ -439,7 +458,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         if (totalLimit == 0m)
             return (null, null, null);
 
-        var settings = await db.Settings.FirstOrDefaultAsync()
+        var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Settings row missing.");
         var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
         var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
@@ -447,6 +466,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService)
         var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
 
         var actualSpend = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= periodStart
                      && t.Date <= periodEnd
                      && budgetCategoryIds.Contains(t.CategoryId)

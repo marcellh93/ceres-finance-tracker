@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -14,6 +15,7 @@ public class DashboardApiController(
     IBudgetService budgetService,
     ISettingsService settingsService,
     IAccountService accountService,
+    ICurrentUserAccessor user,
     AppDbContext db) : ControllerBase
 {
     [HttpGet("health")]
@@ -55,6 +57,7 @@ public class DashboardApiController(
         var cutoff = today.AddDays(days);
 
         var query = db.RecurringTransactions
+            .Owned(user)
             .AsNoTracking()
             .Where(r => r.IsActive && r.NextDueDate <= cutoff)
             .Include(r => r.Account).ThenInclude(a => a.Currency);
@@ -148,6 +151,7 @@ public class DashboardApiController(
         var today = DateOnly.FromDateTime(DateTime.Today);
 
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.IsActive && a.CurrencyId == currencyId)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
@@ -158,6 +162,7 @@ public class DashboardApiController(
 
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
         var allLiabilityPayments = await db.LiabilityPayments
+            .Owned(user)
             .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
             .AsNoTracking()
             .ToListAsync();
@@ -224,6 +229,7 @@ public class DashboardApiController(
         var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-11);
 
         var allTransactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= windowStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Category)
@@ -264,6 +270,7 @@ public class DashboardApiController(
         var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         var transactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= periodStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId &&
                         t.Category.CategoryType.Name == "Expense" &&
@@ -294,6 +301,7 @@ public class DashboardApiController(
         var currency = await db.Currencies.AsNoTracking().FirstAsync(c => c.Id == currencyId);
 
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.IsActive && a.CurrencyId == currencyId && a.AccountType.Name != "Liability")
             .AsNoTracking()
             .ToListAsync();
@@ -321,6 +329,7 @@ public class DashboardApiController(
         var windowStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-11);
 
         var allTransactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= windowStart && t.Date <= today &&
                         t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Category)

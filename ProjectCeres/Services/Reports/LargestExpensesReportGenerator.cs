@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services.Reports;
@@ -11,7 +12,7 @@ public record LargestExpenseRow(
     string CurrencySymbol,
     decimal Amount);
 
-public class LargestExpensesReportGenerator(AppDbContext db) : IReportGenerator
+public class LargestExpensesReportGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -20,6 +21,7 @@ public class LargestExpensesReportGenerator(AppDbContext db) : IReportGenerator
         var to         = parameters.To          ?? throw new ArgumentException("To is required.");
 
         var rows = await db.Transactions
+            .Owned(user)
             .Where(t =>
                 t.Date >= from &&
                 t.Date <= to &&

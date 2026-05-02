@@ -22,6 +22,7 @@ public class TransactionService(
     {
         // --- Regular transactions ---
         var txQuery = db.Transactions
+            .Owned(user)
             .Where(t => !t.Category.IsSystem)
             .Include(t => t.Account).ThenInclude(a => a.Currency)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
@@ -54,6 +55,7 @@ public class TransactionService(
 
         // --- Liability payments ---
         var lpQuery = db.LiabilityPayments
+            .Owned(user)
             .Include(p => p.AssetAccount)
             .Include(p => p.LiabilityAccount)
             .AsQueryable();
@@ -92,6 +94,7 @@ public class TransactionService(
     public async Task<int> CountAsync(Guid? accountId = null, DateOnly? from = null, DateOnly? to = null)
     {
         var txQuery = db.Transactions
+            .Owned(user)
             .Where(t => !t.Category.IsSystem)
             .AsQueryable();
 
@@ -102,7 +105,7 @@ public class TransactionService(
         if (to.HasValue)
             txQuery = txQuery.Where(t => t.Date <= to.Value);
 
-        var lpQuery = db.LiabilityPayments.AsQueryable();
+        var lpQuery = db.LiabilityPayments.Owned(user).AsQueryable();
 
         if (accountId.HasValue)
             lpQuery = lpQuery.Where(p => p.AssetAccountId == accountId.Value || p.LiabilityAccountId == accountId.Value);
@@ -118,6 +121,7 @@ public class TransactionService(
     {
         // Try regular transaction first
         var t = await db.Transactions
+            .Owned(user)
             .Include(t => t.Account)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .Include(t => t.Budget)
@@ -143,6 +147,7 @@ public class TransactionService(
 
         // Fall back to liability payment
         var p = await db.LiabilityPayments
+            .Owned(user)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (p is not null)
@@ -208,7 +213,7 @@ public class TransactionService(
         await ValidateNotBeforeOpeningBalanceAsync(vm.AccountId!.Value, vm.Date);
         await ValidateBudgetCurrencyAsync(vm.BudgetId, vm.AccountId!.Value);
 
-        var transaction = await db.Transactions.FindAsync(vm.Id)
+        var transaction = await db.Transactions.Owned(user).FirstOrDefaultAsync(t => t.Id == vm.Id)
             ?? throw new InvalidOperationException($"Transaction {vm.Id} not found.");
 
         transaction.Date        = vm.Date;
@@ -226,6 +231,7 @@ public class TransactionService(
     {
         // Try regular transaction first
         var transaction = await db.Transactions
+            .Owned(user)
             .Include(t => t.Attachments)
             .FirstOrDefaultAsync(t => t.Id == id);
 
@@ -245,7 +251,7 @@ public class TransactionService(
 
     public async Task MarkClearedAsync(Guid id, bool cleared)
     {
-        var transaction = await db.Transactions.FindAsync(id)
+        var transaction = await db.Transactions.Owned(user).FirstOrDefaultAsync(t => t.Id == id)
             ?? throw new InvalidOperationException($"Transaction {id} not found.");
         transaction.IsCleared = cleared;
         await db.SaveChangesAsync();
@@ -253,7 +259,7 @@ public class TransactionService(
 
     public async Task MarkNeedsReviewAsync(Guid id, bool needsReview)
     {
-        var transaction = await db.Transactions.FindAsync(id)
+        var transaction = await db.Transactions.Owned(user).FirstOrDefaultAsync(t => t.Id == id)
             ?? throw new InvalidOperationException($"Transaction {id} not found.");
         transaction.NeedsReview = needsReview;
         await db.SaveChangesAsync();
@@ -262,6 +268,7 @@ public class TransactionService(
     public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null, string? currency = null)
     {
         var query = db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= from && t.Date <= to && !t.Category.IsSystem && !t.IsCleared);
 
         if (accountId.HasValue)
@@ -286,8 +293,8 @@ public class TransactionService(
     {
         if (budgetId is null) return;
 
-        var budget  = await db.Budgets.FindAsync(budgetId.Value);
-        var account = await db.Accounts.FindAsync(accountId);
+        var budget  = await db.Budgets.Owned(user).FirstOrDefaultAsync(b => b.Id == budgetId.Value);
+        var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == accountId);
         if (budget is null || account is null) return;
 
         if (budget.CurrencyId != account.CurrencyId)

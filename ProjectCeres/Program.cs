@@ -41,12 +41,16 @@ builder.Services.AddControllers()
         };
     });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 // Phase 3 pre-auth: every user-owned row is stamped with a sentinel UserId. Swap this
 // registration for an HttpContext-backed accessor when authentication lands.
 builder.Services.AddScoped<ICurrentUserAccessor, SingleUserAccessor>();
+builder.Services.AddScoped<UserOwnershipInterceptor>();
+
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.AddInterceptors(sp.GetRequiredService<UserOwnershipInterceptor>());
+});
 
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IAccountService, AccountService>();

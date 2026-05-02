@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services.Reports;
@@ -12,7 +13,7 @@ public record NetWorthSnapshotRow(
     decimal Liabilities,
     decimal NetWorth);
 
-public class NetWorthOverTimeReportGenerator(AppDbContext db) : IReportGenerator
+public class NetWorthOverTimeReportGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -26,6 +27,7 @@ public class NetWorthOverTimeReportGenerator(AppDbContext db) : IReportGenerator
         // Load all transactions up to end of range for accounts in this currency.
         // We need all history (not just within range) to compute cumulative balances.
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.CurrencyId == currencyId && a.IsActive)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)

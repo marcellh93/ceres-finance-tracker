@@ -13,6 +13,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
     public async Task<IEnumerable<Category>> GetAllAsync(bool includeInactive = false)
     {
         var query = db.Categories
+            .OwnedOrShared(user)
             .Include(c => c.CategoryType)
             .AsQueryable();
 
@@ -24,6 +25,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
 
     public async Task<Category?> GetByIdAsync(Guid id) =>
         await db.Categories
+            .OwnedOrShared(user)
             .Include(c => c.CategoryType)
             .FirstOrDefaultAsync(c => c.Id == id);
 
@@ -47,7 +49,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
 
     public async Task UpdateAsync(CategoryEditViewModel vm)
     {
-        var category = await db.Categories.FindAsync(vm.Id)
+        var category = await db.Categories.OwnedOrShared(user).FirstOrDefaultAsync(c => c.Id == vm.Id)
             ?? throw new InvalidOperationException($"Category {vm.Id} not found.");
 
         if (category.IsSystem || IsReserved(category.Id))
@@ -60,7 +62,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
 
     public async Task DeactivateAsync(Guid id)
     {
-        var category = await db.Categories.FindAsync(id)
+        var category = await db.Categories.OwnedOrShared(user).FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new InvalidOperationException($"Category {id} not found.");
 
         if (category.IsSystem || IsReserved(category.Id))
@@ -129,7 +131,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
         if (category is null)
             return Result.Fail("NOT_FOUND", "Category not found.");
 
-        var hasTransactions = await db.Transactions.AnyAsync(t => t.CategoryId == id);
+        var hasTransactions = await db.Transactions.Owned(user).AnyAsync(t => t.CategoryId == id);
         var policy = CategoryPolicies.CanDeactivate(category, hasTransactions);
         if (!policy.IsSuccess) return policy;
 

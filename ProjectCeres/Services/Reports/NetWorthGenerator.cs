@@ -1,14 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 
 namespace ProjectCeres.Services.Reports;
 
-public class NetWorthGenerator(AppDbContext db) : IReportGenerator
+public class NetWorthGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.IsActive)
             .Include(a => a.Currency)
             .Include(a => a.AccountType)

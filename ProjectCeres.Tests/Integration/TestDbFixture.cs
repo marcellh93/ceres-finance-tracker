@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Tests.Integration;
@@ -21,6 +22,7 @@ public class TestDbFixture : IAsyncDisposable
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestConnectionString)
+            .AddInterceptors(new UserOwnershipInterceptor(new SingleUserAccessor()))
             .Options;
 
         Db = new AppDbContext(options);

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 
@@ -24,7 +25,7 @@ public class TransactionExportServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _service = new TransactionExportService(_fixture.Db);
+        _service = new TransactionExportService(_fixture.Db, new SingleUserAccessor());
 
         var account = new Account
         {

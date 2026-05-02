@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -11,7 +12,8 @@ namespace ProjectCeres.Controllers.Api;
 public class TransfersApiController(
     ITransferService transferService,
     AppDbContext db,
-    IFileAttachmentService attachmentService) : ControllerBase
+    IFileAttachmentService attachmentService,
+    ICurrentUserAccessor user) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTransferRequest request)
@@ -67,6 +69,7 @@ public class TransfersApiController(
     public async Task<ActionResult<TransferEditDto>> Get(Guid id)
     {
         var dto = await db.Transfers
+            .Owned(user)
             .Where(t => t.Id == id)
             .Select(t => new TransferEditDto(
                 t.Id,

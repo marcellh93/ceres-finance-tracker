@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
@@ -8,10 +9,12 @@ namespace ProjectCeres.Services;
 public class MovementService : IMovementService
 {
     private readonly AppDbContext _db;
+    private readonly ICurrentUserAccessor _user;
 
-    public MovementService(AppDbContext db)
+    public MovementService(AppDbContext db, ICurrentUserAccessor user)
     {
         _db = db;
+        _user = user;
     }
 
     public async Task<List<MovementListItemViewModel>> GetRecentAsync(
@@ -63,9 +66,9 @@ public class MovementService : IMovementService
 
     public async Task<MovementType?> GetTypeAsync(Guid id)
     {
-        if (await _db.Transactions.AnyAsync(t => t.Id == id))     return MovementType.Transaction;
-        if (await _db.Transfers.AnyAsync(t => t.Id == id))        return MovementType.Transfer;
-        if (await _db.LiabilityPayments.AnyAsync(p => p.Id == id)) return MovementType.LiabilityPayment;
+        if (await _db.Transactions.Owned(_user).AnyAsync(t => t.Id == id))     return MovementType.Transaction;
+        if (await _db.Transfers.Owned(_user).AnyAsync(t => t.Id == id))        return MovementType.Transfer;
+        if (await _db.LiabilityPayments.Owned(_user).AnyAsync(p => p.Id == id)) return MovementType.LiabilityPayment;
         return null;
     }
 
@@ -77,6 +80,7 @@ public class MovementService : IMovementService
         Guid? accountId, DateOnly? from, DateOnly? to, string? q = null, string? currency = null)
     {
         var query = _db.Transactions
+            .Owned(_user)
             .Include(t => t.Account).ThenInclude(a => a.Currency)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .AsQueryable();
@@ -116,6 +120,7 @@ public class MovementService : IMovementService
         Guid? accountId, DateOnly? from, DateOnly? to, string? q = null, string? currency = null)
     {
         var query = _db.Transfers
+            .Owned(_user)
             .Include(t => t.SourceAccount).ThenInclude(a => a.Currency)
             .Include(t => t.DestAccount)
             .AsQueryable();
@@ -152,6 +157,7 @@ public class MovementService : IMovementService
         Guid? accountId, DateOnly? from, DateOnly? to, string? q = null, string? currency = null)
     {
         var query = _db.LiabilityPayments
+            .Owned(_user)
             .Include(p => p.AssetAccount).ThenInclude(a => a.Currency)
             .Include(p => p.LiabilityAccount)
             .AsQueryable();

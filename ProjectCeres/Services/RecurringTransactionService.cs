@@ -11,6 +11,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
     public async Task<IEnumerable<RecurringTransaction>> GetAllAsync(bool includeInactive = false)
     {
         var query = db.RecurringTransactions
+            .Owned(user)
             .Include(r => r.Account)
             .Include(r => r.Category)
             .AsQueryable();
@@ -23,6 +24,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
     public async Task<RecurringTransaction?> GetByIdAsync(Guid id) =>
         await db.RecurringTransactions
+            .Owned(user)
             .Include(r => r.Account)
             .Include(r => r.Category)
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -51,7 +53,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
     public async Task UpdateAsync(RecurringTransactionEditViewModel vm)
     {
-        var reminder = await db.RecurringTransactions.FindAsync(vm.Id)
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == vm.Id)
             ?? throw new InvalidOperationException($"Recurring transaction {vm.Id} not found.");
 
         reminder.Name              = vm.Name;
@@ -67,7 +69,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
     public async Task DeactivateAsync(Guid id)
     {
-        var reminder = await db.RecurringTransactions.FindAsync(id)
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new InvalidOperationException($"Recurring transaction {id} not found.");
 
         reminder.IsActive = false;
@@ -76,7 +78,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
     public async Task<Transaction> ConfirmAsync(Guid id, DateOnly date, decimal amount, string? description, DateOnly? nextDueDate = null)
     {
-        var reminder = await db.RecurringTransactions.FindAsync(id)
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new InvalidOperationException($"Recurring transaction {id} not found.");
 
         var openingDate = await accountService.GetOpeningBalanceDateAsync(reminder.AccountId);
@@ -105,7 +107,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
     public async Task DismissAsync(Guid id)
     {
-        var reminder = await db.RecurringTransactions.FindAsync(id)
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new InvalidOperationException($"Recurring transaction {id} not found.");
 
         reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: null);
@@ -118,6 +120,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         var cutoff = today.AddDays(withinDays);
 
         return await db.RecurringTransactions
+            .Owned(user)
             .Include(r => r.Account)
             .Include(r => r.Category)
             .Where(r => r.IsActive && r.NextDueDate >= today && r.NextDueDate <= cutoff)

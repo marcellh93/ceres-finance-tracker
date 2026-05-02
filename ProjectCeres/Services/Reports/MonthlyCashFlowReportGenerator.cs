@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services.Reports;
@@ -12,7 +13,7 @@ public record MonthlyCashFlowRow(
     decimal TotalExpenses,
     decimal Net);
 
-public class MonthlyCashFlowReportGenerator(AppDbContext db) : IReportGenerator
+public class MonthlyCashFlowReportGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -24,6 +25,7 @@ public class MonthlyCashFlowReportGenerator(AppDbContext db) : IReportGenerator
             ?? throw new InvalidOperationException($"Currency {currencyId} not found.");
 
         var transactions = await db.Transactions
+            .Owned(user)
             .Where(t =>
                 t.Date >= from &&
                 t.Date <= to &&

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -11,7 +12,8 @@ namespace ProjectCeres.Controllers.Api;
 [Route("api/liability-payments")]
 public class LiabilityPaymentsApiController(
     ILiabilityPaymentService liabilityPaymentService,
-    AppDbContext db) : ControllerBase
+    AppDbContext db,
+    ICurrentUserAccessor user) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateLiabilityPaymentRequest request)
@@ -36,6 +38,7 @@ public class LiabilityPaymentsApiController(
     public async Task<ActionResult<LiabilityPaymentEditDto>> Get(Guid id)
     {
         var dto = await db.LiabilityPayments
+            .Owned(user)
             .Where(p => p.Id == id)
             .Select(p => new LiabilityPaymentEditDto(
                 p.Id,

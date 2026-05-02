@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services;
 
-public class TransactionExportService(AppDbContext db) : ITransactionExportService
+public class TransactionExportService(AppDbContext db, ICurrentUserAccessor user) : ITransactionExportService
 {
     public async Task<IReadOnlyList<TransactionExportRow>> ExportAsync(
         Guid?     accountId = null,
@@ -11,6 +12,7 @@ public class TransactionExportService(AppDbContext db) : ITransactionExportServi
         DateOnly? to        = null)
     {
         var query = db.Transactions
+            .Owned(user)
             .Include(t => t.Account)
             .Include(t => t.Category).ThenInclude(c => c.CategoryType)
             .Where(t => !t.Category.IsSystem)

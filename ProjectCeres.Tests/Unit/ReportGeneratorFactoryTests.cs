@@ -1,4 +1,5 @@
 using FluentAssertions;
+using ProjectCeres.Common;
 using ProjectCeres.Services.Reports;
 
 namespace ProjectCeres.Tests.Unit;
@@ -7,14 +8,14 @@ public class ReportGeneratorFactoryTests
 {
     private static ReportGeneratorFactory BuildFactory()
     {
-        var nw   = new NetWorthGenerator(null!);
-        var ie   = new IncomeExpenseGenerator(null!);
-        var eb   = new ExpenseBreakdownGenerator(null!);
-        var th   = new TransactionHistoryGenerator(null!);
-        var bva  = new BudgetVsActualReportGenerator(null!);
-        var le   = new LargestExpensesReportGenerator(null!);
-        var mcf  = new MonthlyCashFlowReportGenerator(null!);
-        var nwot = new NetWorthOverTimeReportGenerator(null!);
+        var nw   = new NetWorthGenerator(null!, new SingleUserAccessor());
+        var ie   = new IncomeExpenseGenerator(null!, new SingleUserAccessor());
+        var eb   = new ExpenseBreakdownGenerator(null!, new SingleUserAccessor());
+        var th   = new TransactionHistoryGenerator(null!, new SingleUserAccessor());
+        var bva  = new BudgetVsActualReportGenerator(null!, new SingleUserAccessor());
+        var le   = new LargestExpensesReportGenerator(null!, new SingleUserAccessor());
+        var mcf  = new MonthlyCashFlowReportGenerator(null!, new SingleUserAccessor());
+        var nwot = new NetWorthOverTimeReportGenerator(null!, new SingleUserAccessor());
         return new ReportGeneratorFactory(nw, ie, eb, th, bva, le, mcf, nwot);
     }
 

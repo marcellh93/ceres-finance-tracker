@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
@@ -13,7 +14,8 @@ public class ImportService(
     AppDbContext? db = null,
     ITransactionService? transactionService = null,
     ITransferDetectionService? transferDetectionService = null,
-    IImportStagedTransactionService? stagedTransactionService = null) : IImportService
+    IImportStagedTransactionService? stagedTransactionService = null,
+    ICurrentUserAccessor? user = null) : IImportService
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
@@ -57,7 +59,7 @@ public class ImportService(
 
         // Load transactions from other accounts for cross-account matching
         var crossAccountTxns = transferDetectionService is not null
-            ? await db.Transactions
+            ? await (user is not null ? db.Transactions.Owned(user) : db.Transactions)
                 .Where(t => t.AccountId != accountId)
                 .ToListAsync()
             : (IReadOnlyList<Transaction>)[];
@@ -77,7 +79,7 @@ public class ImportService(
             result.RowsStaged = detection.StagedRows.Count;
         }
 
-        var existingTxns = await db.Transactions
+        var existingTxns = await (user is not null ? db.Transactions.Owned(user) : db.Transactions)
             .Where(t => t.AccountId == accountId)
             .ToListAsync();
 

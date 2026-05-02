@@ -14,6 +14,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
         string? type = null)
     {
         var query = db.Budgets
+            .Owned(user)
             .Include(b => b.Currency)
             .Include(b => b.LinkedAccount)
             .AsQueryable();
@@ -45,6 +46,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
 
     public async Task<Budget?> GetByIdAsync(Guid id) =>
         await db.Budgets
+            .Owned(user)
             .Include(b => b.Currency)
             .Include(b => b.LinkedAccount)
             .Include(b => b.Transactions)
@@ -58,7 +60,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
         int currencyId = vm.CurrencyId ?? 0;
         if (vm.GoalType == "Savings" && vm.LinkedAccountId.HasValue)
         {
-            var account = await db.Accounts.FindAsync(vm.LinkedAccountId.Value)
+            var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == vm.LinkedAccountId.Value)
                 ?? throw new InvalidOperationException("Linked account not found.");
             currencyId = account.CurrencyId;
         }
@@ -87,7 +89,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
 
     public async Task UpdateAsync(BudgetEditViewModel vm)
     {
-        var budget = await db.Budgets.FindAsync(vm.Id)
+        var budget = await db.Budgets.Owned(user).FirstOrDefaultAsync(b => b.Id == vm.Id)
             ?? throw new InvalidOperationException($"Budget {vm.Id} not found.");
 
         ValidateGoalTypeRules(vm.GoalType, vm.LinkedAccountId);
@@ -96,7 +98,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
         int currencyId = vm.CurrencyId ?? budget.CurrencyId;
         if (vm.GoalType == "Savings" && vm.LinkedAccountId.HasValue)
         {
-            var account = await db.Accounts.FindAsync(vm.LinkedAccountId.Value)
+            var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == vm.LinkedAccountId.Value)
                 ?? throw new InvalidOperationException("Linked account not found.");
             currencyId = account.CurrencyId;
         }
@@ -114,7 +116,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
 
     public async Task DeactivateAsync(Guid id)
     {
-        var budget = await db.Budgets.FindAsync(id)
+        var budget = await db.Budgets.Owned(user).FirstOrDefaultAsync(b => b.Id == id)
             ?? throw new InvalidOperationException($"Budget {id} not found.");
 
         budget.IsActive = false;
@@ -123,7 +125,7 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
 
     public async Task ReactivateAsync(Guid id)
     {
-        var budget = await db.Budgets.FindAsync(id)
+        var budget = await db.Budgets.Owned(user).FirstOrDefaultAsync(b => b.Id == id)
             ?? throw new InvalidOperationException($"Budget {id} not found.");
 
         if (budget.IsActive) return;
@@ -133,17 +135,19 @@ public class BudgetService(AppDbContext db, IAccountService accountService, ICur
 
     public async Task<decimal> GetActualSpendAsync(Guid id) =>
         await db.Transactions
+            .Owned(user)
             .Where(t => t.BudgetId == id)
             .SumAsync(t => t.Amount);
 
     public async Task<BudgetProgressResult> GetProgressAsync(Guid id)
     {
-        var budget = await db.Budgets.FindAsync(id)
+        var budget = await db.Budgets.Owned(user).FirstOrDefaultAsync(b => b.Id == id)
             ?? throw new InvalidOperationException($"Budget {id} not found.");
 
         decimal progress = budget.GoalType == "Savings"
             ? await GetAccountBalanceAsync(budget.LinkedAccountId!.Value)
             : await db.Transactions
+                .Owned(user)
                 .Where(t => t.BudgetId == id)
                 .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 

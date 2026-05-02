@@ -10,6 +10,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
 {
     public async Task<IEnumerable<Transfer>> GetAllAsync() =>
         await db.Transfers
+            .Owned(user)
             .Include(t => t.SourceAccount).ThenInclude(a => a.Currency)
             .Include(t => t.DestAccount).ThenInclude(a => a.Currency)
             .OrderByDescending(t => t.Date)
@@ -18,6 +19,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
 
     public async Task<Transfer?> GetByIdAsync(Guid id) =>
         await db.Transfers
+            .Owned(user)
             .Include(t => t.SourceAccount).ThenInclude(a => a.Currency)
             .Include(t => t.DestAccount).ThenInclude(a => a.Currency)
             .FirstOrDefaultAsync(t => t.Id == id);
@@ -47,7 +49,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
 
     public async Task UpdateAsync(TransferEditViewModel vm)
     {
-        var transfer = await db.Transfers.FindAsync(vm.Id)
+        var transfer = await db.Transfers.Owned(user).FirstOrDefaultAsync(t => t.Id == vm.Id)
             ?? throw new InvalidOperationException($"Transfer {vm.Id} not found.");
 
         ValidateSourceAndDestDifferent(vm.SourceAccountId!.Value, vm.DestAccountId!.Value);
@@ -65,7 +67,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
 
     public async Task DeleteAsync(Guid id)
     {
-        var transfer = await db.Transfers.FindAsync(id)
+        var transfer = await db.Transfers.Owned(user).FirstOrDefaultAsync(t => t.Id == id)
             ?? throw new InvalidOperationException($"Transfer {id} not found.");
 
         db.Transfers.Remove(transfer);
@@ -74,7 +76,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
 
     public async Task MarkClearedAsync(Guid id, bool cleared)
     {
-        var transfer = await db.Transfers.FindAsync(id)
+        var transfer = await db.Transfers.Owned(user).FirstOrDefaultAsync(t => t.Id == id)
             ?? throw new InvalidOperationException($"Transfer {id} not found.");
         transfer.IsCleared = cleared;
         await db.SaveChangesAsync();
@@ -82,7 +84,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
 
     public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null, string? currency = null)
     {
-        var query = db.Transfers.Where(t => !t.IsCleared && t.Date >= from && t.Date <= to);
+        var query = db.Transfers.Owned(user).Where(t => !t.IsCleared && t.Date >= from && t.Date <= to);
         if (accountId.HasValue)
             query = query.Where(t => t.SourceAccountId == accountId.Value || t.DestAccountId == accountId.Value);
         if (!string.IsNullOrWhiteSpace(currency))
@@ -112,6 +114,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
     private async Task ValidateSameCurrencyAsync(Guid sourceId, Guid destId)
     {
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.Id == sourceId || a.Id == destId)
             .Select(a => new { a.Id, a.CurrencyId })
             .ToListAsync();

@@ -10,6 +10,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
 {
     public async Task<LiabilityPayment?> GetByIdAsync(Guid id) =>
         await db.LiabilityPayments
+            .Owned(user)
             .Include(p => p.AssetAccount).ThenInclude(a => a.Currency)
             .Include(p => p.LiabilityAccount).ThenInclude(a => a.Currency)
             .FirstOrDefaultAsync(p => p.Id == id);
@@ -37,7 +38,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
 
     public async Task UpdateAsync(TransactionEditViewModel vm)
     {
-        var payment = await db.LiabilityPayments.FindAsync(vm.Id)
+        var payment = await db.LiabilityPayments.Owned(user).FirstOrDefaultAsync(p => p.Id == vm.Id)
             ?? throw new InvalidOperationException($"Liability payment {vm.Id} not found.");
 
         await ValidateAsync(vm.AccountId!.Value, vm.LiabilityAccountId!.Value, vm.Date);
@@ -54,7 +55,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
 
     public async Task DeleteAsync(Guid id)
     {
-        var payment = await db.LiabilityPayments.FindAsync(id)
+        var payment = await db.LiabilityPayments.Owned(user).FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new InvalidOperationException($"Liability payment {id} not found.");
 
         db.LiabilityPayments.Remove(payment);
@@ -63,7 +64,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
 
     public async Task MarkClearedAsync(Guid id, bool cleared)
     {
-        var payment = await db.LiabilityPayments.FindAsync(id)
+        var payment = await db.LiabilityPayments.Owned(user).FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new InvalidOperationException($"Liability payment {id} not found.");
 
         payment.IsCleared = cleared;
@@ -72,7 +73,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
 
     public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null, string? currency = null)
     {
-        var query = db.LiabilityPayments.Where(p => !p.IsCleared && p.Date >= from && p.Date <= to);
+        var query = db.LiabilityPayments.Owned(user).Where(p => !p.IsCleared && p.Date >= from && p.Date <= to);
         if (accountId.HasValue)
             query = query.Where(p => p.AssetAccountId == accountId.Value || p.LiabilityAccountId == accountId.Value);
         if (!string.IsNullOrWhiteSpace(currency))
@@ -84,6 +85,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
     private async Task ValidateAsync(Guid assetAccountId, Guid liabilityAccountId, DateOnly date)
     {
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.Id == assetAccountId || a.Id == liabilityAccountId)
             .Include(a => a.AccountType)
             .ToListAsync();

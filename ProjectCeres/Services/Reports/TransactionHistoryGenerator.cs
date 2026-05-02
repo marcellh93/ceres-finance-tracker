@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Services.Reports;
 
-public class TransactionHistoryGenerator(AppDbContext db) : IReportGenerator
+public class TransactionHistoryGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -13,6 +14,7 @@ public class TransactionHistoryGenerator(AppDbContext db) : IReportGenerator
         var to         = parameters.To          ?? throw new ArgumentException("To is required.");
 
         var query = db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= from && t.Date <= to && t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Account)
             .Include(t => t.Category)

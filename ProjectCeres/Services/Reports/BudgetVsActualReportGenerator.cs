@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services.Reports;
@@ -11,7 +12,7 @@ public record BudgetVsActualRow(
     decimal ActualSpend,
     decimal Variance);
 
-public class BudgetVsActualReportGenerator(AppDbContext db) : IReportGenerator
+public class BudgetVsActualReportGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -20,6 +21,7 @@ public class BudgetVsActualReportGenerator(AppDbContext db) : IReportGenerator
         var to         = parameters.To          ?? throw new ArgumentException("To is required.");
 
         var budgets = await db.CategoryBudgets
+            .Owned(user)
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
             .Include(cb => cb.Category)
             .Include(cb => cb.Currency)
@@ -30,6 +32,7 @@ public class BudgetVsActualReportGenerator(AppDbContext db) : IReportGenerator
         foreach (var budget in budgets)
         {
             var actual = await db.Transactions
+                .Owned(user)
                 .Where(t =>
                     t.CategoryId == budget.CategoryId &&
                     t.Account.CurrencyId == currencyId &&

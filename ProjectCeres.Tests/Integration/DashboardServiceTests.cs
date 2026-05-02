@@ -36,7 +36,7 @@ public class DashboardServiceTests : IAsyncLifetime
         await _fixture.InitAsync();
         _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
         var settingsService = new SettingsService(_fixture.Db, new SingleUserAccessor());
-        _service = new DashboardService(_fixture.Db, settingsService);
+        _service = new DashboardService(_fixture.Db, settingsService, new SingleUserAccessor());
 
         // Ensure settings row exists (required by DashboardService).
         await settingsService.EnsureExistsAsync();

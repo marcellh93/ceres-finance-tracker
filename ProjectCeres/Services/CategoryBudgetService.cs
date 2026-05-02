@@ -11,6 +11,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
     public async Task<IEnumerable<CategoryBudget>> GetAllAsync(bool includeInactive = false, string? currency = null)
     {
         var query = db.CategoryBudgets
+            .Owned(user)
             .Include(cb => cb.Category).ThenInclude(c => c.CategoryType)
             .Include(cb => cb.Currency)
             .AsQueryable();
@@ -26,6 +27,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
 
     public async Task<CategoryBudget?> GetByIdAsync(Guid id) =>
         await db.CategoryBudgets
+            .Owned(user)
             .Include(cb => cb.Category).ThenInclude(c => c.CategoryType)
             .Include(cb => cb.Currency)
             .FirstOrDefaultAsync(cb => cb.Id == id);
@@ -33,6 +35,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
     public async Task<CategoryBudget> CreateAsync(CategoryBudgetCreateViewModel vm)
     {
         var category = await db.Categories
+            .OwnedOrShared(user)
             .Include(c => c.CategoryType)
             .FirstOrDefaultAsync(c => c.Id == vm.CategoryId)
             ?? throw new InvalidOperationException("Category not found.");
@@ -41,7 +44,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
             throw new InvalidOperationException(
                 "CategoryBudget can only be applied to Expense categories.");
 
-        var existing = await db.CategoryBudgets.FirstOrDefaultAsync(cb =>
+        var existing = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb =>
             cb.CategoryId == vm.CategoryId &&
             cb.CurrencyId == vm.CurrencyId);
 
@@ -65,7 +68,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
 
     public async Task UpdateAsync(CategoryBudgetEditViewModel vm)
     {
-        var budget = await db.CategoryBudgets.FindAsync(vm.Id)
+        var budget = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb => cb.Id == vm.Id)
             ?? throw new InvalidOperationException($"CategoryBudget {vm.Id} not found.");
 
         budget.LimitAmount = vm.LimitAmount;
@@ -74,7 +77,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
 
     public async Task DeactivateAsync(Guid id)
     {
-        var budget = await db.CategoryBudgets.FindAsync(id)
+        var budget = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb => cb.Id == id)
             ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
 
         budget.IsActive = false;
@@ -83,12 +86,12 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
 
     public async Task ReactivateAsync(Guid id)
     {
-        var budget = await db.CategoryBudgets.FindAsync(id)
+        var budget = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb => cb.Id == id)
             ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
 
         if (budget.IsActive) return;
 
-        var conflict = await db.CategoryBudgets.FirstOrDefaultAsync(cb =>
+        var conflict = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb =>
             cb.CategoryId == budget.CategoryId &&
             cb.CurrencyId == budget.CurrencyId &&
             cb.IsActive);
@@ -102,16 +105,17 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
 
     public async Task<decimal> GetActualSpendAsync(Guid id, int year, int month)
     {
-        var budget = await db.CategoryBudgets.FindAsync(id)
+        var budget = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb => cb.Id == id)
             ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
 
-        var settings = await db.Settings.FirstOrDefaultAsync()
+        var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Settings row missing.");
 
         var (periodStart, periodEnd) =
             BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
         return await db.Transactions
+            .Owned(user)
             .Where(t =>
                 t.CategoryId == budget.CategoryId &&
                 t.Account.CurrencyId == budget.CurrencyId &&

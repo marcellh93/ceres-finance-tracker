@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -14,6 +15,7 @@ public class MovementsApiController(
     ITransferService transferService,
     ILiabilityPaymentService liabilityPaymentService,
     IMovementExportService exportService,
+    ICurrentUserAccessor user,
     AppDbContext db) : ControllerBase
 {
     public record ClearRequest(string Type, bool Cleared);
@@ -137,7 +139,7 @@ public class MovementsApiController(
         var bytes = utf8.GetPreamble().Concat(utf8.GetBytes(csv)).ToArray();
 
         var accountName = accountId is { } id
-            ? await db.Accounts.Where(a => a.Id == id).Select(a => a.Name).FirstOrDefaultAsync()
+            ? await db.Accounts.Owned(user).Where(a => a.Id == id).Select(a => a.Name).FirstOrDefaultAsync()
             : null;
         var fileName = BuildExportFileName(accountName, type, from, to, currency);
 

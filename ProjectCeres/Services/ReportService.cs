@@ -1,15 +1,17 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Services;
 
-public class ReportService(AppDbContext db) : IReportService
+public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReportService
 {
     public async Task<IReadOnlyList<NetWorthEntry>> GetNetWorthAsync()
     {
         // Load all active accounts with their currency and transactions (including category type).
         var accounts = await db.Accounts
+            .Owned(user)
             .Where(a => a.IsActive)
             .Include(a => a.Currency)
             .Include(a => a.AccountType)
@@ -20,6 +22,7 @@ public class ReportService(AppDbContext db) : IReportService
 
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
         var liabilityPayments = await db.LiabilityPayments
+            .Owned(user)
             .AsNoTracking()
             .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
             .ToListAsync();
@@ -72,6 +75,7 @@ public class ReportService(AppDbContext db) : IReportService
             ?? throw new InvalidOperationException($"Currency {currencyId} not found.");
 
         var transactions = await db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= from && t.Date <= to && t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Category)
                 .ThenInclude(c => c.CategoryType)
@@ -90,6 +94,7 @@ public class ReportService(AppDbContext db) : IReportService
             ?? throw new InvalidOperationException($"Currency {currencyId} not found.");
 
         var transactions = await db.Transactions
+            .Owned(user)
             .Where(t =>
                 t.Date >= from &&
                 t.Date <= to &&
@@ -117,6 +122,7 @@ public class ReportService(AppDbContext db) : IReportService
         int offset = 0)
     {
         var query = db.Transactions
+            .Owned(user)
             .Where(t => t.Date >= from && t.Date <= to && t.Account.CurrencyId == currencyId && !t.Category.IsSystem)
             .Include(t => t.Account)
             .Include(t => t.Category)
