@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Models;
 
-public class Budget
+public class Budget : IUserOwned
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -15,6 +16,7 @@ public class Budget
     public bool IsActive { get; set; }
     public string GoalType { get; set; } = "Spending";
     public Guid? LinkedAccountId { get; set; }
+    public Guid UserId { get; set; }
 
     public Currency Currency { get; set; } = null!;
     public Account? LinkedAccount { get; set; }

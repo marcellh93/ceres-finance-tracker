@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Models;
 
-public class RecurringTransaction
+public class RecurringTransaction : IUserOwned
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -15,6 +16,7 @@ public class RecurringTransaction
     public DateOnly NextDueDate { get; set; }
     public bool IsActive { get; set; }
     public ReminderBehaviour ReminderBehaviour { get; set; } = ReminderBehaviour.SnapToCalendarDay;
+    public Guid UserId { get; set; }
 
     public Account Account { get; set; } = null!;
     public Category Category { get; set; } = null!;

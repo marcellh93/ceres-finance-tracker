@@ -1,8 +1,11 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
-public class Settings
+public class Settings : IUserOwned
 {
     public int Id { get; set; }
+    public Guid UserId { get; set; }
     public string NumberFormat { get; set; } = string.Empty;
     public string DateFormat { get; set; } = string.Empty;
     public int DefaultCurrencyId { get; set; }

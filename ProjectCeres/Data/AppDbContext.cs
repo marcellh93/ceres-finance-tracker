@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Data;
@@ -33,7 +34,32 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         ConfigureRelationships(modelBuilder);
+        ConfigureUserOwnership(modelBuilder);
         SeedData(modelBuilder);
+    }
+
+    /// <summary>
+    /// Phase 3 multi-tenancy scaffolding. Every user-owned entity has a UserId column.
+    /// Pre-auth, all rows are stamped with <see cref="SingleUserAccessor.SentinelUserId"/>.
+    /// At auth time, an FK to AspNetUsers is added and the sentinel is migrated to a real
+    /// user id. Indexes on UserId are added now so multi-user query plans don't regress later.
+    /// </summary>
+    private static void ConfigureUserOwnership(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Account>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<Budget>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<CategoryBudget>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<RecurringTransaction>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<SavedReport>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<Transaction>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<Transfer>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<LiabilityPayment>().HasIndex(e => e.UserId);
+
+        // Category.UserId is nullable: NULL = system category shared across all users.
+        modelBuilder.Entity<Category>().HasIndex(e => e.UserId);
+
+        // Settings is one row per user. The unique constraint is what makes that true.
+        modelBuilder.Entity<Settings>().HasIndex(e => e.UserId).IsUnique();
     }
 
     // -------------------------------------------------------------------------
@@ -252,6 +278,7 @@ public class AppDbContext : DbContext
 
     private static void SeedAccounts(ModelBuilder modelBuilder)
     {
+        var owner = SingleUserAccessor.SentinelUserId;
         modelBuilder.Entity<Account>().HasData(
             new Account
             {
@@ -259,7 +286,8 @@ public class AppDbContext : DbContext
                 Name          = "Cash",
                 AccountTypeId = 1,
                 CurrencyId    = 1,
-                IsActive      = true
+                IsActive      = true,
+                UserId        = owner
             },
             new Account
             {
@@ -267,7 +295,8 @@ public class AppDbContext : DbContext
                 Name          = "Checking Account",
                 AccountTypeId = 1,
                 CurrencyId    = 1,
-                IsActive      = true
+                IsActive      = true,
+                UserId        = owner
             },
             new Account
             {
@@ -275,7 +304,8 @@ public class AppDbContext : DbContext
                 Name          = "Savings Account",
                 AccountTypeId = 1,
                 CurrencyId    = 1,
-                IsActive      = true
+                IsActive      = true,
+                UserId        = owner
             },
             new Account
             {
@@ -283,47 +313,52 @@ public class AppDbContext : DbContext
                 Name          = "Credit Card",
                 AccountTypeId = 2,
                 CurrencyId    = 1,
-                IsActive      = true
+                IsActive      = true,
+                UserId        = owner
             }
         );
     }
 
     private static void SeedCategories(ModelBuilder modelBuilder)
     {
+        // System categories have UserId = null (shared across all users).
+        // User-default categories are stamped with the pre-auth sentinel so they belong
+        // to the single bootstrap user; they will be remapped at auth time.
+        var owner = (Guid?)SingleUserAccessor.SentinelUserId;
         modelBuilder.Entity<Category>().HasData(
             // --- System ---
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000001"), Name = "Opening Balance",    CategoryTypeId = 1, IsActive = true, IsSystem = true,  LifestyleTag = null     },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000001"), Name = "Opening Balance",    CategoryTypeId = 1, IsActive = true, IsSystem = true,  LifestyleTag = null,    UserId = null  },
 
             // --- Income (CategoryTypeId = 1) ---
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000002"), Name = "Salary",             CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null     },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000003"), Name = "Freelance Income",   CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null     },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000004"), Name = "Rental Income",      CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null     },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000005"), Name = "Investment Income",  CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null     },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000006"), Name = "Business Income",    CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null     },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000007"), Name = "Other Income",       CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null     },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000002"), Name = "Salary",             CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000003"), Name = "Freelance Income",   CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000004"), Name = "Rental Income",      CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000005"), Name = "Investment Income",  CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000006"), Name = "Business Income",    CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000007"), Name = "Other Income",       CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
 
             // --- Expense (CategoryTypeId = 2) ---
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000008"), Name = "Housing / Rent",     CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000009"), Name = "Utilities",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000010"), Name = "Groceries",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000011"), Name = "Transport",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000012"), Name = "Fuel",               CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000013"), Name = "Healthcare",         CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000014"), Name = "Insurance",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000015"), Name = "Subscriptions",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000016"), Name = "Dining Out",         CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000017"), Name = "Entertainment",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000018"), Name = "Clothing",           CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000019"), Name = "Personal Care",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000020"), Name = "Education",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000021"), Name = "Travel",             CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000022"), Name = "Home & Garden",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000023"), Name = "Gifts & Donations",  CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants"  },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000024"), Name = "Other Expenses",         CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = null     },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000008"), Name = "Housing / Rent",     CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000009"), Name = "Utilities",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000010"), Name = "Groceries",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000011"), Name = "Transport",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000012"), Name = "Fuel",               CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000013"), Name = "Healthcare",         CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000014"), Name = "Insurance",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000015"), Name = "Subscriptions",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000016"), Name = "Dining Out",         CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000017"), Name = "Entertainment",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000018"), Name = "Clothing",           CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000019"), Name = "Personal Care",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000020"), Name = "Education",          CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000021"), Name = "Travel",             CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000022"), Name = "Home & Garden",      CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Needs", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000023"), Name = "Gifts & Donations",  CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = "Wants", UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000024"), Name = "Other Expenses",     CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = null,    UserId = owner },
 
             // --- Uncategorized fallbacks (IsSystem = false so they appear in reports and transaction lists) ---
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000025"), Name = "Uncategorized Income",  CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null },
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000026"), Name = "Uncategorized Expense", CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = null }
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000025"), Name = "Uncategorized Income",  CategoryTypeId = 1, IsActive = true, IsSystem = false, LifestyleTag = null, UserId = owner },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000026"), Name = "Uncategorized Expense", CategoryTypeId = 2, IsActive = true, IsSystem = false, LifestyleTag = null, UserId = owner }
         );
     }
 
@@ -333,6 +368,7 @@ public class AppDbContext : DbContext
             new Settings
             {
                 Id                = 1,
+                UserId            = SingleUserAccessor.SentinelUserId,
                 NumberFormat      = "comma_decimal",
                 DateFormat        = "DD/MM/YYYY",
                 DefaultCurrencyId = 1

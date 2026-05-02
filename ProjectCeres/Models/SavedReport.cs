@@ -1,6 +1,8 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
-public class SavedReport
+public class SavedReport : IUserOwned
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -12,6 +14,7 @@ public class SavedReport
     public int? CurrencyId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? DeletedAt { get; set; }
+    public Guid UserId { get; set; }
 
     public ReportType ReportType { get; set; } = null!;
     public Category? Category { get; set; }
