@@ -447,15 +447,15 @@ A template for a predictable financial event that repeats on a regular schedule 
 |--------|------|-------------|-------|
 | Id | uuid | PK | |
 | Name | varchar | NOT NULL | User-given label, e.g. "Monthly Rent", "Salary" |
-| EstimatedAmount | decimal(18,2) | NOT NULL | Default amount pre-filled in the confirmation form — the user can adjust before confirming |
+| EstimatedAmount | decimal(18,2) | nullable | Optional estimated amount pre-filled in the confirmation form. `null` means the amount varies per occurrence. `0` is a valid stored amount. |
 | AccountId | uuid | FK, NOT NULL | → Account |
 | CategoryId | uuid | FK, NOT NULL | → Category |
 | Frequency | varchar | NOT NULL | "monthly", "weekly", "biweekly", "annual" |
-| DayOfPeriod | int | nullable | Day within the frequency period when the reminder fires. Monthly: day of month (e.g. 1 = 1st). Weekly: day of week (1 = Monday). Null for annual entries where NextDueDate is managed directly. |
+| DayOfPeriod | int | nullable | Day within the frequency period for Snap-to-calendar-day reminders. Monthly: day of month (1–31). Weekly/Biweekly: day of week (1=Monday … 7=Sunday, ISO 8601). For Annual and non-Snap reminders, DayOfPeriod must be null. |
 | NextDueDate | date | NOT NULL | Date on which the next reminder appears. Advances to the next period automatically after the user confirms. |
 | IsActive | bit | NOT NULL | False = paused, hidden from the dashboard pending list |
 
-**How confirmation works:** when `NextDueDate` is reached (or within a configurable look-ahead window, e.g. 3 days before), the dashboard shows a pending reminder count. The user opens the reminder to see a pre-filled transaction form using the template values. They adjust any field if needed — the actual amount or date may differ from the estimate — then confirm to write a real `Transaction` record. On confirmation, `NextDueDate` advances to the next period. Dismissing a reminder does not create a transaction and does not advance the schedule.
+**How confirmation works:** when `NextDueDate` is reached (or within a configurable look-ahead window, e.g. 3 days before), the dashboard shows a pending reminder count. The user opens the reminder to see a pre-filled transaction form using the template values. They adjust any field if needed — the actual amount or date may differ from the estimate — then confirm to write a real `Transaction` record. On confirmation, `NextDueDate` advances to the next period. Dismissing a reminder does not create a transaction but does advance `NextDueDate` per the `ReminderBehaviour`.
 
 **Why not auto-create:** amounts vary (utility bills, freelance income), payment dates shift (holidays, bank processing delays), and some periods may be skipped or cancelled. Auto-creation silently produces wrong data in the ledger. The reminder model keeps the user in control while eliminating the need to remember when entries are due.
 
