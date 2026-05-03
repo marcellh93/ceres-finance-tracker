@@ -181,7 +181,7 @@ export function RecurringForm({
           <Label htmlFor="rt-dow">Day of week *</Label>
           <Select
             value={values.dayOfPeriod?.toString() ?? ''}
-            onValueChange={(v) => set({ dayOfPeriod: Number(v) })}
+            onValueChange={(v) => set({ dayOfPeriod: parseInt(v, 10) })}
           >
             <SelectTrigger id="rt-dow">
               <SelectValue placeholder="Pick a day" />

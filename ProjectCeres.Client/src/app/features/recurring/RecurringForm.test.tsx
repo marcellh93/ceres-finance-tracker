@@ -24,8 +24,7 @@ const accounts: AccountListItemDto[] = [
   },
 ];
 
-// CategoryListItemDto stub — shape verified by Step 1 grep
-const categories = [{ id: 'c1', name: 'Housing' }] as any[];
+const categories = [{ id: 'c1', name: 'Housing' }];
 
 const defaults = {
   name: '',
@@ -39,7 +38,7 @@ const defaults = {
 };
 
 describe('RecurringForm', () => {
-  const noop = vi.fn();
+  const noop = () => {};
 
   it('renders Name, EstimatedAmount, NextDueDate fields', () => {
     render(
@@ -116,6 +115,16 @@ describe('RecurringForm', () => {
         categories={categories}
       />,
     );
+    expect(screen.queryByLabelText(/day of (week|month)/i)).not.toBeInTheDocument();
+  });
+
+  it('shows Day of week picker for Snap + Biweekly', () => {
+    render(<RecurringForm values={{ ...defaults, frequency: 'Biweekly', reminderBehaviour: 'SnapToCalendarDay' }} onChange={noop} accounts={accounts} categories={categories} />);
+    expect(screen.getByLabelText(/day of week \*/i)).toBeInTheDocument();
+  });
+
+  it('hides day picker for RelativeToLastConfirmation regardless of frequency', () => {
+    render(<RecurringForm values={{ ...defaults, frequency: 'Monthly', reminderBehaviour: 'RelativeToLastConfirmation' }} onChange={noop} accounts={accounts} categories={categories} />);
     expect(screen.queryByLabelText(/day of (week|month)/i)).not.toBeInTheDocument();
   });
 
