@@ -101,7 +101,7 @@ export function RecurringConfirmDialog({ open, reminder, onChanged, onOpenChange
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm} disabled={submitting || !amount}>
+          <AlertDialogAction onClick={handleConfirm} disabled={submitting || !amount || (isManual && !nextDueDate)}>
             {submitting ? 'Confirming…' : 'Confirm — record'}
           </AlertDialogAction>
         </AlertDialogFooter>

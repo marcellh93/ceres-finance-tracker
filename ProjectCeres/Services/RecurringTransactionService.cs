@@ -38,7 +38,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
             .Owned(user)
             .Include(r => r.Account)
             .Include(r => r.Category)
-            .Where(r => r.IsActive && r.NextDueDate >= today && r.NextDueDate <= cutoff)
+            .Where(r => r.IsActive && r.NextDueDate <= cutoff)
             .OrderBy(r => r.NextDueDate)
             .ToListAsync();
     }

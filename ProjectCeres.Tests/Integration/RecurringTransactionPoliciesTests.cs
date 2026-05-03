@@ -76,18 +76,26 @@ public class RecurringTransactionPoliciesTests
     }
 
     [Fact]
-    public void ValidateSchedule_SnapBiweekly_WithDay10_Succeeds()
+    public void ValidateSchedule_SnapBiweekly_WithDay1_Succeeds()
     {
         var result = RecurringTransactionPolicies.ValidateSchedule(
-            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 10);
+            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 1);
         result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
-    public void ValidateSchedule_SnapBiweekly_WithDay15_Fails()
+    public void ValidateSchedule_SnapBiweekly_WithDay7_Succeeds()
     {
         var result = RecurringTransactionPolicies.ValidateSchedule(
-            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 15);
+            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 7);
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateSchedule_SnapBiweekly_WithDay8_Fails()
+    {
+        var result = RecurringTransactionPolicies.ValidateSchedule(
+            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 8);
         result.IsSuccess.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(RecurringTransactionPolicies.InvalidDayOfPeriodCode);
     }

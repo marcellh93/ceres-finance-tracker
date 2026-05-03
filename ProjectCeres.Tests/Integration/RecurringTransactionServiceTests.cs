@@ -228,6 +228,19 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
         results.Should().NotContain(r => r.Id == dueLater.Id);
     }
 
+    [Fact]
+    public async Task GetUpcomingAsync_IncludesOverdueReminders()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        // Overdue (due 5 days ago) — must be included even with withinDays=0
+        var overdue = await CreateReminderAsync(name: "Overdue Reminder", nextDueDate: today.AddDays(-5));
+
+        var results = (await _service.GetUpcomingAsync(withinDays: 0)).ToList();
+
+        results.Should().Contain(r => r.Id == overdue.Id);
+    }
+
     // -------------------------------------------------------------------------
     // TryReactivateAsync
     // -------------------------------------------------------------------------

@@ -24,9 +24,8 @@ public static class RecurringTransactionPolicies
         {
             var max = frequency switch
             {
-                Frequency.Monthly   => 31,
-                Frequency.Biweekly  => 14,
-                _                   => 7,   // Weekly
+                Frequency.Monthly => 31,
+                _                 => 7,   // Weekly + Biweekly: ISO 8601 day-of-week 1–7
             };
             if (dayOfPeriod < 1 || dayOfPeriod > max)
                 return Result.Fail(InvalidDayOfPeriodCode,

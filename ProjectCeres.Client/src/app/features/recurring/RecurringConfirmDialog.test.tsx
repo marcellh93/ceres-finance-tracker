@@ -47,6 +47,12 @@ describe('RecurringConfirmDialog', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
+  it('disables Confirm button when ManualDate and no next-due-date provided', () => {
+    render(<RecurringConfirmDialog open reminder={makeReminder({ reminderBehaviour: 'ManualDate' })} onChanged={vi.fn()} onOpenChange={vi.fn()} />);
+    const btn = screen.getByRole('button', { name: /confirm — record/i });
+    expect(btn).toBeDisabled();
+  });
+
   it('shows inline error on 422 DATE_BEFORE_OPENING_BALANCE', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       status: 422, ok: false,
