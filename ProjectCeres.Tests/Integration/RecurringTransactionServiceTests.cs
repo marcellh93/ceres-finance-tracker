@@ -616,4 +616,42 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
         results.Should().Contain(r => r.Id == dueSoon.Id);
         results.Should().NotContain(r => r.Id == dueLater.Id);
     }
+
+    // -------------------------------------------------------------------------
+    // TryReactivateAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task TryReactivateAsync_returns_ok_for_archived_reminder()
+    {
+        var reminder = await CreateReminderAsync();
+        await _service.DeactivateAsync(reminder.Id);
+
+        var result = await _service.TryReactivateAsync(reminder.Id);
+
+        result.IsSuccess.Should().BeTrue();
+        var reloaded = await _fixture.Db.RecurringTransactions.FindAsync(reminder.Id);
+        reloaded!.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TryReactivateAsync_is_idempotent_for_active_reminder()
+    {
+        var reminder = await CreateReminderAsync();
+
+        var result = await _service.TryReactivateAsync(reminder.Id);
+
+        result.IsSuccess.Should().BeTrue();
+        var reloaded = await _fixture.Db.RecurringTransactions.FindAsync(reminder.Id);
+        reloaded!.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TryReactivateAsync_returns_fail_for_unknown_id()
+    {
+        var result = await _service.TryReactivateAsync(Guid.NewGuid());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Value.Code.Should().Be("NOT_FOUND");
+    }
 }

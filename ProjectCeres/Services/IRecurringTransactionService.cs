@@ -25,4 +25,5 @@ public interface IRecurringTransactionService
     Task<Result> TryDeactivateAsync(Guid id);
     Task<Result<Transaction>> TryConfirmAsync(Guid id, ConfirmRecurringTransactionRequest request);
     Task<Result> TryDismissAsync(Guid id);
+    Task<Result> TryReactivateAsync(Guid id);
 }

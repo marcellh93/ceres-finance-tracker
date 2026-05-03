@@ -370,4 +370,79 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         var responseBody = await patch.Content.ReadAsStringAsync();
         responseBody.Should().Contain("INVALID_DAY_OF_PERIOD");
     }
+
+    private async Task<Guid> CreateAndArchiveReminder()
+    {
+        var id = await CreateOne();
+        var archiveRes = await _client.PatchAsync($"/api/recurring-transactions/{id}/archive", null);
+        archiveRes.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        return id;
+    }
+
+    private async Task<Guid> CreateReminderAsOtherUser()
+    {
+        var id = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.RecurringTransactions.Add(new RecurringTransaction
+        {
+            Id              = id,
+            UserId          = otherUserId,
+            Name            = "other-user-recurring",
+            EstimatedAmount = 1m,
+            AccountId       = CheckingAccountId,
+            CategoryId      = SalaryCategoryId,
+            Frequency       = Frequency.Monthly,
+            NextDueDate     = new DateOnly(2026, 6, 1),
+            IsActive        = true,
+        });
+        await db.SaveChangesAsync();
+        return id;
+    }
+
+    [Fact]
+    public async Task Reactivate_returns_204_for_archived_reminder()
+    {
+        var id = await CreateAndArchiveReminder();
+        var res = await _client.PatchAsync($"/api/recurring-transactions/{id}/reactivate", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var getRes = await _client.GetAsync($"/api/recurring-transactions/{id}");
+        getRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await getRes.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("isActive").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reactivate_returns_204_for_already_active_reminder()
+    {
+        var id = await CreateOne();
+        var res = await _client.PatchAsync($"/api/recurring-transactions/{id}/reactivate", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Reactivate_returns_404_for_unknown_id()
+    {
+        var res = await _client.PatchAsync($"/api/recurring-transactions/{Guid.NewGuid()}/reactivate", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Reactivate_returns_404_for_intruder_row()
+    {
+        var intruderId = await CreateReminderAsOtherUser();
+        try
+        {
+            var res = await _client.PatchAsync($"/api/recurring-transactions/{intruderId}/reactivate", null);
+            res.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.RecurringTransactions.Where(r => r.Id == intruderId).ExecuteDeleteAsync();
+        }
+    }
 }

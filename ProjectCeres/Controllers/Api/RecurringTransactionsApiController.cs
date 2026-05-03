@@ -81,6 +81,13 @@ public class RecurringTransactionsApiController(
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
+    [HttpPatch("{id:guid}/reactivate")]
+    public async Task<IActionResult> Reactivate(Guid id)
+    {
+        var result = await reminderService.TryReactivateAsync(id);
+        return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
+    }
+
     [HttpPost("{id:guid}/confirm")]
     public async Task<IActionResult> Confirm(Guid id, [FromBody] ConfirmRecurringTransactionRequest request)
     {

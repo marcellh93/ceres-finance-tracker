@@ -341,4 +341,14 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         await db.SaveChangesAsync();
         return Result.Ok();
     }
+
+    public async Task<Result> TryReactivateAsync(Guid id)
+    {
+        var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id);
+        if (reminder is null) return Result.Fail("NOT_FOUND", "Recurring transaction not found.");
+        if (reminder.IsActive) return Result.Ok();
+        reminder.IsActive = true;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
 }
