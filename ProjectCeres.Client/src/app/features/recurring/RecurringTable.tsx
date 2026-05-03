@@ -1,4 +1,12 @@
 import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { classifyStatus, type RecurringTransactionListItemDto } from './reminder-status';
 import { RecurringRowMenu } from './RecurringRowMenu';
 
@@ -22,24 +30,24 @@ type Props = {
 
 export function RecurringTable({ rows, today, onChanged }: Props) {
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b text-muted-foreground text-xs uppercase tracking-wide">
-          <th className="py-2 text-left font-medium">Name</th>
-          <th className="w-32 py-2 text-left font-medium">Account</th>
-          <th className="w-32 py-2 text-left font-medium">Category</th>
-          <th className="w-24 py-2 text-left font-medium">Frequency</th>
-          <th className="w-24 py-2 text-right font-medium tabular-nums">Est. amount</th>
-          <th className="w-32 py-2 text-left font-medium">Next due</th>
-          <th className="w-12 py-2" />
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Name</TableHead>
+          <TableHead className="w-32">Account</TableHead>
+          <TableHead className="w-32">Category</TableHead>
+          <TableHead className="w-24">Frequency</TableHead>
+          <TableHead className="w-28 text-right">Est. amount</TableHead>
+          <TableHead className="w-32">Next due</TableHead>
+          <TableHead className="w-12" />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
           <RecurringRow key={row.id} row={row} today={today} onChanged={onChanged} />
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -50,11 +58,8 @@ function RecurringRow({
   const archived = !row.isActive;
 
   return (
-    <tr
-      aria-label={row.name}
-      className={`border-b last:border-0 ${archived ? 'opacity-60' : ''}`}
-    >
-      <td className="py-2 pr-4">
+    <TableRow className={archived ? 'opacity-60' : undefined} aria-label={row.name}>
+      <TableCell className="text-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <span>{row.name}</span>
           {statuses.map((s) => (
@@ -63,19 +68,19 @@ function RecurringRow({
             </Badge>
           ))}
         </div>
-      </td>
-      <td className="w-32 py-2 pr-4 truncate">{row.accountName}</td>
-      <td className="w-32 py-2 pr-4 truncate" title={row.categoryName}>{row.categoryName}</td>
-      <td className="w-24 py-2 pr-4">{FREQUENCY_LABELS[row.frequency] ?? row.frequency}</td>
-      <td className="w-24 py-2 pr-4 text-right tabular-nums">
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground">{row.accountName}</TableCell>
+      <TableCell className="text-sm text-muted-foreground" title={row.categoryName}>{row.categoryName}</TableCell>
+      <TableCell className="text-sm">{FREQUENCY_LABELS[row.frequency] ?? row.frequency}</TableCell>
+      <TableCell className="text-right tabular-nums text-sm">
         {row.estimatedAmount == null
           ? '—'
           : `${row.currencySymbol}${row.estimatedAmount.toLocaleString()}`}
-      </td>
-      <td className="w-32 py-2 pr-4">{row.nextDueDate}</td>
-      <td className="w-12 py-2 text-center">
+      </TableCell>
+      <TableCell className="text-sm">{row.nextDueDate}</TableCell>
+      <TableCell>
         <RecurringRowMenu reminder={row} onChanged={onChanged} />
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }

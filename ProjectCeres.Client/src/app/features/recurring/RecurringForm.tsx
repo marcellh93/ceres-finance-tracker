@@ -1,13 +1,15 @@
+import { useState } from 'react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import type { AccountListItemDto } from '../accounts/accounts-api';
+import { Button } from '@/components/ui/button';
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { DatePickerField } from '../../../components/DatePickerField';
+import { AccountCombobox } from '../../components/AccountCombobox';
+import { CategoryCombobox } from '../../components/CategoryCombobox';
+import type { AccountOptionDto, CategoryOptionDto } from '../movements/movements-api';
 
 export type RecurringFormValues = {
   name: string;
@@ -23,17 +25,14 @@ export type RecurringFormValues = {
 type Props = {
   values: RecurringFormValues;
   onChange: (updated: RecurringFormValues) => void;
-  accounts: AccountListItemDto[];
-  categories: Array<{ id: string; name: string }>;
+  accounts: AccountOptionDto[];
+  categories: CategoryOptionDto[];
 };
 
 const FREQUENCIES = ['Weekly', 'Biweekly', 'Monthly', 'Annual'];
 const BEHAVIOURS = [
   { value: 'SnapToCalendarDay', label: 'Snap to calendar day' },
-  {
-    value: 'RelativeToLastConfirmation',
-    label: 'Relative to last confirmation',
-  },
+  { value: 'RelativeToLastConfirmation', label: 'Relative to last confirmation' },
   { value: 'ManualDate', label: 'Manual date' },
 ];
 const WEEKDAYS = [
@@ -57,6 +56,87 @@ function showDayOfMonth(frequency: string, behaviour: string) {
   return behaviour === 'SnapToCalendarDay' && frequency === 'Monthly';
 }
 
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {htmlFor ? (
+        <Label htmlFor={htmlFor} className="text-sm font-medium tracking-wide text-foreground/80">
+          {label}
+        </Label>
+      ) : (
+        <div className="text-sm font-medium tracking-wide text-foreground/80 select-none">
+          {label}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function InlineCombobox({
+  items,
+  value,
+  onSelect,
+  placeholder,
+}: {
+  items: { value: string; label: string }[];
+  value: string;
+  onSelect: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = items.find((i) => i.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between"
+          >
+            {selected ? selected.label : <span className="text-muted-foreground">{placeholder ?? 'Select…'}</span>}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        }
+      />
+      <PopoverContent className="p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandEmpty>No options found.</CommandEmpty>
+            <CommandGroup>
+              {items.map((item) => (
+                <CommandItem
+                  key={item.value}
+                  value={item.value}
+                  onSelect={() => {
+                    onSelect(item.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn('mr-2 h-4 w-4', value === item.value ? 'opacity-100' : 'opacity-0')} />
+                  {item.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function RecurringForm({
   values,
   onChange,
@@ -74,57 +154,38 @@ export function RecurringForm({
     onChange(next);
   }
 
+  const frequencyItems = FREQUENCIES.map((f) => ({ value: f, label: f }));
+  const weekdayItems = WEEKDAYS.map((d) => ({ value: String(d.value), label: d.label }));
+
   return (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-name">Name *</Label>
+    <div className="space-y-5">
+      <Field label="Name *" htmlFor="rt-name">
         <Input
           id="rt-name"
           value={values.name}
           onChange={(e) => set({ name: e.target.value })}
         />
-      </div>
+      </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-account">Account *</Label>
-        <Select
-          value={values.accountId}
-          onValueChange={(v) => set({ accountId: v ?? '' })}
-        >
-          <SelectTrigger id="rt-account">
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Field label="Account *">
+        <AccountCombobox
+          accounts={accounts}
+          value={values.accountId || null}
+          onChange={(id) => set({ accountId: id })}
+          placeholder="Select account"
+        />
+      </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-category">Category *</Label>
-        <Select
-          value={values.categoryId}
-          onValueChange={(v) => set({ categoryId: v ?? '' })}
-        >
-          <SelectTrigger id="rt-category">
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Field label="Category *">
+        <CategoryCombobox
+          categories={categories}
+          value={values.categoryId || null}
+          onChange={(id) => set({ categoryId: id })}
+          placeholder="Select category"
+        />
+      </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-amount">Estimated amount</Label>
+      <Field label="Estimated amount" htmlFor="rt-amount">
         <Input
           id="rt-amount"
           type="number"
@@ -136,70 +197,37 @@ export function RecurringForm({
         <p className="text-xs text-muted-foreground">
           Leave blank if the amount varies each time.
         </p>
-      </div>
+      </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-frequency">Frequency *</Label>
-        <Select
+      <Field label="Frequency *">
+        <InlineCombobox
+          items={frequencyItems}
           value={values.frequency}
-          onValueChange={(v) => set({ frequency: v ?? '' })}
-        >
-          <SelectTrigger id="rt-frequency">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {FREQUENCIES.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          onSelect={(v) => set({ frequency: v })}
+        />
+      </Field>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-behaviour">Reminder behaviour *</Label>
-        <Select
+      <Field label="Reminder behaviour *">
+        <InlineCombobox
+          items={BEHAVIOURS}
           value={values.reminderBehaviour}
-          onValueChange={(v) => set({ reminderBehaviour: v ?? '' })}
-        >
-          <SelectTrigger id="rt-behaviour">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {BEHAVIOURS.map((b) => (
-              <SelectItem key={b.value} value={b.value}>
-                {b.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          onSelect={(v) => set({ reminderBehaviour: v })}
+        />
+      </Field>
 
       {showDayOfWeek(values.frequency, values.reminderBehaviour) && (
-        <div className="space-y-1.5">
-          <Label htmlFor="rt-dow">Day of week *</Label>
-          <Select
-            value={values.dayOfPeriod?.toString() ?? ''}
-            onValueChange={(v) => set({ dayOfPeriod: parseInt(v ?? '', 10) })}
-          >
-            <SelectTrigger id="rt-dow">
-              <SelectValue placeholder="Pick a day" />
-            </SelectTrigger>
-            <SelectContent>
-              {WEEKDAYS.map((d) => (
-                <SelectItem key={d.value} value={d.value.toString()}>
-                  {d.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Field label="Day of week *">
+          <InlineCombobox
+            items={weekdayItems}
+            value={values.dayOfPeriod != null ? String(values.dayOfPeriod) : ''}
+            onSelect={(v) => set({ dayOfPeriod: parseInt(v, 10) })}
+            placeholder="Pick a day"
+          />
+        </Field>
       )}
 
       {showDayOfMonth(values.frequency, values.reminderBehaviour) && (
-        <div className="space-y-1.5">
-          <Label htmlFor="rt-dom">Day of month *</Label>
+        <Field label="Day of month *" htmlFor="rt-dom">
           <Input
             id="rt-dom"
             type="number"
@@ -213,18 +241,17 @@ export function RecurringForm({
           <p className="text-xs text-muted-foreground">
             1–31. Snaps to the last day if the month is shorter.
           </p>
-        </div>
+        </Field>
       )}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="rt-nextdue">Next due date *</Label>
-        <Input
+      <Field label="Next due date *" htmlFor="rt-nextdue">
+        <DatePickerField
           id="rt-nextdue"
-          type="date"
-          value={values.nextDueDate}
-          onChange={(e) => set({ nextDueDate: e.target.value })}
+          value={values.nextDueDate || null}
+          onChange={(v) => set({ nextDueDate: v ?? '' })}
+          hideClear
         />
-      </div>
+      </Field>
     </div>
   );
 }

@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
-import { ACCOUNTS_URL, type AccountListItemDto } from '../accounts/accounts-api';
+import { ACCOUNTS_ACTIVE_URL, CATEGORIES_ACTIVE_URL, type AccountOptionDto, type CategoryOptionDto } from '../movements/movements-api';
 import { RecurringForm, type RecurringFormValues } from './RecurringForm';
 import { RECURRING_URL } from './recurring-api';
 
@@ -23,8 +22,11 @@ const DEFAULTS: RecurringFormValues = {
 
 export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
   const navigate = useNavigate();
-  const accounts = useApi<AccountListItemDto[]>(ACCOUNTS_URL);
-  const categories = useApi<Array<{ id: string; name: string }>>('/api/categories');
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { headingRef.current?.focus(); }, []);
+
+  const accounts = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
+  const categories = useApi<CategoryOptionDto[]>(CATEGORIES_ACTIVE_URL);
   const [values, setValues] = useState<RecurringFormValues>(() => ({
     ...DEFAULTS,
     nextDueDate: todayIso(),
@@ -68,36 +70,44 @@ export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader><CardTitle>New reminder</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-semibold">New reminder</h1>
+        </div>
+        <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader><CardTitle>New reminder</CardTitle></CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <RecurringForm
-            values={values}
-            onChange={setValues}
-            accounts={accounts.data ?? []}
-            categories={categories.data ?? []}
-          />
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => navigate('/recurring')}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="space-y-1">
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
+          New reminder
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Set up a template that you can confirm into a real transaction on each due date.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <RecurringForm
+          values={values}
+          onChange={setValues}
+          accounts={accounts.data ?? []}
+          categories={categories.data ?? []}
+        />
+        <div className="flex items-center gap-2 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={() => navigate('/recurring')}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }

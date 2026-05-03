@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
-import { ACCOUNTS_URL, type AccountListItemDto } from '../accounts/accounts-api';
+import { ACCOUNTS_ACTIVE_URL, CATEGORIES_ACTIVE_URL, type AccountOptionDto, type CategoryOptionDto } from '../movements/movements-api';
 import { RecurringForm, type RecurringFormValues } from './RecurringForm';
 import { RECURRING_BY_ID_URL, type RecurringTransactionDetailDto } from './recurring-api';
 import type { RecurringPageCtx } from './RecurringCreate';
@@ -13,9 +12,11 @@ import type { RecurringPageCtx } from './RecurringCreate';
 export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
   const detail = useApi<RecurringTransactionDetailDto>(RECURRING_BY_ID_URL(id!));
-  const accounts = useApi<AccountListItemDto[]>(ACCOUNTS_URL);
-  const categories = useApi<Array<{ id: string; name: string }>>('/api/categories');
+  const accounts = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
+  const categories = useApi<CategoryOptionDto[]>(CATEGORIES_ACTIVE_URL);
   const [values, setValues] = useState<RecurringFormValues | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -36,6 +37,10 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
     }
     if (detail.error) setNotFound(true);
   }, [detail.data, detail.error]);
+
+  useEffect(() => {
+    if (values) headingRef.current?.focus();
+  }, [values]);
 
   const loading = detail.loading || accounts.loading || categories.loading;
 
@@ -75,47 +80,50 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
 
   if (notFound) {
     return (
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <p>That reminder doesn&apos;t exist.</p>
-          <Button variant="outline" onClick={() => navigate('/recurring')}>← Back to Recurring</Button>
-        </CardContent>
-      </Card>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <p className="text-sm text-muted-foreground">That reminder doesn&apos;t exist.</p>
+        <Button variant="outline" onClick={() => navigate('/recurring')}>← Back to Recurring</Button>
+      </div>
     );
   }
 
   if (loading || !values) {
     return (
-      <Card>
-        <CardHeader><CardTitle>Edit reminder</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-semibold">Edit reminder</h1>
+        </div>
+        <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader><CardTitle>Edit reminder</CardTitle></CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <RecurringForm
-            values={values}
-            onChange={setValues}
-            accounts={accounts.data ?? []}
-            categories={categories.data ?? []}
-          />
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save'}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => navigate('/recurring')}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="space-y-1">
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
+          Edit reminder
+        </h1>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <RecurringForm
+          values={values}
+          onChange={setValues}
+          accounts={accounts.data ?? []}
+          categories={categories.data ?? []}
+        />
+        <div className="flex items-center gap-2 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={() => navigate('/recurring')}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
