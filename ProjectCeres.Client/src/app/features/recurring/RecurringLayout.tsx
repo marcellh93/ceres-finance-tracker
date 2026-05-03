@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { CardError } from '../../components/CardError';
-import { useApi } from '../../lib/use-api';
+import { useApi, type UseApiResult } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
 import { RecurringTable } from './RecurringTable';
 import { buildListUrl, type RecurringTransactionListItemDto } from './recurring-api';
@@ -47,7 +47,8 @@ export function RecurringLayout() {
   const allList = useApi<RecurringTransactionListItemDto[]>('/api/recurring-transactions?includeInactive=true');
 
   const refreshBell = () => {}; // replaced by ReminderCountProvider in Task 18
-  const ctx: RecurringLayoutCtx = { refetch: list.refetch, refreshBell };
+  const refetch = () => { list.refetch(); allList.refetch(); };
+  const ctx: RecurringLayoutCtx = { refetch, refreshBell };
 
   if (childActive) {
     return (
@@ -100,7 +101,7 @@ export function RecurringLayout() {
             allList={allList}
             query={debouncedSearch}
             onClearSearch={() => setSearchInput('')}
-            onChanged={list.refetch}
+            onChanged={refetch}
           />
         </CardContent>
       </Card>
@@ -109,8 +110,8 @@ export function RecurringLayout() {
 }
 
 type BodyProps = {
-  list: ReturnType<typeof useApi<RecurringTransactionListItemDto[]>>;
-  allList: ReturnType<typeof useApi<RecurringTransactionListItemDto[]>>;
+  list: UseApiResult<RecurringTransactionListItemDto[]>;
+  allList: UseApiResult<RecurringTransactionListItemDto[]>;
   query: string;
   onClearSearch: () => void;
   onChanged: () => void;
@@ -164,7 +165,7 @@ function RecurringBody({ list, allList, query, onClearSearch, onChanged }: BodyP
   if (sorted.length === 0 && query) {
     return (
       <div className="px-3 py-8 text-center text-sm text-muted-foreground italic space-y-3">
-        <p>No reminders match &apos;{query}&apos;.</p>
+        <p>No reminders match '{query}'.</p>
         <Button type="button" variant="link" onClick={onClearSearch}>Clear search</Button>
       </div>
     );
