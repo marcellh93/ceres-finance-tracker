@@ -9,10 +9,10 @@ public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReport
 {
     public async Task<IReadOnlyList<NetWorthEntry>> GetNetWorthAsync()
     {
-        // Load all active accounts with their currency and transactions (including category type).
+        // Load all accounts (including archived) — deactivated accounts still count
+        // toward net worth per models.md lines 276–281.
         var accounts = await db.Accounts
             .Owned(user)
-            .Where(a => a.IsActive)
             .Include(a => a.Currency)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
