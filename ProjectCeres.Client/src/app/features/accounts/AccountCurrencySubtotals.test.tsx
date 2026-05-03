@@ -54,4 +54,17 @@ describe('AccountCurrencySubtotals', () => {
     render(<AccountCurrencySubtotals rows={rows} />);
     expect(screen.getByText(/\$700/)).toBeInTheDocument();
   });
+
+  it('excludes accounts flagged ExcludeFromReports from the math', () => {
+    const rows = [
+      row({ id: 'a', balance: 4102.85, accountTypeName: 'Asset',     currencyCode: 'EUR', currencySymbol: '€' }),
+      row({ id: 'b', balance: 154.95,  accountTypeName: 'Liability', currencyCode: 'EUR', currencySymbol: '€' }),
+      row({ id: 'c', balance: 5000,    accountTypeName: 'Liability', currencyCode: 'EUR', currencySymbol: '€', isActive: false, excludeFromReports: true }),
+      row({ id: 'd', balance: 200,     accountTypeName: 'Asset',     currencyCode: 'USD', currencySymbol: '$' }),
+    ];
+    render(<AccountCurrencySubtotals rows={rows} />);
+    // EUR net should be 4102.85 - 154.95 = 3947.90 (Test Loan excluded), not -1052.10.
+    expect(screen.getByText(/€3,947\.90/)).toBeInTheDocument();
+    expect(screen.queryByText(/-€1,052/)).toBeNull();
+  });
 });

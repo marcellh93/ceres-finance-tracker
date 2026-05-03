@@ -37,6 +37,9 @@ export function AccountCurrencySubtotals({ rows }: Props) {
 function computeNetPerCurrency(rows: AccountListItemDto[]): CurrencyTotal[] {
   const map = new Map<string, CurrencyTotal>();
   for (const r of rows) {
+    // Mirror the server-side report rule: archived accounts opted out of
+    // reports via excludeFromReports don't contribute to the strip either.
+    if (r.excludeFromReports) continue;
     const cur = map.get(r.currencyCode) ?? { code: r.currencyCode, symbol: r.currencySymbol, net: 0 };
     const sign = r.accountTypeName === 'Liability' ? -1 : 1;
     cur.net += sign * r.balance;
