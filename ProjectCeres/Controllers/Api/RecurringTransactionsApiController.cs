@@ -97,9 +97,9 @@ public class RecurringTransactionsApiController(
     }
 
     [HttpPost("{id:guid}/dismiss")]
-    public async Task<IActionResult> Dismiss(Guid id)
+    public async Task<IActionResult> Dismiss(Guid id, [FromBody] DismissRecurringTransactionRequest? body)
     {
-        var result = await reminderService.TryDismissAsync(id);
+        var result = await reminderService.TryDismissAsync(id, body?.NextDueDate);
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 

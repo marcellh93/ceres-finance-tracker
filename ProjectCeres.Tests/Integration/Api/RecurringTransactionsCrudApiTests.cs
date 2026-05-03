@@ -448,4 +448,65 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
             await db.RecurringTransactions.Where(r => r.Id == intruderId).ExecuteDeleteAsync();
         }
     }
+
+    private async Task<Guid> CreateManualDateReminder(DateOnly nextDueDate)
+    {
+        var res = await _client.PostAsJsonAsync("/api/recurring-transactions", new
+        {
+            name              = $"ManualDate-{Guid.NewGuid():N}",
+            estimatedAmount   = (decimal?)null,
+            accountId         = CheckingAccountId,
+            categoryId        = SalaryCategoryId,
+            frequency         = "Monthly",
+            dayOfPeriod       = (int?)null,
+            nextDueDate       = nextDueDate.ToString("yyyy-MM-dd"),
+            reminderBehaviour = "ManualDate"
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        _createdIds.Add(id);
+        return id;
+    }
+
+    private async Task<Guid> CreateSnapMonthlyReminder(DateOnly nextDueDate, int dayOfPeriod)
+    {
+        var res = await _client.PostAsJsonAsync("/api/recurring-transactions", new
+        {
+            name              = $"SnapMonthly-{Guid.NewGuid():N}",
+            estimatedAmount   = (decimal?)null,
+            accountId         = CheckingAccountId,
+            categoryId        = SalaryCategoryId,
+            frequency         = "Monthly",
+            dayOfPeriod       = dayOfPeriod,
+            nextDueDate       = nextDueDate.ToString("yyyy-MM-dd"),
+            reminderBehaviour = "SnapToCalendarDay"
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        _createdIds.Add(id);
+        return id;
+    }
+
+    [Fact]
+    public async Task Dismiss_ManualDate_with_next_due_date_advances_schedule()
+    {
+        var id = await CreateManualDateReminder(nextDueDate: new DateOnly(2026, 5, 3));
+        var body = new { nextDueDate = "2026-06-01" };
+        var res = await _client.PostAsJsonAsync($"/api/recurring-transactions/{id}/dismiss", body);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var get = await _client.GetFromJsonAsync<JsonElement>($"/api/recurring-transactions/{id}");
+        get.GetProperty("nextDueDate").GetString().Should().Be("2026-06-01");
+    }
+
+    [Fact]
+    public async Task Dismiss_SnapMonthly_without_body_advances_schedule()
+    {
+        var id = await CreateSnapMonthlyReminder(nextDueDate: new DateOnly(2026, 5, 15), dayOfPeriod: 15);
+        var res = await _client.PostAsync($"/api/recurring-transactions/{id}/dismiss", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var get = await _client.GetFromJsonAsync<JsonElement>($"/api/recurring-transactions/{id}");
+        get.GetProperty("nextDueDate").GetString().Should().Be("2026-06-15");
+    }
 }

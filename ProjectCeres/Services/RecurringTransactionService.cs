@@ -105,12 +105,12 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         return transaction;
     }
 
-    public async Task DismissAsync(Guid id)
+    public async Task DismissAsync(Guid id, DateOnly? nextDueDate = null)
     {
         var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new InvalidOperationException($"Recurring transaction {id} not found.");
 
-        reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: null);
+        reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: nextDueDate);
         await db.SaveChangesAsync();
     }
 
@@ -163,16 +163,11 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         var day  = reminder.DayOfPeriod!.Value;
         var from = confirmDate ?? reminder.NextDueDate;
 
-        // Try the target day in the month after the confirm date
         var candidate = new DateOnly(from.Year, from.Month, 1).AddMonths(1);
-        // Clamp day to last day of that month
         var daysInMonth = DateTime.DaysInMonth(candidate.Year, candidate.Month);
         candidate = new DateOnly(candidate.Year, candidate.Month, Math.Min(day, daysInMonth));
 
-        // If we confirmed on or after DayOfPeriod, the next occurrence is already within the same
-        // +1 month window, but if DayOfPeriod has already passed in that +1 month relative to
-        // confirmDate, skip one more month.
-        if (from.Day >= day)
+        if (confirmDate.HasValue && from.Day >= day)
             candidate = candidate.AddMonths(1);
 
         return candidate;
@@ -333,11 +328,11 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         return Result<Transaction>.Ok(transaction);
     }
 
-    public async Task<Result> TryDismissAsync(Guid id)
+    public async Task<Result> TryDismissAsync(Guid id, DateOnly? nextDueDate)
     {
         var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id);
         if (reminder is null) return Result.Fail("NOT_FOUND", "Recurring transaction not found.");
-        reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: null);
+        reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: nextDueDate);
         await db.SaveChangesAsync();
         return Result.Ok();
     }

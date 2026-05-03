@@ -15,7 +15,7 @@ public interface IRecurringTransactionService
     /// <summary>Creates a transaction from the template and advances NextDueDate per ReminderBehaviour.</summary>
     Task<Transaction> ConfirmAsync(Guid id, DateOnly date, decimal amount, string? description, DateOnly? nextDueDate = null);
     /// <summary>Advances NextDueDate without creating a transaction.</summary>
-    Task DismissAsync(Guid id);
+    Task DismissAsync(Guid id, DateOnly? nextDueDate = null);
     /// <summary>Returns active reminders with NextDueDate within the given number of days from today.</summary>
     Task<IEnumerable<RecurringTransaction>> GetUpcomingAsync(int withinDays);
 
@@ -24,6 +24,6 @@ public interface IRecurringTransactionService
     Task<Result<RecurringTransaction>> TryUpdateAsync(Guid id, UpdateRecurringTransactionRequest request);
     Task<Result> TryDeactivateAsync(Guid id);
     Task<Result<Transaction>> TryConfirmAsync(Guid id, ConfirmRecurringTransactionRequest request);
-    Task<Result> TryDismissAsync(Guid id);
+    Task<Result> TryDismissAsync(Guid id, DateOnly? nextDueDate);
     Task<Result> TryReactivateAsync(Guid id);
 }
