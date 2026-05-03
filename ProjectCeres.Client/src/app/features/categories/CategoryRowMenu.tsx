@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   CATEGORY_ARCHIVE_URL,
+  CATEGORY_REACTIVATE_URL,
   type ApiErrorEnvelope,
   type CategoryListItemDto,
 } from './categories-api';
@@ -57,6 +58,22 @@ export function CategoryRowMenu({ category, onChanged }: Props) {
     }
   }
 
+  async function handleReactivate() {
+    try {
+      const response = await fetch(CATEGORY_REACTIVATE_URL(category.id), {
+        method: 'PATCH',
+      });
+      if (response.ok) {
+        toast.success('Reactivated.');
+        onChanged();
+        return;
+      }
+      toast.error("Couldn't reactivate. Try again.");
+    } catch {
+      toast.error("Couldn't reactivate. Try again.");
+    }
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -77,7 +94,11 @@ export function CategoryRowMenu({ category, onChanged }: Props) {
             <DropdownMenuItem onClick={() => setConfirmOpen(true)}>
               Archive…
             </DropdownMenuItem>
-          ) : null}
+          ) : (
+            <DropdownMenuItem onClick={handleReactivate}>
+              Reactivate
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

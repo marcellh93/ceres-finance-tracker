@@ -94,4 +94,21 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
         await db.SaveChangesAsync();
         return Result.Ok();
     }
+
+    public async Task<Result> TryReactivateAsync(Guid id)
+    {
+        var category = await db.Categories
+            .OwnedOrShared(user)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (category is null)
+            return Result.Fail("NOT_FOUND", "Category not found.");
+
+        var policy = CategoryPolicies.CanReactivate(category);
+        if (!policy.IsSuccess) return policy;
+
+        category.IsActive = true;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
 }

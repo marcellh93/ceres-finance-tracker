@@ -13,4 +13,5 @@ public interface ICategoryService
     Task<Result<Category>> TryCreateAsync(CreateCategoryRequest request);
     Task<Result<Category>> TryUpdateAsync(Guid id, UpdateCategoryRequest request);
     Task<Result> TryDeactivateAsync(Guid id);
+    Task<Result> TryReactivateAsync(Guid id);
 }

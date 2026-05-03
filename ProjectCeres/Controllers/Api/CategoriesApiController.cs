@@ -89,6 +89,15 @@ public class CategoriesApiController(
             : ToErrorResponse(result.Error!.Value);
     }
 
+    [HttpPatch("{id:guid}/reactivate")]
+    public async Task<IActionResult> Reactivate(Guid id)
+    {
+        var result = await categoryService.TryReactivateAsync(id);
+        return result.IsSuccess
+            ? NoContent()
+            : ToErrorResponse(result.Error!.Value);
+    }
+
     private static CategoryDetailDto ToDetail(Models.Category c) => new(
         c.Id, c.Name, c.CategoryTypeId, c.CategoryType.Name,
         c.LifestyleTag, c.IsActive, c.IsSystem);

@@ -49,11 +49,22 @@ describe('CategoryRowMenu', () => {
     expect(screen.getByText('Archive…')).toBeInTheDocument();
   });
 
-  it('shows only Edit for archived rows', async () => {
+  it('shows Edit + Reactivate for archived rows (no Archive)', async () => {
     renderMenu(archivedRow);
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
     expect(await screen.findByText('Edit')).toBeInTheDocument();
+    expect(screen.getByText('Reactivate')).toBeInTheDocument();
     expect(screen.queryByText('Archive…')).toBeNull();
+  });
+
+  it('reactivate 204 fires toast.success and onChanged', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204, json: async () => null });
+    const onChanged = vi.fn();
+    renderMenu(archivedRow, onChanged);
+    fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
+    fireEvent.click(await screen.findByText('Reactivate'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reactivated.'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it('clicking Edit navigates to /categories/:id/edit', async () => {

@@ -3,6 +3,7 @@
 export const CATEGORIES_URL = '/api/categories';
 export const CATEGORY_BY_ID_URL = (id: string) => `/api/categories/${id}`;
 export const CATEGORY_ARCHIVE_URL = (id: string) => `/api/categories/${id}/archive`;
+export const CATEGORY_REACTIVATE_URL = (id: string) => `/api/categories/${id}/reactivate`;
 export const CATEGORY_TYPES_URL = '/api/category-types';
 
 export function buildListUrl(includeInactive: boolean): string {
