@@ -55,14 +55,16 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
         });
 
     private async Task<Guid> CreateAssetAccountAsync(int currencyId = 1) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Asset {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = currencyId,
-            OpeningBalance     = 0m,
-            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Asset {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: 0m,
+            OpeningBalanceDate: DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     // -------------------------------------------------------------------------
     // CreateAsync — expense-only guard

@@ -37,44 +37,52 @@ public class LiabilityPaymentServiceTests : IAsyncLifetime
     // -------------------------------------------------------------------------
 
     private async Task<Guid> CreateAssetAccountAsync(int currencyId = 1, DateOnly? openingBalanceDate = null) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Asset {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = currencyId,
-            OpeningBalance     = 0m,
-            OpeningBalanceDate = openingBalanceDate ?? DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Asset {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: 0m,
+            OpeningBalanceDate: openingBalanceDate ?? DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private async Task<Guid> CreateAssetAccountWithOpeningBalanceAsync(decimal amount, DateOnly date) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Asset {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = 1,
-            OpeningBalance     = amount,
-            OpeningBalanceDate = date
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Asset {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: 1,
+            Description: null,
+            OpeningBalance: amount,
+            OpeningBalanceDate: date,
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private async Task<Guid> CreateLiabilityAccountAsync(int currencyId = 1, DateOnly? openingBalanceDate = null) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Liability {Guid.NewGuid():N}",
-            AccountTypeId      = 2,
-            CurrencyId         = currencyId,
-            OpeningBalance     = 0m,
-            OpeningBalanceDate = openingBalanceDate ?? DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Liability {Guid.NewGuid():N}",
+            AccountTypeId: 2,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: 0m,
+            OpeningBalanceDate: openingBalanceDate ?? DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private async Task<Guid> CreateLiabilityAccountWithOpeningBalanceAsync(decimal amount, DateOnly date) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Liability {Guid.NewGuid():N}",
-            AccountTypeId      = 2,
-            CurrencyId         = 1,
-            OpeningBalance     = amount,
-            OpeningBalanceDate = date
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Liability {Guid.NewGuid():N}",
+            AccountTypeId: 2,
+            CurrencyId: 1,
+            Description: null,
+            OpeningBalance: amount,
+            OpeningBalanceDate: date,
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private TransactionCreateViewModel MakeCreateVm(Guid assetId, Guid liabilityId, decimal amount = 100m) =>
         new()

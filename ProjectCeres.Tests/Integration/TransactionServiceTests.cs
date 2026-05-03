@@ -72,24 +72,28 @@ public class TransactionServiceTests : IAsyncLifetime
         };
 
     private async Task<Guid> CreateAssetAccountAsync(string? name = null, int currencyId = 1) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = name ?? $"Asset {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = currencyId,
-            OpeningBalance     = 0m,
-            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: name ?? $"Asset {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: 0m,
+            OpeningBalanceDate: DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private async Task<Guid> CreateLiabilityAccountAsync(string? name = null, int currencyId = 1) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = name ?? $"Liability {Guid.NewGuid():N}",
-            AccountTypeId      = 2,
-            CurrencyId         = currencyId,
-            OpeningBalance     = 0m,
-            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: name ?? $"Liability {Guid.NewGuid():N}",
+            AccountTypeId: 2,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: 0m,
+            OpeningBalanceDate: DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     // -------------------------------------------------------------------------
     // Regular transaction — CRUD

@@ -319,14 +319,16 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
     public async Task ConfirmAsync_ThrowsWhenDateIsBeforeAccountOpeningBalance()
     {
         var openingDate = new DateOnly(2026, 3, 1);
-        var account = await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Account {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = 1,
-            OpeningBalance     = 500m,
-            OpeningBalanceDate = openingDate
-        });
+        var account = (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Account {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: 1,
+            Description: null,
+            OpeningBalance: 500m,
+            OpeningBalanceDate: openingDate,
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!;
 
         var reminder = await _service.CreateAsync(new RecurringTransactionCreateViewModel
         {

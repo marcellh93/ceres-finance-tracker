@@ -210,4 +210,57 @@ public class AccountsCrudApiTests : IAsyncLifetime
         var rows = await res.Content.ReadFromJsonAsync<List<JsonElement>>();
         rows!.Select(r => r.GetProperty("name").GetString()).Should().BeEquivalentTo(["Asset", "Liability"]);
     }
+
+    [Fact]
+    public async Task Get_returns_HasTransactions_false_for_account_with_no_movements()
+    {
+        var create = await _client.PostAsJsonAsync("/api/accounts", new
+        {
+            Name                   = $"Empty-{Guid.NewGuid():N}",
+            AccountTypeId          = 1,
+            CurrencyId             = 1,
+            Description            = (string?)null,
+            OpeningBalance         = 0m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.UtcNow),
+            LiabilityRepaymentType = (string?)null,
+            InterestRate           = (decimal?)null,
+            ExcludeFromSpendable   = false,
+        });
+        create.EnsureSuccessStatusCode();
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>();
+        var id = created.GetProperty("id").GetGuid();
+        _createdAccountIds.Add(id);
+
+        var res = await _client.GetAsync("/api/accounts");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rows = await res.Content.ReadFromJsonAsync<List<JsonElement>>();
+        var row = rows!.First(r => r.GetProperty("id").GetGuid() == id);
+        row.GetProperty("hasTransactions").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Get_returns_HasTransactions_true_for_account_with_opening_balance()
+    {
+        var create = await _client.PostAsJsonAsync("/api/accounts", new
+        {
+            Name                   = $"Funded-{Guid.NewGuid():N}",
+            AccountTypeId          = 1,
+            CurrencyId             = 1,
+            Description            = (string?)null,
+            OpeningBalance         = 100m,
+            OpeningBalanceDate     = DateOnly.FromDateTime(DateTime.UtcNow),
+            LiabilityRepaymentType = (string?)null,
+            InterestRate           = (decimal?)null,
+            ExcludeFromSpendable   = false,
+        });
+        create.EnsureSuccessStatusCode();
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>();
+        var id = created.GetProperty("id").GetGuid();
+        _createdAccountIds.Add(id);
+
+        var res = await _client.GetAsync("/api/accounts");
+        var rows = await res.Content.ReadFromJsonAsync<List<JsonElement>>();
+        var row = rows!.First(r => r.GetProperty("id").GetGuid() == id);
+        row.GetProperty("hasTransactions").GetBoolean().Should().BeTrue();
+    }
 }

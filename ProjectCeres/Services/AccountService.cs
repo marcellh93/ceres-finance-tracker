@@ -32,97 +32,6 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
             .Include(a => a.Currency)
             .FirstOrDefaultAsync(a => a.Id == id);
 
-    public async Task<Account> CreateAsync(AccountCreateViewModel vm)
-    {
-        var accountType = await db.AccountTypes.FindAsync(vm.AccountTypeId!.Value);
-        if (accountType?.Name == "Liability")
-            ValidateLiabilityRepaymentFields(vm.LiabilityRepaymentType, vm.InterestRate);
-
-        var account = new Account
-        {
-            Id                     = Guid.NewGuid(),
-            Name                   = vm.Name,
-            AccountTypeId          = vm.AccountTypeId!.Value,
-            CurrencyId             = vm.CurrencyId!.Value,
-            Description            = vm.Description,
-            LiabilityRepaymentType = vm.LiabilityRepaymentType,
-            InterestRate           = vm.InterestRate,
-            IsActive               = true,
-            ExcludeFromSpendable   = accountType?.Name == "Liability" ? false : vm.ExcludeFromSpendable,
-            UserId                 = user.UserId,
-        };
-
-        db.Accounts.Add(account);
-
-        if (vm.OpeningBalance != 0)
-        {
-            db.Transactions.Add(new Transaction
-            {
-                Id          = Guid.NewGuid(),
-                Date        = vm.OpeningBalanceDate,
-                Amount      = Math.Abs(vm.OpeningBalance),
-                Description = "Opening Balance",
-                AccountId   = account.Id,
-                CategoryId  = OpeningBalanceCategoryId,
-                CreatedAt   = DateTime.UtcNow,
-                UserId      = user.UserId,
-            });
-        }
-
-        await db.SaveChangesAsync();
-        return account;
-    }
-
-    public async Task UpdateAsync(AccountEditViewModel vm)
-    {
-        var account = await db.Accounts
-            .Owned(user)
-            .Include(a => a.AccountType)
-            .FirstOrDefaultAsync(a => a.Id == vm.Id)
-            ?? throw new InvalidOperationException($"Account {vm.Id} not found.");
-
-        if (account.AccountType.Name == "Liability")
-            ValidateLiabilityRepaymentFields(vm.LiabilityRepaymentType, vm.InterestRate);
-
-        account.Name                   = vm.Name;
-        account.Description            = vm.Description;
-        account.LiabilityRepaymentType = vm.LiabilityRepaymentType;
-        account.InterestRate           = vm.InterestRate;
-        account.ExcludeFromSpendable   = account.AccountType.Name == "Liability" ? false : vm.ExcludeFromSpendable;
-
-        // Manage the opening balance transaction (system-managed, not user-editable directly).
-        var existing = await db.Transactions
-            .Owned(user)
-            .FirstOrDefaultAsync(t => t.AccountId == vm.Id && t.CategoryId == OpeningBalanceCategoryId);
-
-        if (existing is not null)
-        {
-            if (vm.OpeningBalance == 0)
-                db.Transactions.Remove(existing);
-            else
-            {
-                existing.Amount = Math.Abs(vm.OpeningBalance);
-                existing.Date   = vm.OpeningBalanceDate;
-            }
-        }
-        else if (vm.OpeningBalance != 0)
-        {
-            db.Transactions.Add(new Transaction
-            {
-                Id          = Guid.NewGuid(),
-                UserId      = user.UserId,
-                Date        = vm.OpeningBalanceDate,
-                Amount      = Math.Abs(vm.OpeningBalance),
-                Description = "Opening Balance",
-                AccountId   = vm.Id,
-                CategoryId  = OpeningBalanceCategoryId,
-                CreatedAt   = DateTime.UtcNow
-            });
-        }
-
-        await db.SaveChangesAsync();
-    }
-
     public async Task<decimal> GetOpeningBalanceAsync(Guid id)
     {
         var t = await db.Transactions
@@ -139,14 +48,6 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
         return t?.Date;
     }
 
-    public async Task DeactivateAsync(Guid id)
-    {
-        var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == id)
-            ?? throw new InvalidOperationException($"Account {id} not found.");
-
-        account.IsActive = false;
-        await db.SaveChangesAsync();
-    }
 
     public async Task<decimal> GetBalanceAsync(Guid id)
     {
@@ -208,15 +109,6 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
         balance -= transfersOut;
 
         return balance;
-    }
-
-    private static void ValidateLiabilityRepaymentFields(string? repaymentType, decimal? interestRate)
-    {
-        if (repaymentType == "Amortising" && interestRate is null)
-            throw new InvalidOperationException("An Amortising liability must have an interest rate.");
-
-        if (repaymentType == "FullMonthly" && interestRate is not null)
-            throw new InvalidOperationException("A FullMonthly liability must not have an interest rate.");
     }
 
     public async Task<AccountLedgerViewModel?> GetLedgerAsync(Guid id)

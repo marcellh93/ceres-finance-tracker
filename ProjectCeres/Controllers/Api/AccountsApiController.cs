@@ -46,11 +46,15 @@ public class AccountsApiController(
         foreach (var a in accounts)
         {
             var balance = await accountService.GetBalanceAsync(a.Id);
+            var hasTransactions =
+                await db.Transactions.Owned(user).AnyAsync(t => t.AccountId == a.Id) ||
+                await db.Transfers.Owned(user).AnyAsync(t => t.SourceAccountId == a.Id || t.DestAccountId == a.Id) ||
+                await db.LiabilityPayments.Owned(user).AnyAsync(p => p.AssetAccountId == a.Id || p.LiabilityAccountId == a.Id);
             dtos.Add(new AccountListItemDto(
                 a.Id, a.Name, a.AccountTypeId, a.AccountType.Name,
                 a.CurrencyId, a.Currency.Code, a.Currency.Symbol,
                 a.Description, a.IsActive, a.ExcludeFromSpendable,
-                a.LiabilityRepaymentType, a.InterestRate, balance));
+                a.LiabilityRepaymentType, a.InterestRate, balance, hasTransactions));
         }
         return Ok(dtos);
     }
@@ -86,7 +90,8 @@ public class AccountsApiController(
             a.Id, a.Name, a.AccountTypeId, a.AccountType.Name,
             a.CurrencyId, a.Currency.Code, a.Currency.Symbol,
             a.Description, a.IsActive, a.ExcludeFromSpendable,
-            a.LiabilityRepaymentType, a.InterestRate, request.OpeningBalance);
+            a.LiabilityRepaymentType, a.InterestRate, request.OpeningBalance,
+            request.OpeningBalance != 0);
         return Created($"/api/accounts/{a.Id}", dto);
     }
 

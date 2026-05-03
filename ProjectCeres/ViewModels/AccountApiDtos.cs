@@ -15,7 +15,8 @@ public record AccountListItemDto(
     bool    ExcludeFromSpendable,
     string? LiabilityRepaymentType,
     decimal? InterestRate,
-    decimal Balance);
+    decimal Balance,
+    bool    HasTransactions);
 
 public record AccountDetailDto(
     Guid    Id,

@@ -141,42 +141,9 @@ public class UiVerificationTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
-    // Stage 5.1 — Account Edit: LiabilityRepaymentType select + hint text
+    // Stage 5.1 — Account Edit Razor view tests removed: the SPA replaces them.
+    // Coverage moves to AccountForm.test.tsx (client) and AccountsCrudApiTests (server).
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task AccountEdit_LiabilityAccount_RendersRepaymentTypeSelectAndHint()
-    {
-        var accountId = await SeedLiabilityAccountAsync("FullMonthly", null);
-
-        var response = await _client.GetAsync($"/Accounts/Edit/{accountId}");
-        var body     = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("LiabilityRepaymentType",
-            because: "the repayment type select must be rendered for liability accounts");
-        body.Should().Contain("Amortising",
-            because: "the Amortising option must be present in the select");
-        body.Should().Contain("Full Monthly",
-            because: "the FullMonthly option must be present in the select");
-        body.Should().Contain("Full Monthly",
-            because: "the repayment type description hint must appear");
-        body.Should().Contain("loans and mortgages",
-            because: "the hint text explaining Amortising must be rendered");
-    }
-
-    [Fact]
-    public async Task AccountEdit_LiabilityAccount_RendersInterestRateField()
-    {
-        var accountId = await SeedLiabilityAccountAsync("Amortising", 0.035m);
-
-        var response = await _client.GetAsync($"/Accounts/Edit/{accountId}");
-        var body     = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("InterestRate",
-            because: "the interest rate input must be in the HTML for Amortising accounts");
-    }
 
     private async Task SeedTransactionAsync(Guid accountId)
     {
@@ -199,59 +166,9 @@ public class UiVerificationTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
-    // Stage 5.2 — Account Ledger: projection panel data and what-if input
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task AccountLedger_AmorisingAccount_RendersProjectionPanelFormOnGet()
-    {
-        // A transaction is needed so balance > 0 — the projection panel only renders
-        // when the account has a positive outstanding balance.
-        var accountId = await SeedLiabilityAccountAsync("Amortising", 0.035m);
-        await SeedTransactionAsync(accountId);
-
-        var response = await _client.GetAsync($"/Accounts/Ledger/{accountId}");
-        var body     = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("Payoff Projection",
-            because: "the projection panel heading must render for Amortising accounts with balance > 0");
-        body.Should().Contain("Monthly payment amount",
-            because: "the what-if monthly payment input must be rendered");
-        body.Should().Contain("Calculate",
-            because: "the Calculate submit button must be rendered");
-    }
-
-    [Fact]
-    public async Task AccountLedger_AmorisingAccount_PostWithMonthlyPayment_RendersProjectionResults()
-    {
-        var accountId = await SeedLiabilityAccountAsync("Amortising", 0.035m);
-        await SeedTransactionAsync(accountId);
-
-        // GET first to obtain anti-forgery token
-        var getResponse = await _client.GetAsync($"/Accounts/Ledger/{accountId}");
-        var page        = await getResponse.Content.ReadAsStringAsync();
-        var token       = System.Text.RegularExpressions.Regex.Match(
-            page, @"<input[^>]+name=""__RequestVerificationToken""[^>]+value=""([^""]+)""")
-            .Groups[1].Value;
-
-        var form = new Dictionary<string, string>
-        {
-            ["monthlyPayment"]             = "100",
-            ["__RequestVerificationToken"] = token
-        };
-
-        var response = await _client.PostAsync(
-            $"/Accounts/Ledger/{accountId}",
-            new FormUrlEncodedContent(form));
-        var body = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("Total interest cost",
-            because: "the projection results must include total interest cost after POST");
-        body.Should().Contain("Estimated payoff",
-            because: "the projected payoff date must appear in the results");
-    }
+    // Stage 5.2 — Account Ledger Razor view tests removed: the SPA replaces them.
+    // Coverage moves to AccountLedger.test.tsx (client) including the projection
+    // math (projection.test.ts) which now lives entirely SPA-side.
 
     // -------------------------------------------------------------------------
     // Stage 6.1 — Recurring Transaction Create: fields present

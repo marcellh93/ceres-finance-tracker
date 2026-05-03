@@ -10,7 +10,9 @@ public static class AccountPolicies
 
     /// <summary>
     /// A liability with Amortising repayment must have an interest rate;
-    /// a liability with FullMonthly repayment must NOT have an interest rate.
+    /// a liability with FullMonthly repayment must NOT have an interest rate;
+    /// a liability with no repayment type must NOT have an interest rate
+    /// (closes the silent invariant gap so a stale rate cannot persist).
     /// </summary>
     public static Result ValidateLiabilityRepayment(string? repaymentType, decimal? interestRate)
     {
@@ -18,6 +20,8 @@ public static class AccountPolicies
             return Result.Fail(InvalidLiabilityRepaymentCode, "An Amortising liability must have an interest rate.");
         if (repaymentType == "FullMonthly" && interestRate is not null)
             return Result.Fail(InvalidLiabilityRepaymentCode, "A FullMonthly liability must not have an interest rate.");
+        if (repaymentType is null && interestRate is not null)
+            return Result.Fail(InvalidLiabilityRepaymentCode, "An account with no repayment type must not have an interest rate.");
         return Result.Ok();
     }
 }

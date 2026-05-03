@@ -13,6 +13,9 @@ import { Review } from './pages/Review';
 import { Security } from './pages/Security';
 import { Settings } from './pages/Settings';
 import { Support } from './pages/Support';
+import { AccountCreate } from './features/accounts/AccountCreate';
+import { AccountEdit } from './features/accounts/AccountEdit';
+import { AccountLedger } from './features/accounts/AccountLedger';
 import { BudgetCreate } from './features/budgets/BudgetCreate';
 import { BudgetEdit } from './features/budgets/BudgetEdit';
 import { CategoryCreate } from './features/categories/CategoryCreate';
@@ -31,7 +34,11 @@ export function App() {
           <Route path=":id/edit" element={<MovementEdit />} />
         </Route>
         <Route path="review" element={<Review />} />
-        <Route path="accounts" element={<Accounts />} />
+        <Route path="accounts" element={<Accounts />}>
+          <Route path="new" element={<AccountCreate />} />
+          <Route path=":id/edit" element={<AccountEdit />} />
+        </Route>
+        <Route path="accounts/:id/ledger" element={<AccountLedger />} />
         <Route path="categories" element={<Categories />}>
           <Route path="new" element={<CategoryCreate />} />
           <Route path=":id/edit" element={<CategoryEdit />} />

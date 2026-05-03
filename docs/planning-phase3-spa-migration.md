@@ -45,7 +45,7 @@
 
 | MVC Controller | Actions to port to API | Notes |
 |---|---|---|
-| `AccountsController` | Index, Create, Edit, Deactivate, Ledger | Ledger becomes a filtered Movements query |
+| `AccountsController` | Index, Create, Edit, Deactivate, Ledger | **Migrated (2026-05-03).** SPA at `/app/accounts` with nested `/new` and `/:id/edit` routes plus a sibling top-level `/accounts/:id/ledger` route. Page actions 302-redirect to the SPA. Razor views deleted; throwing CRUD service methods removed; `LiabilityProjectionService` deleted (projection math moved to SPA-side `projection.ts`, single source of truth post-cutover). `AccountListItemDto` gained a `HasTransactions` field that powers adaptive archive AlertDialog copy. `AccountPolicies.ValidateLiabilityRepayment` extended to symmetrically reject `null repaymentType + non-null rate`. Spec: `docs/superpowers/specs/2026-05-03-accounts-spa-design.md`. Plan: `docs/superpowers/plans/2026-05-03-accounts-spa.md`. |
 | `TransactionsController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `BulkMarkCleared` and `ToggleCleared` POST actions remain `[Obsolete]` until final SPA cleanup. |
 | `TransfersController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `ToggleCleared` POST action remains `[Obsolete]` until final SPA cleanup. |
 | `BudgetsController` | Index, Create, Edit, Deactivate (×2 for Category + Goal) | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/budgets/*`. Razor views deleted. POST overloads removed entirely (the SPA POSTs JSON to the new `/api/category-budgets` and `/api/goal-budgets`). |
@@ -189,7 +189,7 @@ With those two facts established, the frontend was reorganised into batches:
 |---|------|--------|-------|
 | 1 | Settings | ✅ Migrated 2026-05-02 (commit `e842250`) | First pilot — locked the `features/<area>/` + page+form split + Popover+Command picker idiom. |
 | 2 | Categories | ✅ Migrated 2026-05-02 (commit `9578f9a` + follow-ups `132d5df`, `87f6709`) | Second pilot — exercised the template against list + nested CRUD + archive + system-row UX. |
-| 3 | Accounts | Pending | Closest in shape to Categories (CRUD with deactivate-not-delete, system Opening Balance row). |
+| 3 | Accounts | ✅ Migrated 2026-05-03 (commit `b31eea6`) | List + Create/Edit/Ledger; per-currency subtotal strip; type-driven balance colour; conditional Asset/Liability fields with two-layer interest-rate normalisation; SPA-side payoff projection; adaptive archive copy via `HasTransactions`. |
 | 4 | Recurring | Pending | Adds frequency rules + next-due-date computation; Confirm/Dismiss stateful actions. |
 | 5 | Reports | Pending | Largest scope: 8 report views + 8 CSV exports. SavedReport CRUD is deferred (ADR-0055). |
 | 6 | Review | Pending | Reconciliation review — unattended-import staged transactions/transfers triage. |

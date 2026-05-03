@@ -60,14 +60,16 @@ public class GoalBudgetServiceTests : IAsyncLifetime
         });
 
     private async Task<Guid> CreateAssetAccountAsync(decimal openingBalance = 0m) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Asset {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = 1,
-            OpeningBalance     = openingBalance,
-            OpeningBalanceDate = new DateOnly(2026, 1, 1)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Asset {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: 1,
+            Description: null,
+            OpeningBalance: openingBalance,
+            OpeningBalanceDate: new DateOnly(2026, 1, 1),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     // -------------------------------------------------------------------------
     // GoalType validation on CreateAsync

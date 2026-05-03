@@ -45,24 +45,28 @@ public class ReportGeneratorTests : IAsyncLifetime
     // -------------------------------------------------------------------------
 
     private async Task<Guid> CreateAssetAccountAsync(int currencyId = 1, decimal openingBalance = 0m) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Asset {Guid.NewGuid():N}",
-            AccountTypeId      = 1,
-            CurrencyId         = currencyId,
-            OpeningBalance     = openingBalance,
-            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Asset {Guid.NewGuid():N}",
+            AccountTypeId: 1,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: openingBalance,
+            OpeningBalanceDate: DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private async Task<Guid> CreateLiabilityAccountAsync(int currencyId = 1, decimal openingBalance = 0m) =>
-        (await _accountService.CreateAsync(new AccountCreateViewModel
-        {
-            Name               = $"Liability {Guid.NewGuid():N}",
-            AccountTypeId      = 2,
-            CurrencyId         = currencyId,
-            OpeningBalance     = openingBalance,
-            OpeningBalanceDate = DateOnly.FromDateTime(DateTime.Today)
-        })).Id;
+        (await _accountService.TryCreateAsync(new CreateAccountRequest(
+            Name: $"Liability {Guid.NewGuid():N}",
+            AccountTypeId: 2,
+            CurrencyId: currencyId,
+            Description: null,
+            OpeningBalance: openingBalance,
+            OpeningBalanceDate: DateOnly.FromDateTime(DateTime.Today),
+            LiabilityRepaymentType: null,
+            InterestRate: null,
+            ExcludeFromSpendable: false))).Value!.Id;
 
     private void AddTransaction(Guid accountId, Guid categoryId, decimal amount, DateOnly? date = null)
     {
