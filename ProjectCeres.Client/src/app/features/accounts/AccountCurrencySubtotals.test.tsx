@@ -45,23 +45,13 @@ describe('AccountCurrencySubtotals', () => {
     expect(screen.getByText(/\$200/)).toBeInTheDocument();
   });
 
-  it('excludes archived accounts from the math', () => {
+  it('includes archived accounts in the math (strip reflects what the parent passes)', () => {
     const rows = [
       row({ id: 'a', balance: 1000, currencyCode: 'EUR', currencySymbol: '€' }),
-      row({ id: 'b', balance: 9999, currencyCode: 'USD', currencySymbol: '$', isActive: false }),
-      row({ id: 'c', balance: 500,  currencyCode: 'USD', currencySymbol: '$' }),
+      row({ id: 'b', balance: 500, currencyCode: 'USD', currencySymbol: '$', isActive: false }),
+      row({ id: 'c', balance: 200, currencyCode: 'USD', currencySymbol: '$' }),
     ];
     render(<AccountCurrencySubtotals rows={rows} />);
-    expect(screen.getByText(/\$500/)).toBeInTheDocument();
-    expect(screen.queryByText(/\$10/)).toBeNull();
-  });
-
-  it('renders nothing when only archived accounts span 2 currencies', () => {
-    const rows = [
-      row({ id: 'a', balance: 100, currencyCode: 'EUR', isActive: false }),
-      row({ id: 'b', balance: 200, currencyCode: 'USD', isActive: false }),
-    ];
-    const { container } = render(<AccountCurrencySubtotals rows={rows} />);
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText(/\$700/)).toBeInTheDocument();
   });
 });
