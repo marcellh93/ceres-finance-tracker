@@ -518,6 +518,81 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
+    // SnapToCalendarDay — unit-level (Weekly + Biweekly)
+    // -------------------------------------------------------------------------
+
+    private static RecurringTransaction MakeReminder(
+        Frequency frequency, ReminderBehaviour behaviour, int? dayOfPeriod, DateOnly nextDueDate)
+    {
+        return new RecurringTransaction
+        {
+            Id = Guid.NewGuid(), UserId = Guid.NewGuid(),
+            Name = "Test", AccountId = Guid.NewGuid(), CategoryId = Guid.NewGuid(),
+            Frequency = frequency, ReminderBehaviour = behaviour,
+            DayOfPeriod = dayOfPeriod, NextDueDate = nextDueDate, IsActive = true,
+        };
+    }
+
+    private static DateOnly InvokeSnapToCalendarDay(RecurringTransaction reminder, DateOnly? confirmDate)
+    {
+        var method = typeof(RecurringTransactionService).GetMethod(
+            "SnapToCalendarDay",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        return (DateOnly)method.Invoke(null, [reminder, confirmDate])!;
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Weekly_AdvancesToTargetWeekday_FromEarlierInWeek()
+    {
+        // Confirm on Wednesday 2026-04-29 (Wed), target Monday (DayOfPeriod=1)
+        var reminder = MakeReminder(Frequency.Weekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 1,
+            nextDueDate: new DateOnly(2026, 4, 27));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 4, 29)); // Wed
+        result.Should().Be(new DateOnly(2026, 5, 4)); // Next Monday from Wed
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Weekly_AdvancesToTargetWeekday_FromTargetDay()
+    {
+        // Confirm on Monday 2026-04-28 (Mon), target Monday (DayOfPeriod=1)
+        var reminder = MakeReminder(Frequency.Weekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 1,
+            nextDueDate: new DateOnly(2026, 4, 28));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 4, 28));
+        result.Should().Be(new DateOnly(2026, 5, 4)); // Same-day → next Monday (7 days)
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Weekly_AdvancesToTargetWeekday_FromLaterInWeek()
+    {
+        // Confirm on Friday 2026-05-01, target Wednesday (DayOfPeriod=3)
+        var reminder = MakeReminder(Frequency.Weekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 3,
+            nextDueDate: new DateOnly(2026, 5, 1));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 5, 1)); // Fri
+        result.Should().Be(new DateOnly(2026, 5, 6)); // Next Wednesday from Fri
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Biweekly_AdvancesAtLeast8Days_FromTargetDay()
+    {
+        // Confirm on Wednesday 2026-04-29, target Wednesday (DayOfPeriod=3)
+        var reminder = MakeReminder(Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 3,
+            nextDueDate: new DateOnly(2026, 4, 29));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 4, 29));
+        result.Should().Be(new DateOnly(2026, 5, 13)); // daysAhead=0 → 7; biweekly: +7 → 14 days
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Biweekly_TargetMidweek()
+    {
+        // Confirm on Tuesday 2026-04-28, target Wednesday (DayOfPeriod=3)
+        // daysAhead = (Wed=3 - Tue=2 + 7) % 7 = 1; 1 < 8 → add 7 → 8 days
+        var reminder = MakeReminder(Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 3,
+            nextDueDate: new DateOnly(2026, 4, 28));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 4, 28));
+        result.Should().Be(new DateOnly(2026, 5, 6)); // Tue + 8 days = Wed May 6
+    }
+
+    // -------------------------------------------------------------------------
     // GetUpcomingAsync (6.2)
     // -------------------------------------------------------------------------
 

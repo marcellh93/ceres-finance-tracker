@@ -146,10 +146,21 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
     private static DateOnly SnapToCalendarDay(RecurringTransaction reminder, DateOnly? confirmDate)
     {
-        if (reminder.DayOfPeriod is null || reminder.Frequency != Frequency.Monthly)
+        if (reminder.DayOfPeriod is null)
             return AdvanceByFrequency(reminder.NextDueDate, reminder.Frequency);
 
-        var day  = reminder.DayOfPeriod.Value;
+        return reminder.Frequency switch
+        {
+            Frequency.Monthly  => SnapMonthly(reminder, confirmDate),
+            Frequency.Weekly   => SnapWeekly(reminder, confirmDate, doubleStep: false),
+            Frequency.Biweekly => SnapWeekly(reminder, confirmDate, doubleStep: true),
+            _                  => AdvanceByFrequency(reminder.NextDueDate, reminder.Frequency),
+        };
+    }
+
+    private static DateOnly SnapMonthly(RecurringTransaction reminder, DateOnly? confirmDate)
+    {
+        var day  = reminder.DayOfPeriod!.Value;
         var from = confirmDate ?? reminder.NextDueDate;
 
         // Try the target day in the month after the confirm date
@@ -165,6 +176,18 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
             candidate = candidate.AddMonths(1);
 
         return candidate;
+    }
+
+    private static DateOnly SnapWeekly(RecurringTransaction reminder, DateOnly? confirmDate, bool doubleStep)
+    {
+        // DayOfPeriod: 1=Monday … 7=Sunday (ISO 8601)
+        // DayOfWeek:   Sunday=0 … Saturday=6
+        var targetDow = (DayOfWeek)(reminder.DayOfPeriod!.Value % 7);
+        var from = confirmDate ?? reminder.NextDueDate;
+        var daysAhead = ((int)targetDow - (int)from.DayOfWeek + 7) % 7;
+        if (daysAhead == 0) daysAhead = 7;           // never return same-day
+        if (doubleStep && daysAhead < 8) daysAhead += 7;
+        return from.AddDays(daysAhead);
     }
 
     private static DateOnly AdvanceByFrequency(DateOnly from, Frequency frequency) =>
