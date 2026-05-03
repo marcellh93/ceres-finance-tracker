@@ -11,19 +11,24 @@ import { RECURRING_URL } from './recurring-api';
 
 export type RecurringPageCtx = { refetch: () => void; refreshBell: () => void };
 
-const TODAY = new Date().toISOString().slice(0, 10);
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const DEFAULTS: RecurringFormValues = {
   name: '', accountId: '', categoryId: '', estimatedAmount: '',
   frequency: 'Monthly', reminderBehaviour: 'SnapToCalendarDay',
-  dayOfPeriod: null, nextDueDate: TODAY,
+  dayOfPeriod: null, nextDueDate: '',
 };
 
 export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
   const navigate = useNavigate();
   const accounts = useApi<AccountListItemDto[]>(ACCOUNTS_URL);
   const categories = useApi<Array<{ id: string; name: string }>>('/api/categories');
-  const [values, setValues] = useState<RecurringFormValues>(DEFAULTS);
+  const [values, setValues] = useState<RecurringFormValues>(() => ({
+    ...DEFAULTS,
+    nextDueDate: todayIso(),
+  }));
   const [submitting, setSubmitting] = useState(false);
 
   const loading = accounts.loading || categories.loading;

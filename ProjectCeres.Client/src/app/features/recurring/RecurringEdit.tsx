@@ -32,6 +32,7 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
         dayOfPeriod: detail.data.dayOfPeriod,
         nextDueDate: detail.data.nextDueDate,
       });
+      setNotFound(false);
     }
     if (detail.error) setNotFound(true);
   }, [detail.data, detail.error]);
