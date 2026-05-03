@@ -348,6 +348,18 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Goal budget progress | GET | `/api/goal-budgets/{id}/progress` | Returns progress payload. For Spending goals: SUM of tagged transactions vs. target. For Savings goals: linked-account balance vs. target. |
 | Budget discriminator | GET | `/api/budgets/{id}` | Returns `{ id, kind: "CategoryBudget" \| "GoalBudget" }` — used by SPA edit route to dispatch to the correct typed endpoint. `404` if neither exists. |
 | List currencies | GET | `/api/currencies` | Returns `{ id, code, symbol }[]` — supported currencies for budget/account forms. |
+| List recurring transactions | GET | `/api/recurring-transactions` | Returns `RecurringTransactionListItemDto[]`. Query: `includeArchived` (bool). `estimatedAmount` is `decimal?` — `null` means "amount varies". |
+| Create recurring transaction | POST | `/api/recurring-transactions` | Body: `CreateRecurringTransactionRequest`. Returns `201 Created` with `{ id }`. `422` on validation failures. |
+| Get recurring transaction | GET | `/api/recurring-transactions/{id}` | Returns `RecurringTransactionEditDto`. `estimatedAmount` is `decimal?` (null = amount varies). `404` if missing. |
+| Update recurring transaction | PUT | `/api/recurring-transactions/{id}` | Body: `UpdateRecurringTransactionRequest`. `204` on success, `422` on validation, `404` on missing. |
+| Archive recurring transaction | PATCH | `/api/recurring-transactions/{id}/archive` | Sets `IsActive = false`. `204` on success, `404` on missing. |
+| Reactivate recurring transaction | PATCH | `/api/recurring-transactions/{id}/reactivate` | Sets `IsActive = true`. `204` on success, `404` on missing. |
+| Confirm recurring transaction | PATCH | `/api/recurring-transactions/{id}/confirm` | Creates a `Transaction` from the template and advances `NextDueDate`. `204` on success. |
+| Dismiss recurring transaction | POST | `/api/recurring-transactions/{id}/dismiss` | Skips the current due date and advances `NextDueDate`. Accepts an optional body `{ "nextDueDate": "yyyy-MM-dd" }` — required when `frequency` is `ManualDate` (no auto-advance formula exists). `204` on success. |
+
+#### `EstimatedAmount` semantics
+
+`estimatedAmount` is `decimal?` on both list and edit DTOs. A `null` value means "amount varies" and should be displayed as "Varies" in the UI. A non-null value is a positive decimal string (following the standard [amounts convention](#amounts)) representing the expected amount per occurrence.
 
 #### `409 DUPLICATE_BUDGET` response shape
 
