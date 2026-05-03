@@ -244,4 +244,87 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
             await db.RecurringTransactions.Where(r => r.Id == intruderId).ExecuteDeleteAsync();
         }
     }
+
+    private object ValidCreateRequest(decimal? amount = 1000m) => new
+    {
+        name              = $"Reminder-{Guid.NewGuid():N}",
+        estimatedAmount   = amount,
+        accountId         = CheckingAccountId,
+        categoryId        = SalaryCategoryId,
+        frequency         = "Monthly",
+        dayOfPeriod       = 1,
+        nextDueDate       = "2026-06-01",
+        reminderBehaviour = "SnapToCalendarDay"
+    };
+
+    private object ValidUpdateRequest(decimal? amount = 1000m) => new
+    {
+        name              = $"Updated-{Guid.NewGuid():N}",
+        estimatedAmount   = amount,
+        accountId         = CheckingAccountId,
+        categoryId        = SalaryCategoryId,
+        frequency         = "Monthly",
+        dayOfPeriod       = 1,
+        nextDueDate       = "2026-07-01",
+        reminderBehaviour = "SnapToCalendarDay"
+    };
+
+    private async Task<Guid> CreateReminderWithAmount(decimal? amount)
+    {
+        var res = await _client.PostAsJsonAsync("/api/recurring-transactions", ValidCreateRequest(amount));
+        res.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        _createdIds.Add(id);
+        return id;
+    }
+
+    [Fact]
+    public async Task Post_with_null_estimated_amount_persists_null()
+    {
+        var id = await CreateReminderWithAmount(null);
+
+        var res = await _client.GetAsync($"/api/recurring-transactions/{id}");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("estimatedAmount").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Post_with_zero_estimated_amount_persists_zero()
+    {
+        var id = await CreateReminderWithAmount(0m);
+
+        var res = await _client.GetAsync($"/api/recurring-transactions/{id}");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("estimatedAmount").GetDecimal().Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Patch_can_set_estimated_amount_to_null()
+    {
+        var id = await CreateReminderWithAmount(100m);
+
+        var patchRes = await _client.PatchAsJsonAsync($"/api/recurring-transactions/{id}", ValidUpdateRequest(null));
+        patchRes.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var res = await _client.GetAsync($"/api/recurring-transactions/{id}");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("estimatedAmount").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Patch_can_set_estimated_amount_to_value()
+    {
+        var id = await CreateReminderWithAmount(null);
+
+        var patchRes = await _client.PatchAsJsonAsync($"/api/recurring-transactions/{id}", ValidUpdateRequest(12.99m));
+        patchRes.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var res = await _client.GetAsync($"/api/recurring-transactions/{id}");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
+        dto.GetProperty("estimatedAmount").GetDecimal().Should().Be(12.99m);
+    }
 }

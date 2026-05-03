@@ -33,7 +33,7 @@ public record RecurringTransactionDetailDto(
 
 public record CreateRecurringTransactionRequest(
     [Required, StringLength(100, MinimumLength = 1)] string Name,
-    [Range(0, 999999999999.99)] decimal EstimatedAmount,
+    [Range(0, 999999999999.99)] decimal? EstimatedAmount,
     [Required] Guid? AccountId,
     [Required] Guid? CategoryId,
     [Required] string Frequency,
@@ -43,7 +43,7 @@ public record CreateRecurringTransactionRequest(
 
 public record UpdateRecurringTransactionRequest(
     [Required, StringLength(100, MinimumLength = 1)] string Name,
-    [Range(0, 999999999999.99)] decimal EstimatedAmount,
+    [Range(0, 999999999999.99)] decimal? EstimatedAmount,
     [Required] Guid? AccountId,
     [Required] Guid? CategoryId,
     [Required] string Frequency,
@@ -56,3 +56,5 @@ public record ConfirmRecurringTransactionRequest(
     [Range(0, 999999999999.99)] decimal Amount,
     string? Description,
     DateOnly? NextDueDate);
+
+public record DismissRecurringTransactionRequest(DateOnly? NextDueDate);
