@@ -213,7 +213,10 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
         var scheduleCheck = RecurringTransactionPolicies.ValidateSchedule(freq, behaviour, request.DayOfPeriod);
         if (!scheduleCheck.IsSuccess)
-            return Result<RecurringTransaction>.Fail(scheduleCheck.Error!.Value.Code, scheduleCheck.Error!.Value.Message);
+        {
+            var err = scheduleCheck.Error!.Value;
+            return Result<RecurringTransaction>.Fail(err.Code, err.Message);
+        }
 
         var accountOk = await db.Accounts.Owned(user).AnyAsync(a => a.Id == request.AccountId!.Value);
         if (!accountOk)
@@ -258,7 +261,10 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
         var scheduleCheck = RecurringTransactionPolicies.ValidateSchedule(freq, behaviour, request.DayOfPeriod);
         if (!scheduleCheck.IsSuccess)
-            return Result<RecurringTransaction>.Fail(scheduleCheck.Error!.Value.Code, scheduleCheck.Error!.Value.Message);
+        {
+            var err = scheduleCheck.Error!.Value;
+            return Result<RecurringTransaction>.Fail(err.Code, err.Message);
+        }
 
         var reminder = await db.RecurringTransactions.Owned(user)
             .Include(r => r.Account).Include(r => r.Category)
