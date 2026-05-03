@@ -509,4 +509,12 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         var get = await _client.GetFromJsonAsync<JsonElement>($"/api/recurring-transactions/{id}");
         get.GetProperty("nextDueDate").GetString().Should().Be("2026-06-15");
     }
+
+    [Fact]
+    public async Task Dismiss_ManualDate_without_next_due_date_returns_422()
+    {
+        var id = await CreateManualDateReminder(nextDueDate: new DateOnly(2026, 5, 3));
+        var res = await _client.PostAsync($"/api/recurring-transactions/{id}/dismiss", null);
+        res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
 }

@@ -332,6 +332,12 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
     {
         var reminder = await db.RecurringTransactions.Owned(user).FirstOrDefaultAsync(r => r.Id == id);
         if (reminder is null) return Result.Fail("NOT_FOUND", "Recurring transaction not found.");
+
+        // ManualDate behaviour requires an explicit nextDueDate; surface that as a 422 instead of an exception.
+        if (reminder.ReminderBehaviour == ReminderBehaviour.ManualDate && nextDueDate is null)
+            return Result.Fail("NEXT_DUE_DATE_REQUIRED",
+                "Please set the next due date before dismissing a ManualDate reminder.");
+
         reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: null, nextDueDate: nextDueDate);
         await db.SaveChangesAsync();
         return Result.Ok();
