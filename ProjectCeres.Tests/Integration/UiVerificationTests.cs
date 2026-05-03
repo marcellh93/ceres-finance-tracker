@@ -9,37 +9,30 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration;
 
 /// <summary>
-/// WAF tests covering Stage 5 and Stage 6 UI/UX checklist items:
+/// WAF tests covering Stage 5 UI/UX checklist items.
 ///
 /// — Stage 5.1: Account Edit for a Liability account renders the LiabilityRepaymentType
 ///   select and the repayment type description hint. InterestRate field is present in HTML
 ///   but hidden via JS when RepaymentType != Amortising (JS show/hide not testable here).
+///   → Tests removed: the Accounts SPA replaces them. Coverage moves to AccountForm.test.tsx.
 ///
-/// — Stage 5.2: Amortising account Ledger page renders the Payoff Projection section with
-///   payoff date, interest cost, and the "what if" monthly payment input.
+/// — Stage 5.2: Amortising account Ledger page renders the Payoff Projection section.
+///   → Tests removed: the SPA replaces them. Coverage moves to AccountLedger.test.tsx.
 ///
-/// — Stage 6.1: Recurring Transaction Create renders the ReminderBehaviour select,
-///   the EstimatedAmount field, and the DayOfPeriod field. JS-driven hide on ManualDate
-///   is not testable via WAF.
-///
-/// — Stage 6.2: Upcoming Payments page renders a table; due-today rows contain the
-///   "Due today" badge; the navbar data-upcoming-count attribute is present.
+/// — Stage 6.1/6.2: Recurring Transaction Razor views (Create, Upcoming).
+///   → Tests removed: RecurringTransactions SPA replaces these routes; the Razor
+///     controller now returns 302 redirects. Coverage moves to the React test suite.
 ///
 /// Seed data IDs used:
 ///   AccountTypeId 1 = Asset, 2 = Liability
 ///   CurrencyId    1 = EUR
-///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing (Expense)
 /// </summary>
 [Collection("IntegrationTests")]
 public class UiVerificationTests : IAsyncLifetime
 {
-    private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
-
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededAccountIds = [];
-    private readonly List<Guid> _seededReminderIds = [];
-    private readonly List<Guid> _seededTransactionIds = [];
 
     public UiVerificationTests(TestWebApplicationFactory factory)
     {
@@ -55,16 +48,6 @@ public class UiVerificationTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        if (_seededTransactionIds.Count > 0)
-            await db.Transactions
-                .Where(t => _seededTransactionIds.Contains(t.Id))
-                .ExecuteDeleteAsync();
-
-        if (_seededReminderIds.Count > 0)
-            await db.RecurringTransactions
-                .Where(r => _seededReminderIds.Contains(r.Id))
-                .ExecuteDeleteAsync();
-
         if (_seededAccountIds.Count > 0)
             await db.Accounts
                 .Where(a => _seededAccountIds.Contains(a.Id))
@@ -72,157 +55,7 @@ public class UiVerificationTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
-    // Helpers
+    // All Razor-layer UI verification tests have been removed as the SPA replaces
+    // the Razor views. See the class summary for migration notes.
     // -------------------------------------------------------------------------
-
-    private async Task<Guid> SeedLiabilityAccountAsync(
-        string repaymentType = "Amortising",
-        decimal? interestRate = 0.035m)
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var account = new Account
-        {
-            Id                     = Guid.NewGuid(),
-            Name                   = $"WAF Liability {Guid.NewGuid():N}",
-            AccountTypeId          = 2,
-            CurrencyId             = 1,
-            IsActive               = true,
-            LiabilityRepaymentType = repaymentType,
-            InterestRate           = interestRate
-        };
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync();
-        _seededAccountIds.Add(account.Id);
-        return account.Id;
-    }
-
-    private async Task<Guid> SeedAssetAccountAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var account = new Account
-        {
-            Id            = Guid.NewGuid(),
-            Name          = $"WAF Asset {Guid.NewGuid():N}",
-            AccountTypeId = 1,
-            CurrencyId    = 1,
-            IsActive      = true
-        };
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync();
-        _seededAccountIds.Add(account.Id);
-        return account.Id;
-    }
-
-    private async Task<Guid> SeedReminderDueTodayAsync(Guid accountId)
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var reminder = new RecurringTransaction
-        {
-            Id                = Guid.NewGuid(),
-            Name              = $"WAF Reminder {Guid.NewGuid():N}",
-            AccountId         = accountId,
-            CategoryId        = HousingCategoryId,
-            Frequency         = Frequency.Monthly,
-            ReminderBehaviour = ReminderBehaviour.SnapToCalendarDay,
-            NextDueDate       = DateOnly.FromDateTime(DateTime.Today),
-            EstimatedAmount   = 100m,
-            IsActive          = true
-        };
-        db.RecurringTransactions.Add(reminder);
-        await db.SaveChangesAsync();
-        _seededReminderIds.Add(reminder.Id);
-        return reminder.Id;
-    }
-
-    // -------------------------------------------------------------------------
-    // Stage 5.1 — Account Edit Razor view tests removed: the SPA replaces them.
-    // Coverage moves to AccountForm.test.tsx (client) and AccountsCrudApiTests (server).
-    // -------------------------------------------------------------------------
-
-    private async Task SeedTransactionAsync(Guid accountId)
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var txn = new Transaction
-        {
-            Id         = Guid.NewGuid(),
-            Date       = new DateOnly(2025, 1, 15),
-            Amount     = 200m,
-            AccountId  = accountId,
-            CategoryId = HousingCategoryId,
-            IsCleared  = false,
-            CreatedAt  = DateTime.UtcNow
-        };
-        db.Transactions.Add(txn);
-        await db.SaveChangesAsync();
-        _seededTransactionIds.Add(txn.Id);
-    }
-
-    // -------------------------------------------------------------------------
-    // Stage 5.2 — Account Ledger Razor view tests removed: the SPA replaces them.
-    // Coverage moves to AccountLedger.test.tsx (client) including the projection
-    // math (projection.test.ts) which now lives entirely SPA-side.
-
-    // -------------------------------------------------------------------------
-    // Stage 6.1 — Recurring Transaction Create: fields present
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task RecurringTransactionCreate_RendersReminderBehaviourSelectAndEstimatedAmount()
-    {
-        var response = await _client.GetAsync("/RecurringTransactions/Create");
-        var body     = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("ReminderBehaviour",
-            because: "the ReminderBehaviour select must be rendered");
-        body.Should().Contain("Snap to Calendar Day",
-            because: "the SnapToCalendarDay option must be present");
-        body.Should().Contain("Manual Date",
-            because: "the ManualDate option must be present");
-        body.Should().Contain("EstimatedAmount",
-            because: "the EstimatedAmount field must be rendered");
-        body.Should().Contain("DayOfPeriod",
-            because: "the DayOfPeriod field must be present in the HTML (JS hides it for ManualDate)");
-    }
-
-    // -------------------------------------------------------------------------
-    // Stage 6.2 — Upcoming Payments: table, due-today badge, navbar count attr
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task UpcomingPayments_WithDueTodayReminder_RendersDueTodayBadge()
-    {
-        var accountId = await SeedAssetAccountAsync();
-        await SeedReminderDueTodayAsync(accountId);
-
-        var response = await _client.GetAsync("/RecurringTransactions/Upcoming");
-        var body     = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("data-table",
-            because: "the upcoming payments table must use the data-table class");
-        body.Should().Contain("Due today",
-            because: "a reminder due today must show the Due today badge");
-        body.Should().Contain("badge-warning",
-            because: "the due-today badge must use the amber badge-warning class");
-    }
-
-    [Fact]
-    public async Task AnyPage_NavbarRoot_RendersDataUpcomingCountAttribute()
-    {
-        var response = await _client.GetAsync("/RecurringTransactions/Upcoming");
-        var body     = await response.Content.ReadAsStringAsync();
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        body.Should().Contain("data-upcoming-count",
-            because: "the navbar root must render data-upcoming-count for the React bell badge");
-    }
 }

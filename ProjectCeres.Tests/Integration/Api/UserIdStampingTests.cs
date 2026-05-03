@@ -169,18 +169,19 @@ public class UserIdStampingTests : IAsyncLifetime
     {
         using var scope = _factory.Services.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.IRecurringTransactionService>();
-        var vm = new ProjectCeres.ViewModels.RecurringTransactionCreateViewModel
-        {
-            Name              = $"StampedRecurring-{Guid.NewGuid():N}",
-            EstimatedAmount   = 100m,
-            AccountId         = (Guid?)CheckingAccountId,
-            CategoryId        = (Guid?)SalaryCategoryId,
-            Frequency         = ProjectCeres.Models.Frequency.Monthly,
-            DayOfPeriod       = 1,
-            NextDueDate       = new DateOnly(2026, 6, 1),
-            ReminderBehaviour = ProjectCeres.Models.ReminderBehaviour.SnapToCalendarDay
-        };
-        var created = await svc.CreateAsync(vm);
+        var request = new ProjectCeres.ViewModels.CreateRecurringTransactionRequest(
+            Name:              $"StampedRecurring-{Guid.NewGuid():N}",
+            EstimatedAmount:   100m,
+            AccountId:         CheckingAccountId,
+            CategoryId:        SalaryCategoryId,
+            Frequency:         "Monthly",
+            DayOfPeriod:       1,
+            NextDueDate:       new DateOnly(2026, 6, 1),
+            ReminderBehaviour: "SnapToCalendarDay"
+        );
+        var result = await svc.TryCreateAsync(request);
+        result.IsSuccess.Should().BeTrue();
+        var created = result.Value!;
         _createdRecurringIds.Add(created.Id);
 
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -191,25 +192,34 @@ public class UserIdStampingTests : IAsyncLifetime
     [Fact]
     public async Task RecurringTransactionService_ConfirmAsync_stamps_UserId_on_created_transaction()
     {
-        // ConfirmAsync converts a recurring template into a real Transaction. The created
+        // TryConfirmAsync converts a recurring template into a real Transaction. The created
         // Transaction must inherit the user's id.
         using var scope = _factory.Services.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.IRecurringTransactionService>();
 
-        var template = await svc.CreateAsync(new ProjectCeres.ViewModels.RecurringTransactionCreateViewModel
-        {
-            Name              = $"ConfirmSrc-{Guid.NewGuid():N}",
-            EstimatedAmount   = 200m,
-            AccountId         = (Guid?)CheckingAccountId,
-            CategoryId        = (Guid?)SalaryCategoryId,
-            Frequency         = ProjectCeres.Models.Frequency.Monthly,
-            DayOfPeriod       = 1,
-            NextDueDate       = new DateOnly(2026, 6, 1),
-            ReminderBehaviour = ProjectCeres.Models.ReminderBehaviour.SnapToCalendarDay
-        });
+        var templateResult = await svc.TryCreateAsync(new ProjectCeres.ViewModels.CreateRecurringTransactionRequest(
+            Name:              $"ConfirmSrc-{Guid.NewGuid():N}",
+            EstimatedAmount:   200m,
+            AccountId:         CheckingAccountId,
+            CategoryId:        SalaryCategoryId,
+            Frequency:         "Monthly",
+            DayOfPeriod:       1,
+            NextDueDate:       new DateOnly(2026, 6, 1),
+            ReminderBehaviour: "SnapToCalendarDay"
+        ));
+        templateResult.IsSuccess.Should().BeTrue();
+        var template = templateResult.Value!;
         _createdRecurringIds.Add(template.Id);
 
-        var tx = await svc.ConfirmAsync(template.Id, new DateOnly(2026, 6, 1), 200m, "confirmed");
+        var confirmResult = await svc.TryConfirmAsync(template.Id,
+            new ProjectCeres.ViewModels.ConfirmRecurringTransactionRequest(
+                Date:        new DateOnly(2026, 6, 1),
+                Amount:      200m,
+                Description: "confirmed",
+                NextDueDate: null
+            ));
+        confirmResult.IsSuccess.Should().BeTrue();
+        var tx = confirmResult.Value!;
         _createdTransactionIds.Add(tx.Id);
 
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
