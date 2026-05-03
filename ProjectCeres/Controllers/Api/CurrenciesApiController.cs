@@ -12,6 +12,6 @@ public class CurrenciesApiController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Get() =>
         Ok(await db.Currencies
             .OrderBy(c => c.Code)
-            .Select(c => new { id = c.Id, code = c.Code, symbol = c.Symbol })
+            .Select(c => new { id = c.Id, code = c.Code, name = c.Name, symbol = c.Symbol })
             .ToListAsync());
 }

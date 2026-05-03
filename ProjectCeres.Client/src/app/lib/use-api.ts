@@ -36,7 +36,7 @@ export function useApi<T>(url: string): UseApiResult<T> {
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ data: undefined, error: undefined, loading: true });
+    setState((prev) => ({ data: prev.data, error: undefined, loading: true }));
 
     fetch(url, { signal: controller.signal })
       .then(async (response) => {

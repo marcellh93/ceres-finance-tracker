@@ -178,8 +178,8 @@ function PayoffProjectionCard({
           <dd className="tabular-nums">{(annualRate * 100).toFixed(2)}%</dd>
         </dl>
 
-        <div className="mt-4 flex items-end gap-3">
-          <div className="flex-1">
+        <div className="mt-6 flex items-end gap-3">
+          <div className="flex-1 space-y-1.5">
             <Label htmlFor="monthlyPayment">Monthly payment</Label>
             <Input
               id="monthlyPayment"
