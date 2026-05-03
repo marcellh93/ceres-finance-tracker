@@ -420,6 +420,9 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         var id = await CreateOne();
         var res = await _client.PatchAsync($"/api/recurring-transactions/{id}/reactivate", null);
         res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var get = await _client.GetFromJsonAsync<JsonElement>($"/api/recurring-transactions/{id}");
+        get.GetProperty("isActive").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
