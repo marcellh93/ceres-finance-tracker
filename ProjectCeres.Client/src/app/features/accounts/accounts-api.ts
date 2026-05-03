@@ -3,6 +3,7 @@
 export const ACCOUNTS_URL = '/api/accounts';
 export const ACCOUNT_BY_ID_URL = (id: string) => `/api/accounts/${id}`;
 export const ACCOUNT_ARCHIVE_URL = (id: string) => `/api/accounts/${id}/archive`;
+export const ACCOUNT_REACTIVATE_URL = (id: string) => `/api/accounts/${id}/reactivate`;
 export const ACCOUNT_LEDGER_URL = (id: string) => `/api/accounts/${id}/ledger`;
 export const ACCOUNT_TYPES_URL = '/api/account-types';
 export const CURRENCIES_URL = '/api/currencies';

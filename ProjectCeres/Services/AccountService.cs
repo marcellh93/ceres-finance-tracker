@@ -364,4 +364,13 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
         await db.SaveChangesAsync();
         return Result.Ok();
     }
+
+    public async Task<Result> TryReactivateAsync(Guid id)
+    {
+        var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == id);
+        if (account is null) return Result.Fail("NOT_FOUND", "Account not found.");
+        account.IsActive = true;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
 }

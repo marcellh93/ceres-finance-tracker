@@ -56,10 +56,11 @@ describe('AccountRowMenu', () => {
     expect(screen.getByText('Archive…')).toBeInTheDocument();
   });
 
-  it('shows only View ledger for archived rows', async () => {
+  it('shows View ledger + Reactivate for archived rows', async () => {
     renderMenu(archived);
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
     expect(await screen.findByText('View ledger')).toBeInTheDocument();
+    expect(screen.getByText('Reactivate')).toBeInTheDocument();
     expect(screen.queryByText('Edit')).toBeNull();
     expect(screen.queryByText('Archive…')).toBeNull();
   });
@@ -103,6 +104,16 @@ describe('AccountRowMenu', () => {
     fireEvent.click(await screen.findByText('Archive…'));
     fireEvent.click(await screen.findByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Archived.'));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('reactivate 204 fires toast.success and onChanged', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204, json: async () => null });
+    const onChanged = vi.fn();
+    renderMenu(archived, onChanged);
+    fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
+    fireEvent.click(await screen.findByText('Reactivate'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reactivated.'));
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
 

@@ -109,6 +109,13 @@ public class AccountsApiController(
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
+    [HttpPatch("{id:guid}/reactivate")]
+    public async Task<IActionResult> Reactivate(Guid id)
+    {
+        var result = await accountService.TryReactivateAsync(id);
+        return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
+    }
+
     [HttpGet("{id:guid}/ledger")]
     public async Task<ActionResult<AccountLedgerDto>> GetLedger(Guid id)
     {

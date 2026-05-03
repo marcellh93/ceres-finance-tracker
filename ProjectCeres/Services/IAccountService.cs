@@ -21,4 +21,5 @@ public interface IAccountService
     Task<Result<Account>> TryCreateAsync(CreateAccountRequest request);
     Task<Result<Account>> TryUpdateAsync(Guid id, UpdateAccountRequest request);
     Task<Result> TryDeactivateAsync(Guid id);
+    Task<Result> TryReactivateAsync(Guid id);
 }

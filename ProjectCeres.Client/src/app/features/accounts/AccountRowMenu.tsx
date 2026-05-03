@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ACCOUNT_ARCHIVE_URL, type AccountListItemDto } from './accounts-api';
+import { ACCOUNT_ARCHIVE_URL, ACCOUNT_REACTIVATE_URL, type AccountListItemDto } from './accounts-api';
 
 const ARCHIVE_COPY_EMPTY =
   "This account has no transactions. It will be hidden from the active list and pickers; you can find it again with the Include archived toggle. Safe to archive.";
@@ -52,6 +52,20 @@ export function AccountRowMenu({ account, onChanged }: Props) {
     }
   }
 
+  async function handleReactivate() {
+    try {
+      const response = await fetch(ACCOUNT_REACTIVATE_URL(account.id), { method: 'PATCH' });
+      if (response.ok) {
+        toast.success('Reactivated.');
+        onChanged();
+        return;
+      }
+      toast.error("Couldn't reactivate. Try again.");
+    } catch {
+      toast.error("Couldn't reactivate. Try again.");
+    }
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -75,7 +89,11 @@ export function AccountRowMenu({ account, onChanged }: Props) {
             <DropdownMenuItem onClick={() => setConfirmOpen(true)}>
               Archive…
             </DropdownMenuItem>
-          ) : null}
+          ) : (
+            <DropdownMenuItem onClick={handleReactivate}>
+              Reactivate
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
