@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { CardError } from '../../components/CardError';
 import { useApi, type UseApiResult } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
+import { useReminderCount } from '../../layout/ReminderCountProvider';
 import { RecurringTable } from './RecurringTable';
 import { buildListUrl, type RecurringTransactionListItemDto } from './recurring-api';
 
@@ -46,7 +47,7 @@ export function RecurringLayout() {
   const list = useApi<RecurringTransactionListItemDto[]>(buildListUrl(includeInactive));
   const allList = useApi<RecurringTransactionListItemDto[]>('/api/recurring-transactions?includeInactive=true');
 
-  const refreshBell = () => {}; // replaced by ReminderCountProvider in Task 18
+  const { refresh: refreshBell } = useReminderCount();
   const refetch = () => { list.refetch(); allList.refetch(); };
   const ctx: RecurringLayoutCtx = { refetch, refreshBell };
 

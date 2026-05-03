@@ -20,7 +20,7 @@ export function ReminderCountProvider({ children }: { children: React.ReactNode 
     reminders: api.data ?? [],
     loading: api.loading,
     refresh: api.refetch,
-  }), [api.data, api.loading, api.refetch]);
+  }), [api.data, api.loading]);
 
   return <ReminderCountContext.Provider value={value}>{children}</ReminderCountContext.Provider>;
 }

@@ -122,7 +122,7 @@ function NotificationsButton() {
                 aria-hidden
                 className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground font-semibold"
               >
-                {count > 9 ? '9+' : count}
+                {count > 9 ? '9+' : String(count)}
               </span>
             )}
           </Button>

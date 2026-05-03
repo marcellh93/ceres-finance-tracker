@@ -7,16 +7,17 @@ import { ReminderCountProvider } from './ReminderCountProvider';
 beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: (query: string) => ({
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
       matches: true, // pretend we're on desktop
       media: query,
       onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => true,
-    }),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
   });
   // ReminderCountProvider fetches on mount — provide a default empty response
   global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
