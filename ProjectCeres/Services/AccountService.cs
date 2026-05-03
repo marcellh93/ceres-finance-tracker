@@ -356,11 +356,12 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
         return Result<Account>.Ok(account);
     }
 
-    public async Task<Result> TryDeactivateAsync(Guid id)
+    public async Task<Result> TryDeactivateAsync(Guid id, bool excludeFromReports = false)
     {
         var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == id);
         if (account is null) return Result.Fail("NOT_FOUND", "Account not found.");
         account.IsActive = false;
+        account.ExcludeFromReports = excludeFromReports;
         await db.SaveChangesAsync();
         return Result.Ok();
     }
@@ -370,6 +371,10 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
         var account = await db.Accounts.Owned(user).FirstOrDefaultAsync(a => a.Id == id);
         if (account is null) return Result.Fail("NOT_FOUND", "Account not found.");
         account.IsActive = true;
+        // Reactivating an account always re-includes it in reports — the flag's
+        // only meaning is "this archived account opted out", which doesn't apply
+        // to active accounts.
+        account.ExcludeFromReports = false;
         await db.SaveChangesAsync();
         return Result.Ok();
     }

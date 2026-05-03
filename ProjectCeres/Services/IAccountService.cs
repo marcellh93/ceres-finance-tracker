@@ -20,6 +20,6 @@ public interface IAccountService
     // API surface (Result-returning).
     Task<Result<Account>> TryCreateAsync(CreateAccountRequest request);
     Task<Result<Account>> TryUpdateAsync(Guid id, UpdateAccountRequest request);
-    Task<Result> TryDeactivateAsync(Guid id);
+    Task<Result> TryDeactivateAsync(Guid id, bool excludeFromReports = false);
     Task<Result> TryReactivateAsync(Guid id);
 }

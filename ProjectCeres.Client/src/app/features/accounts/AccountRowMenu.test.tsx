@@ -85,18 +85,28 @@ describe('AccountRowMenu', () => {
     fireEvent.click(await screen.findByText('Archive…'));
     expect(await screen.findByText(/archive 'cash'\?/i)).toBeInTheDocument();
     expect(screen.getByText(/no transactions/i)).toBeInTheDocument();
-    expect(screen.getByText(/safe to archive/i)).toBeInTheDocument();
   });
 
-  it('archive dialog uses consequence copy for accounts with transactions', async () => {
+  it('archive dialog hides the exclude-from-reports switch for empty accounts', async () => {
+    renderMenu(activeEmpty);
+    fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
+    fireEvent.click(await screen.findByText('Archive…'));
+    await screen.findByText(/archive 'cash'\?/i);
+    // The switch only applies when there are transactions to count toward
+    // net worth — empty accounts contribute nothing either way.
+    expect(screen.queryByLabelText(/exclude from net worth/i)).toBeNull();
+  });
+
+  it('archive dialog uses consequence copy + exclude switch for accounts with transactions', async () => {
     renderMenu(activeWithTransactions);
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
     fireEvent.click(await screen.findByText('Archive…'));
     expect(await screen.findByText(/archive 'checking account'\?/i)).toBeInTheDocument();
     expect(screen.getByText(/still counts toward your net worth/i)).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /exclude from net worth and reports/i })).toBeInTheDocument();
   });
 
-  it('archive 204 fires toast.success and onChanged', async () => {
+  it('archive 204 fires toast.success, onChanged, and sends excludeFromReports=false by default', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 204, json: async () => null });
     const onChanged = vi.fn();
     renderMenu(activeWithTransactions, onChanged);
@@ -105,6 +115,22 @@ describe('AccountRowMenu', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Archived.'));
     expect(onChanged).toHaveBeenCalledTimes(1);
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ excludeFromReports: false });
+  });
+
+  it('archive sends excludeFromReports=true when the switch is toggled on', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 204, json: async () => null });
+    renderMenu(activeWithTransactions);
+    fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
+    fireEvent.click(await screen.findByText('Archive…'));
+    const sw = await screen.findByRole('switch', { name: /exclude from net worth and reports/i });
+    fireEvent.click(sw);
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Archived.'));
+    const [, init] = mockFetch.mock.calls[0];
+    expect(JSON.parse(init.body as string)).toEqual({ excludeFromReports: true });
   });
 
   it('reactivate 204 fires toast.success and onChanged', async () => {

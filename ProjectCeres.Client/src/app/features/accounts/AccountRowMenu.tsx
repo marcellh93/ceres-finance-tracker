@@ -19,13 +19,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { ACCOUNT_ARCHIVE_URL, ACCOUNT_REACTIVATE_URL, type AccountListItemDto } from './accounts-api';
 
 const ARCHIVE_COPY_EMPTY =
-  "This account has no transactions. It will be hidden from the active list and pickers; you can find it again with the Include archived toggle. Safe to archive.";
+  "This account has no transactions. It will be hidden from the active list and pickers; you can find it again with the Include archived toggle.";
 
 const ARCHIVE_COPY_NON_EMPTY =
-  "This account will be hidden from the active list and pickers. Existing transactions stay attached to it, and the balance still counts toward your net worth and reports. You can find archived accounts with the toggle.";
+  "This account will be hidden from the active list and pickers. Existing transactions stay attached to it. By default the balance still counts toward your net worth and reports — toggle the option below to exclude it.";
 
 type Props = {
   account: AccountListItemDto;
@@ -36,11 +38,22 @@ type Props = {
 export function AccountRowMenu({ account, onChanged }: Props) {
   const navigate = useNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [excludeFromReports, setExcludeFromReports] = useState(false);
+
+  function openConfirm() {
+    setExcludeFromReports(false);
+    setConfirmOpen(true);
+  }
 
   async function handleArchive() {
+    const exclude = excludeFromReports;
     setConfirmOpen(false);
     try {
-      const response = await fetch(ACCOUNT_ARCHIVE_URL(account.id), { method: 'PATCH' });
+      const response = await fetch(ACCOUNT_ARCHIVE_URL(account.id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excludeFromReports: exclude }),
+      });
       if (response.ok) {
         toast.success('Archived.');
         onChanged();
@@ -86,7 +99,7 @@ export function AccountRowMenu({ account, onChanged }: Props) {
             View ledger
           </DropdownMenuItem>
           {account.isActive ? (
-            <DropdownMenuItem onClick={() => setConfirmOpen(true)}>
+            <DropdownMenuItem onClick={openConfirm}>
               Archive…
             </DropdownMenuItem>
           ) : (
@@ -105,6 +118,18 @@ export function AccountRowMenu({ account, onChanged }: Props) {
               {account.hasTransactions ? ARCHIVE_COPY_NON_EMPTY : ARCHIVE_COPY_EMPTY}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {account.hasTransactions ? (
+            <div className="flex items-start gap-3 rounded-md border border-input bg-muted/40 px-3 py-3">
+              <Switch
+                id="excludeFromReports"
+                checked={excludeFromReports}
+                onCheckedChange={setExcludeFromReports}
+              />
+              <Label htmlFor="excludeFromReports" className="text-sm font-normal leading-tight cursor-pointer">
+                Also exclude from net worth and reports
+              </Label>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleArchive}>Archive</AlertDialogAction>

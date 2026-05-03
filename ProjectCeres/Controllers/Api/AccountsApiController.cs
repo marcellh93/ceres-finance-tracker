@@ -53,7 +53,7 @@ public class AccountsApiController(
             dtos.Add(new AccountListItemDto(
                 a.Id, a.Name, a.AccountTypeId, a.AccountType.Name,
                 a.CurrencyId, a.Currency.Code, a.Currency.Symbol,
-                a.Description, a.IsActive, a.ExcludeFromSpendable,
+                a.Description, a.IsActive, a.ExcludeFromSpendable, a.ExcludeFromReports,
                 a.LiabilityRepaymentType, a.InterestRate, balance, hasTransactions));
         }
         return Ok(dtos);
@@ -75,7 +75,7 @@ public class AccountsApiController(
         return new AccountDetailDto(
             a.Id, a.Name, a.AccountTypeId, a.AccountType.Name,
             a.CurrencyId, a.Currency.Code, a.Currency.Symbol,
-            a.Description, a.IsActive, a.ExcludeFromSpendable,
+            a.Description, a.IsActive, a.ExcludeFromSpendable, a.ExcludeFromReports,
             a.LiabilityRepaymentType, a.InterestRate,
             openingBalance, openingBalanceDate);
     }
@@ -89,7 +89,7 @@ public class AccountsApiController(
         var dto = new AccountListItemDto(
             a.Id, a.Name, a.AccountTypeId, a.AccountType.Name,
             a.CurrencyId, a.Currency.Code, a.Currency.Symbol,
-            a.Description, a.IsActive, a.ExcludeFromSpendable,
+            a.Description, a.IsActive, a.ExcludeFromSpendable, a.ExcludeFromReports,
             a.LiabilityRepaymentType, a.InterestRate, request.OpeningBalance,
             request.OpeningBalance != 0);
         return Created($"/api/accounts/{a.Id}", dto);
@@ -103,9 +103,10 @@ public class AccountsApiController(
     }
 
     [HttpPatch("{id:guid}/archive")]
-    public async Task<IActionResult> Archive(Guid id)
+    public async Task<IActionResult> Archive(Guid id, [FromBody] ArchiveAccountRequest? request = null)
     {
-        var result = await accountService.TryDeactivateAsync(id);
+        var excludeFromReports = request?.ExcludeFromReports ?? false;
+        var result = await accountService.TryDeactivateAsync(id, excludeFromReports);
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 

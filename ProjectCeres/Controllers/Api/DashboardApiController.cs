@@ -152,7 +152,7 @@ public class DashboardApiController(
 
         var accounts = await db.Accounts
             .Owned(user)
-            .Where(a => a.CurrencyId == currencyId)
+            .Where(a => a.CurrencyId == currencyId && !a.ExcludeFromReports)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
                 .ThenInclude(t => t.Category)

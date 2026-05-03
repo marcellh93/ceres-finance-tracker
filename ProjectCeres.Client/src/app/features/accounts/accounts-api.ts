@@ -28,6 +28,7 @@ export type AccountListItemDto = {
   description: string | null;
   isActive: boolean;
   excludeFromSpendable: boolean;
+  excludeFromReports: boolean;
   liabilityRepaymentType: RepaymentType | null;
   interestRate: number | null;
   balance: number;
@@ -45,6 +46,7 @@ export type AccountDetailDto = {
   description: string | null;
   isActive: boolean;
   excludeFromSpendable: boolean;
+  excludeFromReports: boolean;
   liabilityRepaymentType: RepaymentType | null;
   interestRate: number | null;
   openingBalance: number;

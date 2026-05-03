@@ -13,6 +13,7 @@ public record AccountListItemDto(
     string? Description,
     bool    IsActive,
     bool    ExcludeFromSpendable,
+    bool    ExcludeFromReports,
     string? LiabilityRepaymentType,
     decimal? InterestRate,
     decimal Balance,
@@ -29,6 +30,7 @@ public record AccountDetailDto(
     string? Description,
     bool    IsActive,
     bool    ExcludeFromSpendable,
+    bool    ExcludeFromReports,
     string? LiabilityRepaymentType,
     decimal? InterestRate,
     decimal OpeningBalance,
@@ -55,6 +57,8 @@ public record UpdateAccountRequest(
     string? LiabilityRepaymentType,
     [Range(0.0, 1.0)] decimal? InterestRate,
     bool ExcludeFromSpendable);
+
+public record ArchiveAccountRequest(bool ExcludeFromReports);
 
 public record LedgerEntryDto(
     DateOnly Date,

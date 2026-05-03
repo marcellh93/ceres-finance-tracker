@@ -12,6 +12,7 @@ public class Account : IUserOwned
     public string? Description { get; set; }
     public bool IsActive { get; set; }
     public bool ExcludeFromSpendable { get; set; }
+    public bool ExcludeFromReports { get; set; }
     public string? LiabilityRepaymentType { get; set; }
     [Column(TypeName = "decimal(5,4)")]
     public decimal? InterestRate { get; set; }

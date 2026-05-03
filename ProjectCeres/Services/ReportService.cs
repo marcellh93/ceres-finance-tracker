@@ -9,10 +9,14 @@ public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReport
 {
     public async Task<IReadOnlyList<NetWorthEntry>> GetNetWorthAsync()
     {
-        // Load all accounts (including archived) — deactivated accounts still count
-        // toward net worth per models.md lines 276–281.
+        // Include all accounts that contribute to net worth — active accounts
+        // always do; archived accounts do too unless the user explicitly
+        // opted out at archive time via ExcludeFromReports. Active accounts
+        // always have ExcludeFromReports = false (reactivate auto-clears),
+        // so a single "!ExcludeFromReports" filter covers both cases.
         var accounts = await db.Accounts
             .Owned(user)
+            .Where(a => !a.ExcludeFromReports)
             .Include(a => a.Currency)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
