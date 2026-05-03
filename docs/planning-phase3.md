@@ -262,20 +262,27 @@ shadcn/ui covers the Phase 2 baseline. Phase 3 additions required:
 
 ### 14. Implementation order
 
-1. Token layer + `docs/design-system.md` — zero visible change; everything downstream depends on it
-2. App shell (sidebar, top bar, responsive behavior)
-3. Auth screens (login, TOTP, register, password reset) — outside the shell
-4. Onboarding wizard — outside the shell
+> The list below is the **architectural sequencing** — what depends on what at the API + auth + design-system layers. The actual frontend execution was reorganised into batches once Phase 2's API surface and the sentinel-based pre-auth scaffolding made it clear that most SPA work is unblocked by Auth/Onboarding. **Source of truth for the running batch order: [planning-phase3-spa-migration.md → "Frontend execution batches"](planning-phase3-spa-migration.md#frontend-execution-batches--actual-revised-order-locked-2026-05-02).**
+
+
+1. Token layer + `docs/design-system.md` — zero visible change; everything downstream depends on it ✓
+2. App shell (sidebar, top bar, responsive behavior) ✓
+3. Auth screens (login, TOTP, register, password reset) — **deferred to Batch 3** (after every Razor view is deleted; sentinel `SingleUserAccessor` covers identity in the meantime)
+4. Onboarding wizard — **deferred to Batch 3** (same reason as above)
 5. Dashboard — first page inside the shell ✓ **Migrated (2026-04-29).** All 5 chart endpoints ship typed wrapper DTOs with `currencyCode`/`currencySymbol`. React dashboard is live at `/app/`. Razor dashboard view, partial, and controller deleted; 302 redirect from `/Dashboard` → `/app/` is live.
 6. Movements + Transactions + Transfers — highest daily usage; includes quick-add, per-table search, saved searches
    - ✓ **Movements list page + quick-add (2026-04-30).** SPA Movements at `/app/movements` with text search + 3 filters. Quick-add modal wired to TopBar `+` and Movements page header. POST endpoints for Transactions, Transfers, Liability Payments. Sonner toasts. Razor `MovementsController` redirected to SPA.
    - ✓ **Full Transactions/Transfers/LiabilityPayments CRUD (2026-05-01).** SPA Movements supports Create/Edit/Delete via routed pages at `/app/movements/new` and `/app/movements/:id/edit`. Attachments via two-phase upload on Edit. Bulk-cleared and CSV export buttons in the page header. Razor `TransactionsController` and `TransfersController` page actions now 302-redirect to the SPA. See spec: `docs/superpowers/specs/2026-04-30-movements-crud.md`. Plans: `docs/superpowers/plans/2026-04-30-movements-crud-plan-{1,2,3}-*.md`.
    - Pending: Per-table search & saved searches (own brainstorm).
    - ✓ **Budgets — full CRUD with archive lifecycle (2026-05-01).** Unified `/app/budgets` page with Category and Goal tabs. `Settings.PeriodStartDay` (1–31, originally shipped as `BudgetPeriodStartDay`) implemented; every monthly view (Cycle to Date, Spending by Category, Income vs. Avg, CategoryBudget actual-spend) respects the configured cycle. Razor `BudgetsController` page actions 302-redirect to the SPA. Spec: `docs/superpowers/specs/2026-05-01-budgets-spa-design.md`. Plan: `docs/superpowers/plans/2026-05-01-budgets-spa-implementation.md`.
-   - Pending: Reports (Step 5b — separate plan).
 7. Accounts + Categories + Budgets + Recurring Transactions — management screens
+   - ✓ **Categories — list + nested CRUD + archive lifecycle (2026-05-02).** SPA at `/app/categories` with `/new` and `/:id/edit`. AlertDialog-confirmed archive flow, 409 in-use error surfaced in the toast, system rows pinned with leading lock icon, `Save` + `Cancel` form pattern. Razor `CategoriesController` slimmed to four 302 redirects; Razor views and throwing service methods deleted (covered at the API level by `CategoriesCrudApiTests`). Spec: `docs/superpowers/specs/2026-05-02-categories-spa-design.md`. Plan: `docs/superpowers/plans/2026-05-02-categories-spa.md`.
+   - Pending: Accounts (Batch 2 #3), Recurring (Batch 2 #4).
 8. Reports + Import/Export — complex, lower frequency
+   - Pending: Reports (Batch 2 #5), Review (Batch 2 #6 — reconciliation review for unattended-import staged transactions/transfers), Import (Batch 2 #7).
 9. Settings + Sessions + Support — lowest frequency; includes saved searches management
+   - ✓ **Settings — first SPA-pattern pilot (2026-05-02).** SPA at `/app/settings` exercising the locked `features/<area>/` template + Popover+Command pickers + `useApi` GET / hand-rolled `fetch` PATCH idiom. Razor `SettingsController` page action 302-redirects to the SPA; Razor view + view models deleted. Spec: `docs/superpowers/specs/2026-05-02-spa-page-pattern-and-settings-design.md`. Plan: `docs/superpowers/plans/2026-05-02-spa-page-pattern-and-settings.md`.
+   - Pending: Sessions (after Batch 3 Auth lands), Support (after Batch 3).
 
 ---
 

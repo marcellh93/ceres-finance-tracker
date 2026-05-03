@@ -49,10 +49,10 @@
 | `TransactionsController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `BulkMarkCleared` and `ToggleCleared` POST actions remain `[Obsolete]` until final SPA cleanup. |
 | `TransfersController` | Index, Create, Edit, Delete | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/movements*`. Razor views deleted. `ToggleCleared` POST action remains `[Obsolete]` until final SPA cleanup. |
 | `BudgetsController` | Index, Create, Edit, Deactivate (×2 for Category + Goal) | **Migrated (2026-05-01).** Page actions 302-redirect to `/app/budgets/*`. Razor views deleted. POST overloads removed entirely (the SPA POSTs JSON to the new `/api/category-budgets` and `/api/goal-budgets`). |
-| `CategoriesController` | Index, Create, Edit, Deactivate | — |
+| `CategoriesController` | Index, Create, Edit, Deactivate | **Migrated (2026-05-02).** SPA at `/app/categories` with nested `/new` and `/:id/edit` routes. Page actions 302-redirect to the SPA. Razor views deleted; throwing `CreateAsync`/`UpdateAsync`/`DeactivateAsync` service methods removed (covered at the API level by `CategoriesCrudApiTests`). Spec: `docs/superpowers/specs/2026-05-02-categories-spa-design.md`. Plan: `docs/superpowers/plans/2026-05-02-categories-spa.md`. |
 | `RecurringTransactionsController` | Index, Create, Edit, Deactivate, Confirm, Dismiss | Confirm and Dismiss are stateful actions — design endpoint contract carefully |
 | `ReportsController` | Index + 8 report views + 8 CSV exports | Each report → `GET /api/reports/{type}` with `?format=csv` for the export branch. SavedReport entity is `IUserOwned` and dormant; CRUD is a deliberate follow-up since neither the Razor app nor the API exposes it today. |
-| `SettingsController` | Edit | → `GET /api/settings` + `PATCH /api/settings` |
+| `SettingsController` | Edit | **Migrated (2026-05-02).** SPA at `/app/settings`; `GET /api/settings` + `PATCH /api/settings` already shipped in Phase 2. Page action 302-redirects to the SPA. Razor view and view models deleted. Spec: `docs/superpowers/specs/2026-05-02-spa-page-pattern-and-settings-design.md`. Plan: `docs/superpowers/plans/2026-05-02-spa-page-pattern-and-settings.md`. **This is the SPA-page template** — Categories and the four remaining management screens (Accounts, Recurring, Reports, Review, Import) follow the patterns it locked. |
 | `DashboardController` | Index | **Migrated (2026-04-29).** Dashboard is fully React; data served by `DashboardApiController`. 302 redirect from `/Dashboard` → `/app/` is live; Razor dashboard view, partial, and controller deleted. |
 | `MovementsController` | Index | **Migrated (2026-04-30).** Movements list is fully React at `/app/movements`. 302 redirect from `/Movements` → `/app/movements` is live; `Views/Movements/Index.cshtml` is deleted. |
 | `AttachmentsController` | Serve, Delete | File serving needs special handling: streaming response, `Content-Disposition: attachment` |
@@ -166,6 +166,38 @@ Do not delete Razor in a single "big bang" PR. Port feature area by feature area
 5. Budgets + Reports
 6. Accounts + Categories + Recurring Transactions
 7. Settings + Session management + Support tickets
+
+### Frontend execution batches — actual revised order (locked 2026-05-02)
+
+The original feature-area order above describes the **architectural sequencing** — what depends on what at the API + auth + design-system layers. The actual frontend execution diverged for two reasons that became clear once Phase 2 wrapped:
+
+1. **Most API endpoints already shipped in Phase 2.** Movements, Transfers, Budgets, Categories, Recurring, Reports, and CSV import all have working API controllers; the SPA migration is now mostly a frontend exercise. This means the frontend can run ahead of auth without being blocked.
+2. **Sentinel-based pre-auth.** `SingleUserAccessor` (see `ProjectCeres/Common/ICurrentUserAccessor.cs`) stamps every user-owned row with `00000000-0000-0000-0000-000000000001` until real Identity-backed auth lands. This unblocks every SPA page from depending on the Auth/Onboarding work, which was originally sequenced first because it was assumed to be a hard prerequisite. It is not — at auth time, a one-shot data migration remaps the sentinel to the first registered user's real Id and the FK to `AspNetUsers` is added.
+
+With those two facts established, the frontend was reorganised into batches:
+
+**Batch 1 — Foundation (complete):**
+- Design system tokens + `docs/design-system.md` (2026-04-29)
+- App shell — sidebar, top bar, responsive behavior (2026-04-29)
+- Dashboard SPA (2026-04-29)
+- Movements + Transactions + Transfers SPA, including quick-add (2026-04-30 → 2026-05-01)
+- Budgets SPA (2026-05-01)
+
+**Batch 2 — Pattern-validation pages (in progress):** Settings was promoted to first because it is the smallest possible page (one form, one resource, no list, no nested routes) and its purpose was to **lock the SPA-page template** that every remaining management screen would copy. Categories followed as the second pilot, exercising the template against a more complex shape (list + nested Create/Edit routes + archive lifecycle + system-row treatment). The remaining five pages port that template area-by-area.
+
+| # | Page | Status | Notes |
+|---|------|--------|-------|
+| 1 | Settings | ✅ Migrated 2026-05-02 (commit `e842250`) | First pilot — locked the `features/<area>/` + page+form split + Popover+Command picker idiom. |
+| 2 | Categories | ✅ Migrated 2026-05-02 (commit `9578f9a` + follow-ups `132d5df`, `87f6709`) | Second pilot — exercised the template against list + nested CRUD + archive + system-row UX. |
+| 3 | Accounts | Pending | Closest in shape to Categories (CRUD with deactivate-not-delete, system Opening Balance row). |
+| 4 | Recurring | Pending | Adds frequency rules + next-due-date computation; Confirm/Dismiss stateful actions. |
+| 5 | Reports | Pending | Largest scope: 8 report views + 8 CSV exports. SavedReport CRUD is deferred (ADR-0055). |
+| 6 | Review | Pending | Reconciliation review — unattended-import staged transactions/transfers triage. |
+| 7 | Import | Pending | CSV import with column mapping + transfer-detection confidence. |
+
+**Batch 3 — Auth + Onboarding (deferred until Batch 2 ships):** Auth screens, TOTP, registration, password reset, and the first-run onboarding wizard land after every Razor view is gone, so the sentinel-to-real-user data migration is the only remaining identity concern. Sequencing this last avoids re-touching SPA pages to wire `useAuth` mid-flight.
+
+**Batch 4 — Cleanup:** Drop the `/app/` prefix, add the one-shot `/app/*` → `/*` 301, delete every per-area 302 redirect added during migration, strip MVC infrastructure from `Program.cs`. See "Final cleanup plan" below.
 
 ### Per-area redirect rules (during migration)
 
