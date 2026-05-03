@@ -1,11 +1,13 @@
 import { Bell, Menu, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AvatarMenu } from './AvatarMenu';
 import { BrandMark } from './BrandMark';
+import { useReminderCount } from './ReminderCountProvider';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import { QuickAddModal } from '../components/QuickAddModal';
 import { SearchModal } from '../components/SearchModal';
 import { isMac, useKeyboardShortcut } from '../lib/use-keyboard-shortcut';
@@ -96,17 +98,73 @@ export function TopBar({ onMenuClick }: TopBarProps) {
 }
 
 function NotificationsButton() {
+  const { count, reminders, loading, refresh } = useReminderCount();
+  const [open, setOpen] = useState(false);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) refresh();
+  }
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         render={
-          <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={count > 0 ? `Notifications, ${count} due` : 'Notifications'}
+            className="relative"
+          >
             <Bell className="h-5 w-5" />
+            {count > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground font-semibold"
+              >
+                {count > 9 ? '9+' : count}
+              </span>
+            )}
           </Button>
         }
       />
-      <PopoverContent align="end" className="w-72">
-        <p className="text-sm text-muted-foreground">You have no notifications.</p>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="px-3 py-2 border-b text-sm font-medium">Reminders</div>
+        {loading ? (
+          <div className="px-3 py-4 space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        ) : reminders.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-muted-foreground">
+            Nothing due. You&apos;re all caught up.
+          </p>
+        ) : (
+          <ul className="max-h-72 overflow-y-auto divide-y">
+            {reminders.map((r) => (
+              <li key={r.id} className="px-3 py-2">
+                <Link
+                  to="/recurring"
+                  onClick={() => setOpen(false)}
+                  className="text-sm hover:underline block"
+                >
+                  {r.name} — {r.nextDueDate}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="px-3 py-2 border-t">
+          <Button
+            variant="link"
+            size="sm"
+            render={
+              <Link to="/recurring" onClick={() => setOpen(false)}>
+                View all reminders →
+              </Link>
+            }
+          />
+        </div>
       </PopoverContent>
     </Popover>
   );
