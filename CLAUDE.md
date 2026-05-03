@@ -87,9 +87,18 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 - `docs/security-model.md` — threat model, data protection rules, access control rules (unified view)
 - `docs/api-contract.md` — API conventions, response shape, versioning strategy (Phase 3+)
 - `docs/multi-tenancy-strategy.md` — Phase 3 migration plan for scoping all data to users
+- `docs/design-system.md` — React client design system: tokens, primitives, recipes. Source of truth for UI look-and-feel.
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
 - When an open question in any planning doc (`docs/planning.md`, `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md`) is resolved, remove it from Open Questions, mark it `[x]`, and append it to `docs/planning-resolved.md`. If the decision is architectural, execute the sync-docs skill.
+
+## Frontend Work
+
+For any change to `ProjectCeres.Client/` (React/TS, styling, layout, copy):
+1. Read `docs/design-system.md` — use existing tokens/recipes; never hard-code values.
+2. Invoke `frontend-design` for visual design and `vercel-react-best-practices` for React perf patterns before proposing.
+3. Show the result; wait for approval before committing.
+4. Before commit, run `web-design-guidelines` against the changed files as a final audit.
 
 ## After Completing Any Stage
 

@@ -24,7 +24,7 @@ export function ReportTableCard({ slug, queryString, children }: Props) {
           onClick={() => toast.info('Exporting report…')}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-2 no-underline')}
         >
-          <Download className="h-4 w-4" />
+          <Download className="h-4 w-4" aria-hidden="true" />
           Export CSV
         </a>
       </CardHeader>

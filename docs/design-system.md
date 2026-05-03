@@ -40,6 +40,16 @@ To retune a color or any other token, edit `index.css` only — no component cha
 
 The internal `/design-system.html` route renders every token live and doubles as a visual regression check. Open it during local development to verify any token change.
 
+### Working rules (for any frontend change)
+
+1. **Use existing tokens and recipes.** If a token, variant, or recipe already covers what you're building, reuse it — don't invent a parallel one. Hex literals, ad-hoc spacing, hand-rolled versions of documented primitives all count as violations.
+2. **Missing tokens go in `index.css` first.** If a needed token, badge variant, or recipe is genuinely absent, add it to `index.css` and document it here *before* building the consumer. Components that ship with private one-off values become future inconsistency debt.
+3. **Invoke the `frontend-design` skill** for visual decisions, and `vercel-react-best-practices` for React implementation. They're complementary, not redundant: `frontend-design` enforces interaction-state, affordance, mobile, and copy quality; `vercel-react-best-practices` covers re-render hygiene, bundle/import patterns, and rendering perf. Skip the `server-*` rule family (no RSC) and read `bundle-dynamic-imports` as `React.lazy` (no `next/dynamic`). The React Native skill does not apply — the client is web-only.
+4. **Show the rendered result and wait for explicit approval** before committing layout, copy, or hierarchy changes. Pre-votes inside an option menu do not count as consent.
+5. **Cross-codebase consistency.** A change to a shared primitive must be applied everywhere it's used in the same pass — never leave one page on the old version and another on the new.
+6. **View transitions.** The project uses *CSS-based* view transitions today (`<feature>-row-<id>` / `<feature>-form` naming — see [Motion → View transition naming](#view-transition-naming)). React's `<ViewTransition>` component (covered by `vercel-react-view-transitions`) requires `react@canary`; we're on stable. Treat that skill as a reference for the eventual canary-React migration, not as a default trigger today.
+7. **Pre-commit audit.** Run `web-design-guidelines` against the changed files before commit — it covers accessibility, focus states, form patterns, content overflow, hydration, and motion preferences. Treat its output as a tripwire, not a fresh rule source: many of its rules are already encoded in this document (tabular numerals via `<Numeric>`, ellipsis character `…` in copy, inline form errors, the `outline-none` + `tabIndex={-1}` route-focus pattern). Re-flagged items signal drift from the design system, not a new requirement.
+
 ---
 
 ## Color palette

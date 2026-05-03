@@ -390,7 +390,7 @@ Returned by `POST /api/category-budgets` and `PATCH /api/category-budgets/{id}/r
 | SavedReports | CRUD + list | Soft-deletable; restorable |
 | SavedSearches | CRUD + list | Per-user, per-table; stores filter set + text search; scoped to table name |
 | RecurringTransactions | CRUD + list | Templates only; confirming a reminder creates a Transaction |
-| Reports | GET only (generated on demand) | Net Worth, Income/Expense, Expense Breakdown, Transaction History |
+| Reports | GET only (generated on demand) | 8 reports: net-worth, income-expense, expense-breakdown, transaction-history, budget-vs-actual, largest-expenses, monthly-cash-flow, net-worth-over-time. All accept `?format=csv` for download. |
 | Attachments | Upload (POST), download (GET), delete | Scoped to a Transaction |
 | Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3; includes `PeriodStartDay`, notification preferences |
 | Notifications | GET (list preferences), PATCH (update preferences) | Controls: weekly digest opt-in, new session alert opt-out, Safe to Spend alert |

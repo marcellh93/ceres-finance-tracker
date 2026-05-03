@@ -78,6 +78,7 @@ export function TransactionHistory() {
                 size="sm"
                 disabled={!hasPrev}
                 onClick={() => setFilter('page', page - 1)}
+                aria-label="Previous page"
               >
                 Previous
               </Button>
