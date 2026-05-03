@@ -245,6 +245,50 @@ Migration path: introduce `QueryClientProvider` in `src/app/main.tsx`, replace `
 
 ---
 
+### Movements filter — Show: All / Active accounts only
+
+- **What:** A filter chip on the SPA Movements page (`/app/movements`) letting the user restrict the list to transactions whose account is currently active. Defaults to All so the audit-trail behaviour is preserved.
+- **Why:** When the Accounts SPA shipped (2026-05-03), we deliberately kept Movements showing transactions for archived accounts too — hiding them would conflict with the trust/auditability promise (you should always be able to find a transaction you remember entering) and with the deletion-strategy ADR (ADR-0023). But once a user has accumulated several archived accounts, the noise may become real. Add the toggle when that friction shows up in actual use.
+- **Scope:** Single chip in `MovementsFilterBar.tsx`; URL param `accountStatus=active`; server-side filter on the existing `/api/movements` endpoint or post-filter in the SPA (decide at implementation time based on dataset size).
+- **Triggered by:** Accounts SPA design discussion (`docs/superpowers/specs/2026-05-03-accounts-spa-design.md`, Q4 follow-up).
+
+---
+
+### Dashboard net-worth tile — "Includes archived accounts" tooltip
+
+- **What:** A small info tooltip on the Net Worth KPI tile (and the Net Worth Over Time chart) that explains: archived accounts still contribute to the figure because the underlying money or debt still exists. Same wording the Accounts archive AlertDialog uses.
+- **Why:** Per `models.md` line 276–281, deactivated accounts must count toward net worth and balance reports — otherwise the figure would silently drop when an account is archived. This is correct behaviour but non-obvious. The tooltip closes the loop so a user doesn't see net worth fail to drop after archiving and lose trust in the math.
+- **Scope:** One Tooltip + Info icon next to the Net Worth tile title in `ProjectCeres.Client/src/app/features/dashboard/NetWorthCard.tsx`; same treatment on the Net Worth Over Time chart header (`NetWorthChart.tsx` in the same directory).
+- **Triggered by:** Accounts SPA design discussion (`docs/superpowers/specs/2026-05-03-accounts-spa-design.md`, Q4 follow-up).
+
+---
+
+### Receivables — money owed to the user, with optional interest accrual
+
+**What:** A first-class way to track "someone owes me money" — symmetric to the existing Liability + amortising-interest construct, but mirrored: interest accrues on what's owed *to* the user, the borrower's payments reduce the balance, and the user can review an aging schedule of outstanding receivables. Closes a real gap in the data model where the only workaround today is an Asset account with a "Loan to X" description and manually recorded Income entries — which loses automatic interest accrual and conflates receivables with cash.
+
+**Why this matters for the autónomo audience:** late-paying clients with penalty interest under Spanish commercial law (Ley 3/2004) are a daily reality for Spanish freelancers. Informal personal loans to family or friends with agreed interest are common across the broader audience. The existing model handles "you owe someone" symmetrically well (Liability + LiabilityPayment + Amortising); the missing mirror means "someone owes you" can only be modelled as an unaccrued asset balance, which understates the true position over time.
+
+**Architectural sketch (open questions inside):**
+
+- **Account modelling:** three forks. (a) Add `IsReceivable: bool` to Asset accounts and reuse the existing `LiabilityRepaymentType` + `InterestRate` fields — minimum schema change, but couples a sub-flag to AccountType in a way that complicates queries ("show me real assets" needs a where-not clause). (b) Introduce a third `AccountType` row called `Receivable` — clean separation, but the lookup table currently asserts a binary "Asset / Liability" world that touches reports, dashboard, charts, and the existing balance-sign convention. (c) Introduce a separate `Receivable` entity entirely, FK'd to its own ledger, not modelled as an Account at all — most flexible but reinvents the most-tested code path in the app.
+- **Interest accrual mechanism:** two forks. (a) Periodic background job recomputes accrual at period close, writing an `InterestAccrual` ledger entry — auditable, deterministic, but introduces scheduled background work to an app that today is purely on-read. (b) On-read recomputation — every time the user opens the receivable's ledger, derive accrued interest from the principal + rate + elapsed periods. Avoids new infrastructure but breaks the audit-trail principle ("when did this interest hit my balance" becomes "the moment you happened to refresh"). The choice here is an ADR-level decision because it's the first scheduler the app would have.
+- **Collection events:** mirror of `LiabilityPayment`. Reuse the same entity with sides swapped (cleanest for code, awkward for field semantics — `AssetAccountId` and `LiabilityAccountId` would stop matching their meaning), or introduce `ReceivableCollection` as a parallel entity (clean semantics, doubled code paths). A fourth movement type appears in the unified Movements list and quick-add modal regardless.
+- **Surfaces that need re-audit:** net worth math (already covers receivable principal but not accrued interest), Movements list (interest accruals are a fourth row type), spendable balance (receivables should default to `ExcludeFromSpendable=true` because uncollected money isn't spendable), Reports (an aging-schedule report is a standard accounting expectation), Dashboard (an "Owed to me" tile is a likely add).
+
+**Why deferred (not now):**
+- Substantial new server work (entity, service, accrual logic, possibly a scheduler) that lives outside the current SPA-migration framing. The Accounts SPA scope is already large (CRUD + Ledger + payoff projection + conditional liability fields + adaptive archive copy + server policy hardening); folding receivables in blows it up.
+- The accrual scheduler decision is ADR-grade — it's the first scheduled background work in the codebase. Needs its own brainstorm to settle on-read vs. cron, miss-handling, audit semantics.
+- Receivables touch sensitive multi-user data (who owes whom). Phase 4 (auth + multi-user) is the right gating context, both for the audience fit (autónomos) and for the privacy implications.
+
+**Workaround until shipped:** Create an Asset account named "Loan to X", set the opening balance to the principal, record collection events as Income transactions tagged to a "Loan repayment" category. Loses automatic interest accrual but principal tracking works.
+
+**Gate:** Phase 4 (freelancer/autónomo support). Open the brainstorm once the Accounts SPA, the broader SPA migration (Batches 2 + 3 + cleanup), and Phase 3 auth are stable.
+
+**Triggered by:** Accounts SPA brainstorm (`docs/superpowers/specs/2026-05-03-accounts-spa-design.md`, post-Q12 follow-up question from the user, 2026-05-03).
+
+---
+
 ## Phase 5 — Business Model
 
 **Gate: Phase 4 must be stable. See [`business-model.md`](business-model.md) for full detail.**
