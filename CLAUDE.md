@@ -99,6 +99,7 @@ For any change to `ProjectCeres.Client/` (React/TS, styling, layout, copy):
 2. Invoke `frontend-design` for visual design and `vercel-react-best-practices` for React perf patterns before proposing.
 3. Show the result; wait for approval before committing.
 4. Before commit, run `web-design-guidelines` against the changed files as a final audit.
+5. **After implementing, run the UX/UI verification checklist** (see `docs/design-system.md` § Working rules). Start the dev server, open every changed page in the browser, and explicitly verify: golden path, layout context (sticky ancestors don't obscure content), empty state, error state, mobile at 375px, and all navigation links. If browser access is unavailable, say so and hand the checklist to the user with specific URLs to check.
 
 ## After Completing Any Stage
 

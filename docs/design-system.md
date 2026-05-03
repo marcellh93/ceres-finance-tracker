@@ -49,6 +49,14 @@ The internal `/design-system.html` route renders every token live and doubles as
 5. **Cross-codebase consistency.** A change to a shared primitive must be applied everywhere it's used in the same pass — never leave one page on the old version and another on the new.
 6. **View transitions.** The project uses *CSS-based* view transitions today (`<feature>-row-<id>` / `<feature>-form` naming — see [Motion → View transition naming](#view-transition-naming)). React's `<ViewTransition>` component (covered by `vercel-react-view-transitions`) requires `react@canary`; we're on stable. Treat that skill as a reference for the eventual canary-React migration, not as a default trigger today.
 7. **Pre-commit audit.** Run `web-design-guidelines` against the changed files before commit — it covers accessibility, focus states, form patterns, content overflow, hydration, and motion preferences. Treat its output as a tripwire, not a fresh rule source: many of its rules are already encoded in this document (tabular numerals via `<Numeric>`, ellipsis character `…` in copy, inline form errors, the `outline-none` + `tabIndex={-1}` route-focus pattern). Re-flagged items signal drift from the design system, not a new requirement.
+8. **UX/UI verification checklist — required after every implementation.** Start `dotnet run` + `pnpm dev` and open each changed page in the browser. Explicitly verify:
+   - **Golden path** — primary action works, result looks correct.
+   - **Layout context** — content inside `<Outlet>` is not obscured by sticky ancestors (navbars, filter bars, sidebars). A component that looks correct in isolation can be buried in context.
+   - **Empty state** — page renders sensibly with no data.
+   - **Error state** — `<CardError>` fires and retry works.
+   - **Mobile 375px** — layout collapses correctly; no horizontal overflow.
+   - **Navigation** — all back buttons, breadcrumbs, and pagination links go to the right place.
+   If browser access is unavailable, say so explicitly and hand this checklist to the user with the specific URLs and actions to verify. Never silently skip it.
 
 ---
 
