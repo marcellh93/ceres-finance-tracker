@@ -67,7 +67,7 @@ export function RecurringLayout() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <header>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold outline-none">
           Recurring transactions
@@ -79,7 +79,7 @@ export function RecurringLayout() {
       </header>
 
       <Card>
-        <CardContent className="pt-6 space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1 space-y-1.5">
               <Label htmlFor="recurring-search" className="sr-only">Filter reminders</Label>

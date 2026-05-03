@@ -161,7 +161,7 @@ export function BudgetsLayout() {
 
       {tab === 'category' && (
         <>
-          {categoryQuery.loading && <Skeleton className="h-[300px] w-full" />}
+          {categoryQuery.loading && !categoryQuery.data && <Skeleton className="h-[300px] w-full" />}
           {categoryQuery.error && <CardError section="Category Budgets" onRetry={categoryQuery.refetch} />}
           {categoryQuery.data && categoryQuery.data.length === 0 && (
             <p className="text-sm text-muted-foreground">No category budgets.</p>
@@ -174,7 +174,7 @@ export function BudgetsLayout() {
 
       {tab === 'goal' && (
         <>
-          {goalQuery.loading && <Skeleton className="h-[300px] w-full" />}
+          {goalQuery.loading && !goalQuery.data && <Skeleton className="h-[300px] w-full" />}
           {goalQuery.error && <CardError section="Goal Budgets" onRetry={goalQuery.refetch} />}
           {goalQuery.data && goalQuery.data.length === 0 && (
             <p className="text-sm text-muted-foreground">No goal budgets.</p>

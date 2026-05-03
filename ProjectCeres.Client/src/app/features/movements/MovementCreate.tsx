@@ -92,6 +92,7 @@ export function MovementCreate() {
             accountId: values.accountId,
             categoryId: values.categoryId,
             description: values.description || null,
+            isCleared: values.isCleared,
           }
         : movementType === 'Transfer'
           ? {
@@ -100,6 +101,7 @@ export function MovementCreate() {
               sourceAccountId: values.sourceAccountId,
               destAccountId: values.destAccountId,
               description: values.description || null,
+              isCleared: values.isCleared,
             }
           : {
               date: values.date,
@@ -107,6 +109,7 @@ export function MovementCreate() {
               assetAccountId: values.assetAccountId,
               liabilityAccountId: values.liabilityAccountId,
               description: values.description || null,
+              isCleared: values.isCleared,
             };
 
     const response = await fetch(url, {
@@ -118,13 +121,15 @@ export function MovementCreate() {
     if (response.status === 201) {
       toast.success('Created.');
       refetch();
-      const created = (await response.json()) as { id: string };
-      const navState =
-        pendingAttachments.length > 0 ? { pendingAttachments } : undefined;
-      navigate(`/movements/${created.id}/edit?created=1`, {
-        replace: true,
-        state: navState,
-      });
+      if (pendingAttachments.length > 0) {
+        const created = (await response.json()) as { id: string };
+        navigate(`/movements/${created.id}/edit?created=1`, {
+          replace: true,
+          state: { pendingAttachments },
+        });
+      } else {
+        navigate('/movements', { replace: true });
+      }
       return { ok: true };
     }
 

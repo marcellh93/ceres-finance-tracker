@@ -47,6 +47,7 @@ export function CategoryEdit() {
           </div>
           <Button
             variant="outline"
+            nativeButton={false}
             className="mt-4"
             render={<Link to="/categories">Back to Categories</Link>}
           />

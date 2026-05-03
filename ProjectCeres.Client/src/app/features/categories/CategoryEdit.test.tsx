@@ -74,7 +74,7 @@ describe('CategoryEdit', () => {
     await waitFor(() =>
       expect(screen.getByText(/that category doesn't exist/i)).toBeInTheDocument(),
     );
-    expect(screen.getByRole('link', { name: /back to categories/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to categories/i })).toBeInTheDocument();
   });
 
   it('PATCH success fires toast.success and navigates back', async () => {

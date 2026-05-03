@@ -230,14 +230,14 @@ export function RecurringForm({
         <Field label="Day of month *" htmlFor="rt-dom">
           <Input
             id="rt-dom"
-            type="number"
-            min={1}
-            max={31}
+            type="text"
+            inputMode="numeric"
             value={values.dayOfPeriod?.toString() ?? ''}
             onChange={(e) => {
-              if (!e.target.value) { set({ dayOfPeriod: null }); return; }
-              const v = Math.min(31, Math.max(1, parseInt(e.target.value, 10)));
-              if (!Number.isNaN(v)) set({ dayOfPeriod: v });
+              const digits = e.target.value.replace(/[^0-9]/g, '');
+              if (!digits) { set({ dayOfPeriod: null }); return; }
+              const v = Math.min(31, Math.max(1, parseInt(digits, 10)));
+              set({ dayOfPeriod: v });
             }}
           />
           <p className="text-xs text-muted-foreground">

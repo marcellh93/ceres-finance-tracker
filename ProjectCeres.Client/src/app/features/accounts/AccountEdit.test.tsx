@@ -75,7 +75,7 @@ describe('AccountEdit', () => {
     await waitFor(() =>
       expect(screen.getByText(/that account doesn't exist/i)).toBeInTheDocument(),
     );
-    expect(screen.getByRole('link', { name: /back to accounts/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to accounts/i })).toBeInTheDocument();
   });
 
   it('PATCH success fires toast.success and navigates back', async () => {

@@ -104,7 +104,7 @@ describe('AccountsLayout', () => {
   it('clicking + New account navigates to /accounts/new', async () => {
     renderAt('/accounts');
     await screen.findByText('Cash');
-    fireEvent.click(screen.getByRole('link', { name: /new account/i }));
+    fireEvent.click(screen.getByRole('button', { name: /new account/i }));
     expect(await screen.findByTestId('new-page')).toBeInTheDocument();
   });
 

@@ -63,10 +63,10 @@ export function RecurringRowMenu({ reminder, onChanged }: Props) {
         <DropdownMenuContent align="end">
           {reminder.isActive ? (
             <>
-              <DropdownMenuItem onClick={() => setConfirmOpen(true)}>Confirm…</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setConfirmOpen(true)}>Confirm</DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate(`/recurring/${reminder.id}/edit`)}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDismissOpen(true)}>Dismiss…</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive…</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDismissOpen(true)}>Dismiss</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setArchiveOpen(true)}>Archive</DropdownMenuItem>
             </>
           ) : (
             <DropdownMenuItem onClick={handleReactivate}>Reactivate</DropdownMenuItem>

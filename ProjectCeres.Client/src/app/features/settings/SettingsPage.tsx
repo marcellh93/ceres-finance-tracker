@@ -40,7 +40,7 @@ export function SettingsPage() {
     return (
       <PageShell>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent>
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               Couldn't load settings.
             </div>

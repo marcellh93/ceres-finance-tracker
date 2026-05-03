@@ -74,7 +74,7 @@ export function AccountsLayout() {
       {list.data ? <AccountCurrencySubtotals rows={list.data} /> : null}
 
       <Card>
-        <CardContent className="pt-6 space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1 space-y-1.5">
               <Label htmlFor="acc-search" className="sr-only">Filter accounts</Label>
@@ -85,7 +85,7 @@ export function AccountsLayout() {
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
-            <Button render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New account</Link>} />
+            <Button nativeButton={false} render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New account</Link>} />
           </div>
           <div className="flex items-center gap-2">
             <Switch
@@ -127,7 +127,7 @@ function AccountsBody({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [list.data, lower]);
 
-  if (list.loading) {
+  if (list.loading && !list.data) {
     return (
       <div data-testid="accounts-skeleton" className="space-y-2 py-2">
         <Skeleton className="h-9 w-full" />

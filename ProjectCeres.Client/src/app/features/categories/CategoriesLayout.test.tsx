@@ -155,7 +155,7 @@ describe('CategoriesLayout', () => {
   it('clicking New category navigates to /categories/new', async () => {
     renderAt('/categories');
     await screen.findByText('Groceries');
-    fireEvent.click(screen.getByRole('link', { name: /new category/i }));
+    fireEvent.click(screen.getByRole('button', { name: /new category/i }));
     expect(await screen.findByTestId('new-page')).toBeInTheDocument();
   });
 });

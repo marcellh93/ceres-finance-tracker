@@ -49,7 +49,7 @@ export function AccountLedger() {
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               That account doesn't exist.
             </div>
-            <Button variant="outline" render={<Link to="/accounts">Back to Accounts</Link>} />
+            <Button variant="outline" nativeButton={false} render={<Link to="/accounts">Back to Accounts</Link>} />
           </CardContent>
         </Card>
       </div>
@@ -101,7 +101,7 @@ export function AccountLedger() {
       ) : null}
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent>
           {ledger.data.entries.length === 0 ? (
             <div className="px-3 py-8 text-center text-sm text-muted-foreground italic">
               No entries found for this account.

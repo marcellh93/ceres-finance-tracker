@@ -128,8 +128,17 @@ function NotificationsButton() {
           </Button>
         }
       />
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="px-3 py-2 border-b text-sm font-medium">Reminders</div>
+      <PopoverContent align="end" className="w-80 p-0 overflow-hidden">
+        {count > 0 ? (
+          <div className="bg-destructive/10 border-b border-destructive/20 px-3 py-2.5 flex items-center gap-2">
+            <Bell className="h-4 w-4 text-destructive shrink-0" />
+            <span className="text-sm font-semibold text-destructive">
+              {count === 1 ? '1 reminder due' : `${count} reminders due`}
+            </span>
+          </div>
+        ) : (
+          <div className="px-3 py-2.5 border-b text-sm font-medium">Reminders</div>
+        )}
         {loading ? (
           <div className="px-3 py-4 space-y-2">
             <Skeleton className="h-4 w-full" />
@@ -140,27 +149,30 @@ function NotificationsButton() {
             Nothing due. You&apos;re all caught up.
           </p>
         ) : (
-          <ul className="max-h-72 overflow-y-auto divide-y">
+          <ul className="max-h-64 overflow-y-auto divide-y divide-border">
             {reminders.map((r) => (
-              <li key={r.id} className="px-3 py-2">
+              <li key={r.id}>
                 <Link
                   to="/recurring"
                   onClick={() => setOpen(false)}
-                  className="text-sm hover:underline block"
+                  className="flex flex-col gap-0.5 px-3 py-2.5 hover:bg-muted transition-colors"
                 >
-                  {r.name} — {r.nextDueDate}
+                  <span className="text-sm font-medium text-foreground leading-snug">{r.name}</span>
+                  <span className="text-xs text-destructive font-medium">Due {r.nextDueDate}</span>
                 </Link>
               </li>
             ))}
           </ul>
         )}
-        <div className="px-3 py-2 border-t">
+        <div className="px-3 py-2 border-t bg-muted/40">
           <Button
-            variant="link"
+            nativeButton={false}
+            variant="default"
             size="sm"
+            className="w-full"
             render={
               <Link to="/recurring" onClick={() => setOpen(false)}>
-                View all reminders →
+                Review reminders →
               </Link>
             }
           />

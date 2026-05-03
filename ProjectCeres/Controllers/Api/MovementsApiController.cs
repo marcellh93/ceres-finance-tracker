@@ -192,6 +192,8 @@ public class MovementsApiController(
         return string.IsNullOrEmpty(slug) ? "account" : slug;
     }
 
+    private static readonly Guid OpeningBalanceCategoryId = new("20000000-0000-0000-0000-000000000001");
+
     private static MovementListItemDto MapToDto(MovementListItemViewModel m)
     {
         return new MovementListItemDto(
@@ -203,6 +205,7 @@ public class MovementsApiController(
             CurrencySymbol: m.CurrencySymbol ?? "",
             Description: m.Description,
             IsCleared: m.IsCleared,
+            IsOpeningBalance: m.CategoryId == OpeningBalanceCategoryId,
             AccountName: m.AccountName,
             CategoryName: m.CategoryName,
             CategoryTypeName: m.CategoryTypeName,

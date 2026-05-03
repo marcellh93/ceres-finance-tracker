@@ -154,7 +154,7 @@ describe('MovementCreate', () => {
     expect(screen.getByText(/select destination/i)).toBeInTheDocument();
   });
 
-  it('Test 4: successful POST → navigates to /movements/:id/edit?created=1', async () => {
+  it('Test 4: successful POST with no pending files → navigates to /movements list', async () => {
     mockTransactionCreate('new-id');
 
     renderAt('/movements/new?type=transaction');
@@ -167,10 +167,7 @@ describe('MovementCreate', () => {
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith(
-        '/movements/new-id/edit?created=1',
-        expect.objectContaining({ replace: true }),
-      );
+      expect(navigateMock).toHaveBeenCalledWith('/movements', { replace: true });
     });
   });
 
@@ -269,7 +266,7 @@ describe('MovementCreate', () => {
     });
   });
 
-  it('Test 8: Successful save with no file → navigate state has no pendingAttachments', async () => {
+  it('Test 8: Successful save with no file → navigates to /movements list (no edit redirect)', async () => {
     mockTransactionCreate('new-id');
 
     renderAt('/movements/new?type=transaction');
@@ -282,21 +279,12 @@ describe('MovementCreate', () => {
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith(
-        '/movements/new-id/edit?created=1',
-        expect.objectContaining({ replace: true }),
-      );
+      expect(navigateMock).toHaveBeenCalledWith('/movements', { replace: true });
     });
 
     const editCall = navigateMock.mock.calls.find(
       (c) => typeof c[0] === 'string' && (c[0] as string).startsWith('/movements/new-id/edit'),
     );
-    expect(editCall).toBeTruthy();
-    const opts = editCall![1] as { state?: { pendingAttachments?: File[] } } | undefined;
-    if (opts?.state) {
-      expect(opts.state.pendingAttachments).toBeUndefined();
-    } else {
-      expect(opts?.state).toBeUndefined();
-    }
+    expect(editCall).toBeFalsy();
   });
 });

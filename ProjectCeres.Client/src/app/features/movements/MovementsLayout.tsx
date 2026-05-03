@@ -155,7 +155,7 @@ export function MovementsLayout() {
 
       <MovementsFilterBar />
 
-      {(!currencyReady || loading) && <Skeleton className="h-[400px] w-full" />}
+      {(!currencyReady || (loading && !data)) && <Skeleton className="h-[400px] w-full" />}
       {currencyReady && error && <CardError section="Movements" onRetry={refetch} />}
       {currencyReady && data && data.items.length === 0 && (
         <p className="text-sm text-muted-foreground">No movements found.</p>

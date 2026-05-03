@@ -96,7 +96,7 @@ export function CategoriesLayout() {
       </header>
 
       <Card>
-        <CardContent className="pt-6 space-y-4">
+        <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <Tabs value={tab} onValueChange={(v) => setTab(asTab(v))}>
               <TabsList>
@@ -114,6 +114,7 @@ export function CategoriesLayout() {
               />
             </div>
             <Button
+              nativeButton={false}
               render={
                 <Link to="new">
                   <Plus className="h-4 w-4 mr-1" />
@@ -178,7 +179,7 @@ function CategoriesBody({
     return [...userActive, ...userArchived, ...system];
   }, [list.data, typeName, lower]);
 
-  if (list.loading) {
+  if (list.loading && !list.data) {
     return (
       <div data-testid="categories-skeleton" className="space-y-2 py-2">
         <Skeleton className="h-9 w-full" />

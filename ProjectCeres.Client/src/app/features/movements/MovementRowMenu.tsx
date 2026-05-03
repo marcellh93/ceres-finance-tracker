@@ -30,10 +30,11 @@ import { parseValidationErrors } from './movement-validation';
 type Props = {
   movementId: string;
   movementType: MovementType;
+  isOpeningBalance?: boolean;
   onDeleted: () => void;
 };
 
-export function MovementRowMenu({ movementId, movementType, onDeleted }: Props) {
+export function MovementRowMenu({ movementId, movementType, isOpeningBalance, onDeleted }: Props) {
   const navigate = useNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -74,9 +75,11 @@ export function MovementRowMenu({ movementId, movementType, onDeleted }: Props) 
           <DropdownMenuItem onClick={() => navigate(`/movements/${movementId}/edit`)}>
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setConfirmOpen(true)}>
-            Delete
-          </DropdownMenuItem>
+          {!isOpeningBalance && (
+            <DropdownMenuItem onClick={() => setConfirmOpen(true)}>
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

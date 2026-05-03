@@ -50,7 +50,7 @@ export function AccountEdit() {
           <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             That account doesn't exist.
           </div>
-          <Button variant="outline" className="mt-4" render={<Link to="/accounts">Back to Accounts</Link>} />
+          <Button variant="outline" nativeButton={false} className="mt-4" render={<Link to="/accounts">Back to Accounts</Link>} />
         </CardContent>
       </Card>
     );

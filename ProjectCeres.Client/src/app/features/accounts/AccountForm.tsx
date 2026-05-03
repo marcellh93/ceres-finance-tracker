@@ -133,7 +133,7 @@ export function AccountForm({
     <TooltipProvider delay={200}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-1.5">
-          <Label htmlFor="accountName">Name</Label>
+          <Label htmlFor="accountName">Name *</Label>
           <Input
             id="accountName"
             aria-label="Name"
@@ -145,7 +145,7 @@ export function AccountForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="accountType">Type</Label>
+          <Label htmlFor="accountType">{mode === 'create' ? 'Type *' : 'Type'}</Label>
           {mode === 'edit' ? (
             <LockedRow
               id="accountType"
@@ -171,7 +171,7 @@ export function AccountForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="accountCurrency">Currency</Label>
+          <Label htmlFor="accountCurrency">{mode === 'create' ? 'Currency *' : 'Currency'}</Label>
           {mode === 'edit' ? (
             <LockedRow
               id="accountCurrency"

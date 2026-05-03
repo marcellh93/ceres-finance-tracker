@@ -27,31 +27,31 @@ describe('RecurringRowMenu', () => {
   it('shows Confirm, Edit, Dismiss, Archive for active row', async () => {
     renderMenu(makeReminder());
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
-    expect(screen.getByText('Confirm…')).toBeInTheDocument();
+    expect(screen.getByText('Confirm')).toBeInTheDocument();
     expect(screen.getByText('Edit')).toBeInTheDocument();
-    expect(screen.getByText('Dismiss…')).toBeInTheDocument();
-    expect(screen.getByText('Archive…')).toBeInTheDocument();
+    expect(screen.getByText('Dismiss')).toBeInTheDocument();
+    expect(screen.getByText('Archive')).toBeInTheDocument();
   });
 
   it('shows only Reactivate for archived row', () => {
     renderMenu(makeReminder({ isActive: false }));
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
     expect(screen.getByText('Reactivate')).toBeInTheDocument();
-    expect(screen.queryByText('Confirm…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Confirm')).not.toBeInTheDocument();
   });
 
-  it('opens Confirm dialog when Confirm… clicked', () => {
+  it('opens Confirm dialog when Confirm clicked', () => {
     renderMenu(makeReminder());
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
-    fireEvent.click(screen.getByText('Confirm…'));
+    fireEvent.click(screen.getByText('Confirm'));
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByText(/Confirm 'Rent'/)).toBeInTheDocument();
   });
 
-  it('opens Archive dialog when Archive… clicked', () => {
+  it('opens Archive dialog when Archive clicked', () => {
     renderMenu(makeReminder());
     fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
-    fireEvent.click(screen.getByText('Archive…'));
+    fireEvent.click(screen.getByText('Archive'));
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(screen.getByText(/Archive 'Rent'/)).toBeInTheDocument();
   });

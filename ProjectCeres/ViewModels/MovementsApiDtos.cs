@@ -9,6 +9,7 @@ public record MovementListItemDto(
     string CurrencySymbol,
     string? Description,
     bool IsCleared,
+    bool IsOpeningBalance,
     string? AccountName,
     string? CategoryName,
     string? CategoryTypeName,

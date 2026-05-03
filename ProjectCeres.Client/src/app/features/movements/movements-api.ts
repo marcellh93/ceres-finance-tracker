@@ -17,6 +17,7 @@ export type MovementListItemDto = {
   currencySymbol: string;
   description: string | null;
   isCleared: boolean;
+  isOpeningBalance: boolean;
   accountName: string | null;
   categoryName: string | null;
   categoryTypeName: string | null;

@@ -83,6 +83,7 @@ export function MovementsTable({ items, onRefetch }: Props) {
                 <MovementRowMenu
                   movementId={item.id}
                   movementType={item.movementType}
+                  isOpeningBalance={item.isOpeningBalance}
                   onDeleted={onRefetch}
                 />
               </td>
