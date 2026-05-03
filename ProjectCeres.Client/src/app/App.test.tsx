@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from './App';
 
@@ -10,7 +10,6 @@ const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/accounts',     expectedHeading: 'Accounts' },
   { path: '/categories',   expectedHeading: 'Categories' },
   { path: '/budgets',      expectedHeading: 'Budgets' },
-  { path: '/recurring',    expectedHeading: 'Recurring Transactions' },
   { path: '/import',       expectedHeading: 'Import' },
   { path: '/reports',      expectedHeading: 'Reports' },
   { path: '/settings',     expectedHeading: 'Settings' },
@@ -32,6 +31,18 @@ describe('App routes', () => {
       expect(heading).toBeDefined();
     });
   }
+
+  it('renders recurring list page at /recurring', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    render(
+      <MemoryRouter initialEntries={['/recurring']}>
+        <App />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Recurring transactions' })).toBeInTheDocument()
+    );
+  });
 
   it('renders the Movement Create page at /movements/new?type=transaction', () => {
     render(

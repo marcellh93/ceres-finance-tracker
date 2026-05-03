@@ -23,6 +23,19 @@ import { CategoryEdit } from './features/categories/CategoryEdit';
 import { MovementCreate } from './features/movements/MovementCreate';
 import { MovementEdit } from './features/movements/MovementEdit';
 import { MovementsLayout } from './features/movements/MovementsLayout';
+import { RecurringCreate } from './features/recurring/RecurringCreate';
+import { RecurringEdit } from './features/recurring/RecurringEdit';
+import { useRecurringLayoutCtx } from './features/recurring/RecurringLayout';
+
+function RecurringCreateBridge() {
+  const ctx = useRecurringLayoutCtx();
+  return <RecurringCreate ctx={ctx} />;
+}
+
+function RecurringEditBridge() {
+  const ctx = useRecurringLayoutCtx();
+  return <RecurringEdit ctx={ctx} />;
+}
 
 export function App() {
   return (
@@ -47,7 +60,10 @@ export function App() {
           <Route path="new" element={<BudgetCreate />} />
           <Route path=":id/edit" element={<BudgetEdit />} />
         </Route>
-        <Route path="recurring" element={<Recurring />} />
+        <Route path="recurring" element={<Recurring />}>
+          <Route path="new" element={<RecurringCreateBridge />} />
+          <Route path=":id/edit" element={<RecurringEditBridge />} />
+        </Route>
         <Route path="import" element={<Import />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />

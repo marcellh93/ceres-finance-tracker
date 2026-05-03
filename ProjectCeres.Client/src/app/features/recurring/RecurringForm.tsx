@@ -89,7 +89,7 @@ export function RecurringForm({
         <Label htmlFor="rt-account">Account *</Label>
         <Select
           value={values.accountId}
-          onValueChange={(v) => set({ accountId: v })}
+          onValueChange={(v) => set({ accountId: v ?? '' })}
         >
           <SelectTrigger id="rt-account">
             <SelectValue placeholder="Select account" />
@@ -108,7 +108,7 @@ export function RecurringForm({
         <Label htmlFor="rt-category">Category *</Label>
         <Select
           value={values.categoryId}
-          onValueChange={(v) => set({ categoryId: v })}
+          onValueChange={(v) => set({ categoryId: v ?? '' })}
         >
           <SelectTrigger id="rt-category">
             <SelectValue placeholder="Select category" />
@@ -142,7 +142,7 @@ export function RecurringForm({
         <Label htmlFor="rt-frequency">Frequency *</Label>
         <Select
           value={values.frequency}
-          onValueChange={(v) => set({ frequency: v })}
+          onValueChange={(v) => set({ frequency: v ?? '' })}
         >
           <SelectTrigger id="rt-frequency">
             <SelectValue />
@@ -161,7 +161,7 @@ export function RecurringForm({
         <Label htmlFor="rt-behaviour">Reminder behaviour *</Label>
         <Select
           value={values.reminderBehaviour}
-          onValueChange={(v) => set({ reminderBehaviour: v })}
+          onValueChange={(v) => set({ reminderBehaviour: v ?? '' })}
         >
           <SelectTrigger id="rt-behaviour">
             <SelectValue />
@@ -181,7 +181,7 @@ export function RecurringForm({
           <Label htmlFor="rt-dow">Day of week *</Label>
           <Select
             value={values.dayOfPeriod?.toString() ?? ''}
-            onValueChange={(v) => set({ dayOfPeriod: parseInt(v, 10) })}
+            onValueChange={(v) => set({ dayOfPeriod: parseInt(v ?? '', 10) })}
           >
             <SelectTrigger id="rt-dow">
               <SelectValue placeholder="Pick a day" />
