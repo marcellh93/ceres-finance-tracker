@@ -554,11 +554,13 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
     [Fact]
     public void SnapToCalendarDay_Weekly_AdvancesToTargetWeekday_FromTargetDay()
     {
-        // Confirm on Monday 2026-04-28 (Mon), target Monday (DayOfPeriod=1)
+        // Confirm on Monday 2026-04-27 (Mon), target Monday (DayOfPeriod=1)
+        // Same-day: daysAhead = 0 → guard fires → daysAhead = 7 → next Monday
         var reminder = MakeReminder(Frequency.Weekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 1,
-            nextDueDate: new DateOnly(2026, 4, 28));
-        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 4, 28));
-        result.Should().Be(new DateOnly(2026, 5, 4)); // Same-day → next Monday (7 days)
+            nextDueDate: new DateOnly(2026, 4, 27));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 4, 27));
+        // daysAhead = (1 - 1 + 7) % 7 = 0 → same-day guard → daysAhead = 7 → 2026-05-04
+        result.Should().Be(new DateOnly(2026, 5, 4));
     }
 
     [Fact]
