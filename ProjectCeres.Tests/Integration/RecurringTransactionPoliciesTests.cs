@@ -74,4 +74,21 @@ public class RecurringTransactionPoliciesTests
             Frequency.Monthly, ReminderBehaviour.ManualDate, dayOfPeriod: null);
         result.IsSuccess.Should().BeTrue();
     }
+
+    [Fact]
+    public void ValidateSchedule_SnapBiweekly_WithDay10_Succeeds()
+    {
+        var result = RecurringTransactionPolicies.ValidateSchedule(
+            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 10);
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateSchedule_SnapBiweekly_WithDay15_Fails()
+    {
+        var result = RecurringTransactionPolicies.ValidateSchedule(
+            Frequency.Biweekly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 15);
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Value.Code.Should().Be(RecurringTransactionPolicies.InvalidDayOfPeriodCode);
+    }
 }

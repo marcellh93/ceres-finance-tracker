@@ -22,7 +22,12 @@ public static class RecurringTransactionPolicies
 
         if (snapNonAnnual)
         {
-            var max = frequency == Frequency.Monthly ? 31 : 7;
+            var max = frequency switch
+            {
+                Frequency.Monthly   => 31,
+                Frequency.Biweekly  => 14,
+                _                   => 7,   // Weekly
+            };
             if (dayOfPeriod < 1 || dayOfPeriod > max)
                 return Result.Fail(InvalidDayOfPeriodCode,
                     $"Day of period must be 1–{max} for {frequency} reminders.");
