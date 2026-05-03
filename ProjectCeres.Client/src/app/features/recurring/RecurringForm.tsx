@@ -111,7 +111,7 @@ function InlineCombobox({
           </Button>
         }
       />
-      <PopoverContent className="p-0" align="start">
+      <PopoverContent className="p-0 w-(--anchor-width) min-w-(--anchor-width)" align="start">
         <Command>
           <CommandList>
             <CommandEmpty>No options found.</CommandEmpty>

@@ -70,19 +70,19 @@ export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <>
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold">New reminder</h1>
         </div>
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <>
       <div className="space-y-1">
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           New reminder
@@ -108,6 +108,6 @@ export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
           </Button>
         </div>
       </form>
-    </div>
+    </>
   );
 }

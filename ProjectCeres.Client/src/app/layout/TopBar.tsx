@@ -120,7 +120,7 @@ function NotificationsButton() {
             {count > 0 && (
               <span
                 aria-hidden
-                className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground font-semibold"
+                className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] text-white font-semibold"
               >
                 {count > 9 ? '9+' : String(count)}
               </span>

@@ -53,7 +53,7 @@ export function RecurringLayout() {
 
   if (childActive) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         <Outlet context={ctx} />
       </div>
     );
@@ -131,7 +131,7 @@ function RecurringBody({ list, allList, query, onClearSearch, onChanged }: BodyP
       });
   }, [list.data, lower]);
 
-  if (list.loading) {
+  if (list.loading && !list.data) {
     return (
       <div data-testid="recurring-skeleton" className="space-y-2 py-2">
         {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}

@@ -80,7 +80,7 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
 
   if (notFound) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-4">
         <p className="text-sm text-muted-foreground">That reminder doesn&apos;t exist.</p>
         <Button variant="outline" onClick={() => navigate('/recurring')}>← Back to Recurring</Button>
       </div>
@@ -89,19 +89,19 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
 
   if (loading || !values) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <>
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold">Edit reminder</h1>
         </div>
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <>
       <div className="space-y-1">
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Edit reminder
@@ -124,6 +124,6 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
           </Button>
         </div>
       </form>
-    </div>
+    </>
   );
 }
