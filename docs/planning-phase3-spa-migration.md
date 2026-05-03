@@ -189,7 +189,7 @@ With those two facts established, the frontend was reorganised into batches:
 |---|------|--------|-------|
 | 1 | Settings | ✅ Migrated 2026-05-02 (commit `e842250`) | First pilot — locked the `features/<area>/` + page+form split + Popover+Command picker idiom. |
 | 2 | Categories | ✅ Migrated 2026-05-02 (commit `9578f9a` + follow-ups `132d5df`, `87f6709`) | Second pilot — exercised the template against list + nested CRUD + archive + system-row UX. |
-| 3 | Accounts | ✅ Migrated 2026-05-03 (commit `b31eea6`) | List + Create/Edit/Ledger; per-currency subtotal strip; type-driven balance colour; conditional Asset/Liability fields with two-layer interest-rate normalisation; SPA-side payoff projection; adaptive archive copy via `HasTransactions`. |
+| 3 | Accounts | ✅ Migrated 2026-05-03 (commit `03220b8`) | List + Create/Edit/Ledger; per-currency subtotal strip; type-driven balance colour; conditional Asset/Liability fields with two-layer interest-rate normalisation; SPA-side payoff projection; adaptive archive copy via `HasTransactions`. |
 | 4 | Recurring | Pending | Adds frequency rules + next-due-date computation; Confirm/Dismiss stateful actions. |
 | 5 | Reports | Pending | Largest scope: 8 report views + 8 CSV exports. SavedReport CRUD is deferred (ADR-0055). |
 | 6 | Review | Pending | Reconciliation review — unattended-import staged transactions/transfers triage. |
