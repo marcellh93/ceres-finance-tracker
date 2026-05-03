@@ -90,7 +90,7 @@ export function RecurringLayout() {
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
-            <Button render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New reminder</Link>} />
+            <Button nativeButton={false} render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New reminder</Link>} />
           </div>
           <div className="flex items-center gap-2">
             <Switch id="include-archived" checked={includeInactive} onCheckedChange={setIncludeInactive} />

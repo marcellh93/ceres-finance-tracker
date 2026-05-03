@@ -20,7 +20,9 @@ function renderMenu(reminder: RecurringTransactionListItemDto, onChanged = vi.fn
 }
 
 describe('RecurringRowMenu', () => {
-  beforeEach(() => { global.fetch = vi.fn(); });
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+  });
 
   it('shows Confirm, Edit, Dismiss, Archive for active row', async () => {
     renderMenu(makeReminder());

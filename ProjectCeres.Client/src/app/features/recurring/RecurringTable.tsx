@@ -60,10 +60,10 @@ function RecurringRow({
   return (
     <TableRow className={archived ? 'opacity-60' : undefined} aria-label={row.name}>
       <TableCell className="text-sm">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span>{row.name}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="truncate">{row.name}</span>
           {statuses.map((s) => (
-            <Badge key={s} variant={STATUS_VARIANTS[s] ?? 'secondary'}>
+            <Badge key={s} variant={STATUS_VARIANTS[s] ?? 'secondary'} className="shrink-0">
               {STATUS_LABELS[s] ?? s}
             </Badge>
           ))}

@@ -111,7 +111,7 @@ function InlineCombobox({
           </Button>
         }
       />
-      <PopoverContent className="p-0 w-(--anchor-width) min-w-(--anchor-width)" align="start">
+      <PopoverContent className="p-0 w-(--anchor-width) min-w-max" align="start">
         <Command>
           <CommandList>
             <CommandEmpty>No options found.</CommandEmpty>
@@ -234,9 +234,11 @@ export function RecurringForm({
             min={1}
             max={31}
             value={values.dayOfPeriod?.toString() ?? ''}
-            onChange={(e) =>
-              set({ dayOfPeriod: e.target.value ? Number(e.target.value) : null })
-            }
+            onChange={(e) => {
+              if (!e.target.value) { set({ dayOfPeriod: null }); return; }
+              const v = Math.min(31, Math.max(1, parseInt(e.target.value, 10)));
+              if (!Number.isNaN(v)) set({ dayOfPeriod: v });
+            }}
           />
           <p className="text-xs text-muted-foreground">
             1–31. Snaps to the last day if the month is shorter.

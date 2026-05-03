@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DatePickerField } from '../../../components/DatePickerField';
 import { RECURRING_CONFIRM_URL } from './recurring-api';
 import type { RecurringTransactionListItemDto } from './reminder-status';
 
@@ -78,7 +79,12 @@ export function RecurringConfirmDialog({ open, reminder, onChanged, onOpenChange
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="confirm-date">Date *</Label>
-            <Input id="confirm-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <DatePickerField
+              id="confirm-date"
+              value={date || null}
+              onChange={(v) => setDate(v ?? '')}
+              hideClear
+            />
             {inlineError && <p className="text-sm text-destructive">{inlineError}</p>}
           </div>
           <div className="space-y-1.5">
@@ -94,15 +100,19 @@ export function RecurringConfirmDialog({ open, reminder, onChanged, onOpenChange
           {isManual && (
             <div className="space-y-1.5">
               <Label htmlFor="confirm-next-due">Next due date *</Label>
-              <Input id="confirm-next-due" type="date"
-                value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} />
+              <DatePickerField
+                id="confirm-next-due"
+                value={nextDueDate || null}
+                onChange={(v) => setNextDueDate(v ?? '')}
+                hideClear
+              />
             </div>
           )}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={handleConfirm} disabled={submitting || !amount || (isManual && !nextDueDate)}>
-            {submitting ? 'Confirming…' : 'Confirm — record'}
+            {submitting ? 'Confirming…' : 'Confirm'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
