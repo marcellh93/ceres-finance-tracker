@@ -211,6 +211,10 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         if (!Enum.TryParse<ReminderBehaviour>(request.ReminderBehaviour, out var behaviour))
             return Result<RecurringTransaction>.Fail("INVALID_REMINDER_BEHAVIOUR", $"Unknown reminder behaviour '{request.ReminderBehaviour}'.");
 
+        var scheduleCheck = RecurringTransactionPolicies.ValidateSchedule(freq, behaviour, request.DayOfPeriod);
+        if (!scheduleCheck.IsSuccess)
+            return Result<RecurringTransaction>.Fail(scheduleCheck.Error!.Value.Code, scheduleCheck.Error!.Value.Message);
+
         var accountOk = await db.Accounts.Owned(user).AnyAsync(a => a.Id == request.AccountId!.Value);
         if (!accountOk)
             return Result<RecurringTransaction>.Fail("INVALID_ACCOUNT", "The selected account does not exist.");
@@ -251,6 +255,10 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
             return Result<RecurringTransaction>.Fail("INVALID_FREQUENCY", $"Unknown frequency '{request.Frequency}'.");
         if (!Enum.TryParse<ReminderBehaviour>(request.ReminderBehaviour, out var behaviour))
             return Result<RecurringTransaction>.Fail("INVALID_REMINDER_BEHAVIOUR", $"Unknown reminder behaviour '{request.ReminderBehaviour}'.");
+
+        var scheduleCheck = RecurringTransactionPolicies.ValidateSchedule(freq, behaviour, request.DayOfPeriod);
+        if (!scheduleCheck.IsSuccess)
+            return Result<RecurringTransaction>.Fail(scheduleCheck.Error!.Value.Code, scheduleCheck.Error!.Value.Message);
 
         var reminder = await db.RecurringTransactions.Owned(user)
             .Include(r => r.Account).Include(r => r.Category)

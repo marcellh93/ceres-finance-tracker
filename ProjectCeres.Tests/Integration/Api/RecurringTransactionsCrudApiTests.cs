@@ -91,6 +91,7 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
             accountId         = Guid.NewGuid(),
             categoryId        = SalaryCategoryId,
             frequency         = "Monthly",
+            dayOfPeriod       = 1,
             nextDueDate       = "2026-06-01",
             reminderBehaviour = "SnapToCalendarDay"
         });
@@ -130,6 +131,7 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
             accountId         = CheckingAccountId,
             categoryId        = SalaryCategoryId,
             frequency         = "Monthly",
+            dayOfPeriod       = 1,
             nextDueDate       = "2026-06-01",
             reminderBehaviour = "SnapToCalendarDay"
         });
@@ -326,5 +328,46 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         res.StatusCode.Should().Be(HttpStatusCode.OK);
         var dto = await res.Content.ReadFromJsonAsync<JsonElement>();
         dto.GetProperty("estimatedAmount").GetDecimal().Should().Be(12.99m);
+    }
+
+    [Fact]
+    public async Task Post_with_invalid_day_of_period_returns_422()
+    {
+        var body = new
+        {
+            name              = $"Policy-Test-{Guid.NewGuid():N}",
+            estimatedAmount   = (decimal?)null,
+            accountId         = CheckingAccountId,
+            categoryId        = SalaryCategoryId,
+            frequency         = "Weekly",
+            dayOfPeriod       = 8,
+            nextDueDate       = "2026-06-01",
+            reminderBehaviour = "SnapToCalendarDay"
+        };
+        var post = await _client.PostAsJsonAsync("/api/recurring-transactions", body);
+        post.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var responseBody = await post.Content.ReadAsStringAsync();
+        responseBody.Should().Contain("INVALID_DAY_OF_PERIOD");
+    }
+
+    [Fact]
+    public async Task Patch_with_invalid_day_of_period_returns_422()
+    {
+        var id = await CreateOne();
+        var body = new
+        {
+            name              = "Updated",
+            estimatedAmount   = 1000m,
+            accountId         = CheckingAccountId,
+            categoryId        = SalaryCategoryId,
+            frequency         = "Weekly",
+            dayOfPeriod       = 8,
+            nextDueDate       = "2026-07-01",
+            reminderBehaviour = "SnapToCalendarDay"
+        };
+        var patch = await _client.PatchAsJsonAsync($"/api/recurring-transactions/{id}", body);
+        patch.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var responseBody = await patch.Content.ReadAsStringAsync();
+        responseBody.Should().Contain("INVALID_DAY_OF_PERIOD");
     }
 }
