@@ -69,6 +69,23 @@ public class ImportStagedTransactionService(
         }
     }
 
+    public async Task<Result> TryConfirmAllAsync()
+    {
+        var pending = await db.ImportStagedTransactions
+            .Owned(user)
+            .Where(s => s.Status == StagedTransactionStatus.Pending)
+            .ToListAsync();
+
+        foreach (var staged in pending)
+        {
+            staged.Status     = StagedTransactionStatus.Confirmed;
+            staged.ResolvedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
+
     public async Task<Result> TryDisputeAsync(Guid id)
     {
         if (!await db.ImportStagedTransactions.Owned(user).AnyAsync(s => s.Id == id))

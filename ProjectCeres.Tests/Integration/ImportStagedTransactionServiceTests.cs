@@ -205,6 +205,37 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
+    // TryConfirmAllAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task TryConfirmAllAsync_ConfirmsAllPendingRows()
+    {
+        var txId1 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
+        var txId2 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 200m);
+        var txId3 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 300m);
+
+        var staged1 = await CreateStagedAsync(txId1, StagedTransactionStatus.Pending);
+        var staged2 = await CreateStagedAsync(txId2, StagedTransactionStatus.Pending);
+        var staged3 = await CreateStagedAsync(txId3, StagedTransactionStatus.Pending);
+
+        var result = await _service.TryConfirmAllAsync();
+
+        result.IsSuccess.Should().BeTrue();
+
+        var r1 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged1.Id);
+        var r2 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged2.Id);
+        var r3 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged3.Id);
+
+        r1!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        r2!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        r3!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        r1.ResolvedAt.Should().NotBeNull();
+        r2.ResolvedAt.Should().NotBeNull();
+        r3.ResolvedAt.Should().NotBeNull();
+    }
+
+    // -------------------------------------------------------------------------
     // DisputeAsync
     // -------------------------------------------------------------------------
 

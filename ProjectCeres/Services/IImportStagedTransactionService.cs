@@ -14,5 +14,6 @@ public interface IImportStagedTransactionService
 
     // API surface (Result-returning).
     Task<Result> TryConfirmAsync(Guid id);
+    Task<Result> TryConfirmAllAsync();
     Task<Result> TryDisputeAsync(Guid id);
 }
