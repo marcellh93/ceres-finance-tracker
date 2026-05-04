@@ -42,6 +42,7 @@ export function ReportTableCard({ slug, queryString, children, pagination }: Pro
       {pagination && (
         <div className="flex items-center justify-center gap-3 border-t border-border px-4 py-2">
           <button
+            type="button"
             onClick={pagination.onPrev}
             disabled={pagination.currentPage === 1}
             aria-label="Previous page"
@@ -53,6 +54,7 @@ export function ReportTableCard({ slug, queryString, children, pagination }: Pro
             Page {pagination.currentPage} of {pagination.totalPages}
           </span>
           <button
+            type="button"
             onClick={pagination.onNext}
             disabled={pagination.currentPage === pagination.totalPages}
             aria-label="Next page"

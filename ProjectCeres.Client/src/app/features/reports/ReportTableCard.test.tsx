@@ -61,4 +61,17 @@ describe('ReportTableCard pagination', () => {
     );
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
   });
+
+  it('calls onPrev when prev button clicked', async () => {
+    const onPrev = vi.fn();
+    render(
+      <MemoryRouter>
+        <ReportTableCard slug="test" queryString="" pagination={{ currentPage: 2, totalPages: 3, onNext: vi.fn(), onPrev }}>
+          <div>content</div>
+        </ReportTableCard>
+      </MemoryRouter>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /previous/i }));
+    expect(onPrev).toHaveBeenCalledOnce();
+  });
 });
