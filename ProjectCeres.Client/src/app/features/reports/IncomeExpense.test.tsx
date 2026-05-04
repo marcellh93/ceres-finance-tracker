@@ -44,4 +44,18 @@ describe('IncomeExpense report', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText(/Couldn't load Income vs Expense/)).toBeInTheDocument());
   });
+
+  it('renders a chart when data is present', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (String(url).includes('income-expense')) {
+        return Promise.resolve({ ok: true, json: async () => ({ currencyCode: 'EUR', currencySymbol: '€', totalIncome: 3000, totalExpenses: 2000, savingsRate: 0.33 }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Income')).toBeInTheDocument());
+    // Chart renders income and expenses as grouped bars — verify both values appear
+    expect(screen.getAllByText(/3000\.00/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2000\.00/).length).toBeGreaterThan(0);
+  });
 });
