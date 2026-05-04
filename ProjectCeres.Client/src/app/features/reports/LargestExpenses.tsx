@@ -66,7 +66,7 @@ export function LargestExpenses() {
               <CartesianGrid horizontal={false} stroke="var(--border)" />
               <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={100} />
-              <Tooltip contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }} formatter={(v: number) => `${symbol} ${v.toFixed(2)}`} />
+              <Tooltip contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }} formatter={(v: unknown) => `${symbol} ${(v as number).toFixed(2)}`} />
               <Bar dataKey="amount" fill="var(--destructive)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ChartContainer>

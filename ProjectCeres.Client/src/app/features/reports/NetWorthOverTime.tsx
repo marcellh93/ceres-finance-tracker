@@ -102,7 +102,7 @@ export function NetWorthOverTime() {
               <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }}
-                formatter={(value: number) => [`${symbol} ${value.toFixed(2)}`, 'Net Worth']}
+                formatter={(value: unknown) => [`${symbol} ${(value as number).toFixed(2)}`, 'Net Worth']}
               />
               <Area type="monotone" dataKey="netWorth" stroke="var(--primary)" strokeWidth={2} fill="url(#grad-nwot)" dot={false} />
             </AreaChart>

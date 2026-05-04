@@ -59,7 +59,7 @@ export function IncomeExpense() {
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }} formatter={(v: number) => `${symbol} ${v.toFixed(2)}`} />
+              <Tooltip contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }} formatter={(v: unknown) => `${symbol} ${(v as number).toFixed(2)}`} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="income" fill="var(--success)" radius={[4, 4, 0, 0]} />
               <Bar dataKey="expenses" fill="var(--destructive)" radius={[4, 4, 0, 0]} />
