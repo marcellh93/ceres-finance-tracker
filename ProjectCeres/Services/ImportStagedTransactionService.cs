@@ -17,7 +17,7 @@ public class ImportStagedTransactionService(
     public async Task<IReadOnlyList<ImportStagedTransaction>> GetPendingAsync() =>
         await db.ImportStagedTransactions
             .Owned(user)
-            .Include(s => s.Account)
+            .Include(s => s.Account).ThenInclude(a => a.Currency)
             .Include(s => s.MatchedTransaction)
             .Where(s => s.Status == StagedTransactionStatus.Pending)
             .OrderBy(s => s.ImportedAt)

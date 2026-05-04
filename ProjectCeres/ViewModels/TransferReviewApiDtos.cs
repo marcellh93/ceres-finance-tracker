@@ -7,6 +7,8 @@ public record StagedTransferDto(
     DateTime ImportedAt,
     Guid     AccountId,
     string   AccountName,
+    string   AccountCurrencyCode,
+    string   AccountCurrencySymbol,
     DateOnly RawDate,
     decimal  RawAmount,
     string?  RawDescription,

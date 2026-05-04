@@ -16,6 +16,8 @@ public class ReconciliationReviewApiController(IImportStagedTransactionService s
         return Ok(pending.Select(s => new StagedTransactionDto(
             s.Id, s.ImportedAt,
             s.AccountId, s.Account?.Name ?? s.AccountId.ToString(),
+            s.Account?.Currency?.Code   ?? string.Empty,
+            s.Account?.Currency?.Symbol ?? string.Empty,
             s.RawDate, s.RawAmount, s.RawDescription,
             s.MatchedTransactionId,
             s.MatchedTransaction?.Description,

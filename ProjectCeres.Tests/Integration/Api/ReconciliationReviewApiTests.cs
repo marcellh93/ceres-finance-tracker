@@ -100,6 +100,18 @@ public class ReconciliationReviewApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetPending_includes_account_currency_code_and_symbol()
+    {
+        var (_, _, stagedId) = await SeedSentinelStagedAsync();
+        var res = await _client.GetAsync("/api/reconciliation-review/pending");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rows = await res.Content.ReadFromJsonAsync<List<JsonElement>>();
+        var row  = rows!.First(r => r.GetProperty("id").GetGuid() == stagedId);
+        row.GetProperty("accountCurrencyCode").GetString().Should().Be("EUR");
+        row.GetProperty("accountCurrencySymbol").GetString().Should().Be("€");
+    }
+
+    [Fact]
     public async Task GetPending_excludes_intruder_rows()
     {
         var intruderId = await SeedIntruderStagedAsync();
