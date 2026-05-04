@@ -35,12 +35,12 @@ describe('TransactionHistory report', () => {
     await waitFor(() => expect(screen.getByText('Lidl')).toBeInTheDocument());
   });
 
-  it('renders pagination controls when data is full page', async () => {
+  it('renders pagination controls when data exceeds one page', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
       if (String(url).includes('transaction-history')) {
         return Promise.resolve({
           ok: true,
-          json: async () => Array.from({ length: 50 }, (_, i) => ({
+          json: async () => Array.from({ length: 51 }, (_, i) => ({
             id: String(i), date: '2026-05-01', accountName: 'Checking', categoryName: 'Groceries',
             categoryTypeName: 'Expense', description: `Tx ${i}`, amount: 10, currencySymbol: '€',
           })),
@@ -49,7 +49,7 @@ describe('TransactionHistory report', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
     renderPage();
-    await waitFor(() => expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /next page/i })).toBeInTheDocument());
   });
 
   it('renders empty state when data is []', async () => {
