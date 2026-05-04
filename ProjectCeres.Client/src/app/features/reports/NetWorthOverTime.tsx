@@ -8,8 +8,7 @@ import { ChartContainer } from '@/components/ui/chart';
 import { useApi } from '../../lib/use-api';
 import { usePagination } from '@/hooks/usePagination';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
-import { REPORTS_NET_WORTH_OVER_TIME_URL, reportMetaBySlug, type NetWorthSnapshotRowDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_NET_WORTH_OVER_TIME_URL, type NetWorthSnapshotRowDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
@@ -27,7 +26,7 @@ function formatDelta(value: number, symbol: string): string {
 }
 
 export function NetWorthOverTime() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<NetWorthSnapshotRowDto[]>(REPORTS_NET_WORTH_OVER_TIME_URL(qs));
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], 6);
@@ -45,7 +44,6 @@ export function NetWorthOverTime() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Net Worth Over Time" description={reportMetaBySlug('net-worth-over-time')?.description} filters={filters} />
       <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Net Worth Over Time" onRetry={refetch} />}

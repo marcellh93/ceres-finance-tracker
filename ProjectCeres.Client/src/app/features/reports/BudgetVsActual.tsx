@@ -8,8 +8,7 @@ import { CardError } from '../../components/CardError';
 import { useApi } from '../../lib/use-api';
 import { cn } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
-import { REPORTS_BUDGET_VS_ACTUAL_URL, reportMetaBySlug, type BudgetVsActualRowDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_BUDGET_VS_ACTUAL_URL, type BudgetVsActualRowDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
@@ -30,7 +29,7 @@ function BudgetProgressCell({ limit, actual }: { limit: number; actual: number }
 }
 
 export function BudgetVsActual() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<BudgetVsActualRowDto[]>(REPORTS_BUDGET_VS_ACTUAL_URL(qs));
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], 6);
@@ -42,7 +41,6 @@ export function BudgetVsActual() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Budget vs Actual" description={reportMetaBySlug('budget-vs-actual')?.description} filters={filters} />
       <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Budget vs Actual" onRetry={refetch} />}

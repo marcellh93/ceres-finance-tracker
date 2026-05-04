@@ -8,8 +8,7 @@ import { ChartContainer } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useApi } from '../../lib/use-api';
 import { usePagination } from '@/hooks/usePagination';
-import { REPORTS_MONTHLY_CASH_FLOW_URL, reportMetaBySlug, type MonthlyCashFlowRowDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_MONTHLY_CASH_FLOW_URL, type MonthlyCashFlowRowDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
@@ -17,7 +16,7 @@ import { useReportsFilters } from './useReportsFilters';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export function MonthlyCashFlow() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<MonthlyCashFlowRowDto[]>(REPORTS_MONTHLY_CASH_FLOW_URL(qs));
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], 6);
@@ -35,7 +34,6 @@ export function MonthlyCashFlow() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Monthly Cash Flow" description={reportMetaBySlug('monthly-cash-flow')?.description} filters={filters} />
       <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Monthly Cash Flow" onRetry={refetch} />}

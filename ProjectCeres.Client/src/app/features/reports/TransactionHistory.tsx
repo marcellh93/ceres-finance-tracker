@@ -7,8 +7,7 @@ import { CardError } from '../../components/CardError';
 import { useApi } from '../../lib/use-api';
 import { useSettings } from '../../lib/use-settings';
 import { formatDate } from '../../lib/date-format';
-import { REPORTS_TRANSACTION_HISTORY_URL, reportMetaBySlug, type TransactionHistoryRowDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_TRANSACTION_HISTORY_URL, type TransactionHistoryRowDto } from './reports-api';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { ReportTableCard } from './ReportTableCard';
 import { useReportsFilters } from './useReportsFilters';
@@ -16,7 +15,7 @@ import { useReportsFilters } from './useReportsFilters';
 const PAGE_SIZE = 50;
 
 export function TransactionHistory() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<TransactionHistoryRowDto[]>(REPORTS_TRANSACTION_HISTORY_URL(qs));
   const { data: settings } = useSettings();
@@ -24,10 +23,7 @@ export function TransactionHistory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <ReportHeader title="Transaction History" description={reportMetaBySlug('transaction-history')?.description} filters={filters} />
-        <ReportLocalFilterBar />
-      </div>
+      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Transaction History" onRetry={refetch} />}
       {data && data.length === 0 && (

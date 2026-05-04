@@ -8,14 +8,13 @@ import { ChartContainer } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { useApi } from '../../lib/use-api';
 import { usePagination } from '@/hooks/usePagination';
-import { REPORTS_EXPENSE_BREAKDOWN_URL, reportMetaBySlug, type ExpenseBreakdownDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_EXPENSE_BREAKDOWN_URL, type ExpenseBreakdownDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 export function ExpenseBreakdown() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<ExpenseBreakdownDto>(REPORTS_EXPENSE_BREAKDOWN_URL(qs));
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data?.categories ?? [], 6);
@@ -31,7 +30,6 @@ export function ExpenseBreakdown() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Expense Breakdown" description={reportMetaBySlug('expense-breakdown')?.description} filters={filters} />
       <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Expense Breakdown" onRetry={refetch} />}

@@ -7,14 +7,13 @@ import { CardError } from '../../components/CardError';
 import { ChartContainer } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useApi } from '../../lib/use-api';
-import { REPORTS_INCOME_EXPENSE_URL, reportMetaBySlug, type IncomeExpenseSummaryDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_INCOME_EXPENSE_URL, type IncomeExpenseSummaryDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 export function IncomeExpense() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<IncomeExpenseSummaryDto>(REPORTS_INCOME_EXPENSE_URL(qs));
 
@@ -27,7 +26,6 @@ export function IncomeExpense() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Income vs Expense" description={reportMetaBySlug('income-expense')?.description} filters={filters} />
       <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[80px] w-full" />}
       {error && <CardError section="Income vs Expense" onRetry={refetch} />}

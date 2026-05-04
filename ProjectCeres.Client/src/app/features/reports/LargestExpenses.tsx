@@ -10,14 +10,13 @@ import { useApi } from '../../lib/use-api';
 import { useSettings } from '../../lib/use-settings';
 import { formatDate } from '../../lib/date-format';
 import { usePagination } from '@/hooks/usePagination';
-import { REPORTS_LARGEST_EXPENSES_URL, reportMetaBySlug, type LargestExpenseRowDto } from './reports-api';
-import { ReportHeader } from './ReportHeader';
+import { REPORTS_LARGEST_EXPENSES_URL, type LargestExpenseRowDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 export function LargestExpenses() {
-  const { filters, toQueryString } = useReportsFilters();
+  const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<LargestExpenseRowDto[]>(REPORTS_LARGEST_EXPENSES_URL(qs));
   const { data: settings } = useSettings();
@@ -35,7 +34,6 @@ export function LargestExpenses() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Largest Expenses" description={reportMetaBySlug('largest-expenses')?.description} filters={filters} />
       <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Largest Expenses" onRetry={refetch} />}
