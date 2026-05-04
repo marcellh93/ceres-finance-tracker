@@ -54,3 +54,29 @@ describe('BudgetVsActual report', () => {
     await waitFor(() => expect(screen.getByText(/no active budgets/i)).toBeInTheDocument());
   });
 });
+
+const bvaRows = [
+  { categoryName: 'Groceries', currencyCode: 'EUR', currencySymbol: '€', limitPerPeriod: 200, totalLimit: 200, actualSpend: 150, variance: 50 },
+  { categoryName: 'Dining',    currencyCode: 'EUR', currencySymbol: '€', limitPerPeriod: 100, totalLimit: 100, actualSpend: 120, variance: -20 },
+];
+
+it('renders KPI tile for Total Budget', async () => {
+  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => bvaRows });
+  renderPage();
+  await waitFor(() => expect(screen.getByText('Total Budget')).toBeInTheDocument());
+  expect(screen.getAllByText(/300\.00/).length).toBeGreaterThan(0); // 200 + 100 = 300
+});
+
+it('renders KPI tile for Total Spent', async () => {
+  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => bvaRows });
+  renderPage();
+  await waitFor(() => expect(screen.getByText('Total Spent')).toBeInTheDocument());
+  expect(screen.getAllByText(/270\.00/).length).toBeGreaterThan(0); // 150 + 120 = 270
+});
+
+it('renders KPI tile for Overall Used', async () => {
+  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => bvaRows });
+  renderPage();
+  await waitFor(() => expect(screen.getByText('Overall Used')).toBeInTheDocument());
+  expect(screen.getByText(/90\.0%/)).toBeInTheDocument(); // 270/300 = 90%
+});

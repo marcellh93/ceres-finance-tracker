@@ -2,12 +2,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Numeric } from '@/components/Numeric';
+import { Tile } from '@/components/Tile';
+import { StatTile } from '@/components/StatTile';
 import { CardError } from '../../components/CardError';
 import { useApi } from '../../lib/use-api';
 import { cn } from '@/lib/utils';
-import { REPORTS_BUDGET_VS_ACTUAL_URL, type BudgetVsActualRowDto } from './reports-api';
+import { usePagination } from '@/hooks/usePagination';
+import { REPORTS_BUDGET_VS_ACTUAL_URL, reportMetaBySlug, type BudgetVsActualRowDto } from './reports-api';
 import { ReportHeader } from './ReportHeader';
 import { ReportTableCard } from './ReportTableCard';
+import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 function BudgetProgressCell({ limit, actual }: { limit: number; actual: number }) {
@@ -29,54 +33,74 @@ export function BudgetVsActual() {
   const { filters, toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<BudgetVsActualRowDto[]>(REPORTS_BUDGET_VS_ACTUAL_URL(qs));
+  const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], 6);
+
+  const totalBudget = (data ?? []).reduce((s, r) => s + r.totalLimit, 0);
+  const totalSpent  = (data ?? []).reduce((s, r) => s + r.actualSpend, 0);
+  const pctUsed     = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+  const symbol      = data?.[0]?.currencySymbol ?? '€';
 
   return (
     <div className="space-y-6">
-      <ReportHeader title="Budget vs Actual" filters={filters} />
+      <ReportHeader title="Budget vs Actual" description={reportMetaBySlug('budget-vs-actual')?.description} filters={filters} />
+      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Budget vs Actual" onRetry={refetch} />}
       {data && data.length === 0 && (
         <p className="text-sm text-muted-foreground">No active budgets for this period.</p>
       )}
       {data && data.length > 0 && (
-        <ReportTableCard slug="budget-vs-actual" queryString={qs}>
-          <Table className="min-w-[680px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Limit/period</TableHead>
-                <TableHead className="text-right">Total limit</TableHead>
-                <TableHead className="text-right">Actual</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead className="text-right">Variance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((row) => (
-                <TableRow key={row.categoryName}>
-                  <TableCell className="font-medium">{row.categoryName}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    <Numeric>{row.currencySymbol} {row.limitPerPeriod.toFixed(2)}</Numeric>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Numeric>{row.currencySymbol} {row.totalLimit.toFixed(2)}</Numeric>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Numeric>{row.currencySymbol} {row.actualSpend.toFixed(2)}</Numeric>
-                  </TableCell>
-                  <TableCell>
-                    <BudgetProgressCell limit={row.totalLimit} actual={row.actualSpend} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Numeric className={row.variance >= 0 ? 'text-success' : 'text-destructive'}>
-                      {row.variance > 0 ? '+' : ''}{row.currencySymbol} {row.variance.toFixed(2)}
-                    </Numeric>
-                  </TableCell>
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Tile>
+              <StatTile label="Total Budget" value={<Numeric className="text-xl">{symbol} {totalBudget.toFixed(2)}</Numeric>} />
+            </Tile>
+            <Tile>
+              <StatTile label="Total Spent" value={<Numeric className={`text-xl ${totalSpent > totalBudget ? 'text-destructive' : ''}`}>{symbol} {totalSpent.toFixed(2)}</Numeric>} />
+            </Tile>
+            <Tile>
+              <StatTile label="Overall Used" value={<Numeric className={`text-xl ${pctUsed > 100 ? 'text-destructive' : ''}`}>{pctUsed.toFixed(1)}%</Numeric>} />
+            </Tile>
+          </div>
+          <ReportTableCard slug="budget-vs-actual" queryString={qs} pagination={totalPages > 1 ? { currentPage, totalPages, onNext: next, onPrev: prev } : undefined}>
+            <Table className="min-w-[680px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Limit/period</TableHead>
+                  <TableHead className="text-right">Total limit</TableHead>
+                  <TableHead className="text-right">Actual</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead className="text-right">Variance</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </ReportTableCard>
+              </TableHeader>
+              <TableBody>
+                {paginatedItems.map((row) => (
+                  <TableRow key={row.categoryName}>
+                    <TableCell className="font-medium">{row.categoryName}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      <Numeric>{row.currencySymbol} {row.limitPerPeriod.toFixed(2)}</Numeric>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Numeric>{row.currencySymbol} {row.totalLimit.toFixed(2)}</Numeric>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Numeric>{row.currencySymbol} {row.actualSpend.toFixed(2)}</Numeric>
+                    </TableCell>
+                    <TableCell>
+                      <BudgetProgressCell limit={row.totalLimit} actual={row.actualSpend} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Numeric className={row.variance > 0 ? 'text-success' : row.variance < 0 ? 'text-destructive' : 'text-muted-foreground'}>
+                        {row.variance > 0 ? '+' : ''}{row.currencySymbol} {row.variance.toFixed(2)}
+                      </Numeric>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ReportTableCard>
+        </>
       )}
     </div>
   );
