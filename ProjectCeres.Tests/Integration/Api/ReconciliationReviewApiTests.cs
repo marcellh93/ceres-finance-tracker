@@ -140,14 +140,6 @@ public class ReconciliationReviewApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ConfirmAll_returns_204()
-    {
-        await SeedSentinelStagedAsync();
-        var res = await _client.PostAsync("/api/reconciliation-review/confirm-all", null);
-        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
-    }
-
-    [Fact]
     public async Task ConfirmAll_returns_204_with_pending_rows_and_marks_all_confirmed()
     {
         var (_, _, stagedId1) = await SeedSentinelStagedAsync();
