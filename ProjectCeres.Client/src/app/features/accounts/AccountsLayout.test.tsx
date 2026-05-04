@@ -198,29 +198,41 @@ describe('AccountsLayout', () => {
     await screen.findByText('Cash');
   });
 
-  it('disables the cross-fade when prefers-reduced-motion matches', async () => {
-    const matchMediaSpy = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      writable: true,
-      value: matchMediaSpy,
+  describe('with prefers-reduced-motion', () => {
+    const originalMatchMedia = window.matchMedia;
+
+    afterEach(() => {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia,
+      });
     });
 
-    renderAt('/accounts');
-    await screen.findByText('Cash');
-    const transitions = document.querySelectorAll('[data-data-transition]');
-    expect(transitions.length).toBeGreaterThan(0);
-    transitions.forEach((node) => {
-      expect(node.getAttribute('data-reduced-motion')).toBe('true');
+    it('disables the cross-fade when prefers-reduced-motion matches', async () => {
+      const matchMediaSpy = vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: matchMediaSpy,
+      });
+
+      renderAt('/accounts');
+      await screen.findByText('Cash');
+      const transitions = document.querySelectorAll('[data-data-transition]');
+      expect(transitions.length).toBeGreaterThan(0);
+      transitions.forEach((node) => {
+        expect(node.getAttribute('data-reduced-motion')).toBe('true');
+      });
     });
   });
 });
