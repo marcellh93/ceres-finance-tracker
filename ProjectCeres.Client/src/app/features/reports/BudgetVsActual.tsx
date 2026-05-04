@@ -56,10 +56,10 @@ export function BudgetVsActual() {
               <StatTile label="Total Budget" value={<Numeric className="text-xl">{symbol} {totalBudget.toFixed(2)}</Numeric>} />
             </Tile>
             <Tile>
-              <StatTile label="Total Spent" value={<Numeric className={`text-xl ${totalSpent > totalBudget ? 'text-destructive' : ''}`}>{symbol} {totalSpent.toFixed(2)}</Numeric>} />
+              <StatTile label="Total Spent" value={<Numeric className={`text-xl ${totalSpent > totalBudget ? 'text-destructive' : totalSpent === totalBudget ? 'text-muted-foreground' : ''}`}>{symbol} {totalSpent.toFixed(2)}</Numeric>} />
             </Tile>
             <Tile>
-              <StatTile label="Overall Used" value={<Numeric className={`text-xl ${pctUsed > 100 ? 'text-destructive' : ''}`}>{pctUsed.toFixed(1)}%</Numeric>} />
+              <StatTile label="Overall Used" value={<Numeric className={`text-xl ${pctUsed > 100 ? 'text-destructive' : pctUsed === 100 ? 'text-muted-foreground' : ''}`}>{pctUsed.toFixed(1)}%</Numeric>} />
             </Tile>
           </div>
           <ReportTableCard slug="budget-vs-actual" queryString={qs} pagination={totalPages > 1 ? { currentPage, totalPages, onNext: next, onPrev: prev } : undefined}>

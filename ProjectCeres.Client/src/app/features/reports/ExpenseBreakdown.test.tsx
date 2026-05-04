@@ -84,5 +84,6 @@ describe('ExpenseBreakdown report', () => {
     mockBreakdown();
     renderPage();
     await waitFor(() => expect(screen.getByText('Categories')).toBeInTheDocument());
+    expect(screen.getByText('3')).toBeInTheDocument(); // 3 categories in fixture
   });
 });
