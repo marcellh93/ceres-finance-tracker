@@ -205,6 +205,57 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
         result.Should().Be(new DateOnly(2026, 5, 6)); // Tue + 8 days = Wed May 6
     }
 
+    [Fact]
+    public void SnapToCalendarDay_Monthly_AnchorIs1st_ConfirmOnAnchor_AdvancesToNextMonthAnchor()
+    {
+        // Reproduces the production bug: monthly rent on the 1st, confirmed on May 1st,
+        // must advance to June 1st (not July 1st).
+        var reminder = MakeReminder(Frequency.Monthly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 1,
+            nextDueDate: new DateOnly(2026, 5, 1));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 5, 1));
+        result.Should().Be(new DateOnly(2026, 6, 1));
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Monthly_AnchorIs15th_ConfirmEarlyInMonth_AdvancesToNextMonthAnchor()
+    {
+        // Confirm before the anchor day — next due is next month's anchor.
+        var reminder = MakeReminder(Frequency.Monthly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 15,
+            nextDueDate: new DateOnly(2026, 5, 15));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 5, 10));
+        result.Should().Be(new DateOnly(2026, 6, 15));
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Monthly_AnchorIs15th_ConfirmLateInMonth_AdvancesToNextMonthAnchor()
+    {
+        // Confirm late (after the anchor) — next due is still next month's anchor, never month-after-next.
+        var reminder = MakeReminder(Frequency.Monthly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 15,
+            nextDueDate: new DateOnly(2026, 5, 15));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 5, 25));
+        result.Should().Be(new DateOnly(2026, 6, 15));
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Monthly_AnchorIs1st_ConfirmLateInMonth_AdvancesToNextMonthAnchor()
+    {
+        // Confirm a 1st-of-month reminder mid-month — next due is the 1st of next month, not the month after.
+        var reminder = MakeReminder(Frequency.Monthly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 1,
+            nextDueDate: new DateOnly(2026, 5, 1));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 5, 15));
+        result.Should().Be(new DateOnly(2026, 6, 1));
+    }
+
+    [Fact]
+    public void SnapToCalendarDay_Monthly_AnchorIs31st_FebruaryClampsToLastDay()
+    {
+        // 31st-of-month reminder confirmed in January → February has 28 days in 2026, so clamp.
+        var reminder = MakeReminder(Frequency.Monthly, ReminderBehaviour.SnapToCalendarDay, dayOfPeriod: 31,
+            nextDueDate: new DateOnly(2026, 1, 31));
+        var result = InvokeSnapToCalendarDay(reminder, confirmDate: new DateOnly(2026, 1, 31));
+        result.Should().Be(new DateOnly(2026, 2, 28));
+    }
+
     // -------------------------------------------------------------------------
     // GetUpcomingAsync (6.2)
     // -------------------------------------------------------------------------

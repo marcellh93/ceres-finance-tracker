@@ -80,12 +80,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
 
         var candidate = new DateOnly(from.Year, from.Month, 1).AddMonths(1);
         var daysInMonth = DateTime.DaysInMonth(candidate.Year, candidate.Month);
-        candidate = new DateOnly(candidate.Year, candidate.Month, Math.Min(day, daysInMonth));
-
-        if (confirmDate.HasValue && from.Day >= day)
-            candidate = candidate.AddMonths(1);
-
-        return candidate;
+        return new DateOnly(candidate.Year, candidate.Month, Math.Min(day, daysInMonth));
     }
 
     private static DateOnly SnapWeekly(RecurringTransaction reminder, DateOnly? confirmDate, bool doubleStep)
