@@ -49,4 +49,27 @@ describe('NetWorthOverTime report', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Apr 2026')).toBeInTheDocument());
   });
+
+  const twoRows = [
+    { year: 2026, month: 1, currencyCode: 'EUR', currencySymbol: '€', assets: 40000, liabilities: 5000, netWorth: 35000 },
+    { year: 2026, month: 4, currencyCode: 'EUR', currencySymbol: '€', assets: 48200, liabilities: 5400, netWorth: 42800 },
+  ];
+
+  it('renders KPI tile for Net Worth', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => twoRows });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Net Worth')).toBeInTheDocument());
+  });
+
+  it('renders KPI tile for Total Assets', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => twoRows });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Total Assets')).toBeInTheDocument());
+  });
+
+  it('renders KPI tile for Total Liabilities', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => twoRows });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Total Liabilities')).toBeInTheDocument());
+  });
 });
