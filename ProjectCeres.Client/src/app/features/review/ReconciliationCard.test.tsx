@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Toaster } from 'sonner';
@@ -84,5 +84,12 @@ describe('ReconciliationCard', () => {
     await userEvent.click(screen.getByRole('button', { name: /Confirm match/i }));
     await waitFor(() => expect(screen.getByText(/Couldn't confirm/i)).toBeInTheDocument());
     expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it('row menu opens and shows Dispute item which opens the dialog', async () => {
+    render(<ReconciliationCard staged={dto()} onChanged={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /More actions/i }));
+    fireEvent.click(screen.getByText('Dispute'));
+    await waitFor(() => expect(screen.getByText('Dispute this match?')).toBeInTheDocument());
   });
 });
