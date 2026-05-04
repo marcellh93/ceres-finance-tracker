@@ -517,4 +517,60 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         var res = await _client.PostAsync($"/api/recurring-transactions/{id}/dismiss", null);
         res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
+
+    private async Task<Guid> CreateRelativeReminder(DateOnly nextDueDate, string frequency = "Monthly")
+    {
+        var res = await _client.PostAsJsonAsync("/api/recurring-transactions", new
+        {
+            name              = $"Relative-{Guid.NewGuid():N}",
+            estimatedAmount   = (decimal?)null,
+            accountId         = CheckingAccountId,
+            categoryId        = SalaryCategoryId,
+            frequency         = frequency,
+            dayOfPeriod       = (int?)null,
+            nextDueDate       = nextDueDate.ToString("yyyy-MM-dd"),
+            reminderBehaviour = "RelativeToLastConfirmation"
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        _createdIds.Add(id);
+        return id;
+    }
+
+    [Fact]
+    public async Task Dismiss_RelativeToLastConfirmation_advances_from_stored_next_due_date()
+    {
+        // Distinct from Confirm: Dismiss passes confirmDate=null, so RelativeToLastConfirmation
+        // advances from the reminder's stored NextDueDate, not from "today".
+        var id = await CreateRelativeReminder(nextDueDate: new DateOnly(2026, 5, 15));
+        var res = await _client.PostAsync($"/api/recurring-transactions/{id}/dismiss", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var get = await _client.GetFromJsonAsync<JsonElement>($"/api/recurring-transactions/{id}");
+        get.GetProperty("nextDueDate").GetString().Should().Be("2026-06-15");
+    }
+
+    [Fact]
+    public async Task Dismiss_returns_404_for_unknown_id()
+    {
+        var res = await _client.PostAsync($"/api/recurring-transactions/{Guid.NewGuid()}/dismiss", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Dismiss_returns_404_for_intruder_row()
+    {
+        var intruderId = await CreateReminderAsOtherUser();
+        try
+        {
+            var res = await _client.PostAsync($"/api/recurring-transactions/{intruderId}/dismiss", null);
+            res.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.RecurringTransactions.Where(r => r.Id == intruderId).ExecuteDeleteAsync();
+        }
+    }
 }
