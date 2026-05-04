@@ -19,6 +19,15 @@ function renderPage() {
   );
 }
 
+const breakdown = {
+  currencyCode: 'EUR', currencySymbol: '€',
+  categories: [
+    { categoryName: 'Groceries', lifestyleTag: 'Essential', total: 500 },
+    { categoryName: 'Dining', lifestyleTag: null, total: 300 },
+    { categoryName: 'Transport', lifestyleTag: 'Essential', total: 200 },
+  ],
+};
+
 describe('ExpenseBreakdown report', () => {
   it('renders heading', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
@@ -34,7 +43,7 @@ describe('ExpenseBreakdown report', () => {
       return Promise.resolve({ ok: true, json: async () => [] });
     });
     renderPage();
-    await waitFor(() => expect(screen.getByText('Groceries')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Groceries').length).toBeGreaterThan(0));
   });
 
   it('renders empty state when categories is []', async () => {
@@ -46,5 +55,34 @@ describe('ExpenseBreakdown report', () => {
     });
     renderPage();
     await waitFor(() => expect(screen.getByText(/no expense/i)).toBeInTheDocument());
+  });
+
+  function mockBreakdown() {
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (String(url).includes('expense-breakdown')) {
+        return Promise.resolve({ ok: true, json: async () => breakdown });
+      }
+      return Promise.resolve({ ok: true, json: async () => [] });
+    });
+  }
+
+  it('renders KPI tile for Largest Category', async () => {
+    mockBreakdown();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Largest Category')).toBeInTheDocument());
+    expect(screen.getAllByText('Groceries').length).toBeGreaterThan(0); // largest by total
+  });
+
+  it('renders KPI tile for Total Expenses', async () => {
+    mockBreakdown();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Total Expenses')).toBeInTheDocument());
+    expect(screen.getAllByText(/1000\.00/).length).toBeGreaterThan(0); // 500 + 300 + 200 = 1000
+  });
+
+  it('renders KPI tile for Categories count', async () => {
+    mockBreakdown();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Categories')).toBeInTheDocument());
   });
 });
