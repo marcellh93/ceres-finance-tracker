@@ -28,39 +28,17 @@ public class ImportStagedTransactionService(
             .Owned(user)
             .CountAsync(s => s.Status == StagedTransactionStatus.Pending);
 
-    public async Task ConfirmAsync(Guid id)
+    public async Task<Result> TryConfirmAsync(Guid id)
     {
-        var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id)
-            ?? throw new InvalidOperationException($"Staged transaction {id} not found.");
+        var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id);
+        if (staged is null)
+            return Result.Fail("NOT_FOUND", "Staged transaction not found.");
 
-        staged.Status     = StagedTransactionStatus.Confirmed;
-        staged.ResolvedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-    }
-
-    public async Task ConfirmAllAsync()
-    {
-        var pending = await db.ImportStagedTransactions
-            .Owned(user)
-            .Where(s => s.Status == StagedTransactionStatus.Pending)
-            .ToListAsync();
-
-        foreach (var staged in pending)
+        try
         {
             staged.Status     = StagedTransactionStatus.Confirmed;
             staged.ResolvedAt = DateTime.UtcNow;
-        }
-
-        await db.SaveChangesAsync();
-    }
-
-    public async Task<Result> TryConfirmAsync(Guid id)
-    {
-        if (!await db.ImportStagedTransactions.Owned(user).AnyAsync(s => s.Id == id))
-            return Result.Fail("NOT_FOUND", "Staged transaction not found.");
-        try
-        {
-            await ConfirmAsync(id);
+            await db.SaveChangesAsync();
             return Result.Ok();
         }
         catch (InvalidOperationException ex)
@@ -88,40 +66,34 @@ public class ImportStagedTransactionService(
 
     public async Task<Result> TryDisputeAsync(Guid id)
     {
-        if (!await db.ImportStagedTransactions.Owned(user).AnyAsync(s => s.Id == id))
+        var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id);
+        if (staged is null)
             return Result.Fail("NOT_FOUND", "Staged transaction not found.");
+
         try
         {
-            await DisputeAsync(id);
+            if (staged.MatchedTransactionId.HasValue)
+                await transactionService.MarkClearedAsync(staged.MatchedTransactionId.Value, cleared: false);
+
+            var categoryId = staged.RawAmount >= 0 ? UncategorizedIncomeId : UncategorizedExpenseId;
+            var txId = await transactionService.CreateAsync(new TransactionCreateViewModel
+            {
+                Date        = staged.RawDate,
+                Amount      = Math.Abs(staged.RawAmount),
+                Description = staged.RawDescription,
+                AccountId   = staged.AccountId,
+                CategoryId  = categoryId
+            });
+            await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
+
+            staged.Status     = StagedTransactionStatus.Disputed;
+            staged.ResolvedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
             return Result.Ok();
         }
         catch (InvalidOperationException ex)
         {
             return Result.Fail("VALIDATION_ERROR", ex.Message);
         }
-    }
-
-    public async Task DisputeAsync(Guid id)
-    {
-        var staged = await db.ImportStagedTransactions.Owned(user).FirstOrDefaultAsync(s => s.Id == id)
-            ?? throw new InvalidOperationException($"Staged transaction {id} not found.");
-
-        if (staged.MatchedTransactionId.HasValue)
-            await transactionService.MarkClearedAsync(staged.MatchedTransactionId.Value, cleared: false);
-
-        var categoryId = staged.RawAmount >= 0 ? UncategorizedIncomeId : UncategorizedExpenseId;
-        var txId = await transactionService.CreateAsync(new TransactionCreateViewModel
-        {
-            Date        = staged.RawDate,
-            Amount      = Math.Abs(staged.RawAmount),
-            Description = staged.RawDescription,
-            AccountId   = staged.AccountId,
-            CategoryId  = categoryId
-        });
-        await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
-
-        staged.Status     = StagedTransactionStatus.Disputed;
-        staged.ResolvedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
     }
 }

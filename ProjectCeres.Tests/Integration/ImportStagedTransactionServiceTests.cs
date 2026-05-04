@@ -140,68 +140,21 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
-    // ConfirmAsync
+    // TryConfirmAsync
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task ConfirmAsync_SetsStatusConfirmedAndResolvedAt()
+    public async Task TryConfirmAsync_DoesNotChangeMatchedTransactionClearedState()
     {
         var txId = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
         await _transactionService.MarkClearedAsync(txId, cleared: true);
         var staged = await CreateStagedAsync(txId);
 
-        await _service.ConfirmAsync(staged.Id);
+        var result = await _service.TryConfirmAsync(staged.Id);
 
-        var reloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(staged.Id);
-        reloaded!.Status.Should().Be(StagedTransactionStatus.Confirmed);
-        reloaded.ResolvedAt.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task ConfirmAsync_DoesNotChangeMatchedTransactionClearedState()
-    {
-        var txId = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
-        await _transactionService.MarkClearedAsync(txId, cleared: true);
-        var staged = await CreateStagedAsync(txId);
-
-        await _service.ConfirmAsync(staged.Id);
-
+        result.IsSuccess.Should().BeTrue();
         var tx = await _fixture.Db.Transactions.FindAsync(txId);
         tx!.IsCleared.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task ConfirmAsync_ThrowsWhenNotFound()
-    {
-        var act = async () => await _service.ConfirmAsync(Guid.NewGuid());
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    // -------------------------------------------------------------------------
-    // ConfirmAllAsync
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task ConfirmAllAsync_ConfirmsAllPendingRows()
-    {
-        var txId1 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
-        var txId2 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 200m);
-        var txId3 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 300m);
-
-        var staged1 = await CreateStagedAsync(txId1, StagedTransactionStatus.Pending);
-        var staged2 = await CreateStagedAsync(txId2, StagedTransactionStatus.Pending);
-        var staged3 = await CreateStagedAsync(txId3, StagedTransactionStatus.Confirmed);
-
-        await _service.ConfirmAllAsync();
-
-        var r1 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged1.Id);
-        var r2 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged2.Id);
-        var r3 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged3.Id);
-
-        r1!.Status.Should().Be(StagedTransactionStatus.Confirmed);
-        r2!.Status.Should().Be(StagedTransactionStatus.Confirmed);
-        r3!.Status.Should().Be(StagedTransactionStatus.Confirmed); // already confirmed, not re-processed
-        r3.ResolvedAt.Should().BeNull(); // ConfirmAllAsync did not set ResolvedAt on already-confirmed row
     }
 
     // -------------------------------------------------------------------------
@@ -357,38 +310,25 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
     }
 
     // -------------------------------------------------------------------------
-    // DisputeAsync
+    // TryDisputeAsync
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task DisputeAsync_SetsStatusDisputed()
+    public async Task TryDisputeAsync_UnclearsTheOriginalTransaction()
     {
         var txId = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
         await _transactionService.MarkClearedAsync(txId, cleared: true);
         var staged = await CreateStagedAsync(txId);
 
-        await _service.DisputeAsync(staged.Id);
+        var result = await _service.TryDisputeAsync(staged.Id);
 
-        var reloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(staged.Id);
-        reloaded!.Status.Should().Be(StagedTransactionStatus.Disputed);
-        reloaded.ResolvedAt.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task DisputeAsync_UnclearsTheOriginalTransaction()
-    {
-        var txId = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
-        await _transactionService.MarkClearedAsync(txId, cleared: true);
-        var staged = await CreateStagedAsync(txId);
-
-        await _service.DisputeAsync(staged.Id);
-
+        result.IsSuccess.Should().BeTrue();
         var tx = await _fixture.Db.Transactions.FindAsync(txId);
         tx!.IsCleared.Should().BeFalse();
     }
 
     [Fact]
-    public async Task DisputeAsync_InsertsNewTransactionWithNeedsReview()
+    public async Task TryDisputeAsync_InsertsNewTransactionWithNeedsReview()
     {
         var txId = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
         await _transactionService.MarkClearedAsync(txId, cleared: true);
@@ -396,8 +336,9 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
 
         var countBefore = _fixture.Db.Transactions.Count(t => t.AccountId == _accountId);
 
-        await _service.DisputeAsync(staged.Id);
+        var result = await _service.TryDisputeAsync(staged.Id);
 
+        result.IsSuccess.Should().BeTrue();
         var countAfter = _fixture.Db.Transactions.Count(t => t.AccountId == _accountId);
         countAfter.Should().Be(countBefore + 1);
 
@@ -411,14 +352,7 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DisputeAsync_ThrowsWhenNotFound()
-    {
-        var act = async () => await _service.DisputeAsync(Guid.NewGuid());
-        await act.Should().ThrowAsync<InvalidOperationException>();
-    }
-
-    [Fact]
-    public async Task DisputeAsync_WhenMatchedTransactionIsNull_StillInsertsNewTransaction()
+    public async Task TryDisputeAsync_WhenMatchedTransactionIsNull_StillInsertsNewTransaction()
     {
         var staged = new ImportStagedTransaction
         {
@@ -436,8 +370,9 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
 
         var countBefore = _fixture.Db.Transactions.Count(t => t.AccountId == _accountId);
 
-        await _service.DisputeAsync(staged.Id);
+        var result = await _service.TryDisputeAsync(staged.Id);
 
+        result.IsSuccess.Should().BeTrue();
         var reloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(staged.Id);
         reloaded!.Status.Should().Be(StagedTransactionStatus.Disputed);
 
