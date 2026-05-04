@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi, type UseApiResult } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { AccountCurrencySubtotals } from './AccountCurrencySubtotals';
 import { AccountsTable } from './AccountsTable';
 import { ACCOUNTS_URL, buildListUrl, type AccountListItemDto } from './accounts-api';
@@ -71,7 +73,7 @@ export function AccountsLayout() {
         </p>
       </header>
 
-      {list.data ? <AccountCurrencySubtotals rows={list.data} /> : null}
+      <SubtotalsArea list={list} />
 
       <Card>
         <CardContent className="space-y-4">
@@ -107,6 +109,24 @@ export function AccountsLayout() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SubtotalsArea({ list }: { list: UseApiResult<AccountListItemDto[]> }) {
+  const showSkeleton = useDelayedLoading(list.loading && !list.data);
+  if (!list.data && !showSkeleton) {
+    return null;
+  }
+  const state: DataTransitionState =
+    showSkeleton && !list.data ? 'skeleton' : 'data';
+  return (
+    <DataTransition
+      state={state}
+      skeleton={<div data-testid="subtotals-skeleton" className="h-12 w-full" />}
+      error={null}
+    >
+      {list.data ? <AccountCurrencySubtotals rows={list.data} /> : null}
+    </DataTransition>
   );
 }
 
