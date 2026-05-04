@@ -164,4 +164,63 @@ describe('AccountsLayout', () => {
       expect(screen.getByText(/^no accounts\.$/i)).toBeInTheDocument();
     });
   });
+
+  it('does not flash the skeleton when the response is faster than the delay window', async () => {
+    renderAt('/accounts');
+    expect(screen.queryByTestId('accounts-skeleton')).toBeNull();
+    await screen.findByText('Cash');
+    expect(screen.queryByTestId('accounts-skeleton')).toBeNull();
+  });
+
+  it('shows the skeleton then cross-fades to data when the response is slow', async () => {
+    let resolveFetch: (value: { ok: true; status: 200; json: () => Promise<unknown> }) => void;
+    const slowResponse = new Promise<{ ok: true; status: 200; json: () => Promise<unknown> }>(
+      (resolve) => { resolveFetch = resolve; },
+    );
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/accounts') return slowResponse;
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+    });
+
+    renderAt('/accounts');
+
+    await waitFor(
+      () => expect(screen.getByTestId('accounts-skeleton')).toBeInTheDocument(),
+      { timeout: 500 },
+    );
+
+    resolveFetch!({
+      ok: true,
+      status: 200,
+      json: async () => allRows.filter((r) => r.isActive),
+    });
+
+    await screen.findByText('Cash');
+  });
+
+  it('disables the cross-fade when prefers-reduced-motion matches', async () => {
+    const matchMediaSpy = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: matchMediaSpy,
+    });
+
+    renderAt('/accounts');
+    await screen.findByText('Cash');
+    const transitions = document.querySelectorAll('[data-data-transition]');
+    expect(transitions.length).toBeGreaterThan(0);
+    transitions.forEach((node) => {
+      expect(node.getAttribute('data-reduced-motion')).toBe('true');
+    });
+  });
 });
