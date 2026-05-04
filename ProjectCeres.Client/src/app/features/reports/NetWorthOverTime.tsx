@@ -21,7 +21,8 @@ function monthLabel(row: NetWorthSnapshotRowDto): string {
 }
 
 function formatDelta(value: number, symbol: string): string {
-  const sign = value >= 0 ? '↑' : '↓';
+  if (value === 0) return `— ${symbol} 0.00`;
+  const sign = value > 0 ? '↑' : '↓';
   return `${sign} ${symbol} ${Math.abs(value).toFixed(2)}`;
 }
 
@@ -59,7 +60,7 @@ export function NetWorthOverTime() {
                 label="Net Worth"
                 value={<Numeric className={`text-xl ${last.netWorth >= 0 ? 'text-success' : 'text-destructive'}`}>{symbol} {last.netWorth.toFixed(2)}</Numeric>}
               />
-              <p className={`mt-1 text-xs ${(last.netWorth - first.netWorth) >= 0 ? 'text-success' : 'text-destructive'}`}>
+              <p className={`mt-1 text-xs ${(last.netWorth - first.netWorth) > 0 ? 'text-success' : (last.netWorth - first.netWorth) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {formatDelta(last.netWorth - first.netWorth, symbol)} vs period start
               </p>
             </Tile>
@@ -68,7 +69,7 @@ export function NetWorthOverTime() {
                 label="Total Assets"
                 value={<Numeric className="text-xl">{symbol} {last.assets.toFixed(2)}</Numeric>}
               />
-              <p className={`mt-1 text-xs ${(last.assets - first.assets) >= 0 ? 'text-success' : 'text-destructive'}`}>
+              <p className={`mt-1 text-xs ${(last.assets - first.assets) > 0 ? 'text-success' : (last.assets - first.assets) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {formatDelta(last.assets - first.assets, symbol)} vs period start
               </p>
             </Tile>
@@ -77,7 +78,7 @@ export function NetWorthOverTime() {
                 label="Total Liabilities"
                 value={<Numeric className={`text-xl ${last.liabilities > 0 ? 'text-destructive' : ''}`}>{symbol} {last.liabilities.toFixed(2)}</Numeric>}
               />
-              <p className={`mt-1 text-xs ${(last.liabilities - first.liabilities) <= 0 ? 'text-success' : 'text-destructive'}`}>
+              <p className={`mt-1 text-xs ${(last.liabilities - first.liabilities) < 0 ? 'text-success' : (last.liabilities - first.liabilities) > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {formatDelta(first.liabilities - last.liabilities, symbol)} vs period start
               </p>
             </Tile>

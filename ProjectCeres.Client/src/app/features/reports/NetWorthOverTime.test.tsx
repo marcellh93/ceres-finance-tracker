@@ -59,17 +59,20 @@ describe('NetWorthOverTime report', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => twoRows });
     renderPage();
     await waitFor(() => expect(screen.getByText('Net Worth')).toBeInTheDocument());
+    expect(screen.getByText(/↑.*7800\.00.*vs period start/)).toBeInTheDocument();
   });
 
   it('renders KPI tile for Total Assets', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => twoRows });
     renderPage();
     await waitFor(() => expect(screen.getByText('Total Assets')).toBeInTheDocument());
+    expect(screen.getByText(/↑.*8200\.00.*vs period start/)).toBeInTheDocument();
   });
 
   it('renders KPI tile for Total Liabilities', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => twoRows });
     renderPage();
     await waitFor(() => expect(screen.getByText('Total Liabilities')).toBeInTheDocument());
+    expect(screen.getByText(/↓.*400\.00.*vs period start/)).toBeInTheDocument();
   });
 });
