@@ -45,10 +45,14 @@ function renderAt(path: string) {
 }
 
 describe('AccountsLayout', () => {
-  it('renders skeleton while loading', () => {
+  it('renders skeleton after the delay window when loading is slow', async () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     renderAt('/accounts');
-    expect(screen.getByTestId('accounts-skeleton')).toBeInTheDocument();
+    expect(screen.queryByTestId('accounts-skeleton')).toBeNull();
+    await waitFor(
+      () => expect(screen.getByTestId('accounts-skeleton')).toBeInTheDocument(),
+      { timeout: 500 },
+    );
   });
 
   it('renders active accounts in the table', async () => {

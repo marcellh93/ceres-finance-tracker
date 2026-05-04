@@ -147,20 +147,51 @@ function AccountsBody({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [list.data, lower]);
 
-  if (list.loading && !list.data) {
-    return (
-      <div data-testid="accounts-skeleton" className="space-y-2 py-2">
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-      </div>
-    );
+  const showSkeleton = useDelayedLoading(list.loading && !list.data);
+
+  let state: DataTransitionState;
+  if (showSkeleton && !list.data) {
+    state = 'skeleton';
+  } else if (list.error && !list.data) {
+    state = 'error';
+  } else {
+    state = 'data';
   }
 
-  if (list.error || !list.data) {
-    return <CardError section="Accounts" onRetry={list.refetch} />;
-  }
+  const skeleton = (
+    <div data-testid="accounts-skeleton" className="space-y-2 py-2">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+    </div>
+  );
+
+  const errorSlot = <CardError section="Accounts" onRetry={list.refetch} />;
+
+  return (
+    <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
+      <AccountsDataView
+        list={list}
+        allList={allList}
+        sorted={sorted}
+        query={query}
+        onClearSearch={onClearSearch}
+      />
+    </DataTransition>
+  );
+}
+
+function AccountsDataView({
+  list, allList, sorted, query, onClearSearch,
+}: {
+  list: UseApiResult<AccountListItemDto[]>;
+  allList: UseApiResult<AccountListItemDto[]>;
+  sorted: AccountListItemDto[];
+  query: string;
+  onClearSearch: () => void;
+}) {
+  if (!list.data) return null;
 
   if (sorted.length === 0 && query === '') {
     const totalAccountsExist = (allList.data?.length ?? 0) > 0;
