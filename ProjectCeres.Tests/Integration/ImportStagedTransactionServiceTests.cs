@@ -235,6 +235,127 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
         r3.ResolvedAt.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task TryConfirmAllAsync_IsIdempotentOnEmptyQueue()
+    {
+        // No staged rows seeded.
+        var result = await _service.TryConfirmAllAsync();
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task TryConfirmAllAsync_SetsResolvedAtOnEveryConfirmedRow()
+    {
+        var txId1 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
+        var txId2 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 200m);
+
+        var staged1 = await CreateStagedAsync(txId1, StagedTransactionStatus.Pending);
+        var staged2 = await CreateStagedAsync(txId2, StagedTransactionStatus.Pending);
+
+        var before = DateTime.UtcNow;
+        var result = await _service.TryConfirmAllAsync();
+        var after  = DateTime.UtcNow;
+
+        result.IsSuccess.Should().BeTrue();
+
+        var r1 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged1.Id);
+        var r2 = await _fixture.Db.ImportStagedTransactions.FindAsync(staged2.Id);
+
+        r1!.ResolvedAt.Should().NotBeNull();
+        r2!.ResolvedAt.Should().NotBeNull();
+        r1.ResolvedAt!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        r2.ResolvedAt!.Value.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+    }
+
+    [Fact]
+    public async Task TryConfirmAllAsync_DoesNotTouchAlreadyResolvedRows()
+    {
+        var txId1 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
+        var txId2 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 200m);
+        var txId3 = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 300m);
+
+        var fixedResolvedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var alreadyConfirmed = await CreateStagedAsync(txId1, StagedTransactionStatus.Confirmed);
+        alreadyConfirmed.ResolvedAt = fixedResolvedAt;
+
+        var alreadyDisputed = await CreateStagedAsync(txId2, StagedTransactionStatus.Disputed);
+        alreadyDisputed.ResolvedAt = fixedResolvedAt;
+
+        await _fixture.Db.SaveChangesAsync();
+
+        var pending = await CreateStagedAsync(txId3, StagedTransactionStatus.Pending);
+
+        var result = await _service.TryConfirmAllAsync();
+
+        result.IsSuccess.Should().BeTrue();
+
+        var rConfirmed = await _fixture.Db.ImportStagedTransactions.FindAsync(alreadyConfirmed.Id);
+        var rDisputed  = await _fixture.Db.ImportStagedTransactions.FindAsync(alreadyDisputed.Id);
+        var rPending   = await _fixture.Db.ImportStagedTransactions.FindAsync(pending.Id);
+
+        // Already-resolved rows must be untouched.
+        rConfirmed!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        rConfirmed.ResolvedAt.Should().Be(fixedResolvedAt);
+
+        rDisputed!.Status.Should().Be(StagedTransactionStatus.Disputed);
+        rDisputed.ResolvedAt.Should().Be(fixedResolvedAt);
+
+        // Pending row must now be Confirmed with a fresh ResolvedAt.
+        rPending!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        rPending.ResolvedAt.Should().NotBeNull();
+        rPending.ResolvedAt.Should().NotBe(fixedResolvedAt);
+    }
+
+    [Fact]
+    public async Task TryConfirmAllAsync_DoesNotConfirmOtherUsersPendingRows()
+    {
+        // Own user (sentinel) seeds a Pending row through the standard helper.
+        var ownTxId    = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
+        var ownStaged  = await CreateStagedAsync(ownTxId, StagedTransactionStatus.Pending);
+
+        // Sanity: the helper stamped UserId to the sentinel via the SaveChanges interceptor.
+        ownStaged.UserId.Should().Be(SingleUserAccessor.SentinelUserId);
+
+        // Intruder row: same MatchedTransactionId FK (FK is to Transactions, not user-scoped),
+        // but stamped to a different user. Must bypass the helper to override the auto-stamp.
+        var intruderUserId = Guid.NewGuid();
+        var intruderStaged = new ImportStagedTransaction
+        {
+            Id                   = Guid.NewGuid(),
+            UserId               = intruderUserId,
+            ImportedAt           = DateTime.UtcNow,
+            AccountId            = _accountId,
+            RawDate              = DateOnly.FromDateTime(DateTime.Today),
+            RawAmount            = 100m,
+            RawDescription       = "Intruder CSV row",
+            MatchedTransactionId = ownTxId,
+            Status               = StagedTransactionStatus.Pending
+        };
+        _fixture.Db.ImportStagedTransactions.Add(intruderStaged);
+        await _fixture.Db.SaveChangesAsync();
+
+        // Re-load to confirm the auto-stamp interceptor did NOT overwrite the intruder UserId.
+        var intruderReloadedBefore = await _fixture.Db.ImportStagedTransactions.FindAsync(intruderStaged.Id);
+        intruderReloadedBefore!.UserId.Should().Be(intruderUserId,
+            "test setup requires the intruder row to remain stamped to a foreign user");
+
+        var result = await _service.TryConfirmAllAsync();
+
+        result.IsSuccess.Should().BeTrue();
+
+        var ownReloaded      = await _fixture.Db.ImportStagedTransactions.FindAsync(ownStaged.Id);
+        var intruderReloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(intruderStaged.Id);
+
+        ownReloaded!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        ownReloaded.ResolvedAt.Should().NotBeNull();
+
+        intruderReloaded!.Status.Should().Be(StagedTransactionStatus.Pending);
+        intruderReloaded.ResolvedAt.Should().BeNull();
+        intruderReloaded.UserId.Should().Be(intruderUserId);
+    }
+
     // -------------------------------------------------------------------------
     // DisputeAsync
     // -------------------------------------------------------------------------
