@@ -19,8 +19,8 @@ export function useDelayedLoading(
       setShowSkeleton(false);
       return;
     }
-    const timer = window.setTimeout(() => setShowSkeleton(true), delay);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(() => setShowSkeleton(true), delay);
+    return () => clearTimeout(timer);
   }, [loading, delay]);
 
   return showSkeleton;

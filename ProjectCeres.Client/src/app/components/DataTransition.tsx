@@ -40,8 +40,8 @@ export function DataTransition({
     }
     setPreviousState(prevRef.current);
     prevRef.current = state;
-    const timer = window.setTimeout(() => setPreviousState(null), TRANSITION_MS);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(() => setPreviousState(null), TRANSITION_MS);
+    return () => clearTimeout(timer);
   }, [state, reducedMotion]);
 
   function slotFor(s: DataTransitionState): ReactNode {
@@ -62,7 +62,7 @@ export function DataTransition({
     <div
       data-data-transition
       data-reduced-motion={reducedMotion ? 'true' : 'false'}
-      style={{ position: 'relative' }}
+      className="relative"
     >
       <div
         data-state="active"
