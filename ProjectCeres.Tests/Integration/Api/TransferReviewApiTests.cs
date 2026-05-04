@@ -188,6 +188,55 @@ public class TransferReviewApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DismissAsTransaction_does_not_duplicate_exclusion_when_pattern_already_exists()
+    {
+        var (_, _, stagedId) = await SeedSentinelStagedAsync();
+
+        // Pre-seed an exclusion row whose pattern matches the staged transfer's RawDescription.
+        using (var seedScope = _factory.Services.CreateScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            seedDb.ImportTransferExclusions.Add(new ImportTransferExclusion
+            {
+                Id                 = Guid.NewGuid(),
+                DescriptionPattern = "transfer-test",
+                CreatedAt          = DateTime.UtcNow
+            });
+            await seedDb.SaveChangesAsync();
+        }
+
+        try
+        {
+            var res = await _client.PostAsync($"/api/transfer-review/{stagedId}/dismiss-as-transaction", null);
+            res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var staged = await db.ImportStagedTransfers.FindAsync(stagedId);
+            staged!.Status.Should().Be(StagedTransferStatus.DismissedAsTransaction);
+
+            // Track the created transaction for cleanup.
+            var tx = await db.Transactions.FirstAsync(t => t.Description == "transfer-test");
+            _transactionIds.Add(tx.Id);
+
+            // The dedup branch must NOT have added a second exclusion row.
+            var count = await db.ImportTransferExclusions
+                .CountAsync(e => e.DescriptionPattern == "transfer-test");
+            count.Should().Be(1);
+        }
+        finally
+        {
+            // Cleanup the seeded exclusion so the unique (UserId, DescriptionPattern) index
+            // doesn't trip on retries or other tests reusing this description.
+            using var cleanupScope = _factory.Services.CreateScope();
+            var cleanupDb = cleanupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await cleanupDb.ImportTransferExclusions
+                .Where(e => e.DescriptionPattern == "transfer-test")
+                .ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
     public async Task DismissAsTransaction_returns_404_for_intruder_staged_row()
     {
         var intruderId = await SeedIntruderStagedAsync();
