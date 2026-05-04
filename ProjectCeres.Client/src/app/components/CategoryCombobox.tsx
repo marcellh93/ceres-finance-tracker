@@ -12,9 +12,10 @@ type Props = {
   onChange: (categoryId: string) => void;
   placeholder: string;
   disabled?: boolean;
+  className?: string;
 };
 
-export function CategoryCombobox({ categories, value, onChange, placeholder, disabled }: Props) {
+export function CategoryCombobox({ categories, value, onChange, placeholder, disabled, className = 'w-full' }: Props) {
   const [open, setOpen] = useState(false);
   const selected = categories.find((c) => c.id === value) ?? null;
 
@@ -27,7 +28,7 @@ export function CategoryCombobox({ categories, value, onChange, placeholder, dis
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
-            className="w-full justify-between"
+            className={cn('justify-between', className)}
           >
             {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

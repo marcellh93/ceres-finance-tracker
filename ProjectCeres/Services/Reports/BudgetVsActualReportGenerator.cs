@@ -20,6 +20,9 @@ public class BudgetVsActualReportGenerator(AppDbContext db, ICurrentUserAccessor
         var from       = parameters.From        ?? throw new ArgumentException("From is required.");
         var to         = parameters.To          ?? throw new ArgumentException("To is required.");
 
+        var settings = await db.Settings.Owned(user).SingleAsync();
+        var periodCount = CountPeriodsInRange(from, to, settings.PeriodStartDay);
+
         var budgets = await db.CategoryBudgets
             .Owned(user)
             .Where(cb => cb.IsActive && cb.CurrencyId == currencyId)
@@ -40,15 +43,24 @@ public class BudgetVsActualReportGenerator(AppDbContext db, ICurrentUserAccessor
                     t.Date <= to)
                 .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 
+            var summedLimit = budget.LimitAmount * periodCount;
+
             rows.Add(new BudgetVsActualRow(
                 budget.Category.Name,
                 budget.Currency.Code,
                 budget.Currency.Symbol,
-                budget.LimitAmount,
+                summedLimit,
                 actual,
-                budget.LimitAmount - actual));
+                summedLimit - actual));
         }
 
         return rows;
+    }
+
+    private static int CountPeriodsInRange(DateOnly from, DateOnly to, int startDay)
+    {
+        var (startYear, startMonth) = BudgetPeriod.GetCurrentPeriodMonth(from, startDay);
+        var (endYear,   endMonth)   = BudgetPeriod.GetCurrentPeriodMonth(to,   startDay);
+        return (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
     }
 }

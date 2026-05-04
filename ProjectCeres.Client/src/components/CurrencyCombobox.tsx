@@ -13,9 +13,10 @@ type Props = {
   onChange: (id: number | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
 };
 
-export function CurrencyCombobox({ value, onChange, placeholder = 'Select currency', disabled }: Props) {
+export function CurrencyCombobox({ value, onChange, placeholder = 'Select currency', disabled, className }: Props) {
   const [open, setOpen] = useState(false);
   const { data: currencies } = useApi<CurrencyOption[]>('/api/currencies');
   const list = currencies ?? [];
@@ -31,7 +32,7 @@ export function CurrencyCombobox({ value, onChange, placeholder = 'Select curren
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
-            className="w-full justify-between"
+            className={cn('justify-between', className)}
           >
             {selected ? (
               <span>

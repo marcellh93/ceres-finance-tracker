@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useSettings } from '../../lib/use-settings';
+import { getCurrentPeriodMonth, getBoundsForMonth } from '../../lib/period';
 
 export type ReportsFilters = {
   from: string | null;
@@ -11,17 +13,10 @@ export type ReportsFilters = {
   page: number | null;
 };
 
-function currentMonthRange(): { from: string; to: string } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const lastDay = new Date(y, m + 1, 0).getDate();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 1)}-${pad(lastDay)}` };
-}
-
-function read(params: URLSearchParams): ReportsFilters {
-  const defaults = currentMonthRange();
+function read(params: URLSearchParams, periodStartDay: number): ReportsFilters {
+  const today = new Date();
+  const { year, month } = getCurrentPeriodMonth(today, periodStartDay);
+  const defaults = getBoundsForMonth(year, month, periodStartDay);
   return {
     from: params.get('from') ?? defaults.from,
     to: params.get('to') ?? defaults.to,
@@ -35,7 +30,9 @@ function read(params: URLSearchParams): ReportsFilters {
 
 export function useReportsFilters() {
   const [params, setParams] = useSearchParams();
-  const filters = read(params);
+  const { data: settings } = useSettings();
+  const periodStartDay = settings?.periodStartDay ?? 1;
+  const filters = read(params, periodStartDay);
 
   const setFilter = useCallback(
     <K extends keyof ReportsFilters>(key: K, value: ReportsFilters[K]) => {

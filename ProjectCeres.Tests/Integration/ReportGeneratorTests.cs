@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
@@ -180,6 +181,69 @@ public class ReportGeneratorTests : IAsyncLifetime
         var row = result.Single();
         row.ActualSpend.Should().Be(0m);
         row.Variance.Should().Be(500m);
+    }
+
+    [Fact]
+    public async Task BudgetVsActual_ThreeMonthRange_MultipliesLimitByPeriodCount()
+    {
+        var accountId = await CreateAssetAccountAsync(currencyId: 1);
+        await CreateCategoryBudgetAsync(HousingCategoryId, currencyId: 1, limit: 200m);
+
+        var from = new DateOnly(2026, 1, 1);
+        var to   = new DateOnly(2026, 3, 31);
+
+        AddTransaction(accountId, HousingCategoryId, 600m, new DateOnly(2026, 2, 10));
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
+            new ReportParameters(CurrencyId: 1, From: from, To: to));
+
+        var row = result.Single(r => r.CategoryName == "Housing / Rent");
+        row.LimitAmount.Should().Be(600m);   // 200 × 3 months
+        row.ActualSpend.Should().Be(600m);
+        row.Variance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task BudgetVsActual_SingleMonthRange_LimitUnchanged()
+    {
+        await CreateAssetAccountAsync(currencyId: 1);
+        await CreateCategoryBudgetAsync(HousingCategoryId, currencyId: 1, limit: 300m);
+
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
+            new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
+
+        result.Single(r => r.CategoryName == "Housing / Rent").LimitAmount.Should().Be(300m);
+    }
+
+    [Fact]
+    public async Task BudgetVsActual_PeriodStartDay15_ThreePeriodsInRange()
+    {
+        // With PeriodStartDay=15, the period spanning Jan 15 – Feb 14 is named "February".
+        // A range of Jan 15 to Apr 14 covers 3 full periods (Feb, Mar, Apr).
+        var settings = await _fixture.Db.Settings.SingleAsync();
+        settings.PeriodStartDay = 15;
+        await _fixture.Db.SaveChangesAsync();
+
+        var accountId = await CreateAssetAccountAsync(currencyId: 1);
+        await CreateCategoryBudgetAsync(HousingCategoryId, currencyId: 1, limit: 100m);
+
+        var from = new DateOnly(2026, 1, 15);
+        var to   = new DateOnly(2026, 4, 14);
+
+        AddTransaction(accountId, HousingCategoryId, 300m, new DateOnly(2026, 2, 10));
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
+            new ReportParameters(CurrencyId: 1, From: from, To: to));
+
+        var row = result.Single(r => r.CategoryName == "Housing / Rent");
+        row.LimitAmount.Should().Be(300m);   // 100 × 3 periods
+        row.ActualSpend.Should().Be(300m);
+        row.Variance.Should().Be(0m);
     }
 
     // -------------------------------------------------------------------------

@@ -390,7 +390,24 @@ Returned by `POST /api/category-budgets` and `PATCH /api/category-budgets/{id}/r
 | SavedReports | CRUD + list | Soft-deletable; restorable |
 | SavedSearches | CRUD + list | Per-user, per-table; stores filter set + text search; scoped to table name |
 | RecurringTransactions | CRUD + list | Templates only; confirming a reminder creates a Transaction |
-| Reports | GET only (generated on demand) | 8 reports: net-worth, income-expense, expense-breakdown, transaction-history, budget-vs-actual, largest-expenses, monthly-cash-flow, net-worth-over-time. All accept `?format=csv` for download. |
+| Reports | GET only (generated on demand) | 8 reports: net-worth, income-expense, expense-breakdown, transaction-history, budget-vs-actual, largest-expenses, monthly-cash-flow, net-worth-over-time. All accept `?format=csv` for download. See `budget-vs-actual` row semantics below. |
+#### `budget-vs-actual` row semantics
+
+`GET /api/reports/budget-vs-actual?from=&to=&currencyId=` returns `BudgetVsActualRow[]`:
+
+```json
+{
+  "categoryName": "Housing / Rent",
+  "currencyCode": "EUR",
+  "currencySymbol": "€",
+  "limitAmount": 600,
+  "actualSpend": 540,
+  "variance": 60
+}
+```
+
+**`limitAmount` is the summed budget across the number of periods that fall in `[from, to]`**, not the per-period cap. The period count is derived from `Settings.PeriodStartDay` using the same `BudgetPeriod` math as the dashboard. A category budget of €200/month queried over a 3-month range returns `limitAmount = 600`. A single-period query returns `limitAmount` equal to the configured cap.
+
 | Attachments | Upload (POST), download (GET), delete | Scoped to a Transaction |
 | Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3; includes `PeriodStartDay`, notification preferences |
 | Notifications | GET (list preferences), PATCH (update preferences) | Controls: weekly digest opt-in, new session alert opt-out, Safe to Spend alert |

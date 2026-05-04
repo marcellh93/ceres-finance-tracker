@@ -33,30 +33,41 @@ export function ReportsFilterBar() {
 
   return (
     <div className="sticky top-14 z-10 -mx-6 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex flex-wrap items-center gap-2">
-        {showRange && <DateRangePicker fromKey="from" toKey="to" />}
-        {showCurrency && (
-          <CurrencyCombobox
-            value={filters.currencyId}
-            onChange={(id) => setFilter('currencyId', id)}
-            placeholder="Currency"
-          />
+      <div className="space-y-2">
+        {(showRange || showCurrency) && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {showRange && <DateRangePicker fromKey="from" toKey="to" className="w-full" />}
+            {showCurrency && (
+              <CurrencyCombobox
+                value={filters.currencyId}
+                onChange={(id) => setFilter('currencyId', id)}
+                placeholder="Currency"
+                className="w-full"
+              />
+            )}
+          </div>
         )}
-        {showAccount && (
-          <AccountCombobox
-            accounts={accounts ?? []}
-            value={filters.accountId}
-            onChange={(id) => setFilter('accountId', id)}
-            placeholder="All accounts"
-          />
-        )}
-        {showCategory && (
-          <CategoryCombobox
-            categories={categories ?? []}
-            value={filters.categoryId}
-            onChange={(id) => setFilter('categoryId', id)}
-            placeholder="All categories"
-          />
+        {(showAccount || showCategory) && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {showAccount && (
+              <AccountCombobox
+                accounts={accounts ?? []}
+                value={filters.accountId}
+                onChange={(id) => setFilter('accountId', id)}
+                placeholder="All accounts"
+                className="w-full"
+              />
+            )}
+            {showCategory && (
+              <CategoryCombobox
+                categories={categories ?? []}
+                value={filters.categoryId}
+                onChange={(id) => setFilter('categoryId', id)}
+                placeholder="All categories"
+                className="w-full"
+              />
+            )}
+          </div>
         )}
       </div>
     </div>

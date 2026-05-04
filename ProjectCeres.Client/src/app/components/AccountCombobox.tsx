@@ -13,9 +13,10 @@ type Props = {
   placeholder: string;
   filter?: (account: AccountOptionDto) => boolean;
   disabled?: boolean;
+  className?: string;
 };
 
-export function AccountCombobox({ accounts, value, onChange, placeholder, filter, disabled }: Props) {
+export function AccountCombobox({ accounts, value, onChange, placeholder, filter, disabled, className = 'w-full' }: Props) {
   const [open, setOpen] = useState(false);
   const filtered = filter ? accounts.filter(filter) : accounts;
   const selected = accounts.find((a) => a.id === value) ?? null;
@@ -29,7 +30,7 @@ export function AccountCombobox({ accounts, value, onChange, placeholder, filter
             role="combobox"
             aria-expanded={open}
             disabled={disabled}
-            className="w-full justify-between"
+            className={cn('justify-between', className)}
           >
             {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

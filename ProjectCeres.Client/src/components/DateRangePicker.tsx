@@ -5,6 +5,7 @@ import { CalendarRange } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { useSettings } from '../app/lib/use-settings';
 import { formatDate } from '../app/lib/date-format';
 
@@ -127,9 +128,11 @@ type Props = {
   fromKey?: string;
   /** URL param key for the end date. Default: 'to' */
   toKey?: string;
+  /** Extra classes applied to the trigger button. Use to control width from the parent. */
+  className?: string;
 };
 
-export function DateRangePicker({ fromKey = 'from', toKey = 'to' }: Props) {
+export function DateRangePicker({ fromKey = 'from', toKey = 'to', className }: Props) {
   const [params, setParams] = useSearchParams();
   const { data: settings } = useSettings();
   const [open, setOpen] = useState(false);
@@ -172,7 +175,7 @@ export function DateRangePicker({ fromKey = 'from', toKey = 'to' }: Props) {
             type="button"
             variant="outline"
             aria-label="Date range"
-            className="min-w-[14rem] justify-start font-normal"
+            className={cn('justify-start font-normal', className)}
           >
             <CalendarRange className="mr-2 size-4 opacity-70" aria-hidden="true" />
             <span className="truncate">{triggerLabel}</span>

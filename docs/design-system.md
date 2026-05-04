@@ -1051,6 +1051,25 @@ For destructive operations, prefer a confirmation dialog over a toast.
 
 ---
 
+## Reports index — per-report icon convention
+
+Each report card on `/reports` carries a distinct lucide icon. The mapping is defined in `REPORT_META` inside `reports-api.ts` — add or change an icon there, not in the rendering component.
+
+| Slug | Icon |
+|---|---|
+| `net-worth` | `Wallet` |
+| `net-worth-over-time` | `LineChart` |
+| `income-expense` | `Scale` |
+| `monthly-cash-flow` | `CalendarClock` |
+| `expense-breakdown` | `PieChart` |
+| `budget-vs-actual` | `Target` |
+| `largest-expenses` | `TrendingUp` |
+| `transaction-history` | `Receipt` |
+
+Icons are rendered as `<entry.icon className="h-6 w-6 text-primary" aria-hidden="true" />`. All icons are aria-hidden because the card label makes the icon's meaning redundant for screen readers.
+
+---
+
 ## Showcase route
 
 `http://localhost:5173/design-system.html` (dev) — renders every token and shadcn primitive in every state, with light/dark toggle. Open it whenever a token changes; visual regressions show up here first.

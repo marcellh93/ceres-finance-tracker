@@ -87,18 +87,21 @@ export type NetWorthSnapshotRowDto = {
   netWorth: number;
 };
 
+import { Wallet, LineChart, Scale, CalendarClock, PieChart, Target, TrendingUp, Receipt, type LucideIcon } from 'lucide-react';
+
 // Slug → label map (used by ReportsIndex and ReportHeader)
 export const REPORT_META: Array<{
   slug: string;
   label: string;
   description: string;
+  icon: LucideIcon;
 }> = [
-  { slug: 'net-worth',           label: 'Net Worth',            description: 'Current assets, liabilities, and net worth across all accounts.' },
-  { slug: 'net-worth-over-time', label: 'Net Worth Over Time',  description: 'How your net worth has evolved month by month.' },
-  { slug: 'income-expense',      label: 'Income vs Expense',    description: 'Total income, expenses, and savings rate for the period.' },
-  { slug: 'monthly-cash-flow',   label: 'Monthly Cash Flow',    description: 'Income and expenses broken down by calendar month.' },
-  { slug: 'expense-breakdown',   label: 'Expense Breakdown',    description: 'Spending ranked by category for the period.' },
-  { slug: 'budget-vs-actual',    label: 'Budget vs Actual',     description: 'How actual spending compares to your category budgets.' },
-  { slug: 'largest-expenses',    label: 'Largest Expenses',     description: 'Your highest individual expenses, ranked.' },
-  { slug: 'transaction-history', label: 'Transaction History',  description: 'Paginated ledger of all transactions for the period.' },
+  { slug: 'net-worth',           label: 'Net Worth',            description: 'Current assets, liabilities, and net worth across all accounts.',  icon: Wallet },
+  { slug: 'net-worth-over-time', label: 'Net Worth Over Time',  description: 'How your net worth has evolved month by month.',                   icon: LineChart },
+  { slug: 'income-expense',      label: 'Income vs Expense',    description: 'Total income, expenses, and savings rate for the period.',          icon: Scale },
+  { slug: 'monthly-cash-flow',   label: 'Monthly Cash Flow',    description: 'Income and expenses broken down by calendar month.',                icon: CalendarClock },
+  { slug: 'expense-breakdown',   label: 'Expense Breakdown',    description: 'Spending ranked by category for the period.',                       icon: PieChart },
+  { slug: 'budget-vs-actual',    label: 'Budget vs Actual',     description: 'How actual spending compares to your category budgets.',            icon: Target },
+  { slug: 'largest-expenses',    label: 'Largest Expenses',     description: 'Your highest individual expenses, ranked.',                         icon: TrendingUp },
+  { slug: 'transaction-history', label: 'Transaction History',  description: 'Paginated ledger of all transactions for the period.',              icon: Receipt },
 ];
