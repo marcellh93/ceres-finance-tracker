@@ -41,7 +41,7 @@ export function IncomeExpense() {
               <StatTile label="Expenses" value={<Numeric className="text-xl text-destructive">{symbol} {data.totalExpenses.toFixed(2)}</Numeric>} />
             </Tile>
             <Tile>
-              <StatTile label="Net" value={<Numeric className={`text-xl ${net >= 0 ? 'text-success' : 'text-destructive'}`}>{symbol} {net.toFixed(2)}</Numeric>} />
+              <StatTile label="Net" value={<Numeric className={`text-xl ${net > 0 ? 'text-success' : net < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{symbol} {net.toFixed(2)}</Numeric>} />
             </Tile>
             <Tile>
               <StatTile label="Savings Rate" value={<Numeric className="text-xl">{(data.savingsRate * 100).toFixed(1)}%</Numeric>} />
@@ -85,7 +85,7 @@ export function IncomeExpense() {
                 </TableRow>
                 <TableRow>
                   <TableCell>Net</TableCell>
-                  <TableCell className="text-right"><Numeric className={net >= 0 ? 'text-success' : 'text-destructive'}>{symbol} {net.toFixed(2)}</Numeric></TableCell>
+                  <TableCell className="text-right"><Numeric className={net > 0 ? 'text-success' : net < 0 ? 'text-destructive' : 'text-muted-foreground'}>{symbol} {net.toFixed(2)}</Numeric></TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Savings Rate</TableCell>
