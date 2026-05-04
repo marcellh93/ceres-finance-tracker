@@ -46,7 +46,7 @@ export function LargestExpenses() {
             <Tile>
               <StatTile
                 label="Top Expense"
-                value={<span className="text-base font-medium">{top?.description ?? '—'}</span>}
+                value={<span className="text-base font-medium">{top?.description || top?.categoryName || '—'}</span>}
               />
               {top && <p className="mt-1 text-xs text-destructive"><Numeric>{symbol} {top.amount.toFixed(2)}</Numeric></p>}
             </Tile>
