@@ -100,21 +100,39 @@ public class ReportServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetNetWorthAsync_ExcludesInactiveAccounts()
+    public async Task GetNetWorthAsync_ExcludesAccountsOptedOutOfReports()
     {
+        // Per models.md, archived accounts still count toward net worth unless the user
+        // opts the account out via ExcludeFromReports at archive time. ReportService
+        // filters by !ExcludeFromReports, not by IsActive.
         var assetId = await CreateAssetAccountAsync(openingBalance: 500m);
-
-        // Deactivate the account directly — inactive accounts must be excluded from net worth.
         var account = await _fixture.Db.Accounts.FindAsync(assetId);
         account!.IsActive = false;
+        account.ExcludeFromReports = true;
         await _fixture.Db.SaveChangesAsync();
 
         var result = await _service.GetNetWorthAsync();
 
-        // Any EUR entry that exists should not include the deactivated account's balance.
         var eur = result.FirstOrDefault(e => e.CurrencyCode == "EUR");
         if (eur is not null)
             eur.Assets.Should().NotBe(500m);
+    }
+
+    [Fact]
+    public async Task GetNetWorthAsync_IncludesArchivedAccountsThatDidNotOptOut()
+    {
+        // The complement of the rule above: an archived account whose user did NOT opt
+        // out of reports must still contribute to net worth.
+        var assetId = await CreateAssetAccountAsync(openingBalance: 500m);
+        var account = await _fixture.Db.Accounts.FindAsync(assetId);
+        account!.IsActive = false;
+        // ExcludeFromReports stays false (default).
+        await _fixture.Db.SaveChangesAsync();
+
+        var result = await _service.GetNetWorthAsync();
+
+        var eur = result.First(e => e.CurrencyCode == "EUR");
+        eur.Assets.Should().Be(500m);
     }
 
     [Fact]
