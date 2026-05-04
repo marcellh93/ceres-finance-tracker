@@ -148,6 +148,24 @@ public class ReconciliationReviewApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ConfirmAll_returns_204_with_pending_rows_and_marks_all_confirmed()
+    {
+        var (_, _, stagedId1) = await SeedSentinelStagedAsync();
+        var (_, _, stagedId2) = await SeedSentinelStagedAsync();
+
+        var res = await _client.PostAsync("/api/reconciliation-review/confirm-all", null);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var rows = await db.ImportStagedTransactions
+            .Where(s => s.Id == stagedId1 || s.Id == stagedId2)
+            .ToListAsync();
+        rows.Should().HaveCount(2);
+        rows.Should().OnlyContain(s => s.Status == StagedTransactionStatus.Confirmed);
+    }
+
+    [Fact]
     public async Task Dispute_returns_204_and_creates_disputed_transaction()
     {
         var (accountId, _, stagedId) = await SeedSentinelStagedAsync();

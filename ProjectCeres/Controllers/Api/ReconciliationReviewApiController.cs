@@ -37,8 +37,8 @@ public class ReconciliationReviewApiController(IImportStagedTransactionService s
     [HttpPost("confirm-all")]
     public async Task<IActionResult> ConfirmAll()
     {
-        await stagedService.ConfirmAllAsync();
-        return NoContent();
+        var result = await stagedService.TryConfirmAllAsync();
+        return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
     [HttpPost("{id:guid}/dispute")]
