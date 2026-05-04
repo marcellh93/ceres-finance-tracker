@@ -11,7 +11,7 @@ const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/categories',   expectedHeading: 'Categories' },
   { path: '/budgets',      expectedHeading: 'Budgets' },
   { path: '/import',       expectedHeading: 'Import' },
-  { path: '/reports',      expectedHeading: 'Reports' },
+  { path: '/reports/net-worth-over-time', expectedHeading: 'Net Worth Over Time' },
   { path: '/settings',     expectedHeading: 'Settings' },
   { path: '/support',      expectedHeading: 'Support' },
   { path: '/profile',      expectedHeading: 'Profile' },

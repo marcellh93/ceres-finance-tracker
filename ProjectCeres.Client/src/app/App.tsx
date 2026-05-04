@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
 import { Accounts } from './pages/Accounts';
 import { Budgets } from './pages/Budgets';
@@ -9,7 +9,6 @@ import { NotFound } from './pages/NotFound';
 import { Profile } from './pages/Profile';
 import { Recurring } from './pages/Recurring';
 import { ReportsLayout } from './features/reports/ReportsLayout';
-import { ReportsIndex } from './features/reports/ReportsIndex';
 import { NetWorth } from './features/reports/NetWorth';
 import { NetWorthOverTime } from './features/reports/NetWorthOverTime';
 import { IncomeExpense } from './features/reports/IncomeExpense';
@@ -75,7 +74,7 @@ export function App() {
         </Route>
         <Route path="import" element={<Import />} />
         <Route path="reports" element={<ReportsLayout />}>
-          <Route index element={<ReportsIndex />} />
+          <Route index element={<Navigate to="net-worth-over-time" replace />} />
           <Route path="net-worth" element={<NetWorth />} />
           <Route path="net-worth-over-time" element={<NetWorthOverTime />} />
           <Route path="income-expense" element={<IncomeExpense />} />
