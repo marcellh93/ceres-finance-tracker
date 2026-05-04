@@ -115,12 +115,14 @@ public class ReportGeneratorTests : IAsyncLifetime
         result.Should().HaveCount(2);
 
         var housing = result.Single(r => r.CategoryName == "Housing / Rent");
-        housing.LimitAmount.Should().Be(500m);
+        housing.LimitPerPeriod.Should().Be(500m);
+        housing.TotalLimit.Should().Be(500m);
         housing.ActualSpend.Should().Be(300m);
         housing.Variance.Should().Be(200m);
 
         var utilities = result.Single(r => r.CategoryName == "Utilities");
-        utilities.LimitAmount.Should().Be(200m);
+        utilities.LimitPerPeriod.Should().Be(200m);
+        utilities.TotalLimit.Should().Be(200m);
         utilities.ActualSpend.Should().Be(150m);
         utilities.Variance.Should().Be(50m);
     }
@@ -179,6 +181,8 @@ public class ReportGeneratorTests : IAsyncLifetime
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
         var row = result.Single();
+        row.LimitPerPeriod.Should().Be(500m);
+        row.TotalLimit.Should().Be(500m);
         row.ActualSpend.Should().Be(0m);
         row.Variance.Should().Be(500m);
     }
@@ -200,7 +204,8 @@ public class ReportGeneratorTests : IAsyncLifetime
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
         var row = result.Single(r => r.CategoryName == "Housing / Rent");
-        row.LimitAmount.Should().Be(600m);   // 200 × 3 months
+        row.LimitPerPeriod.Should().Be(200m);
+        row.TotalLimit.Should().Be(600m);   // 200 × 3 months
         row.ActualSpend.Should().Be(600m);
         row.Variance.Should().Be(0m);
     }
@@ -215,7 +220,9 @@ public class ReportGeneratorTests : IAsyncLifetime
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
-        result.Single(r => r.CategoryName == "Housing / Rent").LimitAmount.Should().Be(300m);
+        var row = result.Single(r => r.CategoryName == "Housing / Rent");
+        row.LimitPerPeriod.Should().Be(300m);
+        row.TotalLimit.Should().Be(300m);
     }
 
     [Fact]
@@ -241,7 +248,8 @@ public class ReportGeneratorTests : IAsyncLifetime
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
         var row = result.Single(r => r.CategoryName == "Housing / Rent");
-        row.LimitAmount.Should().Be(300m);   // 100 × 3 periods
+        row.LimitPerPeriod.Should().Be(100m);
+        row.TotalLimit.Should().Be(300m);   // 100 × 3 periods
         row.ActualSpend.Should().Be(300m);
         row.Variance.Should().Be(0m);
     }

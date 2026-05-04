@@ -40,11 +40,12 @@ export function BudgetVsActual() {
       )}
       {data && data.length > 0 && (
         <ReportTableCard slug="budget-vs-actual" queryString={qs}>
-          <Table>
+          <Table className="min-w-[680px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Category</TableHead>
-                <TableHead className="text-right">Limit</TableHead>
+                <TableHead className="text-right">Limit/period</TableHead>
+                <TableHead className="text-right">Total limit</TableHead>
                 <TableHead className="text-right">Actual</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead className="text-right">Variance</TableHead>
@@ -54,17 +55,20 @@ export function BudgetVsActual() {
               {data.map((row) => (
                 <TableRow key={row.categoryName}>
                   <TableCell className="font-medium">{row.categoryName}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    <Numeric>{row.currencySymbol} {row.limitPerPeriod.toFixed(2)}</Numeric>
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Numeric>{row.currencySymbol} {row.limitAmount.toFixed(2)}</Numeric>
+                    <Numeric>{row.currencySymbol} {row.totalLimit.toFixed(2)}</Numeric>
                   </TableCell>
                   <TableCell className="text-right">
                     <Numeric>{row.currencySymbol} {row.actualSpend.toFixed(2)}</Numeric>
                   </TableCell>
                   <TableCell>
-                    <BudgetProgressCell limit={row.limitAmount} actual={row.actualSpend} />
+                    <BudgetProgressCell limit={row.totalLimit} actual={row.actualSpend} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <Numeric className={row.variance <= 0 ? 'text-success' : 'text-destructive'}>
+                    <Numeric className={row.variance >= 0 ? 'text-success' : 'text-destructive'}>
                       {row.variance > 0 ? '+' : ''}{row.currencySymbol} {row.variance.toFixed(2)}
                     </Numeric>
                   </TableCell>

@@ -8,13 +8,15 @@ export function ReportsLayout() {
   return (
     <div className="mx-auto max-w-4xl">
       {onDetailPage && (
-        <Link
-          to="/reports"
-          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          Reports
-        </Link>
+        <div className="-mt-6 mb-2 -mx-6 px-6 pt-3 pb-0">
+          <Link
+            to="/reports"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            Reports
+          </Link>
+        </div>
       )}
       <div className="space-y-6">
         <ReportsFilterBar />

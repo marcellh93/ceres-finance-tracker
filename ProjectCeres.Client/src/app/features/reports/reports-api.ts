@@ -53,7 +53,8 @@ export type BudgetVsActualRowDto = {
   categoryName: string;
   currencyCode: string;
   currencySymbol: string;
-  limitAmount: number;
+  limitPerPeriod: number;
+  totalLimit: number;
   actualSpend: number;
   variance: number;
 };

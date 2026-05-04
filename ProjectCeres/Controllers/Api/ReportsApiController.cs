@@ -126,11 +126,11 @@ public class ReportsApiController(
             .GenerateAsync(new ReportParameters(CurrencyId: cid, From: start, To: end));
         if (IsCsv(format))
         {
-            var lines = new List<string> { "Category,Budget Limit,Actual Spend,Variance,% Used" };
+            var lines = new List<string> { "Category,Limit/Period,Total Limit,Actual Spend,Variance,% Used" };
             foreach (var r in rows)
             {
-                var pct = r.LimitAmount > 0 ? r.ActualSpend / r.LimitAmount : 0;
-                lines.Add($"{CsvFormattingHelper.Csv(r.CategoryName)},{F(r.LimitAmount)},{F(r.ActualSpend)},{F(r.Variance)},{pct.ToString("P1", CultureInfo.InvariantCulture)}");
+                var pct = r.TotalLimit > 0 ? r.ActualSpend / r.TotalLimit : 0;
+                lines.Add($"{CsvFormattingHelper.Csv(r.CategoryName)},{F(r.LimitPerPeriod)},{F(r.TotalLimit)},{F(r.ActualSpend)},{F(r.Variance)},{pct.ToString("P1", CultureInfo.InvariantCulture)}");
             }
             return Csv(lines, $"budget-vs-actual_{start:yyyy-MM-dd}_{end:yyyy-MM-dd}.csv");
         }

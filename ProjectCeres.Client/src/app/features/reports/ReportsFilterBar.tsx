@@ -32,7 +32,7 @@ export function ReportsFilterBar() {
   if (!showRange && !showCurrency && !showAccount && !showCategory) return null;
 
   return (
-    <div className="sticky top-14 z-10 -mx-6 border-b bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="sticky top-14 z-10 -mx-6 bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="space-y-2">
         {(showRange || showCurrency) && (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

@@ -8,7 +8,8 @@ public record BudgetVsActualRow(
     string CategoryName,
     string CurrencyCode,
     string CurrencySymbol,
-    decimal LimitAmount,
+    decimal LimitPerPeriod,
+    decimal TotalLimit,
     decimal ActualSpend,
     decimal Variance);
 
@@ -43,15 +44,16 @@ public class BudgetVsActualReportGenerator(AppDbContext db, ICurrentUserAccessor
                     t.Date <= to)
                 .SumAsync(t => (decimal?)t.Amount) ?? 0m;
 
-            var summedLimit = budget.LimitAmount * periodCount;
+            var totalLimit = budget.LimitAmount * periodCount;
 
             rows.Add(new BudgetVsActualRow(
                 budget.Category.Name,
                 budget.Currency.Code,
                 budget.Currency.Symbol,
-                summedLimit,
+                budget.LimitAmount,
+                totalLimit,
                 actual,
-                summedLimit - actual));
+                totalLimit - actual));
         }
 
         return rows;
