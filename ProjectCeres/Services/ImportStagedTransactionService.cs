@@ -34,17 +34,10 @@ public class ImportStagedTransactionService(
         if (staged is null)
             return Result.Fail("NOT_FOUND", "Staged transaction not found.");
 
-        try
-        {
-            staged.Status     = StagedTransactionStatus.Confirmed;
-            staged.ResolvedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-            return Result.Ok();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Fail("VALIDATION_ERROR", ex.Message);
-        }
+        staged.Status     = StagedTransactionStatus.Confirmed;
+        staged.ResolvedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Result.Ok();
     }
 
     public async Task<Result> TryConfirmAllAsync()

@@ -129,6 +129,7 @@ public class ReconciliationReviewApiTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var staged = await db.ImportStagedTransactions.FindAsync(stagedId);
         staged!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+        staged.ResolvedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -168,6 +169,7 @@ public class ReconciliationReviewApiTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var staged = await db.ImportStagedTransactions.FindAsync(stagedId);
         staged!.Status.Should().Be(StagedTransactionStatus.Disputed);
+        staged.ResolvedAt.Should().NotBeNull();
         // The dispute path creates a new Transaction for the disputed row.
         var newTx = await db.Transactions.FirstAsync(t => t.AccountId == accountId && t.Description == "imported-row");
         _transactionIds.Add(newTx.Id);
