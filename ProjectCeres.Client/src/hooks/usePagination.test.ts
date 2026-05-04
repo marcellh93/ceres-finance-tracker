@@ -58,4 +58,16 @@ describe('usePagination', () => {
     expect(result.current.paginatedItems).toEqual([]);
     expect(result.current.totalPages).toBe(1);
   });
+
+  it('resets to page 1 when items shrink below current page', () => {
+    const { result, rerender } = renderHook(
+      ({ items }: { items: number[] }) => usePagination(items, 6),
+      { initialProps: { items: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] } }
+    );
+    act(() => result.current.next());
+    act(() => result.current.next());
+    expect(result.current.currentPage).toBe(3);
+    rerender({ items: [1, 2, 3] }); // one page only
+    expect(result.current.currentPage).toBe(1);
+  });
 });

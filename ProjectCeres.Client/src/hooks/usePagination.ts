@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 export function usePagination<T>(items: T[], pageSize: number) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,8 +22,15 @@ export function usePagination<T>(items: T[], pageSize: number) {
   }
 
   function goTo(page: number) {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    setCurrentPage(() => {
+      const pages = Math.max(1, Math.ceil(items.length / pageSize));
+      return Math.max(1, Math.min(page, pages));
+    });
   }
+
+  useEffect(() => {
+    setCurrentPage((p) => Math.min(p, totalPages));
+  }, [totalPages]);
 
   return { paginatedItems, currentPage, totalPages, next, prev, goTo };
 }
