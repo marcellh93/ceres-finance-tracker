@@ -19,13 +19,15 @@ describe('ReportsIndex', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
-    expect(screen.getByText('Net Worth')).toBeInTheDocument();
-    expect(screen.getByText('Net Worth Over Time')).toBeInTheDocument();
-    expect(screen.getByText('Income vs Expense')).toBeInTheDocument();
-    expect(screen.getByText('Monthly Cash Flow')).toBeInTheDocument();
-    expect(screen.getByText('Expense Breakdown')).toBeInTheDocument();
-    expect(screen.getByText('Budget vs Actual')).toBeInTheDocument();
-    expect(screen.getByText('Largest Expenses')).toBeInTheDocument();
-    expect(screen.getByText('Transaction History')).toBeInTheDocument();
+    // Each label appears twice: once in the tab bar and once in the index card.
+    // Use getAllByText and verify at least one match per label.
+    expect(screen.getAllByText('Net Worth')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Net Worth Over Time')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Income vs Expense')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Monthly Cash Flow')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Expense Breakdown')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Budget vs Actual')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Largest Expenses')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Transaction History')[0]).toBeInTheDocument();
   });
 });
