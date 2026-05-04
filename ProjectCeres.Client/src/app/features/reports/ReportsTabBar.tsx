@@ -8,19 +8,18 @@ export function ReportsTabBar() {
   const [searchParams] = useSearchParams();
 
   return (
-    <div
-      role="tablist"
+    <nav
       aria-label="Reports"
       className="flex overflow-x-auto border-b border-border bg-background scrollbar-none"
     >
       {REPORT_META.map((entry) => {
         const isActive = entry.slug === activeSlug;
-        const to = `/reports/${entry.slug}?${searchParams.toString()}`;
+        const qs = searchParams.toString();
+        const to = qs ? `/reports/${entry.slug}?${qs}` : `/reports/${entry.slug}`;
         return (
           <Link
             key={entry.slug}
             to={to}
-            role="tab"
             aria-current={isActive ? 'page' : undefined}
             className={cn(
               'relative shrink-0 px-4 py-3 text-sm font-medium text-muted-foreground no-underline transition-colors hover:text-foreground',
@@ -31,6 +30,6 @@ export function ReportsTabBar() {
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

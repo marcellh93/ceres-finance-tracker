@@ -15,23 +15,35 @@ function renderTabBar(path: string, search = '') {
 }
 
 describe('ReportsTabBar', () => {
-  it('renders all 8 report tabs', () => {
+  it('renders all 8 report links', () => {
     renderTabBar('/reports/net-worth-over-time');
-    expect(screen.getByRole('tab', { name: /net worth over time/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /income vs expense/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /transaction history/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /net worth over time/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /income vs expense/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /transaction history/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(8);
   });
 
-  it('marks active tab with aria-current', () => {
+  it('marks active link with aria-current="page"', () => {
     renderTabBar('/reports/income-expense');
-    expect(screen.getByRole('tab', { name: /income vs expense/i })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /income vs expense/i })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('inactive links do not have aria-current', () => {
+    renderTabBar('/reports/income-expense');
+    expect(screen.getByRole('link', { name: /net worth over time/i })).not.toHaveAttribute('aria-current');
   });
 
   it('carries search params forward in tab links', () => {
     renderTabBar('/reports/net-worth-over-time', '?from=2026-01&to=2026-04&currencyId=1');
-    const tab = screen.getByRole('tab', { name: /income vs expense/i });
-    expect(tab.getAttribute('href')).toContain('from=2026-01');
-    expect(tab.getAttribute('href')).toContain('to=2026-04');
-    expect(tab.getAttribute('href')).toContain('currencyId=1');
+    const link = screen.getByRole('link', { name: /income vs expense/i });
+    expect(link.getAttribute('href')).toContain('from=2026-01');
+    expect(link.getAttribute('href')).toContain('to=2026-04');
+    expect(link.getAttribute('href')).toContain('currencyId=1');
+  });
+
+  it('does not produce trailing ? when search params are empty', () => {
+    renderTabBar('/reports/net-worth-over-time');
+    const link = screen.getByRole('link', { name: /income vs expense/i });
+    expect(link.getAttribute('href')).not.toMatch(/\?$/);
   });
 });
