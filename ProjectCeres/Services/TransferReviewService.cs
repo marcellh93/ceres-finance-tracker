@@ -29,71 +29,102 @@ public class TransferReviewService(
             .Owned(user)
             .CountAsync(s => s.Status == StagedTransferStatus.Pending);
 
-    public async Task LinkToExistingAsync(Guid stagedId, Guid otherAccountId)
+    public async Task<Result> TryLinkToExistingAsync(Guid stagedId, Guid otherAccountId)
     {
-        var staged = await db.ImportStagedTransfers.Owned(user).FirstOrDefaultAsync(s => s.Id == stagedId)
-            ?? throw new InvalidOperationException($"Staged transfer {stagedId} not found.");
+        var staged = await db.ImportStagedTransfers.Owned(user).FirstOrDefaultAsync(s => s.Id == stagedId);
+        if (staged is null)
+            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
+        if (!await db.Accounts.Owned(user).AnyAsync(a => a.Id == otherAccountId))
+            return Result.Fail("INVALID_ACCOUNT", "The other account does not exist.");
 
         var absAmount = Math.Abs(staged.RawAmount);
         var (sourceId, destId) = staged.RawAmount < 0
             ? (staged.AccountId, otherAccountId)
             : (otherAccountId, staged.AccountId);
 
-        await transferService.CreateAsync(new TransferCreateViewModel
+        try
         {
-            Date            = staged.RawDate,
-            Amount          = absAmount,
-            SourceAccountId = sourceId,
-            DestAccountId   = destId,
-            Description     = staged.RawDescription
-        });
+            await transferService.CreateAsync(new TransferCreateViewModel
+            {
+                Date            = staged.RawDate,
+                Amount          = absAmount,
+                SourceAccountId = sourceId,
+                DestAccountId   = destId,
+                Description     = staged.RawDescription
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
 
         staged.Status     = StagedTransferStatus.Linked;
         staged.ResolvedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+        return Result.Ok();
     }
 
-    public async Task CreateAsTransferAsync(Guid stagedId, Guid otherAccountId)
+    public async Task<Result> TryCreateAsTransferAsync(Guid stagedId, Guid otherAccountId)
     {
-        var staged = await db.ImportStagedTransfers.Owned(user).FirstOrDefaultAsync(s => s.Id == stagedId)
-            ?? throw new InvalidOperationException($"Staged transfer {stagedId} not found.");
+        var staged = await db.ImportStagedTransfers.Owned(user).FirstOrDefaultAsync(s => s.Id == stagedId);
+        if (staged is null)
+            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
+        if (!await db.Accounts.Owned(user).AnyAsync(a => a.Id == otherAccountId))
+            return Result.Fail("INVALID_ACCOUNT", "The other account does not exist.");
 
         var absAmount = Math.Abs(staged.RawAmount);
         var (sourceId, destId) = staged.RawAmount < 0
             ? (staged.AccountId, otherAccountId)
             : (otherAccountId, staged.AccountId);
 
-        await transferService.CreateAsync(new TransferCreateViewModel
+        try
         {
-            Date            = staged.RawDate,
-            Amount          = absAmount,
-            SourceAccountId = sourceId,
-            DestAccountId   = destId,
-            Description     = staged.RawDescription
-        });
+            await transferService.CreateAsync(new TransferCreateViewModel
+            {
+                Date            = staged.RawDate,
+                Amount          = absAmount,
+                SourceAccountId = sourceId,
+                DestAccountId   = destId,
+                Description     = staged.RawDescription
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
 
         staged.Status     = StagedTransferStatus.CreatedAsTransfer;
         staged.ResolvedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+        return Result.Ok();
     }
 
-    public async Task DismissAsTransactionAsync(Guid stagedId)
+    public async Task<Result> TryDismissAsTransactionAsync(Guid stagedId)
     {
-        var staged = await db.ImportStagedTransfers.Owned(user).FirstOrDefaultAsync(s => s.Id == stagedId)
-            ?? throw new InvalidOperationException($"Staged transfer {stagedId} not found.");
+        var staged = await db.ImportStagedTransfers.Owned(user).FirstOrDefaultAsync(s => s.Id == stagedId);
+        if (staged is null)
+            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
 
         var categoryId = staged.RawAmount >= 0 ? UncategorizedIncomeId : UncategorizedExpenseId;
 
-        var txId = await transactionService.CreateAsync(new TransactionCreateViewModel
+        Guid txId;
+        try
         {
-            Date        = staged.RawDate,
-            Amount      = Math.Abs(staged.RawAmount),
-            Description = staged.RawDescription,
-            AccountId   = staged.AccountId,
-            CategoryId  = categoryId
-        });
-        await transactionService.MarkClearedAsync(txId, cleared: true);
-        await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
+            txId = await transactionService.CreateAsync(new TransactionCreateViewModel
+            {
+                Date        = staged.RawDate,
+                Amount      = Math.Abs(staged.RawAmount),
+                Description = staged.RawDescription,
+                AccountId   = staged.AccountId,
+                CategoryId  = categoryId
+            });
+            await transactionService.MarkClearedAsync(txId, cleared: true);
+            await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Result.Fail("VALIDATION_ERROR", ex.Message);
+        }
 
         if (!string.IsNullOrWhiteSpace(staged.RawDescription))
         {
@@ -115,58 +146,6 @@ public class TransferReviewService(
         staged.Status     = StagedTransferStatus.DismissedAsTransaction;
         staged.ResolvedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
-    }
-
-    // -------------------------------------------------------------------------
-    // API surface (Result-returning).
-    // -------------------------------------------------------------------------
-
-    public async Task<Result> TryLinkToExistingAsync(Guid stagedId, Guid otherAccountId)
-    {
-        if (!await db.ImportStagedTransfers.Owned(user).AnyAsync(s => s.Id == stagedId))
-            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
-        if (!await db.Accounts.Owned(user).AnyAsync(a => a.Id == otherAccountId))
-            return Result.Fail("INVALID_ACCOUNT", "The other account does not exist.");
-        try
-        {
-            await LinkToExistingAsync(stagedId, otherAccountId);
-            return Result.Ok();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Fail("VALIDATION_ERROR", ex.Message);
-        }
-    }
-
-    public async Task<Result> TryCreateAsTransferAsync(Guid stagedId, Guid otherAccountId)
-    {
-        if (!await db.ImportStagedTransfers.Owned(user).AnyAsync(s => s.Id == stagedId))
-            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
-        if (!await db.Accounts.Owned(user).AnyAsync(a => a.Id == otherAccountId))
-            return Result.Fail("INVALID_ACCOUNT", "The other account does not exist.");
-        try
-        {
-            await CreateAsTransferAsync(stagedId, otherAccountId);
-            return Result.Ok();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Fail("VALIDATION_ERROR", ex.Message);
-        }
-    }
-
-    public async Task<Result> TryDismissAsTransactionAsync(Guid stagedId)
-    {
-        if (!await db.ImportStagedTransfers.Owned(user).AnyAsync(s => s.Id == stagedId))
-            return Result.Fail("NOT_FOUND", "Staged transfer not found.");
-        try
-        {
-            await DismissAsTransactionAsync(stagedId);
-            return Result.Ok();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Result.Fail("VALIDATION_ERROR", ex.Message);
-        }
+        return Result.Ok();
     }
 }
