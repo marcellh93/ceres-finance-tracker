@@ -163,4 +163,20 @@ describe('TransferCard', () => {
     );
     expect(onChanged).not.toHaveBeenCalled();
   });
+
+  it('clicking Link to existing opens the link dialog', async () => {
+    render(<TransferCard staged={dto()} accounts={[]} onChanged={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: /Link to existing/i }));
+    await waitFor(() => expect(screen.getByText('Link to existing transfer')).toBeInTheDocument());
+  });
+
+  it('clicking Create transfer opens the create dialog', async () => {
+    render(<TransferCard staged={dto()} accounts={[]} onChanged={() => {}} />);
+    // The trigger button text "Create transfer" matches both the trigger and the dialog title.
+    // Click via getByRole('button') which is unambiguous before the dialog opens.
+    await userEvent.click(screen.getByRole('button', { name: /^Create transfer$/i }));
+    // After click, BOTH the original trigger button AND the dialog title contain "Create transfer".
+    // Assert the dialog opened by checking for body copy unique to the dialog.
+    await waitFor(() => expect(screen.getByText(/We'll create a new transfer record/)).toBeInTheDocument());
+  });
 });
