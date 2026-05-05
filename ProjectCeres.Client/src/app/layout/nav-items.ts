@@ -11,6 +11,10 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
+import { useReviewCount } from '../features/review/ReviewCountProvider';
+
+/** Hook returning a numeric badge count to display next to a nav item. */
+export type NavBadgeHook = () => number;
 
 export type NavItem = {
   /** Path under /app, including the leading slash. */
@@ -19,6 +23,8 @@ export type NavItem = {
   label: string;
   /** Lucide icon component. */
   icon: LucideIcon;
+  /** Optional hook returning a badge count. Pill renders only when > 0. */
+  useBadge?: NavBadgeHook;
 };
 
 export type NavGroup = {
@@ -27,12 +33,14 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+const useReviewBadge: NavBadgeHook = () => useReviewCount().total;
+
 export const navGroups: NavGroup[] = [
   {
     label: 'Activity',
     items: [
       { to: '/movements', label: 'Movements', icon: LayoutList },
-      { to: '/review',    label: 'Review',    icon: Inbox },
+      { to: '/review',    label: 'Review',    icon: Inbox, useBadge: useReviewBadge },
     ],
   },
   {

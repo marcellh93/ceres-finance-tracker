@@ -65,6 +65,13 @@ export function Sidebar() {
 }
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+  // `item.useBadge` is a stable hook reference set at module load (see nav-items.ts).
+  // Calling it conditionally is safe because the same items render in the same order
+  // on every pass — `navGroups` and `bottomItems` are static module-level arrays.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const badgeCount = item.useBadge?.() ?? 0;
+  const ariaLabel = badgeCount > 0 ? `${item.label}, ${badgeCount} pending` : item.label;
+
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn(
       'flex items-center gap-3 rounded-md px-3 py-2 text-sm no-underline transition-colors',
@@ -74,10 +81,21 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
         : 'text-muted-foreground hover:bg-muted hover:text-foreground',
     );
 
+  const badge =
+    badgeCount > 0 ? (
+      <span
+        data-testid={`nav-badge-${item.to.replace('/', '')}`}
+        className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs"
+      >
+        {badgeCount}
+      </span>
+    ) : null;
+
   const link = (
-    <NavLink to={item.to} className={linkClass} end aria-label={item.label}>
+    <NavLink to={item.to} className={linkClass} end aria-label={ariaLabel}>
       <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
       {!collapsed && <span>{item.label}</span>}
+      {!collapsed && badge}
     </NavLink>
   );
 
@@ -86,7 +104,7 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
   return (
     <Tooltip>
       <TooltipTrigger render={link} />
-      <TooltipContent side="right">{item.label}</TooltipContent>
+      <TooltipContent side="right">{ariaLabel}</TooltipContent>
     </Tooltip>
   );
 }
