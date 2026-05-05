@@ -125,4 +125,81 @@ describe('ReviewLayout', () => {
     await userEvent.click(screen.getByRole('tab', { name: /Transfers/ }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/transfer-review/pending'))).toBe(true));
   });
+
+  it('first-paint: shows Reconciliations while counts loading; switches to Transfers once counts resolve 0/N', async () => {
+    let resolveRecon!: (v: Response) => void;
+    let resolveXfer!:  (v: Response) => void;
+
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      if (url.endsWith('/reconciliation-review/pending/count')) {
+        return new Promise<Response>((r) => { resolveRecon = r; });
+      }
+      if (url.endsWith('/transfer-review/pending/count')) {
+        return new Promise<Response>((r) => { resolveXfer = r; });
+      }
+      if (url.endsWith('/reconciliation-review/pending')) return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      if (url.endsWith('/transfer-review/pending'))       return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      if (url.endsWith('/api/accounts'))                  return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    }) as typeof fetch);
+
+    render(
+      <MemoryRouter initialEntries={['/review']}>
+        <ReviewCountProvider>
+          <Routes>
+            <Route path="/review" element={<ReviewLayout />} />
+          </Routes>
+        </ReviewCountProvider>
+      </MemoryRouter>,
+    );
+    // First paint: Reconciliations is provisionally active while counts are still loading.
+    expectActiveTab(/Reconciliations/);
+
+    // Resolve both counts: reconciliation 0, transfer 3.
+    resolveRecon({ ok: true, json: async () => 0 } as Response);
+    resolveXfer({ ok: true, json: async () => 3 } as Response);
+
+    // After counts resolve, A3 should adjust to Transfers (since recon=0 and xfer>0).
+    await waitFor(() => expectActiveTab(/Transfers/));
+  });
+
+  it('first-paint + user-touched: post-load adjustment is suppressed when user already clicked', async () => {
+    let resolveRecon!: (v: Response) => void;
+    let resolveXfer!:  (v: Response) => void;
+
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      if (url.endsWith('/reconciliation-review/pending/count')) {
+        return new Promise<Response>((r) => { resolveRecon = r; });
+      }
+      if (url.endsWith('/transfer-review/pending/count')) {
+        return new Promise<Response>((r) => { resolveXfer = r; });
+      }
+      if (url.endsWith('/reconciliation-review/pending')) return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      if (url.endsWith('/transfer-review/pending'))       return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      if (url.endsWith('/api/accounts'))                  return Promise.resolve({ ok: true, json: async () => [] } as Response);
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    }) as typeof fetch);
+
+    render(
+      <MemoryRouter initialEntries={['/review']}>
+        <ReviewCountProvider>
+          <Routes>
+            <Route path="/review" element={<ReviewLayout />} />
+          </Routes>
+        </ReviewCountProvider>
+      </MemoryRouter>,
+    );
+    // User clicks Reconciliations explicitly. Even though it was already provisionally active,
+    // this click sets the userTouchedTab.current ref, which must suppress the post-load adjustment.
+    await userEvent.click(screen.getByRole('tab', { name: /Reconciliations/ }));
+
+    // Resolve counts so that, without the userTouchedTab guard, A3 would switch to Transfers.
+    resolveRecon({ ok: true, json: async () => 0 } as Response);
+    resolveXfer({ ok: true, json: async () => 5 } as Response);
+
+    // Wait long enough for any auto-switch effect to fire, then assert it did NOT happen.
+    await waitFor(() => expect(screen.getByTestId('transfers-count').textContent).toBe('5'));
+    // Reconciliations must STILL be active (the user-touched flag suppressed the auto-switch).
+    expectActiveTab(/Reconciliations/);
+  });
 });

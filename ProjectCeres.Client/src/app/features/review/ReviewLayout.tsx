@@ -54,7 +54,13 @@ export function ReviewLayout() {
 
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as string)} className="mt-6">
         <TabsList>
-          <TabsTrigger value="reconciliations">
+          <TabsTrigger
+            value="reconciliations"
+            // Mark the tab as user-touched even when clicking the already-active tab
+            // (base-ui's onValueChange does NOT fire when value is unchanged, so the
+            // suppression flag would otherwise never be set in that case).
+            onClick={() => { userTouchedTab.current = true; }}
+          >
             Reconciliations
             {reconciliationCount > 0 && (
               <span
@@ -65,7 +71,10 @@ export function ReviewLayout() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="transfers">
+          <TabsTrigger
+            value="transfers"
+            onClick={() => { userTouchedTab.current = true; }}
+          >
             Transfers
             {transferCount > 0 && (
               <span
