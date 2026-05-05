@@ -58,8 +58,8 @@
 | `AttachmentsController` | Serve, Delete | File serving needs special handling: streaming response, `Content-Disposition: attachment` |
 | `HomeController` | Index | Deleted — replaced by React Router's root route |
 | `CsvImportProfilesController` | Index, Create, Edit, Delete, Recover | Phase 2 addition. Soft-delete with 90-day Recover window. |
-| `TransferReviewController` | Index + Link/CreateAsTransfer/DismissAsTransaction | Phase 2 addition. Stateful actions on `ImportStagedTransfer` rows. |
-| `ReconciliationReviewController` | Index | Phase 2 addition. Audit scope at port time. |
+| `TransferReviewController` | Index + Link/CreateAsTransfer/DismissAsTransaction | **Migrated (2026-05-06).** Page action 302-redirects to `/app/review?tab=transfers`. Razor view and `StagedTransferViewModel` deleted. Stateful actions consolidated into `TransferReviewApiController` (`link-to-existing` / `create-as-transfer` / `dismiss-as-transaction`); throwing service variants on `ITransferReviewService` removed. See `Review` row in §8 below. |
+| `ReconciliationReviewController` | Index | **Migrated (2026-05-06).** Page action 302-redirects to `/app/review?tab=reconciliations`. Razor view and `StagedTransactionViewModel` deleted. Inline `Confirm match` + `Dispute` + `Confirm all` actions backed by `ReconciliationReviewApiController`; throwing service variants on `IImportStagedTransactionService` removed in favour of `Try*Async` (incl. new `TryConfirmAllAsync`). See `Review` row in §8 below. |
 
 ---
 
@@ -192,7 +192,7 @@ With those two facts established, the frontend was reorganised into batches:
 | 3 | Accounts | ✅ Migrated 2026-05-03 (commit `03220b8`) | List + Create/Edit/Ledger; per-currency subtotal strip; type-driven balance colour; conditional Asset/Liability fields with two-layer interest-rate normalisation; SPA-side payoff projection; adaptive archive copy via `HasTransactions`. |
 | 4 | Recurring | ✅ Migrated 2026-05-03 | Frequency rules + next-due-date computation; Confirm/Dismiss stateful actions; archive/reactivate lifecycle; TopBar bell wired via `ReminderCountProvider`; Weekly/Biweekly snap fix. |
 | 5 | Reports | ✅ Migrated 2026-05-03 | 8 report pages + `ReportsLayout` + sticky filter bar + CSV export. `DateRangePicker` extracted as shared component. Razor views deleted; `ReportsController` actions → 302 redirects. |
-| 6 | Review | Pending | Reconciliation review — unattended-import staged transactions/transfers triage. |
+| 6 | Review | ✅ Migrated 2026-05-06 (commit `<sha>`) | Unified `/app/review` with Reconciliations + Transfers tabs (deep-linked via `?tab=`). Reconciliations: inline `Confirm match` + `Dispute` row menu (AlertDialog) + `Confirm all` (AlertDialog, backed by new `TryConfirmAllAsync`). Transfers: per-card `Link to existing` / `Create transfer` / `Dismiss` (Link/Create open shared dialog with same-currency-filtered account picker; Dismiss fires immediately). Sidebar `Review` badge driven by new `ReviewCountProvider` over the two existing `pending/count` endpoints. Server-side: throwing CRUD variants dropped from `ITransferReviewService` and `IImportStagedTransactionService`; `StagedTransactionDto` and `StagedTransferDto` enriched with `AccountCurrencyCode` + `AccountCurrencySymbol`. Razor controllers slimmed to redirects (commits `7ba0423`, `101d79b`); views, Razor-only ViewModels, and `_Layout` pending-count badges deleted. Spec: `docs/superpowers/specs/2026-05-04-review-spa-design.md`. Plan: `docs/superpowers/plans/2026-05-04-review-spa.md`. |
 | 7 | Import | Pending | CSV import with column mapping + transfer-detection confidence. |
 
 **Batch 3 — Auth + Onboarding (deferred until Batch 2 ships):** Auth screens, TOTP, registration, password reset, and the first-run onboarding wizard land after every Razor view is gone, so the sentinel-to-real-user data migration is the only remaining identity concern. Sequencing this last avoids re-touching SPA pages to wire `useAuth` mid-flight.

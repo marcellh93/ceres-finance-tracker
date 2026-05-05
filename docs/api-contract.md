@@ -356,6 +356,16 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Reactivate recurring transaction | PATCH | `/api/recurring-transactions/{id}/reactivate` | Sets `IsActive = true`. `204` on success, `404` on missing. |
 | Confirm recurring transaction | PATCH | `/api/recurring-transactions/{id}/confirm` | Creates a `Transaction` from the template and advances `NextDueDate`. `204` on success. |
 | Dismiss recurring transaction | POST | `/api/recurring-transactions/{id}/dismiss` | Skips the current due date and advances `NextDueDate`. Accepts an optional body `{ "nextDueDate": "yyyy-MM-dd" }` — required when `frequency` is `ManualDate` (no auto-advance formula exists). `204` on success. |
+| Pending reconciliations | GET | `/api/reconciliation-review/pending` | Returns `StagedTransactionDto[] { id, importedAt, accountId, accountName, accountCurrencyCode, accountCurrencySymbol, rawDate, rawAmount, rawDescription?, matchedTransactionId?, matchedTransactionDescription?, matchedTransactionDate, matchedTransactionAmount }`. |
+| Pending reconciliation count | GET | `/api/reconciliation-review/pending/count` | Returns an integer. Drives the SPA sidebar `Review` badge. |
+| Confirm reconciliation | POST | `/api/reconciliation-review/{id}/confirm` | Marks the staged row as the canonical match for `MatchedTransactionId`. `204` on success, `404` on missing, `422` with `{ error: { code, message } }` on policy failure. |
+| Confirm all reconciliations | POST | `/api/reconciliation-review/confirm-all` | Confirms every pending row in one call (atomic). `204` on success, `422` with `{ error: { code, message } }` on policy failure. Backed by `TryConfirmAllAsync`. |
+| Dispute reconciliation | POST | `/api/reconciliation-review/{id}/dispute` | Detaches the staged row from its candidate match. `204` on success, `404` on missing, `422` on policy failure. |
+| Pending transfer-review rows | GET | `/api/transfer-review/pending` | Returns `StagedTransferDto[] { id, importedAt, accountId, accountName, accountCurrencyCode, accountCurrencySymbol, rawDate, rawAmount, rawDescription?, candidateTransactionId?, candidateTransactionDescription?, candidateTransactionDate?, candidateTransactionAmount? }`. |
+| Pending transfer-review count | GET | `/api/transfer-review/pending/count` | Returns an integer. Drives the SPA sidebar `Review` badge alongside the reconciliation count. |
+| Link staged row to existing transfer | POST | `/api/transfer-review/{stagedId}/link-to-existing` | Body: `{ otherAccountId: Guid }`. Pairs the staged row with an existing same-currency counterpart row to form a Transfer. `204` on success, `404`/`422` on failure. |
+| Create transfer from staged row | POST | `/api/transfer-review/{stagedId}/create-as-transfer` | Body: `{ otherAccountId: Guid }`. Materialises the staged row as a new Transfer using the picked counterparty account (must share currency). `204` on success, `404`/`422` on failure. |
+| Dismiss staged row as plain transaction | POST | `/api/transfer-review/{stagedId}/dismiss-as-transaction` | Drops the transfer-detection signal and lets the row import as a regular Transaction. `204` on success, `404`/`422` on failure. |
 
 #### `EstimatedAmount` semantics
 
