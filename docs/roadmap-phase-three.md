@@ -716,4 +716,711 @@ Tests required before Stage 9 begins:
 
 ---
 
+## Stage 9 — Auth SPA pages (Batch 3e)
+
+**Status: ❌ Pending.** First user-visible Phase 3 work. Lands after Stage 8 because every flow depends on a working email service.
+
+> **Goal:** every auth screen exists in the SPA, designed to a high bar (these are the first thing beta users see), with full localization (EN/ES), accessibility (focus management, `aria-live`), and clear error states.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 9.1 | `/login` page (email + password form) | `planning-phase3.md` § 10 Auth screen design |
+| 9.2 | `/login/totp` page (6-digit TOTP step) | (above) |
+| 9.3 | `/register` page + email-verification interstitial | (above) |
+| 9.4 | `/password-reset` request page + `/password-reset/confirm` (with TOTP) | `security-model.md` § Password Reset |
+| 9.5 | Lockout / self-service unlock screen | `security-model.md` § Login → Account lockout self-service unlock |
+| 9.6 | TOTP setup flow (QR + manual-entry fallback + backup-codes download) | `planning-phase3.md` § 10 Auth screen design |
+| 9.7 | Backup-codes recovery flow (lost TOTP device) | (above) |
+| 9.8 | Reauthentication prompts on sensitive operations | `security-model.md` § Login → Reauthentication |
+| 9.9 | Language toggle on every auth card (globe icon) | `planning-phase3.md` § Localization |
+
+### Verification checklist
+
+Layout + brand:
+
+- [ ] Centered card layout, no app shell (sidebar, top bar absent)
+- [ ] Ceres logo / wordmark placement consistent across all auth pages
+- [ ] Globe icon language toggle at the bottom of every auth card; instant in-place swap via `i18n.changeLanguage()`, no reload
+- [ ] Pre-auth language detection writes the `lang` cookie (non-HttpOnly, `SameSite=Lax`)
+
+`/login`:
+
+- [ ] Email + password fields with explicit `<label>` (`htmlFor`) — no placeholder-only labels
+- [ ] Submit button has idle / loading / error states
+- [ ] On wrong credentials: generic error "Email or password is incorrect" (no enumeration leak)
+- [ ] On account locked: "Account locked. Check your email for an unlock link." — no other detail
+- [ ] On success without TOTP enrolled: redirect to `/login/totp/setup` (first-login enrolment grace path)
+- [ ] On success with TOTP enrolled: redirect to `/login/totp`
+- [ ] "Forgot password?" link routes to `/password-reset`
+- [ ] "Create account" link routes to `/register`
+
+`/login/totp`:
+
+- [ ] 6-digit input with auto-focus, auto-advance, paste handling
+- [ ] On wrong code: generic error "Invalid code"
+- [ ] On expired window: same generic error (no leak that "the code was right but expired")
+- [ ] On success: cookie set, redirect to `/` (dashboard) or onboarding if first-run
+- [ ] Backup-code link below input: "Lost your device? Use a backup code"
+- [ ] Backup-code path uses single-use code; on success offers backup-codes regeneration
+
+`/register`:
+
+- [ ] Email + password fields; password meets policy (≥ 8 chars, no max < 64) per Stage 6
+- [ ] Submit returns 202 Accepted with "Check your email to verify your address" — no enumeration leak (same response if email already registered)
+- [ ] Verification email sent with single-use 256-bit token, hashed, 30-min expiry
+- [ ] `/email-verify?token=...` page accepts the token, marks email verified, redirects to `/login/totp/setup`
+
+`/password-reset` (request) + `/password-reset/confirm` (action):
+
+- [ ] Request page: email field; submit returns "If that email is registered, you'll receive a link" (constant response + timing)
+- [ ] Email contains link with 256-bit token (15-min expiry)
+- [ ] `/password-reset/confirm?token=...` form requires: TOTP code + new password
+- [ ] On success: token invalidated, all sessions revoked, redirect to `/login`
+- [ ] On expired token: clear error, link to request a new one
+- [ ] On wrong TOTP: generic error, does NOT consume the reset token (token still valid for retry until expiry)
+
+Lockout / unlock:
+
+- [ ] After 10 failed login attempts, account is locked + email sent with self-service unlock link
+- [ ] `/account/unlock?token=...` accepts the signed token, unlocks the account, redirects to `/login` with success toast
+- [ ] Token expires after a reasonable window (e.g., 1 hour)
+- [ ] Lockout email also tells the user "valid TOTP codes are still accepted during lockout" (per `security-model.md` § Login)
+
+TOTP setup (`/login/totp/setup`):
+
+- [ ] QR code displayed (otpauth:// URI) — uses `qrcode` library or equivalent
+- [ ] Manual-entry secret displayed below QR for accessibility / desktop authenticators
+- [ ] Verification step requires entering one valid code before enrolment is complete
+- [ ] On successful enrolment: 10 backup codes generated (cryptographically random, ≥ 20 bits entropy each per NIST 800-63B), shown ONCE, with download (.txt) + print options
+- [ ] Backup codes are hashed in DB after this step; the page warns "These will not be shown again"
+- [ ] User must confirm "I've saved my backup codes" checkbox before proceeding
+- [ ] After enrolment: redirect to onboarding (Stage 10) for first-run, or dashboard for re-enrolment
+
+Backup-codes recovery flow:
+
+- [ ] `/login/totp` accepts a backup code in the same input or via a "Use backup code" toggle
+- [ ] Backup code single-use: marked consumed in DB after success
+- [ ] After backup-code login: warning banner on dashboard suggests "Re-enroll TOTP soon. You have N backup codes remaining."
+- [ ] Re-enrolment from settings invalidates ALL existing backup codes and generates a fresh set
+
+Reauthentication prompts:
+
+- [ ] Reusable `<ReauthenticationDialog>` component prompts for fresh password before sensitive actions
+- [ ] Triggered on: change password, change email, re-enroll TOTP, view active sessions, GDPR erasure (matches `security-model.md` list exactly)
+- [ ] Successful reauthentication grants a 5-minute window scoped to the originating action
+- [ ] Window expires; re-prompt required for the next sensitive action
+
+Error states:
+
+- [ ] Wrong password — generic message
+- [ ] Expired TOTP — generic message
+- [ ] Locked account — clear message with "check email" instruction
+- [ ] Network error — retry-able toast, form state preserved
+- [ ] Server error (500) — clear message, no stack trace exposed
+
+Accessibility:
+
+- [ ] Every form has explicit `<label>` and `aria-describedby` for errors
+- [ ] Focus moves to the first error field on submission failure
+- [ ] Toast errors are also announced via `aria-live="polite"` for screen readers
+- [ ] Tab order is logical (email → password → submit → forgot-password → create-account)
+- [ ] Auth cards are keyboard-navigable; no mouse-only interactions
+- [ ] vitest-axe runs against `/login`, `/login/totp`, `/register`, `/password-reset` with zero violations
+
+Localization:
+
+- [ ] Every string in every auth page uses `useTranslation()` keyed strings
+- [ ] EN + ES translations complete in `en.json` and `es.json`
+- [ ] No untranslated copy visible when toggling to ES
+- [ ] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale
+
+---
+
+## Stage 10 — Onboarding wizard (Batch 3f)
+
+**Status: ❌ Pending.** Lands after Stage 9 because the registration flow ends in onboarding.
+
+> **Goal:** five-step wizard at `/onboarding` that takes a freshly-registered user from "I just created an account" to "I see my net worth on the dashboard." Full-screen stepper, distinct from the standard app shell. See [ADR-0053](decisions/ADR-0053-guided-onboarding-deferred.md).
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 10.1 | `/onboarding` route + full-screen stepper layout | `planning-phase3.md` § 11 Onboarding flow design |
+| 10.2 | Step 1 — Preferences (language, country, default currency, number format, date format) | (above) + `planning-phase3.md` § Localization |
+| 10.3 | Step 2 — First asset account | (above) |
+| 10.4 | Step 3 — First liability (optional, skippable) | (above) |
+| 10.5 | Step 4 — Opening balance | (above) + ADR-0010 (opening balance as auto-created transaction) |
+| 10.6 | Step 5 — Immediate net worth display + "Go to dashboard" CTA | (above) |
+
+### Verification checklist
+
+Layout + flow:
+
+- [ ] `/onboarding` is a top-level route OUTSIDE `AppLayout` (no sidebar, no top bar)
+- [ ] Full-screen stepper with progress indicator at top showing 5 numbered steps
+- [ ] First-run users (no `OnboardingCompletedAt` on Settings) are redirected to `/onboarding` after login until completion
+- [ ] Completion flag persisted to per-user Settings; subsequent logins go straight to dashboard
+- [ ] User can navigate back to a previous step; data from later steps is preserved if revisited
+- [ ] Browser back button triggers an "are you sure you want to leave?" guard if onboarding is partial
+
+Step 1 — Preferences:
+
+- [ ] Five fields grouped: Language (EN/ES), Country (ES, US, GB, CO, AR, VE, Other), Default Currency (EUR, USD, GBP, COP, ARS, VED), Number format (`comma_decimal` / `dot_decimal`), Date format (`DD/MM/YYYY` / `MM/DD/YYYY` / `YYYY-MM-DD`)
+- [ ] All fields pre-filled from `Accept-Language` detection (`security-model.md` § Localization, `planning-phase3.md`)
+- [ ] All fields independently overridable — no cascade (changing country does NOT change currency)
+- [ ] Live format preview displayed: e.g., `€1.234,56 · 28/04/2026`
+- [ ] Saving step 1 applies the language IMMEDIATELY (subsequent steps render in chosen language)
+- [ ] Saved values written to per-user `Settings` row
+
+Step 2 — First asset account:
+
+- [ ] Fields: name (required), `AccountType` (select from asset types: Checking, Savings, Cash, Investment), currency (defaults to step 1's `DefaultCurrency`), opening balance (defaults to 0)
+- [ ] Validation matches the regular Accounts form (Stage 3.3)
+- [ ] On save: account created via the same `AccountService` used by `/accounts/new`
+- [ ] At least one asset account is required to proceed; "Add another" button repeatable
+
+Step 3 — First liability (optional):
+
+- [ ] Skippable via "I don't have any liabilities" option
+- [ ] If proceeding: same form shape as Account Create with liability types (Credit Card, Loan, Mortgage, Other)
+- [ ] Conditional Asset/Liability fields work per Stage 3.3 (interest rate normalization, repayment type)
+
+Step 4 — Opening balance:
+
+- [ ] For each account created in Steps 2 + 3, prompts for the opening balance and date
+- [ ] Defaults the date to today (per ADR-0010 § Opening balance cutover UX)
+- [ ] If user changes the date, shows the explanation about how moving the date affects balance + history
+- [ ] Creates an `IsSystem` opening-balance Transaction for each account
+
+Step 5 — Net worth display:
+
+- [ ] Computed across all accounts created in steps 2–4
+- [ ] Shows per-currency breakdown if multiple currencies (matching the dashboard rule)
+- [ ] "Go to dashboard" CTA marks `OnboardingCompletedAt` and redirects to `/`
+
+Accessibility (per `planning-phase3.md` § 8 Accessibility baseline):
+
+- [ ] Focus moves to the new step's `<h2>` heading on transition (`tabindex="-1"` + `.focus()`)
+- [ ] `aria-live="polite"` step announcer announces step transitions
+- [ ] `aria-current="step"` on the current step indicator
+- [ ] Form-error focus management on validation failures
+- [ ] vitest-axe runs against every onboarding step with zero violations
+
+Localization:
+
+- [ ] Every string keyed; EN + ES complete
+- [ ] "Account type" labels seeded with localized names (e.g., Spanish for "Checking" → "Cuenta corriente")
+- [ ] System category names available in chosen language for any defaults
+
+Tests required before Stage 11 begins:
+
+- [ ] Happy-path integration test: register → verify email → enroll TOTP → onboarding 5 steps → land on dashboard with correct net worth
+- [ ] Skipped-liability path test (Step 3 skipped)
+- [ ] Multi-asset-account path test (two accounts created in Step 2)
+- [ ] Language change in Step 1 propagates to subsequent steps
+- [ ] Onboarding completion flag persists; second login skips onboarding
+
+---
+
+## Stage 11 — Razor + URL cleanup (Batch 4)
+
+**Status: ❌ Pending.** Mechanical cleanup. Lands after Stage 10 because Auth is the last surface that needs the `/app/` prefix to coexist with Razor stubs.
+
+> **Goal:** `/app/` prefix dropped, MVC infrastructure stripped from `Program.cs`, all per-area 302 redirects deleted, one-shot `/app/*` → `/*` 301 in place for legacy bookmarks. The product becomes a pure Web API + SPA.
+
+See [`planning-phase3-spa-migration.md` → Final cleanup plan](planning-phase3-spa-migration.md#final-cleanup-plan-after-every-razor-view-is-gone) for the original detailed sweep.
+
+### Sub-stages
+
+| # | Sub-stage |
+|---|---|
+| 11.1 | React Router `basename` changes from `/app` to `/` |
+| 11.2 | Razor host view's catch-all route changes from `app/{*path}` to `{*path}` |
+| 11.3 | One-shot `/app/*` → `/*` 301 redirects added |
+| 11.4 | Every per-area 302 redirect deleted (Dashboard, Movements, Transactions, Transfers, Categories, Accounts, Recurring, Reports, Review, Import, Settings, Budgets, CsvImportProfiles) |
+| 11.5 | MVC infrastructure stripped from `Program.cs` (controllers-only API surface) |
+| 11.6 | Razor host views deleted (`Views/App/`, `Views/Home/`, `Views/Shared/_Layout.cshtml`, `Error.cshtml`, `_ViewStart.cshtml`, `_ViewImports.cshtml`, `_ValidationScriptsPartial.cshtml`) |
+
+### Verification checklist
+
+URL surface:
+
+- [ ] `/` serves the SPA (no `/app/` prefix anywhere in user-facing URLs)
+- [ ] `/app/*` returns 301 to `/*` for every path that was previously a Batch 2 SPA route
+- [ ] Old SPA bookmarks tested: `https://.../app/movements?needsReview=true` redirects to `https://.../movements?needsReview=true` with query string preserved
+- [ ] Old Razor bookmarks tested: `https://.../Movements` (the per-area 302 from Batch 2) is now a 404 (redirect chain has been removed)
+- [ ] No `/app/` references remain in code or docs (grep returns nothing)
+
+`Program.cs`:
+
+- [ ] `AddControllersWithViews()` replaced with `AddControllers()`
+- [ ] `MapControllerRoute(...)` calls deleted
+- [ ] `MapRazorPages()` (if present) deleted
+- [ ] No remaining MVC-specific service registrations
+- [ ] `app.UseStaticFiles()` retained (still serves `wwwroot/` SPA assets)
+- [ ] Application boots cleanly with zero MVC infrastructure
+
+File deletions:
+
+- [ ] `ProjectCeres/Views/` directory deleted entirely
+- [ ] No `.cshtml` files anywhere in `ProjectCeres/`
+- [ ] No `.razor` files (Phase 3 never used Blazor; just confirm)
+- [ ] `obj/` and `bin/` rebuilt cleanly with no MVC remnants
+
+Razor controller stubs:
+
+- [ ] Every Razor controller (`MovementsController`, `TransactionsController`, `TransfersController`, `CategoriesController`, `AccountsController`, `RecurringTransactionsController`, `ReportsController`, `ImportController`, `CsvImportProfilesController`, `BudgetsController`, `SettingsController`, `DashboardController`, `ReviewController`/`TransfersReviewController`) deleted
+- [ ] Verify by grep: no `: Controller` in `ProjectCeres/Controllers/` outside `ProjectCeres/Controllers/Api/`
+- [ ] All API controllers under `Controllers/Api/` retained and functional
+
+Smoke tests:
+
+- [ ] Application boots without exception
+- [ ] Full SPA loads at `/` and every page renders
+- [ ] Browser dev-tools network tab shows no 404s for legacy assets
+- [ ] All API integration tests still pass (the API surface is unchanged by this batch)
+- [ ] No regressions in the IDOR test suite from Stage 7
+
+---
+
+## Stage 12 — Sessions + Support SPA pages (Batch 5)
+
+**Status: ❌ Pending.** Two SPA pages still pending from Batch 2 that depend on Auth being live.
+
+> **Goal:** users can review and revoke their active sessions, block IPs, and submit support tickets. The pages exist in the SPA at `/settings/sessions` and `/support`.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 12.1 | `/settings/sessions` SPA page | `planning-phase3.md` § Sessions + ADR-0019 |
+| 12.2 | Per-session revoke action | (above) |
+| 12.3 | IP block toggle from session row | (above) |
+| 12.4 | `/support` SPA page (ticket form + list) | `planning-phase3.md` § Support ticket system |
+| 12.5 | `SupportTicket` entity + service + API endpoints (if not already present) | (above) |
+| 12.6 | Admin email notification on new ticket | (above) |
+
+### Verification checklist
+
+`/settings/sessions`:
+
+- [ ] Reauthentication-gated route (per `security-model.md` § Reauthentication)
+- [ ] Lists all active `UserSession` rows: created-at, last-used, IP, user-agent summary, "this session" indicator on the current row
+- [ ] Per-row "Revoke" action calls `DELETE /api/sessions/{id}`
+- [ ] Revoking the current session logs the user out + redirects to `/login`
+- [ ] Per-row "Block this IP" action: adds the IP to `UserBlockedIp`, revokes all sessions from that IP simultaneously
+- [ ] List refreshes optimistically after revoke / block
+- [ ] Empty state: "No other active sessions" when only the current row exists
+
+`/support`:
+
+- [ ] Ticket form: subject (required), message (required), priority (Low / Normal / High / Urgent)
+- [ ] On submit: ticket created with `Status = Open`, email sent to admin address
+- [ ] User's own tickets listed below the form: subject, status, last update, "view" link
+- [ ] Status indicators with semantic colours (Open = sky, InProgress = amber, Resolved = emerald, Closed = zinc)
+- [ ] No edit / delete (ticket history is immutable)
+- [ ] Admin reply mechanism: out of scope for Phase 3; users see "We'll respond by email"
+
+Server side:
+
+- [ ] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt`
+- [ ] Global query filter applies (only owner sees own tickets)
+- [ ] Admin can list all tickets via `Admin/` endpoints (per Stage 7 / ADR-0065)
+- [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
+
+Tests:
+
+- [ ] Revoke own session, verify cookie no longer authenticates
+- [ ] Block own IP, verify subsequent requests from same IP rejected
+- [ ] Submit ticket, verify admin receives email
+- [ ] User A cannot view User B's ticket (IDOR)
+- [ ] Reauthentication required to access `/settings/sessions`
+
+---
+
+## Stage 13 — GDPR baseline (Batch 5)
+
+**Status: ❌ Pending.** Legal gate before opening to invited beta testers in the EU. Covers the privacy policy, cookie consent, retention enforcement, full data export, and right-to-erasure flow.
+
+> **Goal:** Project Ceres meets the legal minimum to host EU users per GDPR + AEPD 2024 + EU Accessibility Act. See [`legal.md`](legal.md) for the underlying compliance requirements.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 13.1 | Privacy policy text + page | `legal.md` + `security-model.md` § Article 13/14 |
+| 13.2 | Cookie consent banner (AEPD 2024 guidelines) | `security-model.md` § Cookie Consent |
+| 13.3 | Records of Processing Activities (RoPA) document | `security-model.md` § Article 30 |
+| 13.4 | Subprocessor inventory + DPA list | `security-model.md` § Article 28 |
+| 13.5 | Data retention policy enforced | `security-model.md` § Data Retention and Deletion Policy |
+| 13.6 | Audit-log auto-purge job (6 months) | `planning-phase3.md` § Audit logging + ADR-0067 |
+| 13.7 | Failed-login retention purge job | (above) |
+| 13.8 | Full ZIP data export — async background job | `planning-phase3.md` § Full data export |
+| 13.9 | Right-to-erasure flow | `security-model.md` § Article 30 + § Data Retention |
+| 13.10 | Breach notification runbook | `security-model.md` § Article 33/34 |
+| 13.11 | DPIA (Data Protection Impact Assessment) document | `security-model.md` § Article 35 |
+
+### Verification checklist
+
+Privacy policy + cookie consent:
+
+- [ ] `/privacy` and `/legal` routes render the policy in EN + ES
+- [ ] Policy describes every data type collected, legal basis, retention period, sharing (subprocessors), user rights
+- [ ] Cookie consent banner appears on first visit; choice persists in a non-tracking cookie
+- [ ] Banner offers granular choice: necessary (always on), analytics (opt-in), preferences (opt-in) — per AEPD 2024
+- [ ] Reject-all is as easy as accept-all (single click, equally prominent)
+- [ ] No tracking / analytics scripts load before consent
+- [ ] Consent is revocable from a footer link on every page
+- [ ] AEPD compliance verified against the 2024 guidelines
+
+RoPA + DPA:
+
+- [ ] `legal.md` § RoPA fully populated for every data type
+- [ ] Subprocessor list includes: hosting provider, email provider, any analytics, any monitoring (Sentry / similar)
+- [ ] DPA signed with each subprocessor; copies stored in secrets/legal repo
+- [ ] DPA terms reflect GDPR Art. 28 requirements (subprocessor controls, breach notification, data return on termination)
+
+Retention policy:
+
+- [ ] Audit log: 6-month auto-purge cron job registered with the background runtime; runs daily, deletes `AuditLog` rows older than 6 months
+- [ ] Failed-login records: same auto-purge, e.g., 90 days
+- [ ] Soft-deleted SavedReports: hard-deleted after 90 days
+- [ ] Soft-deleted CsvImportProfiles: hard-deleted after 90 days (already implemented; verify)
+- [ ] Inactive user records: archived after defined period per `security-model.md` § Data Retention
+- [ ] Each retention rule documented in the policy + verifiable in code (test that runs the purge against fixture data)
+
+Full data export:
+
+- [ ] Endpoint: `POST /api/me/export` returns 202 Accepted with a job id
+- [ ] Background job (registered with `IUserJobRunner.EnterAs`) generates the ZIP
+- [ ] ZIP contents: one CSV per entity (accounts, transactions, transfers, liability_payments, budgets, category_budgets, categories, recurring_transactions, saved_reports, support_tickets, settings); one folder per attachment type with original files
+- [ ] Each CSV uses UTF-8 BOM for Excel compatibility
+- [ ] Generation logs an `AuditLog` entry
+- [ ] When done, sends email with authenticated download link (Stage 8 template)
+- [ ] Download link 24-hour expiry; tied to a single signed token, single-use
+- [ ] Rate limit: max 1 export request / 24 hours / user
+- [ ] Synchronous fallback rejected (see `planning-phase3.md` warning about HTTP worker exhaustion)
+
+Right-to-erasure:
+
+- [ ] `/settings/account/erasure` page describes what will be deleted, when, what is retained (legal-basis-required records like audit log), and confirms intent
+- [ ] Reauthentication-gated initiation
+- [ ] Audit log entry created at request time
+- [ ] Confirmation email sent (Stage 8 template)
+- [ ] Erasure runs as background job (`IUserScope.EnterAs`); deletes all user-owned data per the documented retention policy
+- [ ] Audit-log record of the erasure ITSELF retained (per legal basis) but pseudonymized (user id hashed via `UserRef`, see Stage 15)
+- [ ] After erasure: account row marked `ErasedAt`; no future logins possible; email address freed for re-registration after a documented cooling period
+- [ ] Test: User A initiates erasure → background job completes → no User A data remains in `accounts`, `transactions`, etc.; only audit-log records persist with pseudonymized identifier
+
+Breach notification + DPIA:
+
+- [ ] `legal.md` or `security-model.md` § Breach Notification Runbook documents: who decides, who notifies (DPA + affected users), what content, what timeline (72 hours under GDPR)
+- [ ] DPIA completed for Phase 3 launch — covers high-risk processing (financial data + identity data + EU residents)
+- [ ] DPIA outcome filed with DPO if appointed
+
+Localization:
+
+- [ ] Privacy policy + cookie consent banner translated EN + ES
+- [ ] Erasure confirmation email template EN + ES (Stage 8)
+- [ ] Data export ready email template EN + ES (Stage 8)
+
+---
+
+## Stage 14 — HTTP security headers + CORS (Batch 5)
+
+**Status: ❌ Pending.** Operational security; can land anytime after Stage 6.
+
+> **Goal:** every response carries the standard hardening headers, CORS is configured to allow only the SPA origin, and reverse-proxy forwarding is hardened against IP spoofing.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 14.1 | Content Security Policy (CSP) | `security-model.md` § HTTP Security Headers |
+| 14.2 | `X-Content-Type-Options: nosniff` | (above) |
+| 14.3 | `X-Frame-Options: DENY` | (above) |
+| 14.4 | `Referrer-Policy: strict-origin-when-cross-origin` | (above) |
+| 14.5 | HSTS once HTTPS enforced | (above) |
+| 14.6 | CORS whitelist for the SPA origin only | `planning-phase3.md` § CORS policy |
+| 14.7 | Forwarded-headers middleware with `KnownProxies` | `security-model.md` § Reverse Proxy + `planning-phase3.md` § Forwarded headers |
+| 14.8 | Authenticated-response cache headers | `security-model.md` § Authenticated Response Cache Headers |
+
+### Verification checklist
+
+CSP:
+
+- [ ] `Content-Security-Policy` header present on every HTML response
+- [ ] No inline scripts (`'unsafe-inline'`) — Phase 2 React build is bundled
+- [ ] Sources whitelisted: `'self'`, the email provider domain (if it serves images in emails clicked through), the analytics provider (if any, after consent)
+- [ ] `report-uri` or `report-to` directive configured to a logging endpoint (catches violations early)
+- [ ] CSP tested in browser DevTools: violations log nothing on a clean page render
+
+Other security headers:
+
+- [ ] `X-Content-Type-Options: nosniff` on every response
+- [ ] `X-Frame-Options: DENY` on every response (no iframe embedding)
+- [ ] `Referrer-Policy: strict-origin-when-cross-origin`
+- [ ] `Permissions-Policy` configured (e.g., `camera=(), microphone=(), geolocation=()`)
+- [ ] HSTS: `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` (once HTTPS is enforced; not before)
+- [ ] Verified with `securityheaders.com` or equivalent: A+ rating
+
+CORS:
+
+- [ ] In dev: allowed origin `http://localhost:5173`
+- [ ] In prod: allowed origin is the production frontend origin only
+- [ ] `AllowAnyOrigin()` NEVER combined with `AllowCredentials()` — verified
+- [ ] CORS preflight (`OPTIONS`) handled correctly for all API routes
+- [ ] Test: a request from a non-whitelisted origin is rejected at the CORS layer
+
+Forwarded-headers:
+
+- [ ] `app.UseForwardedHeaders()` registered BEFORE all other middleware
+- [ ] `ForwardedHeadersOptions` configured: `XForwardedFor | XForwardedProto`
+- [ ] `KnownProxies` populated with the actual reverse-proxy IP(s); empty list rejected (security-model warning: "restrict trusted proxy addresses to prevent IP spoofing")
+- [ ] Test: a request with a spoofed `X-Forwarded-For` from a non-trusted source does NOT update `HttpContext.Connection.RemoteIpAddress`
+
+Cache headers:
+
+- [ ] Authenticated API responses: `Cache-Control: no-store` (per `security-model.md` § Authenticated Response Cache Headers)
+- [ ] Static SPA assets: `Cache-Control: public, max-age=...` with content-hashed filenames for invalidation
+- [ ] No authenticated endpoints leak into shared caches (test by hitting the same endpoint with two different sessions and confirming distinct responses)
+
+---
+
+## Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)
+
+**Status: ❌ Pending.** Pre-launch breach mitigation. Lands after Stage 7 (multi-tenancy cutover) so every user-owned table is in place to add the column to.
+
+> **Goal:** every user-owned data row stores `UserRef = HMAC-SHA256(USER_REF_SECRET, userId)` instead of (or alongside) the raw `UserId`. A database dump cannot link financial records to real user identities without the server secret.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 15.1 | Add `UserRef varchar(64)` column to every user-owned entity | `security-model.md` § API Authentication and Identity Masking → Layer 2 |
+| 15.2 | `IUserRefService` that computes `HMAC-SHA256(USER_REF_SECRET, userId)` | (above) |
+| 15.3 | Backfill migration to populate `UserRef` for existing rows | (above) |
+| 15.4 | Updated insert path: every row write computes and stores `UserRef` | (above) |
+| 15.5 | `USER_REF_SECRET` in secret store with rotation procedure | `security-model.md` § Secrets Rotation Procedures |
+| 15.6 | Decision on retaining or dropping raw `UserId` | (recommend retaining for query performance; document) |
+
+### Verification checklist
+
+- [ ] `USER_REF_SECRET` is a cryptographically random 256-bit value
+- [ ] Stored in environment variable / secret store; never in source control
+- [ ] `IUserRefService.Compute(userId)` returns a deterministic 64-char hex string (HMAC-SHA256)
+- [ ] Every user-owned entity has a `UserRef varchar(64) NOT NULL` column with an index
+- [ ] Backfill migration ran successfully on all existing rows post-cutover
+- [ ] Insert path: `UserRef` populated automatically by EF Core save interceptor or service base class
+- [ ] Test: a row inserted via service has matching `UserId` and `UserRef` (where `UserRef` = HMAC of `UserId` under the secret)
+- [ ] Rotation procedure documented: how to add a new secret, dual-hash period, retire old secret
+- [ ] Test rotation: with both old and new secrets active, both lookups (by old `UserRef` and new `UserRef`) succeed during transition
+- [ ] `Per-tenant payload encryption` (Phase 4) explicitly NOT in scope for Phase 3 (per `security-model.md` § Layer 3)
+
+---
+
+## Stage 16 — Hosting + ops (Batch 5)
+
+**Status: ❌ Pending.** Final stage before public beta. Operational, not application-code.
+
+> **Goal:** Project Ceres runs on a real server, behind HTTPS, with database TLS, automated backups, monitoring, and a documented deployment + rollback procedure.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 16.1 | Pick host (small VPS / managed PaaS) | `planning.md` § Open Questions: Hosting platform |
+| 16.2 | HTTPS termination + auto-renewal (Let's Encrypt or provider-managed) | `security-model.md` § HTTPS and TLS |
+| 16.3 | PostgreSQL TLS connection enforced | `security-model.md` § Database Connection TLS |
+| 16.4 | Reverse proxy with `KnownProxies` set | `security-model.md` § Reverse Proxy |
+| 16.5 | Automated database backups + encryption + retention | `security-model.md` § Backup Security |
+| 16.6 | Backup restoration testing (quarterly) | `security-model.md` § Restoration Testing |
+| 16.7 | Backup encryption-key rotation procedure | `security-model.md` § Backup Encryption Key Rotation |
+| 16.8 | CI dependency vulnerability scanning | `security-model.md` § Dependency Scanning |
+| 16.9 | CI secrets scanning | `security-model.md` § Secrets Scanning |
+| 16.10 | Production migration strategy (`dotnet ef database update` vs. CI step vs. reviewed SQL) | `planning.md` § Open Questions |
+| 16.11 | CD pipeline (trigger, staging, migration step, rollback plan) | `planning.md` § Open Questions: CD strategy |
+| 16.12 | Monitoring + alerting (uptime, error rate, certificate expiry) | (operational) |
+| 16.13 | Container / runtime hardening | `security-model.md` § Container / Runtime Hardening |
+
+### Verification checklist
+
+HTTPS + TLS:
+
+- [ ] Production traffic on port 443 with valid TLS certificate
+- [ ] Port 80 redirects to 443
+- [ ] Certificate auto-renewal verified (renewal job runs and succeeds in dry-run)
+- [ ] TLS version: 1.2 minimum, 1.3 preferred (per `security-model.md` § HTTPS and TLS)
+- [ ] Cipher suites: only modern ones — no RC4, 3DES, MD5
+- [ ] Server tested with ssllabs.com: A or A+ rating
+- [ ] HSTS header present once HTTPS verified clean
+
+Database TLS:
+
+- [ ] PostgreSQL connection string uses `Sslmode=Require` minimum, `Sslmode=VerifyFull` ideally
+- [ ] CA certificate pinned where possible
+- [ ] Test: a non-TLS connection attempt is rejected by the server
+
+Reverse proxy:
+
+- [ ] Reverse proxy (nginx / Caddy / provider) terminates TLS
+- [ ] Forwards to .NET app via loopback or unix socket
+- [ ] Forwards `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`
+- [ ] Application's `ForwardedHeadersOptions.KnownProxies` matches the proxy's actual IP
+
+Backups:
+
+- [ ] Automated nightly `pg_dump` to encrypted storage (cloud blob with encryption-at-rest)
+- [ ] Backup retention: 30 daily + 12 monthly minimum (per `security-model.md` § Retention Policy)
+- [ ] Backup encryption key separate from database credentials, stored in secrets store
+- [ ] Quarterly restoration test: actually restore a backup to a staging instance and verify integrity (per `security-model.md` § Restoration Testing)
+- [ ] Backup access controls: only deployment role + DBA can read; logged
+
+Migrations:
+
+- [ ] Migration strategy documented (one of the three options in `planning.md` § Open Questions)
+- [ ] Migrations run as a deploy step, not at app boot (boot-time migrations risk schema drift between instances)
+- [ ] Migration rollback procedure documented for non-trivial migrations
+- [ ] Pre-migration backup snapshot is part of the deploy runbook (especially for Stage 7's sentinel migration)
+
+CI/CD:
+
+- [ ] CI provider chosen (likely GitHub Actions per `planning.md`)
+- [ ] CI runs: build, all server tests, all client tests, vulnerability scan (`dotnet list package --vulnerable`), secret scan
+- [ ] CI fails the build on any test failure or security finding
+- [ ] CD pipeline runs: build artifact, deploy to staging, run integration smoke tests, deploy to prod (manual approval gate)
+- [ ] Rollback plan documented: how to revert the last deploy in under 10 minutes
+
+Container / runtime hardening (per `security-model.md` § Container / Runtime Hardening):
+
+- [ ] Application runs as non-root user
+- [ ] Minimal base image (Alpine or distroless)
+- [ ] Read-only file system except for the writable upload/cache paths
+- [ ] No SSH access to the application host (deploys via CI)
+- [ ] Resource limits (CPU, memory) configured to prevent runaway processes
+
+Monitoring + observability:
+
+- [ ] Uptime monitor (every 5 min) hitting `/api/health` (or equivalent unauthenticated health endpoint)
+- [ ] Error monitoring (Sentry or equivalent) capturing unhandled exceptions
+- [ ] Certificate expiry monitor (alerts 30 days before expiry)
+- [ ] Database disk-space monitor (alerts at 80%)
+- [ ] Logs centralized (provider-agnostic; avoid storing logs only on the app host)
+
+Pre-launch dry run:
+
+- [ ] Full integration test suite passes against staging
+- [ ] Cross-tenant IDOR test suite green (Stage 7)
+- [ ] Email delivery tested end-to-end against the production provider config
+- [ ] CSP violations log empty after a full SPA browse-through
+- [ ] Penetration testing scheduled or completed (per `security-model.md` § Responsible Disclosure and Penetration Testing)
+
+---
+
+## Master pre-launch verification checklist
+
+> Final gate before opening Project Ceres to invited beta testers. Every item must be `[x]` or have a documented exception. This is the consolidated view across stages — if a stage above is incomplete, the parallel item here is incomplete too.
+
+### Authentication + identity
+
+- [ ] All Stage 6 verification items green
+- [ ] All Stage 9 verification items green
+- [ ] All Stage 10 verification items green
+- [ ] First-user registration tested end-to-end on staging: register → verify email → enroll TOTP + download backup codes → onboarding 5 steps → land on dashboard
+- [ ] Lockout tested: 10 failed attempts → email arrives with unlock link → unlock works
+- [ ] Password reset tested: request → email → click → enter TOTP → set new password → all sessions revoked
+- [ ] Email-change tested: dual-address verification, revoke link works for 7 days
+- [ ] Reauthentication tested for every sensitive operation in `security-model.md`'s list
+
+### Multi-tenancy + data isolation
+
+- [ ] All Stage 7 verification items green
+- [ ] Sentinel-to-real-user migration tested in staging with a fresh database snapshot
+- [ ] Architecture test gating `IgnoreQueryFilters()` to `Admin/` is in CI and green
+- [ ] Full IDOR test suite green (15+ tests covering reads, lists, aggregates, mutations, attachments)
+- [ ] Manual cross-tenant audit: dump a single user's rows from staging and verify zero foreign-user rows present
+
+### Email + notifications
+
+- [ ] All Stage 8 verification items green
+- [ ] All 12 EN + ES templates tested in browser staging by sending a real email and viewing it
+- [ ] All 9 mandatory security-event emails fire correctly
+- [ ] DKIM signature present and validates externally (mxtoolbox.com)
+- [ ] DMARC at `p=none` minimum at launch; aggregate reports flowing to a real inbox
+
+### GDPR + legal
+
+- [ ] All Stage 13 verification items green
+- [ ] Privacy policy in EN + ES, accessible without auth, linked from every footer
+- [ ] Cookie consent banner appears on first visit; AEPD-2024 compliant; tested with reject-all
+- [ ] DPIA completed and filed
+- [ ] DPA signed with every subprocessor
+- [ ] Breach notification runbook documented and rehearsed (table-top exercise)
+- [ ] Right-to-erasure tested end-to-end on staging (non-real user)
+- [ ] Full data export tested end-to-end on staging; ZIP opens cleanly in Excel + a CSV viewer
+
+### Security headers + CORS + reverse proxy
+
+- [ ] All Stage 14 verification items green
+- [ ] securityheaders.com rating: A or A+
+- [ ] ssllabs.com rating: A or A+
+- [ ] CSP violations zero on a clean browse-through
+- [ ] CORS rejects non-whitelisted origins
+- [ ] Forwarded-headers spoofing test: spoofed `X-Forwarded-For` from non-trusted source does NOT update remote IP
+
+### Identity masking
+
+- [ ] All Stage 15 verification items green
+- [ ] `UserRef` populated on every existing row + new inserts
+- [ ] `USER_REF_SECRET` in production secret store
+- [ ] Rotation procedure documented
+
+### Hosting + ops
+
+- [ ] All Stage 16 verification items green
+- [ ] HTTPS auto-renewal verified
+- [ ] Database backups encrypted, retained per policy, restoration tested
+- [ ] CI runs on every push, gates merges to main
+- [ ] CD pipeline runs cleanly on a non-launch deploy (smoke deploy)
+- [ ] Rollback procedure tested
+- [ ] Uptime + error monitoring configured with real alerting destinations
+- [ ] Penetration test report reviewed (if completed pre-launch)
+
+### Localization
+
+- [ ] EN + ES coverage: 100% of UI strings, system-seeded category names, transactional emails, generated reports
+- [ ] Manual smoke test in ES across every page
+- [ ] No untranslated copy visible when toggling to ES
+
+### Accessibility (EU Accessibility Act / EN 301 549 / WCAG 2.1 AA)
+
+- [ ] All `planning-phase3.md § 8 Accessibility baseline` items green
+- [ ] vitest-axe runs across every page in CI; zero violations
+- [ ] Keyboard navigation full coverage on every page
+- [ ] `prefers-reduced-motion` respected (covered by Stage 5.5 T1.4)
+- [ ] Screen-reader smoke test on critical flows (login, onboarding, dashboard, transaction create)
+- [ ] Accessibility statement at `/accesibilidad` (per `planning-phase3.md § 8`)
+- [ ] Accessibility feedback inbox documented in the statement
+- [ ] Optional: third-party audit completed (recommended budget EUR 3,000–8,000 per `planning-resolved.md`)
+
+### Phase 2 carry-forward
+
+- [ ] Recurring reminder email push delivers correctly (deferred from Phase 2 per ADR-0044, lands with Stage 8)
+- [ ] Settings → Sessions + Support pages live (Stage 12)
+
+### Documentation hygiene
+
+- [ ] Every shipped stage marked done in this roadmap
+- [ ] `planning-phase3.md`, `planning-resolved.md`, `planning.md` all reflect post-launch state (no stale "pending" items)
+- [ ] All ADRs cross-referenced from the relevant stages
+- [ ] CHANGELOG.md updated for the launch release
+
+---
+
+> **When the master checklist is fully green, Phase 3 is shippable. Phase 4 begins with: per-tenant payload encryption, social login (one provider — likely Google), JWT issuance for mobile, PostgreSQL Row-Level Security as defense in depth, and the deferred items from `docs/planning-future.md`.**
+
+
 
