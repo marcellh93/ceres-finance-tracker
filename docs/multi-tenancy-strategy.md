@@ -76,22 +76,21 @@ var currentUserId = Guid.Parse(
 
 Alternatively, pass `currentUserId` as a parameter to service methods from the controller. The controller retrieves it from `User.FindFirstValue(ClaimTypes.NameIdentifier)`. Either pattern is acceptable; consistency matters more than the specific approach.
 
-### Background processes and non-HTTP contexts (open hazard)
+### Background processes and non-HTTP contexts
 
-The current pre-auth `SingleUserAccessor` always returns a sentinel and works in any context. Once Phase 3 wires an `HttpContextAccessor`-backed implementation, **any code path that runs outside an HTTP request** will resolve `HttpContext` as `null` — reading `UserId` will throw or silently fall back to a default. That is a real footgun for:
+**Resolved by [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md).**
 
-- **Scheduled jobs / cron-like background tasks** (e.g. recurring-reminder advance, retention sweeps, GDPR purge jobs)
-- **CLI commands and `dotnet ef` operations** invoked at deployment time
-- **Application startup hooks** (e.g. `ISettingsService.EnsureExistsAsync` is called at `Program.cs` boot time today — it works because the sentinel accessor is context-free, but the auth-aware one is not)
+Once Phase 3 wires an `HttpContextAccessor`-backed `ICurrentUserAccessor`, any code path that runs outside an HTTP request resolves `HttpContext` as `null`. Reading `UserId` in that state must not silently fall back to a default — combined with the global query filters from [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md), a default `Guid.Empty` would scope every query to "no user" and produce silently empty results.
 
-**Required fix at auth time:** introduce a separate scoped registration for non-HTTP contexts that explicitly identifies the caller. Two acceptable shapes:
+The decided mechanism:
 
-1. **`SystemUserAccessor`** — returns a fixed "system" user id. Background jobs that legitimately operate across all users (cleanup, retention) use this and combine it with explicit per-user iteration. Reading user-scoped data without an explicit user id should throw, not silently default.
-2. **`AmbiguousUserAccessor`** — throws on any read. Forces background jobs to be explicit about who they're acting for; safer default when the right answer is "always per-user."
+- **`IUserScope.EnterAs(userId)`** returns an `IDisposable`; the user id lives in `AsyncLocal<Guid?>` and propagates across `await` boundaries within a single logical flow.
+- **`IUserJobRunner.ForEachUserAsync(filter, work)`** is the convenience layer for per-user iteration jobs (weekly digest, recurring reminders); it enters/exits the scope per user and isolates per-user exceptions.
+- **`ICurrentUserAccessor`** resolves in fixed precedence: HTTP context → background scope → throw `InvalidOperationException`. Silent fallback to `Guid.Empty` is forbidden.
+- **Genuinely cross-tenant background jobs** (audit-log purge, failed-login retention) do not enter a user scope; they access shared/system tables or use `IgnoreQueryFilters()` with documented justification, consistent with the admin-only-bypass rule from ADR-0065.
+- **`Program.cs` boot-time hooks that touch user-owned data are removed.** `ISettingsService.EnsureExistsAsync` is no longer called at startup — Settings rows are created during user registration per [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md).
 
-Whichever shape is chosen, the auth-aware `HttpContext`-backed accessor should also throw on a `null` HttpContext rather than returning `Guid.Empty` — silent defaults are how IDOR sneaks in.
-
-This caveat is tracked here so it is not lost between now and the auth batch. Audit every `IHostedService`, `IStartupFilter`, `Program.cs` boot hook, and `dotnet ef` command-line tool registration before shipping auth.
+`IUserScope` and `IUserJobRunner` ship in the same release as the multi-tenancy cutover, before any Phase 3 background feature lands. Audit every `IHostedService`, `IStartupFilter`, `Program.cs` boot hook, and `dotnet ef` command-line tool registration during the cutover to confirm none queries user-owned data without entering a scope.
 
 ### Services to audit for Phase 3
 
@@ -113,40 +112,38 @@ List-based queries (e.g. "get all accounts") must also be filtered: `WHERE UserI
 
 ## Settings Table Migration
 
+**Resolved by [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md).**
+
 The Phase 1 Settings table has exactly one row containing app-wide preferences (default currency, number format, date format). In Phase 3, this becomes per-user — each user has their own preferences row.
 
 ### Migration steps
 
 1. Add `UserId uuid NOT NULL FK → AspNetUsers.Id` to the Settings table
 2. Add a `UNIQUE` constraint on `UserId` (one row per user)
-3. For the existing single row: decide what UserId it receives. Options:
-   - Assign it to the first registered user (the developer/admin account)
-   - Delete it and let each new user get a default row created on first login
-   - Option 2 is cleaner — it avoids orphaned rows and ties defaults to the registration flow
-4. The application must create a default Settings row for each new user on registration, seeded with system-defined defaults (e.g. EUR, European number format, DD/MM/YYYY date format)
+3. The existing single Settings row is **remapped to the first registered user** along with every other sentinel-tagged row, in a single transaction with pre-/post-checks (see ADR-0066). The developer's existing currency, period start day, and number/date format become the first user's preferences automatically.
+4. The application creates a default Settings row for each subsequent user on registration, seeded with system-defined defaults (e.g. EUR, European number format, DD/MM/YYYY date format)
 5. Update all settings queries to scope by `UserId`
-
-This decision is tracked as an open question in `planning.md`.
 
 ---
 
-## EF Core Global Query Filters (Optional Optimization)
+## EF Core Global Query Filters
 
-EF Core supports [Global Query Filters](https://learn.microsoft.com/en-us/ef/core/querying/filters) — a `WHERE` clause applied automatically to every query for an entity type. This can reduce the risk of forgetting a `UserId` filter in a specific method.
+**Resolved by [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md): adopted, with explicit redundancy and admin-only bypass.**
+
+EF Core [Global Query Filters](https://learn.microsoft.com/en-us/ef/core/querying/filters) apply a `WHERE` clause automatically to every query for an entity type. Phase 3 sets a filter on every user-owned entity in `ApplicationDbContext.OnModelCreating`:
 
 ```csharp
-// In DbContext.OnModelCreating:
 modelBuilder.Entity<Transaction>()
-    .HasQueryFilter(t => t.UserId == _currentUserId);
+    .HasQueryFilter(t => t.UserId == _currentUser.UserId);
 ```
 
-**Trade-offs:**
-- Automatically applied — harder to accidentally omit
-- Harder to reason about — the filter is invisible at the call site
-- Must be disabled explicitly for admin queries (`IgnoreQueryFilters()`) — admin actions that need cross-user access become more complex
-- Requires the DbContext to know the current user ID (inject via constructor or property)
+Service code continues to write `.Where(t => t.UserId == _currentUser.UserId)` explicitly — the redundancy documents intent at the call site and is a second layer that survives if the global filter is ever misconfigured.
 
-Whether to use global query filters is a Phase 3 implementation decision. If used, they must be set up before any multi-user service code is written — retrofitting is harder than applying from the start.
+**`IgnoreQueryFilters()` is reserved for the `Admin/` namespace.** An architecture test fails the build if it appears anywhere else. Admin services that legitimately cross the tenant boundary use it explicitly and pair it with the appropriate scoping (`.Where(t => t.UserId == targetUserId)` for per-user admin queries; no scoping for true platform aggregates).
+
+The global filter expression resolves `_currentUser.UserId` via `ICurrentUserAccessor`, which reads from HTTP context first, then from the background scope set by `IUserScope.EnterAs` (see ADR-0067), then throws if neither is available. Raw SQL queries against user-owned tables are not subject to the filter — either avoid raw SQL on user-owned tables or always include an explicit `WHERE UserId` clause; PostgreSQL Row-Level Security in Phase 4 will catch this category at the database level.
+
+Filters are applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `Settings`, `SupportTicket`, `AuditLog`, and any future user-owned entities. System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) receive no filter.
 
 ---
 

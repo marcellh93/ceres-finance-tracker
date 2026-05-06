@@ -321,7 +321,7 @@ Authentication cookies must be set with:
 - `HttpOnly = true` — blocks JavaScript access, mitigates XSS cookie theft
 - `Secure = true` — HTTPS-only transmission
 - `__Host-` prefix — forces `Secure`, no `Domain` attribute, `Path=/`; modern browsers enforce these constraints and reject non-compliant cookies
-- `SameSite`: use `Strict` if social login is not implemented in this phase; use `Lax` if social login OAuth callbacks are in scope (Strict breaks the OAuth top-level navigation callback). Note that `SameSite=Strict` also blocks the cookie on the first navigation from email links (including the password-reset email). Mitigate by using `Lax` for the session cookie and relying on the explicit CSRF token for state-changing requests. This decision must be made before auth implementation begins — it affects CSRF posture. Record the choice in an ADR.
+- `SameSite = Lax` — resolved by [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md). Strict was rejected because it blocks the cookie on the first navigation from email links (security alerts, password reset, GDPR export ready, "this wasn't me" links) and would also block OAuth top-level-navigation callbacks if social login is added in Phase 4 (per [ADR-0064](decisions/ADR-0064-social-login-deferred-to-phase-4.md)). The remaining CSRF gap is fully closed by the XSRF-TOKEN double-submit pattern (mandatory regardless of `SameSite` choice — see CSRF section below).
 
 The CSRF token cookie (XSRF-TOKEN) does not use `HttpOnly` — the double-submit pattern depends on JavaScript reading it. It must be `Secure` and at minimum `SameSite=Lax`.
 
