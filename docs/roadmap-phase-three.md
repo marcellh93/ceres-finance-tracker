@@ -131,3 +131,215 @@ Five architectural decisions were locked before any Batch 3 implementation began
 - [ ] Per-table search + saved searches — pending; needs brainstorm
 
 ---
+
+## Stage 3 — Management pages (Batch 2 part 2)
+
+**Status: ✅ Done (2026-05-02 → 2026-05-03).** Settings was the SPA-pattern pilot; Categories validated the pattern against more complex shapes; Accounts and Recurring extended it further.
+
+### Sub-stages
+
+| # | Sub-stage | Status | Spec / Plan |
+|---|---|---|---|
+| 3.1 | Settings — first SPA-pattern pilot | ✅ 2026-05-02 (commit `e842250`) | [`docs/superpowers/specs/2026-05-02-spa-page-pattern-and-settings-design.md`](superpowers/specs/2026-05-02-spa-page-pattern-and-settings-design.md) · [`docs/superpowers/plans/2026-05-02-spa-page-pattern-and-settings.md`](superpowers/plans/2026-05-02-spa-page-pattern-and-settings.md) |
+| 3.2 | Categories — list + nested CRUD + archive lifecycle | ✅ 2026-05-02 (commit `9578f9a` + follow-ups `132d5df`, `87f6709`) | [`docs/superpowers/specs/2026-05-02-categories-spa-design.md`](superpowers/specs/2026-05-02-categories-spa-design.md) · [`docs/superpowers/plans/2026-05-02-categories-spa.md`](superpowers/plans/2026-05-02-categories-spa.md) |
+| 3.3 | Accounts — list + Create/Edit + Ledger + payoff projection | ✅ 2026-05-03 (commit `03220b8`) | [`docs/superpowers/specs/2026-05-03-accounts-spa-design.md`](superpowers/specs/2026-05-03-accounts-spa-design.md) · [`docs/superpowers/plans/2026-05-03-accounts-spa.md`](superpowers/plans/2026-05-03-accounts-spa.md) |
+| 3.4 | Recurring — list + Create/Edit + Confirm/Dismiss/Archive/Reactivate + topbar bell | ✅ 2026-05-03 | [`docs/superpowers/specs/2026-05-03-recurring-spa-design.md`](superpowers/specs/2026-05-03-recurring-spa-design.md) · [`docs/superpowers/plans/2026-05-03-recurring-spa.md`](superpowers/plans/2026-05-03-recurring-spa.md) |
+
+### Verification checklist
+
+- [x] Locked the `features/<area>/` + page+form split + Popover+Command picker idiom (Settings pilot)
+- [x] AlertDialog-confirmed archive flow on Categories with 409 in-use error surfaced in toast
+- [x] System category rows pinned with leading lock icon
+- [x] `Save` + `Cancel` form pattern shared across all management pages
+- [x] Accounts: per-currency subtotal strip rendered when 2+ currencies present
+- [x] Accounts: type-driven balance colour (Liability rows always render in destructive)
+- [x] Accounts: conditional Asset/Liability fields with two-layer interest-rate normalisation (SPA submit-time clears rate when not Amortising; server policy rejects null repaymentType + non-null rate)
+- [x] Accounts: SPA-side payoff projection for amortising-liability accounts (`projection.ts`)
+- [x] Accounts: adaptive archive AlertDialog copy via `HasTransactions` field on `AccountListItemDto`
+- [x] Accounts: `LiabilityProjectionService` (zero callers post-cutover) deleted
+- [x] Recurring: AlertDialog-confirmed archive flow; Dismiss dialog accepts optional override next-due-date for ManualDate reminders
+- [x] Recurring: Confirm dialog creates a Transaction
+- [x] Recurring: `ReminderCountProvider` drives the TopBar bell badge with optimistic update on Confirm/Dismiss + refresh from `GET /api/dashboard/summary`
+- [x] Recurring: `EstimatedAmount` is `decimal?` (null = amount varies)
+- [x] Recurring: `SnapToCalendarDay` corrected for Weekly/Biweekly frequencies
+- [x] Recurring: `PATCH /api/recurring-transactions/:id/reactivate` added
+- [x] Recurring: TopBar bell count refetches after row actions (commit `c7a2913`)
+- [x] All four Razor controllers slimmed to 302 redirects; Razor views, throwing CRUD service methods, and Razor-only ViewModels deleted
+- [x] CategoriesCrudApiTests, AccountsCrudApiTests, RecurringTransactionsCrudApiTests cover the API-level behaviour the Razor views previously covered
+
+---
+
+## Stage 4 — Reports + Review + Import (Batch 2 part 3)
+
+**Status: ✅ Done (2026-05-03 → 2026-05-06).** Most complex Batch 2 work — 8 report pages, the unified Review surface, and the import wizard + profiles.
+
+### Sub-stages
+
+| # | Sub-stage | Status | Spec / Plan |
+|---|---|---|---|
+| 4.1 | Reports — 8 report pages + shared layout + sticky filter bar + CSV export | ✅ 2026-05-03 | [`docs/superpowers/plans/2026-05-03-reports-spa.md`](superpowers/plans/2026-05-03-reports-spa.md) |
+| 4.2 | Reports redesign — pinned tab+filter chrome, distinct icons, default period via `Settings.PeriodStartDay`, `chart-format` extracted | ✅ 2026-05-04 (commit `23d9db7`) | [`docs/superpowers/specs/2026-05-04-reports-redesign-design.md`](superpowers/specs/2026-05-04-reports-redesign-design.md) · [`docs/superpowers/plans/2026-05-04-reports-redesign.md`](superpowers/plans/2026-05-04-reports-redesign.md) |
+| 4.3 | Review — unified `/app/review` with Reconciliations + Transfers tabs | ✅ 2026-05-06 | [`docs/superpowers/specs/2026-05-04-review-spa-design.md`](superpowers/specs/2026-05-04-review-spa-design.md) · [`docs/superpowers/plans/2026-05-04-review-spa.md`](superpowers/plans/2026-05-04-review-spa.md) |
+| 4.4 | Import — wizard + profiles SPA, file-level cutover | ✅ 2026-05-06 (commit `7152eda`) | [`docs/superpowers/plans/2026-05-06-import-spa-cutover.md`](superpowers/plans/2026-05-06-import-spa-cutover.md) |
+| 4.5 | Import polish — locale-safe parsing + LiabilityPayment/Transfer duplicate detection | ✅ 2026-05-06 (commit `4e4d7ee`) | (follow-up to 4.4) |
+
+### Reports — verification checklist
+
+- [x] SPA at `/app/reports` with `ReportsLayout` + `ReportsFilterBar` (sticky, slug-aware)
+- [x] All 8 routes wired: net-worth, income-expense, expense-breakdown, transaction-history, budget-vs-actual, largest-expenses, monthly-cash-flow, net-worth-over-time
+- [x] `DateRangePicker` extracted as generic shared component (also wraps Movements)
+- [x] CSV export via `?format=csv` on each report endpoint
+- [x] `ReportsController` actions → 302 redirects; all 9 Razor views deleted
+- [x] Distinct lucide icon per report card (post-launch polish 2026-05-04)
+- [x] Back-link gap fix
+- [x] Equal filter widths
+- [x] Default period respects `Settings.PeriodStartDay` via `src/app/lib/period.ts` TS helper
+- [x] `budget-vs-actual` `LimitAmount` aggregated across periods in range
+- [x] Tab + filter chrome pinned (no scroll-collapse on long pages)
+- [x] `chart-format.ts` extracted (centralizes axis tick + tooltip formatting)
+- [ ] SavedReport CRUD — deferred per [ADR-0055](decisions/ADR-0055-saved-report-configurations-deferred.md); reassess after launch
+- [ ] Spending by Category Over Time — deferred per [ADR-0054](decisions/ADR-0054-nice-to-have-reports-priority.md)
+- [ ] Year-over-Year Comparison — deferred per ADR-0054
+
+### Review — verification checklist
+
+- [x] Unified `/app/review` with `?tab=reconciliations` and `?tab=transfers` deep links
+- [x] Razor controller redirects target the new tab anchors (commits `7ba0423`, `101d79b`)
+- [x] Reconciliations: inline `Confirm match` row action
+- [x] Reconciliations: `Dispute` row menu (AlertDialog)
+- [x] Reconciliations: `Confirm all` (AlertDialog), backed by new `TryConfirmAllAsync`
+- [x] Transfers: per-card `Link to existing` (shared dialog with same-currency-filtered account picker)
+- [x] Transfers: per-card `Create transfer` (shared dialog)
+- [x] Transfers: per-card `Dismiss` (fires immediately, no confirmation)
+- [x] Sidebar `Review` badge driven by new `ReviewCountProvider` over the two existing `pending/count` endpoints
+- [x] Server: throwing CRUD variants dropped from `ITransferReviewService` and `IImportStagedTransactionService`
+- [x] Server: `StagedTransactionDto` and `StagedTransferDto` enriched with `AccountCurrencyCode` + `AccountCurrencySymbol`
+- [x] Razor views, `Staged*ViewModel` classes, and `_Layout` pending-count badges deleted
+
+### Import — verification checklist
+
+- [x] Two SPA surfaces: `/app/import` (3-step wizard) and `/app/import/profiles` (list + nested `/new` and `/:id/edit`)
+- [x] `FileDropzone` primitive (single-file drag-and-drop + click-to-browse + 10 MB guard)
+- [x] `WizardStepper` primitive (numbered pills, completed pills clickable)
+- [x] Header detection via `POST /api/import/headers`
+- [x] Profile-driven mapping copies from `GET /api/import-profiles/:id`
+- [x] Submit posts multipart to `POST /api/import`
+- [x] Result tiles deep-link to Review (`?tab=reconciliations`, `?tab=transfers`) and Movements (`?needsReview=true`)
+- [x] Save-as-profile prompt on result step gated on `selectedProfileId === null`
+- [x] Format inferred from uploaded file's extension
+- [x] Razor `ImportController` and `CsvImportProfilesController` slimmed to 302 redirects
+- [x] Razor views and the four Razor-only ViewModels deleted
+- [x] Locale-safe parsing for `comma_decimal` / `dot_decimal` users
+- [x] LiabilityPayment / Transfer duplicate detection works against archive
+- [ ] Dual debit/credit columns — deferred to follow-up plan
+- [ ] Confidence-scored transfer detection — deferred (see [`docs/superpowers/specs/2026-04-29-import-transfer-detection-confidence-design.md`](superpowers/specs/2026-04-29-import-transfer-detection-confidence-design.md))
+- [ ] Transfer-keyword settings — deferred to follow-up plan
+
+---
+
+## Stage 5 — Frontend polish + data-loading ease-in
+
+**Status: ⚠️ In progress.** Two parallel polish tracks: the Tier 1–5 list in `docs/ceres-polish-checklist-frontend.md` (audit doc, commit `5a653d3`) and the data-loading ease-in pattern (`useDelayedLoading` + `<DataTransition>`) — proven on Accounts, rollout to remaining pages still pending.
+
+> **Why this is its own stage:** these are app-wide UX fundamentals that touch every page. They can't be picked up under any single Stage 1–4 because they cross all of them. They're explicitly *not* blocking Phase 3 launch — they're the difference between "shipped" and "feels well done."
+
+### Sub-stages
+
+| # | Sub-stage | Status | Reference |
+|---|---|---|---|
+| 5.1 | Polish checklist audit doc — file-by-file inventory of frontend gaps | ✅ 2026-05-06 (commit `5a653d3`) | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) |
+| 5.2 | Data-loading ease-in — primitives (`useDelayedLoading` + `<DataTransition>`) | ✅ 2026-05-04 | [`docs/superpowers/specs/2026-05-04-data-loading-ease-in-design.md`](superpowers/specs/2026-05-04-data-loading-ease-in-design.md) · [`docs/superpowers/plans/2026-05-04-data-loading-ease-in.md`](superpowers/plans/2026-05-04-data-loading-ease-in.md) |
+| 5.3 | Data-loading ease-in — reference rollout on Accounts page | ✅ 2026-05-04 (commits `c6052d0` → `5b7d72e`) | (above) |
+| 5.4 | Data-loading ease-in — full rollout to remaining pages | ❌ Pending (committed plan: `fa8b7ff`) | [`docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`](superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md) |
+| 5.5 | Polish checklist Tier 1 — six small CSS / one library wire-up | ❌ Pending | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) § Tier-ordered action list |
+| 5.6 | Polish checklist Tier 2 — extract shared primitives | ❌ Pending | (above) |
+| 5.7 | Polish checklist Tier 3 — production-app polish | ❌ Pending | (above) |
+| 5.8 | Polish checklist Tier 4 — testing and observability | ❌ Pending | (above) |
+| 5.9 | Polish checklist Tier 5 — discretionary | ❌ Pending | (above) |
+
+### Data-loading ease-in — verification checklist
+
+Primitives — done:
+
+- [x] `useDelayedLoading(loading, options?)` shipped at `src/app/lib/use-delayed-loading.ts` with 150 ms default delay
+- [x] `<DataTransition>` component shipped at `src/app/components/DataTransition.tsx` with `skeleton` / `data` / `error` slots
+- [x] Cross-fade uses `var(--motion-duration-base)` + `var(--motion-easing-standard)`
+- [x] `prefers-reduced-motion: reduce` collapses to instant swap
+- [x] Both primitives tested with Vitest (fake timers for delay, matchMedia mock for reduced-motion)
+
+Accounts reference — done:
+
+- [x] `AccountCurrencySubtotals` card wrapped in `<DataTransition>` driven by `useDelayedLoading(list.loading)`
+- [x] `AccountsBody` consolidated into the canonical `<DataTransition>` shape (state derivation + `&& !list.data` stale-data guard)
+- [x] Synchronous-skeleton test rewritten to async with `waitFor` + `{ timeout: 500 }`
+
+Rollout to remaining pages — pending. Tasks per `docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`:
+
+- [ ] Task 1: Categories list page (`CategoriesLayout.tsx`)
+- [ ] Task 2: Movements list page (`MovementsLayout.tsx`)
+- [ ] Task 3: Recurring list page (`RecurringLayout.tsx`)
+- [ ] Task 4: Reports — 8 sub-commits (`BudgetVsActual`, `ExpenseBreakdown`, `IncomeExpense`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorth`, `NetWorthOverTime`, `TransactionHistory`)
+- [ ] Task 5: Budgets list page (`BudgetsLayout.tsx`)
+- [ ] Task 6: Settings page (`SettingsPage.tsx`)
+- [ ] Task 7: Review (`ReconciliationList.tsx`)
+- [ ] Task 8: Dashboard cards — 9 sub-commits (`NetWorthCard`, `MtdCard`, `FinancialHealthCard`, `RemindersCard`, `NetWorthChart`, `CashFlowChart`, `IncomeExpenseChart`, `AccountBalancesChart`, `SpendingByCategoryChart`)
+- [ ] Task 9: Final verification — full client test suite green, production build succeeds, browser sweep on every rolled-out page (fast / slow / reduced-motion paths)
+
+### Polish checklist (`ceres-polish-checklist-frontend.md`) — verification checklist
+
+Tier 1 — six items, ~80% of visible improvement:
+
+- [ ] T1.1 Wire `next-themes` into `ThemeToggle.tsx` (10.2, partial 10.1) — `next-themes` is installed but not used
+- [ ] T1.2 Add `transition` rule for Switch thumb in `index.css` (3.10) — currently snaps with no transition
+- [ ] T1.3 Add `::view-transition-old/new(root)` defaults in `index.css` (1.2) — currently using browser default ~250 ms instead of token-driven 180 ms
+- [ ] T1.4 Add global `prefers-reduced-motion: reduce` override (4.1, 4.2) — no rule anywhere currently
+- [ ] T1.5 Add global theme-flip `transition-colors` rule in `index.css` (10.1) — theme switch is currently a hard flip
+- [ ] T1.6 Add `<ScrollRestoration getKey={l => l.pathname} />` to `AppLayout.tsx` (9.1) — back-navigation currently loses scroll position
+
+Tier 2 — extract shared primitives:
+
+- [ ] T2.7 Extract `<Field>` to a shared component (8.7) — currently inlined twice in `QuickAddModal.tsx` lines 248–271 and `MovementForm.tsx` lines 105–134
+- [ ] T2.8 Extract `<MoneyInput>` shared component; consume from both forms (8.6) — `QuickAddModal.tsx` violates the locale-aware Money input recipe (uses `type="number" step="0.01"`); breaks `comma_decimal` users
+- [ ] T2.9 Wrap `<Skeleton>` to add `role="status"` + `aria-busy="true"` (2.8) — accessibility gap
+- [ ] T2.10 Add `useDelayedLoading(isLoading, 200)` hook (2.7, 7.5) — note: this is now superseded by Stage 5.2; mark Tier 2 item done
+
+Tier 3 — production-app polish:
+
+- [ ] T3.11 Migrate `duration-200` literals to motion tokens (3.1, 3.4) — already on roadmap (Known Limitation in `design-system.md` line 1154)
+- [ ] T3.12 Build `<SubmitButton>` with idle/loading/success/error + spinner (8.4) — replaces `QuickAddModal.tsx` line 230 and `MovementForm.tsx` lines 548–550
+- [ ] T3.13 `useOptimistic` for the Status block toggle on table rows (5.1)
+- [ ] T3.14 Replace MovementForm budget `<select>` with Combobox, or document the rule
+- [ ] T3.15 Harden `index.html` — `theme-color` meta, description meta, per-route titles (1.7)
+
+Tier 4 — testing and observability:
+
+- [ ] T4.16 Disable CSS animations in `test-setup.ts` (12.1) — animations not currently disabled in tests
+- [ ] T4.17 Add `vitest-axe` (4.6, 12.5) — minimum coverage: `MovementForm`, `QuickAddModal`, `AppLayout`
+- [ ] T4.18 Add bundle visualizer (`rollup-plugin-visualizer`) + size budget on `dist/assets/*.js` (5.5)
+
+Tier 5 — discretionary:
+
+- [ ] T5.19 `@formkit/auto-animate` for lists that reorder (0.3, 3.6)
+- [ ] T5.20 OKLCH support in `parseRgb()` so showcase shows live contrast ratios
+- [ ] T5.21 Add motion rules to "Working rules" section in `design-system.md`
+
+### "Feels well done" gut-check — verification checklist
+
+From the same audit doc (§ 15). Once Tier 1 + Stage 5.4 (data-loading rollout) are done, every line below should be `[x]`:
+
+- [ ] No element appears or disappears instantly except in response to typing
+- [x] No content jumps when data loads — skeleton heights match reality
+- [~] Hovering any button gives visible feedback within 150 ms (uses `duration-200`, fine; partial)
+- [ ] Pressing any button gives a subtle scale/color change (verify Button primitive)
+- [x] Tab key reveals a clear focus ring on every interactive element
+- [ ] Switching themes is smooth, not flashy (T1.5 + T1.1)
+- [~] Navigating between pages cross-fades, doesn't snap (browser default until T1.3)
+- [~] Submitting a form shows immediate feedback (T3.12)
+- [ ] No spinners flash for <200 ms (covered by Stage 5.4 rollout)
+- [x] All icons sized identically in similar contexts
+- [x] Border radii consistent
+- [ ] In Reduce Motion mode, the app still works and animations are subdued (T1.4)
+- [ ] Switch toggle slides smoothly (T1.2)
+
+---
+
