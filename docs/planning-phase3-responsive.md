@@ -54,7 +54,7 @@ The `md:` prefix (768px) may be used for fine-tuning within the tablet tier but 
 
 **Mobile and tablet (< 1024px):** hamburger icon in a top bar opens a drawer that slides in from the left. Drawer overlays content with a backdrop. Tapping outside or pressing the close button dismisses it.
 
-**Desktop (≥ 1024px):** persistent sidebar or top nav — decision deferred to Phase 3 kickoff. See [planning-phase3.md — Layout system](planning-phase3.md#4-layout-system).
+**Desktop (≥ 1024px):** persistent sidebar (left) plus a horizontal top bar that hosts the brand mark, global search, and the quick-add `+` button. The sidebar is the primary navigation; the top bar is utility chrome. Resolved by shipping both during the Batch 1 app shell — see `ProjectCeres.Client/src/app/layout/AppLayout.tsx`.
 
 **Requirements:**
 - All navigation destinations reachable from the drawer on mobile
@@ -208,6 +208,5 @@ These must be resolved at Phase 3 kickoff or during implementation of each surfa
 - **Tablet form presentation** — default is full-page (same as mobile). Revisit at Phase 3 kickoff once the SPA visual is taking shape. Options: keep full-page, switch to bottom sheet, or switch to modal.
 - **Chart minimum height on mobile** — what is the minimum readable height for each chart type on a 375px screen? Define per chart at implementation time.
 - **Dashboard card grid on tablet** — 2-column assumed; confirm at kickoff whether some cards (e.g. Net Worth chart) should span full width at the tablet breakpoint.
-- **Sidebar vs. top nav on desktop** — open from planning-phase3.md §4. The navigation drawer implementation on mobile is not affected by this decision, but the desktop shell layout is. Decide at Phase 3 kickoff.
 - **Touch target audit** — after each surface is built, verify all interactive elements meet 44×44px minimum. Define a checklist item in the Definition of Done for each surface.
 - **Responsive testing device matrix** — which physical or emulated devices are used to verify each surface? At minimum: iPhone SE (375px), iPhone 14 (390px), iPad (768px), 13" laptop (1280px), 27" monitor (1920px+ or 2560px+).

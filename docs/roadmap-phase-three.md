@@ -1071,8 +1071,10 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] `/settings/sessions` mobile: session rows render as cards (not table); per-row revoke + IP-block actions reachable
 - [ ] `/settings/sessions` tablet: cards remain (per the responsive doc — Active sessions list is card-view through tablet, table only on desktop)
 - [ ] `/settings/sessions` desktop: standard table layout
+- [ ] `/settings/sessions` touch targets: per-row revoke and IP-block buttons each ≥ 44×44px on mobile; session-row card meets the same minimum across its tappable region
 - [ ] `/support` mobile: ticket form full-page; ticket list as cards; status badges legible
 - [ ] `/support` desktop: form modal or full-page (decided per the form-presentation rule), ticket list as table
+- [ ] `/support` touch targets: every form input, submit button, and ticket-row tap target ≥ 44×44px on mobile
 
 ---
 
@@ -1161,6 +1163,14 @@ Localization:
 - [ ] Privacy policy + cookie consent banner translated EN + ES
 - [ ] Erasure confirmation email template EN + ES (Stage 8)
 - [ ] Data export ready email template EN + ES (Stage 8)
+
+Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)):
+
+- [ ] Cookie consent banner mobile: "accept all" and "reject all" buttons equally prominent, side-by-side or stacked, each ≥ 44×44px on mobile per the AEPD-2024 equal-prominence requirement
+- [ ] Cookie consent banner does not obscure critical content at any breakpoint; granular-choice controls reachable without horizontal scroll
+- [ ] `/privacy` and `/legal` pages render readably on 375px (no horizontal overflow; line length comfortable on mobile)
+- [ ] Erasure confirmation dialog touch targets: confirm + cancel buttons ≥ 44×44px on mobile; destructive button visually distinct without relying on color alone (per WCAG 1.4.1)
+- [ ] Data export request flow on mobile: `/settings/account` export button ≥ 44×44px; the post-202 confirmation message wraps cleanly
 
 ---
 
