@@ -28,6 +28,9 @@ import { BudgetCreate } from './features/budgets/BudgetCreate';
 import { BudgetEdit } from './features/budgets/BudgetEdit';
 import { CategoryCreate } from './features/categories/CategoryCreate';
 import { CategoryEdit } from './features/categories/CategoryEdit';
+import { ProfilesLayout } from './features/import/ProfilesLayout';
+import { ProfileCreate } from './features/import/ProfileCreate';
+import { ProfileEdit } from './features/import/ProfileEdit';
 import { MovementCreate } from './features/movements/MovementCreate';
 import { MovementEdit } from './features/movements/MovementEdit';
 import { MovementsLayout } from './features/movements/MovementsLayout';
@@ -73,8 +76,12 @@ export function App() {
           <Route path=":id/edit" element={<RecurringEditBridge />} />
         </Route>
         <Route path="import" element={<Import />} />
+        <Route path="import/profiles" element={<ProfilesLayout />}>
+          <Route path="new" element={<ProfileCreate />} />
+          <Route path=":id/edit" element={<ProfileEdit />} />
+        </Route>
         <Route path="reports" element={<ReportsLayout />}>
-          <Route index element={<Navigate to="net-worth-over-time" replace />} />
+          <Route index element={<Navigate to="net-worth" replace />} />
           <Route path="net-worth" element={<NetWorth />} />
           <Route path="net-worth-over-time" element={<NetWorthOverTime />} />
           <Route path="income-expense" element={<IncomeExpense />} />
