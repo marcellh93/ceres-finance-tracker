@@ -9,6 +9,8 @@
 > **UI/UX rule:** Phase 3 introduces auth screens, onboarding, sessions/support pages, and the GDPR consent banner — every new SPA page is built to the design system at first ship (no second-pass redesign). For frontend changes, follow `CLAUDE.md` § Frontend Work: invoke `frontend-design`, run the UX/UI verification checklist in the browser, run `web-design-guidelines` before commit.
 >
 > **Security gate rule:** Stages that introduce or modify security-sensitive code (auth, multi-tenancy, sessions, email, headers) cannot be marked done without their verification checklist green. The verification list for each stage is drawn from `security-model.md`, `multi-tenancy-strategy.md`, and the ADRs — items there are not optional.
+>
+> **Responsive rule:** every SPA surface is built mobile-first as it ships. No surface is marked done without verifying its layout at three tiers: `mobile` (< 640px), `tablet` (640–1023px), and `desktop` (≥ 1024px). Touch targets ≥ 44×44px on mobile. No horizontal overflow at or above 320px. The strategy doc — [`planning-phase3-responsive.md`](planning-phase3-responsive.md) — defines the tier behaviour for navigation, tables (table → card collapse on mobile), forms (full-page on mobile, modal on desktop), and charts. Per-stage verification items below.
 
 ---
 
@@ -99,6 +101,12 @@ Five architectural decisions were locked before any Batch 3 implementation began
 - [x] Top bar `+` button wired to QuickAddModal (deferred wiring lives with Stage 2.1)
 - [x] `index.css` defines motion duration + easing tokens (`--motion-duration-fast/base/slow`, standard + emphasized easings)
 - [x] `tw-animate-css` imported in `index.css`
+
+Responsive (foundation tier — applies to every later stage):
+
+- [x] Three breakpoint tiers wired in Tailwind config (`mobile` < 640px / `tablet` 640–1023px / `desktop` ≥ 1024px) per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Breakpoint Strategy
+- [x] Mobile drawer (shadcn `Sheet`, left side) for navigation below 1024px; closes on route change; backdrop dismiss; focus trap while open
+- [x] Sidebar persistent on desktop (decision pending in `planning-phase3-responsive.md` § Open Questions for sidebar-vs-top-nav was resolved by shipping the sidebar)
 
 ---
 
@@ -836,6 +844,16 @@ Localization:
 - [ ] No untranslated copy visible when toggling to ES
 - [ ] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale
 
+Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — auth surfaces are single-column centered card on every tier):
+
+- [ ] Mobile (375px iPhone SE): centered card fills viewport with comfortable padding; no horizontal overflow; touch targets on every input/button ≥ 44×44px
+- [ ] Tablet (768px iPad): centered card constrained to a readable max-width; layout unchanged from mobile beyond the max-width clamp
+- [ ] Desktop (≥ 1024px): centered card constrained to a narrow max-width; sidebar/app shell absent on every auth page
+- [ ] TOTP 6-digit input renders cleanly on mobile (no tiny touch targets, no zoom-on-focus)
+- [ ] QR code in TOTP setup flow is large enough to scan on mobile when displayed at the user's screen
+- [ ] Backup codes download offers a `.txt` that copies cleanly on mobile (long press → save / share sheet)
+- [ ] Language toggle (globe icon) is reachable without scrolling on mobile
+
 ---
 
 ## Stage 10 — Onboarding wizard (Batch 3f)
@@ -922,6 +940,15 @@ Tests required before Stage 11 begins:
 - [ ] Multi-asset-account path test (two accounts created in Step 2)
 - [ ] Language change in Step 1 propagates to subsequent steps
 - [ ] Onboarding completion flag persists; second login skips onboarding
+
+Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — full-screen stepper on every tier):
+
+- [ ] Mobile (375px): stepper progress indicator visible without scrolling; step content fills viewport; the live format preview in Step 1 (`€1.234,56 · 28/04/2026`) wraps cleanly
+- [ ] Tablet + desktop: stepper centered with comfortable max-width; same step content, just constrained
+- [ ] Step transitions don't trigger horizontal overflow at any width
+- [ ] All form inputs meet 44×44px touch-target minimum on mobile
+- [ ] Per-account opening-balance step on mobile lists each account vertically (no horizontal table on small screens)
+- [ ] Step 5 net-worth display per-currency breakdown wraps cleanly on mobile when 2+ currencies present
 
 ---
 
@@ -1038,6 +1065,14 @@ Tests:
 - [ ] Submit ticket, verify admin receives email
 - [ ] User A cannot view User B's ticket (IDOR)
 - [ ] Reauthentication required to access `/settings/sessions`
+
+Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory):
+
+- [ ] `/settings/sessions` mobile: session rows render as cards (not table); per-row revoke + IP-block actions reachable
+- [ ] `/settings/sessions` tablet: cards remain (per the responsive doc — Active sessions list is card-view through tablet, table only on desktop)
+- [ ] `/settings/sessions` desktop: standard table layout
+- [ ] `/support` mobile: ticket form full-page; ticket list as cards; status badges legible
+- [ ] `/support` desktop: form modal or full-page (decided per the form-presentation rule), ticket list as table
 
 ---
 
@@ -1410,6 +1445,19 @@ Pre-launch dry run:
 
 - [ ] Recurring reminder email push delivers correctly (deferred from Phase 2 per ADR-0044, lands with Stage 8)
 - [ ] Settings → Sessions + Support pages live (Stage 12)
+
+### Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md))
+
+- [ ] Every shipped SPA surface verified at three tiers: `mobile` (< 640px), `tablet` (640–1023px), `desktop` (≥ 1024px)
+- [ ] Touch-target audit: every interactive element ≥ 44×44px on mobile
+- [ ] No horizontal overflow at or above 320px on any page
+- [ ] Responsive open questions resolved or explicitly deferred:
+  - [ ] Card field priority per table surface (Transactions, Movements, Transfers, Accounts, Categories, Recurring, Reports tables)
+  - [ ] Mobile row-action pattern (inline icon button / long-press menu / swipe-to-reveal — pick one and apply consistently)
+  - [ ] Tablet form presentation (kept full-page, switched to bottom sheet, or switched to modal — pick one)
+  - [ ] Chart minimum height per chart type on a 375px screen
+  - [ ] Dashboard tablet grid (which cards span full width vs. 2-col)
+- [ ] Device matrix sweep on staging: iPhone SE (375px), iPhone 14 (390px), iPad (768px), 13" laptop (1280px), 27" monitor (≥ 1920px)
 
 ### Documentation hygiene
 

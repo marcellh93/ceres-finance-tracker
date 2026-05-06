@@ -10,12 +10,13 @@
    - [IDOR enforcement](#idor-enforcement)
 2. [Design System & Visual Overhaul](#design-system--visual-overhaul)
 3. [MVC → SPA Migration Plan](#mvc--spa-migration-plan)
-4. [Phase 3 execution batches](#phase-3-execution-batches)
+4. [Responsive design](#responsive-design)
+5. [Phase 3 execution batches](#phase-3-execution-batches)
    - [Batch 3 — Auth + multi-tenancy](#batch-3--auth--multi-tenancy)
    - [Batch 4 — Razor + URL cleanup](#batch-4--razor--url-cleanup)
    - [Batch 5 — Launch readiness](#batch-5--launch-readiness)
-5. [Deferred from Phase 2](#deferred-from-phase-2)
-6. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
+6. [Deferred from Phase 2](#deferred-from-phase-2)
+7. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
 
 ---
 
@@ -300,6 +301,14 @@ The execution plan for migrating from ASP.NET Core MVC + Razor Views to a pure W
 See [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md).
 
 > **Status: Approach locked (2026-04-28).** Design-first, migrate feature by feature — each feature area is fully API-tested, then React-built, then Razor-deleted. Never a big-bang deletion. Hosting model: Option A (React served from ASP.NET Core `wwwroot/`). See full spec: [`docs/superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md`](superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md).
+
+## Responsive design
+
+Responsive web-browser design (mobile / tablet / desktop) is not a separate phase — every SPA surface is built mobile-first as it ships. The strategy doc covers breakpoint tiers (`mobile` < 640px / `tablet` 640–1023px / `desktop` ≥ 1024px), navigation drawer behaviour, table → card collapse on mobile, form-presentation rules per tier, chart reflow, the per-surface inventory, and the open questions to resolve at each kickoff.
+
+See [planning-phase3-responsive.md](planning-phase3-responsive.md).
+
+> **Rule:** do not ship a surface without its mobile layout. Touch targets ≥ 44×44px on mobile. No horizontal overflow at or above 320px. Verification items are integrated into the per-stage checklists in [`roadmap-phase-three.md`](roadmap-phase-three.md).
 
 ---
 
