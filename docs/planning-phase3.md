@@ -10,8 +10,12 @@
    - [IDOR enforcement](#idor-enforcement)
 2. [Design System & Visual Overhaul](#design-system--visual-overhaul)
 3. [MVC → SPA Migration Plan](#mvc--spa-migration-plan)
-4. [Deferred from Phase 2](#deferred-from-phase-2)
-5. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
+4. [Phase 3 execution batches](#phase-3-execution-batches)
+   - [Batch 3 — Auth + multi-tenancy](#batch-3--auth--multi-tenancy)
+   - [Batch 4 — Razor + URL cleanup](#batch-4--razor--url-cleanup)
+   - [Batch 5 — Launch readiness](#batch-5--launch-readiness)
+5. [Deferred from Phase 2](#deferred-from-phase-2)
+6. [Open Questions (blocks Phase 3)](#open-questions-blocks-phase-3)
 
 ---
 
@@ -285,7 +289,7 @@ shadcn/ui covers the Phase 2 baseline. Phase 3 additions required:
    - ✓ **Import — wizard + profiles SPA (2026-05-06).** Two SPA surfaces: `/app/import` (3-step wizard: file + account → mapping → review → result) and `/app/import/profiles` (list + nested `/new` and `/:id/edit`, archive/reactivate within the existing 90-day soft-delete window). New SPA primitives: `FileDropzone` (single-file drag-and-drop + click-to-browse + 10 MB guard) and `WizardStepper` (numbered pills, completed pills clickable). Header detection via `POST /api/import/headers`; profile-driven mapping copies from `GET /api/import-profiles/:id`; submit posts multipart to `POST /api/import`. Result tiles deep-link to Review (reconciliations / transfers) and Movements (`?needsReview=true`). Save-as-profile prompt on the result step gated on `selectedProfileId === null`; format inferred from the uploaded file's extension. Razor `ImportController` and `CsvImportProfilesController` slimmed to 302 redirects; Razor views and the four Razor-only ViewModels (`ImportUploadViewModel`, `ImportSummaryViewModel`, `ImportProfileCreateViewModel`, `ImportProfileEditViewModel`) deleted. **Out of scope (deferred to follow-up plans):** dual debit/credit columns, confidence-scored transfer detection, transfer-keyword settings. Plan: `docs/superpowers/plans/2026-05-06-import-spa-cutover.md`.
 9. Settings + Sessions + Support — lowest frequency; includes saved searches management
    - ✓ **Settings — first SPA-pattern pilot (2026-05-02).** SPA at `/app/settings` exercising the locked `features/<area>/` template + Popover+Command pickers + `useApi` GET / hand-rolled `fetch` PATCH idiom. Razor `SettingsController` page action 302-redirects to the SPA; Razor view + view models deleted. Spec: `docs/superpowers/specs/2026-05-02-spa-page-pattern-and-settings-design.md`. Plan: `docs/superpowers/plans/2026-05-02-spa-page-pattern-and-settings.md`.
-   - Pending: Sessions (after Batch 3 Auth lands), Support (after Batch 3).
+   - Pending: Sessions and Support SPA pages — both depend on Batch 3 Auth and live in [Batch 5 — Launch readiness](#batch-5--launch-readiness).
 
 ---
 
@@ -296,6 +300,59 @@ The execution plan for migrating from ASP.NET Core MVC + Razor Views to a pure W
 See [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md).
 
 > **Status: Approach locked (2026-04-28).** Design-first, migrate feature by feature — each feature area is fully API-tested, then React-built, then Razor-deleted. Never a big-bang deletion. Hosting model: Option A (React served from ASP.NET Core `wwwroot/`). See full spec: [`docs/superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md`](superpowers/specs/2026-04-28-spa-migration-ux-overhaul-design.md).
+
+---
+
+## Phase 3 execution batches
+
+> **Status:** Locked 2026-05-07. Batches 1 and 2 (SPA migration) are complete — see [planning-phase3-spa-migration.md → "Frontend execution batches"](planning-phase3-spa-migration.md#frontend-execution-batches--actual-revised-order-locked-2026-05-02). The three remaining batches are documented here because they are predominantly **server / security / launch-readiness** work, not Razor → React UI ports — which is what the SPA migration doc tracks.
+
+The remaining work to ship Phase 3 splits into three sequential batches with distinct identities:
+
+- **Batch 3 — Auth + multi-tenancy** — make the app multi-user
+- **Batch 4 — Razor + URL cleanup** — remove the Razor scaffolding
+- **Batch 5 — Launch readiness** — make it legal to launch
+
+Sequencing constraints: Batch 3 → Batch 4 (the cleanup needs auth to be live); Batch 5 mostly depends on Batch 3 (most launch-readiness items presuppose real users). Batch 4 and Batch 5 can interleave.
+
+### Batch 3 — Auth + multi-tenancy
+
+> **Goal:** the app supports real users, with real authentication, real tenant isolation, and the email service that auth flows depend on.
+
+| # | Sub-batch | Status | Scope |
+|---|---|---|---|
+| 3a | ADR decisions pass | ✅ Done 2026-05-07 (commit `d2460d2`) | Cookie `SameSite`, social login deferral, EF global query filters, sentinel migration approach, background-job user resolution. ADRs [0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md) → [0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md). |
+| 3b | Identity infrastructure | Pending | ASP.NET Core Identity wiring (hardened options per [`security-model.md` § ASP.NET Core Identity Hardening](security-model.md#aspnet-core-identity-hardening)); Argon2id password hashing with pinned parameters (m=19456, t=2, p=1); `UserSession` table per [ADR-0019](decisions/ADR-0019-session-management-user-configurable-with-ip-controls.md); TOTP infrastructure (encrypted seed via Data Protection, persistent replay-prevention table, hashed backup codes); CSRF middleware with XSRF-TOKEN double-submit pattern; global authorization fallback policy (`RequireAuthenticatedUser`); rate limiting on login/register/reset endpoints; cookie config (`__Host-`, `HttpOnly`, `Secure`, `SameSite=Lax` per [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md)); failed-login logging table; account-lockout self-service unlock token. **No UI yet — integration tests only.** |
+| 3c | Multi-tenancy cutover | Pending | `IUserScope.EnterAs` + `IUserJobRunner.ForEachUserAsync` primitives per [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md); swap `SingleUserAccessor` for `HttpContextAccessor`-backed `ICurrentUserAccessor` (resolves HTTP → background scope → throw); apply EF global query filters to every user-owned entity per [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md); architecture test gating `IgnoreQueryFilters()` to `Admin/` namespace; sentinel-to-real-user data migration per [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md) (single transaction, pre-/post-checks, run on first registration); audit every existing service for `UserId` scoping per [`multi-tenancy-strategy.md` § Services to audit for Phase 3](multi-tenancy-strategy.md#services-to-audit-for-phase-3); IDOR integration test suite (User A → User B's resource → 404, not 403) for every user-owned entity per [`multi-tenancy-strategy.md` § Required Integration Tests Before Phase 3 Launch](multi-tenancy-strategy.md#required-integration-tests-before-phase-3-launch); remove `ISettingsService.EnsureExistsAsync` from `Program.cs` startup. **Highest risk in Phase 3 — touches every service.** |
+| 3d | Email service + email security | Pending | Pick provider; integrate transactional sending; configure SPF + DKIM + DMARC per [`security-model.md` § Email Security Rules](security-model.md#email-security-rules) (DMARC `p=none` at launch, advance to `p=reject` after aggregate reports confirm clean sending); recipient lock to authenticated user's verified address; per-user rate limit on email-triggering endpoints; API key in secret store with documented rotation; transactional templates EN + ES (registration confirmation, password reset, password-changed, email-change verify-new, email-change revoke-old, TOTP-disabled warning, TOTP re-enrolled, backup codes regenerated, lockout self-service unlock, new-session alert, account-locked notification). Lands before 3e because auth UI flows depend on a working email service. |
+| 3e | Auth SPA pages | Pending | `/login`, `/login/totp`, `/register`, `/password-reset` (request + reset-with-TOTP), email-verification interstitial, lockout / unlock screens. Centered card layout (no app shell), language toggle on every auth card, Ceres logo/wordmark placement. Error states: wrong password, expired TOTP, locked account. TOTP setup flow: QR code display, manual-entry fallback, backup-codes download. Backup-codes recovery flow when TOTP device lost. Reauthentication prompts on sensitive operations per [`security-model.md` § Login → Reauthentication](security-model.md#login). |
+| 3f | Onboarding wizard | Pending | Five-step `/onboarding` per [`planning-phase3.md` § 11 Onboarding flow design](#11-onboarding-flow-design): Preferences → first asset account → first liability (optional) → opening balance → immediate net worth display. Full-screen stepper, distinct from app shell. Accessibility: focus moves to step heading on transition; `aria-live="polite"` step announcer; `aria-current="step"` on indicator. Language applied immediately after Preferences step. See [ADR-0053](decisions/ADR-0053-guided-onboarding-deferred.md). |
+
+### Batch 4 — Razor + URL cleanup
+
+> **Goal:** remove the Razor scaffolding now that auth is live and the SPA is the only UI.
+
+This batch is already documented in detail in [`planning-phase3-spa-migration.md` → "Final cleanup plan"](planning-phase3-spa-migration.md#final-cleanup-plan-after-every-razor-view-is-gone). Summary:
+
+1. Drop the `/app/` prefix; React Router `basename` changes from `/app` to `/`.
+2. Add one-shot `/app/*` → `/*` 301 redirects for legacy bookmarks.
+3. Delete every per-area 302 redirect added during Batch 2.
+4. Strip MVC infrastructure from `Program.cs` (controllers-only API surface remains).
+5. Delete the Razor host views (`Views/App/`, `Views/Home/`, `Views/Shared/_Layout.cshtml`, etc.) and any remaining `.cshtml` scaffolding.
+
+Net result: a clean URL space with one one-shot legacy redirect, and a pure Web API + SPA hosting model.
+
+### Batch 5 — Launch readiness
+
+> **Goal:** the app meets the legal, security, and operational bar to open to invited beta testers.
+
+| Sub-batch | Scope |
+|---|---|
+| Sessions + Support SPA pages | `/settings/sessions` — active-sessions list with per-row revoke, IP-block toggles, and the reauthentication gate per [`security-model.md` § Reauthentication for sensitive operations](security-model.md#login). `/support` — ticket form + list, `SupportTicket` entity if not already present, email notification to admin on new ticket. Both depend on Batch 3 auth. |
+| GDPR baseline | Privacy policy text + page; cookie consent banner per AEPD 2024 guidelines per [`security-model.md` § Cookie Consent](security-model.md#cookie-consent-eprivacy--aepd-2024-guidelines); data retention policy enforced (audit log 6-month auto-purge, failed-login retention purge — both run via [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md) cross-tenant background jobs); full ZIP data export as async background job (request → 202 Accepted → email when ready, 24h rate limit, audit-logged); right-to-erasure flow with reauthentication gate; breach notification runbook documented; Records of Processing Activities (RoPA) documented. See [`legal.md`](legal.md). |
+| HTTP security headers + CORS | Configure CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, HSTS (once HTTPS is enforced) per [`security-model.md` § HTTP Security Headers](security-model.md#http-security-headers). CORS whitelist for the React origin only — never combined with `AllowAnyOrigin`. Forwarded headers middleware with restricted `KnownProxies`. |
+| Identity masking (HMAC `UserRef`) | Every user-owned data row stores `UserRef = HMAC-SHA256(USER_REF_SECRET, userId)` per [`security-model.md` § Identity pseudonymisation](security-model.md#layer-2--identity-pseudonymisation-breach-mitigation). `USER_REF_SECRET` lives in the secrets store with documented rotation procedure. Per-tenant payload encryption is deferred to Phase 4. |
+| Hosting + ops | Pick host (most likely a small VPS or managed PaaS); HTTPS termination + auto-renewal; PostgreSQL TLS per [`security-model.md` § Database Connection TLS](security-model.md#database-connection-tls); reverse proxy with `KnownProxies` set; backup encryption + retention + restoration testing per [`security-model.md` § Backup Security](security-model.md#backup-security); CI dependency vulnerability scanning per [`security-model.md` § Dependency Scanning](security-model.md#dependency-scanning). |
 
 ---
 
