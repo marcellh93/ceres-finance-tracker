@@ -26,27 +26,25 @@ export function ReportLocalFilterBar() {
   if (!showAccount && !showCategory) return null;
 
   return (
-    <div className="mb-4">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {showAccount && (
-          <AccountCombobox
-            accounts={accounts ?? []}
-            value={filters.accountId}
-            onChange={(id) => setFilter('accountId', id)}
-            placeholder="All accounts"
-            className="w-full"
-          />
-        )}
-        {showCategory && (
-          <CategoryCombobox
-            categories={categories ?? []}
-            value={filters.categoryId}
-            onChange={(id) => setFilter('categoryId', id)}
-            placeholder="All categories"
-            className="w-full"
-          />
-        )}
-      </div>
+    <div className="grid grid-cols-1 gap-2 px-[8%] pb-2 sm:grid-cols-2">
+      {showAccount && (
+        <AccountCombobox
+          accounts={accounts ?? []}
+          value={filters.accountId}
+          onChange={(id) => setFilter('accountId', id)}
+          placeholder="All accounts"
+          className="w-full"
+        />
+      )}
+      {showCategory && (
+        <CategoryCombobox
+          categories={categories ?? []}
+          value={filters.categoryId}
+          onChange={(id) => setFilter('categoryId', id)}
+          placeholder="All categories"
+          className="w-full"
+        />
+      )}
     </div>
   );
 }

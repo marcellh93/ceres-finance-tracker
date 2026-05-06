@@ -9,8 +9,8 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'rec
 import { useApi } from '../../lib/use-api';
 import { usePagination } from '@/hooks/usePagination';
 import { REPORTS_MONTHLY_CASH_FLOW_URL, type MonthlyCashFlowRowDto } from './reports-api';
+import { formatK } from './chart-format';
 import { ReportTableCard } from './ReportTableCard';
-import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -34,7 +34,6 @@ export function MonthlyCashFlow() {
 
   return (
     <div className="space-y-6">
-      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Monthly Cash Flow" onRetry={refetch} />}
       {data && data.length === 0 && <p className="text-sm text-muted-foreground">No data for this period.</p>}
@@ -62,7 +61,7 @@ export function MonthlyCashFlow() {
             <BarChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={formatK} />
               <Tooltip contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }} formatter={(v: unknown) => `${symbol} ${(v as number).toFixed(2)}`} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="income" fill="var(--success)" radius={[4, 4, 0, 0]} />

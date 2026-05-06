@@ -9,8 +9,8 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { useApi } from '../../lib/use-api';
 import { usePagination } from '@/hooks/usePagination';
 import { REPORTS_EXPENSE_BREAKDOWN_URL, type ExpenseBreakdownDto } from './reports-api';
+import { formatK, truncateLabel } from './chart-format';
 import { ReportTableCard } from './ReportTableCard';
-import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 export function ExpenseBreakdown() {
@@ -30,7 +30,6 @@ export function ExpenseBreakdown() {
 
   return (
     <div className="space-y-6">
-      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Expense Breakdown" onRetry={refetch} />}
       {data && data.categories.length === 0 && <p className="text-sm text-muted-foreground">No expense transactions for this period.</p>}
@@ -58,8 +57,8 @@ export function ExpenseBreakdown() {
           >
             <BarChart layout="vertical" data={chartData} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid horizontal={false} stroke="var(--border)" />
-              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={90} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={formatK} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={120} tickFormatter={(v: string) => truncateLabel(v)} />
               <Tooltip contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }} formatter={(v: unknown) => `${symbol} ${(v as number).toFixed(2)}`} />
               <Bar dataKey="amount" fill="var(--primary)" radius={[0, 4, 4, 0]} />
             </BarChart>

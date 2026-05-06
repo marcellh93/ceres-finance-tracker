@@ -5,7 +5,6 @@ import { usePagination } from '@/hooks/usePagination';
 import { CardError } from '../../components/CardError';
 import { useApi } from '../../lib/use-api';
 import { REPORTS_NET_WORTH_URL, type NetWorthEntryDto } from './reports-api';
-import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { ReportTableCard } from './ReportTableCard';
 import { useReportsFilters } from './useReportsFilters';
 
@@ -18,7 +17,6 @@ export function NetWorth() {
 
   return (
     <div className="space-y-6">
-      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Net Worth" onRetry={refetch} />}
       {data && data.length === 0 && (

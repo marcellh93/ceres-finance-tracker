@@ -8,7 +8,6 @@ import { useApi } from '../../lib/use-api';
 import { useSettings } from '../../lib/use-settings';
 import { formatDate } from '../../lib/date-format';
 import { REPORTS_TRANSACTION_HISTORY_URL, type TransactionHistoryRowDto } from './reports-api';
-import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { ReportTableCard } from './ReportTableCard';
 import { useReportsFilters } from './useReportsFilters';
 
@@ -23,7 +22,6 @@ export function TransactionHistory() {
 
   return (
     <div className="space-y-6">
-      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Transaction History" onRetry={refetch} />}
       {data && data.length === 0 && (

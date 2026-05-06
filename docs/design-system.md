@@ -157,6 +157,20 @@ The `<Numeric>` component (see below) is the enforcement mechanism — wrap any 
 
 **Skeletons:** Match the rendered content's height to prevent layout shift. Common heights: `h-[220px]` for chart cards, `h-[400px]` for tables, `h-5 w-32` for individual text rows.
 
+### Vertical rhythm
+
+Three gap sizes cover almost every case. Pick by the *relationship* between the elements, not by how it looks in isolation.
+
+| Class | Pixels | Use for |
+|---|---|---|
+| `space-y-2` | 8px | Within a related cluster — heading + description, label + value, items in a stat row |
+| `space-y-6` / `py-6` | 24px | Default block-to-block on a page — filter bar → content, card → card, section → section |
+| `pt-10` | 40px | After sticky/fixed chrome — pinned bars carry extra visual weight (own background, fixed position) and need more breathing room than an inline block |
+
+**Don't stack a hard divider on top of generous whitespace.** If the element above has `border-b` and the element below has its own border (Card, table), drop the `border-b` — the background contrast plus whitespace already defines the boundary. Two thin lines with 24–40px between them reads as "two boxes pressed together," not "two distinct sections." Pick one boundary cue: divider line **or** whitespace.
+
+This rule is why `ReportsLayout` removed the `border-b` from its sticky chrome wrapper: the outlet content below already renders Cards with their own borders, and the chrome's bg-background plus `pt-10` of whitespace is enough.
+
 ---
 
 ## Motion
@@ -230,7 +244,7 @@ Always use the tokens via `var(--chart-N)`. Chart components should never hard-c
 
 `pnpm dlx shadcn add <component>` has been run for these — all live under `src/components/ui/` and consume the same tokens:
 
-`alert-dialog`, `avatar`, `badge`, `button`, `calendar`, `card`, `checkbox`, `command`, `dialog`, `dropdown-menu`, `input`, `input-group`, `kbd`, `label`, `navbar`, `popover`, `progress`, `radio-group`, `select`, `separator`, `sheet`, `skeleton`, `sonner`, `switch`, `table`, `tabs`, `textarea`, `tooltip`.
+`alert-dialog`, `avatar`, `badge`, `button`, `calendar`, `card`, `chart`, `command`, `dialog`, `dropdown-menu`, `input`, `input-group`, `kbd`, `label`, `navbar`, `popover`, `progress`, `select`, `separator`, `sheet`, `skeleton`, `sonner`, `switch`, `table`, `tabs`, `textarea`, `tooltip`.
 
 **Notable additions during the SPA migration:**
 - **`InputGroup`** — input with prefix/suffix slots; used for the currency-symbol addon on the money input.
@@ -436,6 +450,39 @@ The Kbd primitive is documented under [shadcn/ui overrides](#shadcnui-overrides)
 
 ---
 
+## Page layout recipes
+
+### Heading → filter bar → content (inline filter bar)
+
+For pages where the filter bar lives in the normal content flow (no sticky chrome). For sticky-chrome layouts, see the next subsection.
+
+**The correct pattern** — matches how Movements spaces its filter bar and table:
+
+```tsx
+<div className="space-y-6">          {/* 24px gap between heading-group and results */}
+  <div>                               {/* plain wrapper — no gap between heading and filter bar */}
+    <ReportHeader title="…" filters={filters} />
+    <ReportsFilterBar />              {/* sits flush below heading */}
+  </div>
+  <ReportTableCard …>…</ReportTableCard>  {/* 24px below filter bar */}
+</div>
+```
+
+**`ReportsFilterBar` padding:** Use `pt-3` only — **no `pb-*` or `py-*`**. Bottom padding on the wrapper creates an extra visible gap between the filter inputs and the card below, on top of the `space-y-6` gap. The result looks like a double gap. `pt-3` gives breathing room between the heading text and the filter inputs without adding space below.
+
+**Why this keeps getting broken:** `space-y-6` on the outer div is necessary for the filter→results gap. The heading→filter flush is achieved by wrapping them in a plain `<div>` (no spacing class) so `space-y-6` treats them as one unit. Any attempt to add `mb-*`, `pb-*`, or extra wrappers between the filter bar and the results will reintroduce the double gap.
+
+### Sticky chrome → content (Reports SPA pattern)
+
+When tabs, header, and filters are pinned together at the top of the scroll container (see `ReportsLayout`), the rhythm shifts:
+
+- **Chrome wrapper:** `sticky top-0 z-10` plus a bleed (`-mx-6 -mt-6`) so the chrome can extend full-width while the inner content keeps the same horizontal indent as the body. Re-indent inside the bleed with `mx-6` so `px-[8%]` calculations match across the chrome and the outlet.
+- **No `border-b` on the chrome wrapper.** The bg-background of the chrome plus the gap below is enough to separate it from page content. Adding a divider creates the double-boundary problem (see Vertical rhythm).
+- **Outlet wrapper:** `pt-10 pb-6` — 40px above to give content breathing room from the pinned chrome, 24px below for normal page-bottom rhythm.
+- **All filter bars (shared and per-page) live inside the chrome,** not in the page body. If only some filters are pinned and others scroll, the layout reads as inconsistent.
+
+---
+
 ## Forms & validation
 
 Every form in the SPA renders against the project's 422 validation envelope — `{ error: { code: "VALIDATION_ERROR", details: [{ field, message }] } }`. Two pieces work together: a **Field wrapper** that pairs a label with its inline error, and a normalisation step that flattens the envelope into a `Record<string, string>` keyed by camelCase field name.
@@ -586,7 +633,7 @@ The canonical date input. A shadcn `<Popover>` triggered by an outline `<Button>
 
 ### When *not* to use `DatePickerField`
 
-- **Date *ranges*** — use `MovementsDateRangePicker` or build a paired-input pattern; this component is single-day only.
+- **Date *ranges*** — use `<DateRangePicker>` (`src/components/DateRangePicker.tsx`) for the generic from/to range used by the Reports filter bar, or `<MovementsDateRangePicker>` for the Movements-specific paired-input pattern. `<DatePickerField>` is single-day only.
 - **Time-of-day** — out of scope; the underlying value is `DateOnly` on the server.
 - **Read-only display of an existing date** — render `formatDate(value, dateFormat)` directly inside a `<Numeric>` cell or plain text. Don't disable the picker.
 

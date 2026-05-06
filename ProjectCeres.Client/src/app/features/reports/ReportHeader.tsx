@@ -5,11 +5,12 @@ import { useSettings } from '../../lib/use-settings';
 
 type Props = {
   title: string;
+  description?: string;
   filters: ReportsFilters;
   showPeriod?: boolean;
 };
 
-export function ReportHeader({ title, filters, showPeriod = true }: Props) {
+export function ReportHeader({ title, description, filters, showPeriod = true }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { data: settings } = useSettings();
 
@@ -29,8 +30,11 @@ export function ReportHeader({ title, filters, showPeriod = true }: Props) {
       >
         {title}
       </h1>
+      {description && (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      )}
       {periodSummary && (
-        <p className="text-sm text-muted-foreground">{periodSummary}</p>
+        <p className="text-xs text-muted-foreground">{periodSummary}</p>
       )}
     </div>
   );

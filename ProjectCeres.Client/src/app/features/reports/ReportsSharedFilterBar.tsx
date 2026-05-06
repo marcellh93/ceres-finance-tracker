@@ -6,7 +6,7 @@ export function ReportsSharedFilterBar() {
   const { filters, setFilter } = useReportsFilters();
 
   return (
-    <div className="sticky top-[6.5rem] z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="grid grid-cols-1 gap-2 px-[8%] py-2 sm:grid-cols-2">
         <DateRangePicker fromKey="from" toKey="to" className="w-full" />
         <CurrencyCombobox

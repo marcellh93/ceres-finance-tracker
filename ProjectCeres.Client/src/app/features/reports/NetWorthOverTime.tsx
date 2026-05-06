@@ -9,8 +9,8 @@ import { useApi } from '../../lib/use-api';
 import { usePagination } from '@/hooks/usePagination';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { REPORTS_NET_WORTH_OVER_TIME_URL, type NetWorthSnapshotRowDto } from './reports-api';
+import { formatK } from './chart-format';
 import { ReportTableCard } from './ReportTableCard';
-import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -44,7 +44,6 @@ export function NetWorthOverTime() {
 
   return (
     <div className="space-y-6">
-      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Net Worth Over Time" onRetry={refetch} />}
       {data && data.length === 0 && (
@@ -97,7 +96,7 @@ export function NetWorthOverTime() {
               </defs>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={formatK} />
               <Tooltip
                 contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: 12 }}
                 formatter={(value: unknown) => [`${symbol} ${(value as number).toFixed(2)}`, 'Net Worth']}

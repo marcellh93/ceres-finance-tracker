@@ -90,13 +90,15 @@ export type NetWorthSnapshotRowDto = {
 
 import { Wallet, LineChart, Scale, CalendarClock, PieChart, Target, TrendingUp, Receipt, type LucideIcon } from 'lucide-react';
 
-// Slug → label map (used by ReportsIndex and ReportHeader)
-export const REPORT_META: Array<{
+type ReportMetaEntry = {
   slug: string;
   label: string;
   description: string;
   icon: LucideIcon;
-}> = [
+};
+
+// Slug → label map (used by ReportsIndex and ReportHeader)
+export const REPORT_META: Array<ReportMetaEntry> = [
   { slug: 'net-worth',           label: 'Net Worth',            description: 'Current assets, liabilities, and net worth across all accounts.',  icon: Wallet },
   { slug: 'net-worth-over-time', label: 'Net Worth Over Time',  description: 'How your net worth has evolved month by month.',                   icon: LineChart },
   { slug: 'income-expense',      label: 'Income vs Expense',    description: 'Total income, expenses, and savings rate for the period.',          icon: Scale },
@@ -106,3 +108,7 @@ export const REPORT_META: Array<{
   { slug: 'largest-expenses',    label: 'Largest Expenses',     description: 'Your highest individual expenses, ranked.',                         icon: TrendingUp },
   { slug: 'transaction-history', label: 'Transaction History',  description: 'Paginated ledger of all transactions for the period.',              icon: Receipt },
 ];
+
+export function reportMetaBySlug(slug: string): ReportMetaEntry | undefined {
+  return REPORT_META.find((entry) => entry.slug === slug);
+}

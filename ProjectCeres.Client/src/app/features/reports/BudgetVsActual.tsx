@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
 import { REPORTS_BUDGET_VS_ACTUAL_URL, type BudgetVsActualRowDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
-import { ReportLocalFilterBar } from './ReportLocalFilterBar';
 import { useReportsFilters } from './useReportsFilters';
 
 function BudgetProgressCell({ limit, actual }: { limit: number; actual: number }) {
@@ -41,7 +40,6 @@ export function BudgetVsActual() {
 
   return (
     <div className="space-y-6">
-      <ReportLocalFilterBar />
       {loading && <Skeleton className="h-[400px] w-full" />}
       {error && <CardError section="Budget vs Actual" onRetry={refetch} />}
       {data && data.length === 0 && (
