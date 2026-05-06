@@ -318,12 +318,12 @@ See [docs/testing.md](testing.md) for the full testing strategy — stack, TDD w
 
 - [ ] **File attachment storage for Phase 3** — local filesystem does not scale to hosted multi-user. Must decide between cloud storage (Azure Blob Storage, S3) and server disk before Phase 3 begins. **Note: `StoredPath` will need a data migration if the storage backend changes after data exists — this decision affects Phase 1 schema.**
 - [ ] **Timezone handling** — transaction dates stored as local date with no timezone. Must decide on a strategy before Phase 3: store UTC and convert for display, require users to set their timezone, or accept local-date ambiguity.
-- [x] **Authentication framework for Phase 3** — ASP.NET Core Identity, third-party provider (Auth0, Keycloak), or custom. Must be decided before any Phase 3 code is written. **Social login option:** OAuth via Google, Facebook, Apple, and Microsoft is a candidate — eliminates password storage complexity and reduces the attack surface, but removes auth availability independence (if the provider is down, users can't log in). If pursued, offer it alongside email/password (not as a replacement) so users can choose. TOTP MFA still applies regardless of login method.
+- [x] **Authentication framework for Phase 3** — ASP.NET Core Identity with email/password (Argon2id m=19456, t=2, p=1) + mandatory TOTP. Social login deferred to Phase 4 per ADR-0064. Cookie-based auth with `SameSite=Lax` per ADR-0063. See planning-resolved.md.
 - [ ] **Hosting platform for Phase 3** — Azure, AWS, DigitalOcean, Fly.io, or bare VPS. All other Phase 3 infrastructure decisions depend on this.
 - [ ] **Email service for Phase 3** — no provider chosen (SendGrid, AWS SES, Mailgun, SMTP). Required before Phase 3 auth can launch.
 - [ ] **Invite mechanism for Phase 3** — "invite-only beta" stated but not designed. No invitation entity, flow, or admin mechanism exists.
 - [x] **Multi-tenancy implementation** — adding UserId FK to every top-level entity. No migration plan exists. Must be designed before Phase 3 code begins.
-- [x] **Settings migration for Phase 3** — single Phase 1 Settings row becomes per-user. What do new users get as defaults?
+- [x] **Settings migration for Phase 3** — existing Settings row remapped to the first registered user per ADR-0066; subsequent users get a default row created on registration. See planning-resolved.md.
 - [x] **WCAG 2.1 AA compliance (Phase 3)** — full audit required before opening to other users. EU Accessibility Act obligations may also apply — see legal.md.
 - [x] **MVC → Web API decoupling (Phase 3)** — base migration plan documented in [planning-phase3-spa-migration.md](planning-phase3-spa-migration.md). Finalize at Phase 3 kickoff before frontend work begins.
 - [ ] **Concurrency handling (Phase 3)** — last-write-wins accepted for Phase 1/2. Before Phase 3, decide whether to add EF Core optimistic concurrency tokens (`RowVersion`) to mutable entities.

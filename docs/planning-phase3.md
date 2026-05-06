@@ -29,7 +29,7 @@ changes needed for any multi-user product.
 
 ## Planned Features (Phase 3)
 
-- **Authentication** — user registration and login with username + password (hashed with Argon2, never stored in plain text), with optional social login (Google, Facebook, Apple, Microsoft) as an alternative credential method. Social login eliminates password storage complexity but introduces an external availability dependency — if the provider is down, users can't log in. If social login is implemented, it is offered alongside email/password, not as a replacement. TOTP MFA applies regardless of login method.
+- **Authentication** — user registration and login with email + password (hashed with Argon2id, never stored in plain text) and mandatory TOTP MFA. Social login is **deferred to Phase 4** per [ADR-0064](decisions/ADR-0064-social-login-deferred-to-phase-4.md); the architecture stays open (provider-agnostic `UserSession` schema, no `ExternalLogin` table in Phase 3). Cookie-based session auth — see [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md) for cookie configuration.
 
 **Login with TOTP — happy path**
 
@@ -87,7 +87,7 @@ stateDiagram-v2
 
     Revoked --> [*]: Session no longer accepted (cookie cleared)
 ```
-- **Secure cookie configuration** — `HttpOnly = true`, `Secure = true`, `SameSite = Strict` or `Lax`. Configure via `CookieAuthenticationOptions` in `Program.cs`.
+- **Secure cookie configuration** — `__Host-` prefix, `HttpOnly = true`, `Secure = true`, `SameSite = Lax` per [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md). Configure via `CookieAuthenticationOptions` in `Program.cs`. Paired with the XSRF-TOKEN double-submit CSRF pattern on all state-changing endpoints — see `security-model.md` § CSRF.
 - **Multi-tenancy** — all data scoped to the logged-in user
 - **Per-user settings** — single-row Settings table migrates to per-user preferences table
 - **Hosting setup** — deploy to a server. No business model yet — invite-only for beta testers.
@@ -389,9 +389,14 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
 - Mobile app — React Native is the leading candidate; no scope, timeline, or platform targets defined
 - E2E testing — Playwright chosen; implement after Phase 2 React migration stabilizes. See [testing.md](testing.md#e2e-tool-playwright).
 
-**Resolved** — moved to [planning-resolved.md](planning-resolved.md):
-- ~~Authentication framework~~ — ASP.NET Core Identity + Argon2id + TOTP, cookie-based auth. Resolved.
-- ~~Multi-tenancy implementation~~ — `UserId` FK on all user-owned entities + HMAC pseudonymisation. See `multi-tenancy-strategy.md`. Resolved.
-- ~~Settings migration~~ — Per-user row created on registration with system defaults; onboarding Preferences step handles overrides. Resolved.
-- ~~WCAG 2.1 AA compliance~~ — Full spec in §8 above. Resolved.
-- ~~MVC → Web API decoupling~~ — Approach locked 2026-04-28. See `planning-phase3-spa-migration.md`. Resolved.
+**Resolved** — full decisions archived in [planning-resolved.md](planning-resolved.md). Phase 3 foundational items resolved so far:
+
+- ~~Authentication framework~~ — ASP.NET Core Identity + Argon2id + TOTP, cookie-based auth. Social login deferred to Phase 4 per [ADR-0064](decisions/ADR-0064-social-login-deferred-to-phase-4.md).
+- ~~Cookie `SameSite`~~ — `Lax` per [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md), paired with XSRF-TOKEN CSRF.
+- ~~EF Core global query filters~~ — Adopted with explicit redundancy and admin-only bypass per [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md).
+- ~~Sentinel-to-real-user migration~~ — Remap to first registered user per [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md).
+- ~~Background-job user resolution~~ — `IUserScope` + `IUserJobRunner` pattern per [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md).
+- ~~Multi-tenancy implementation~~ — `UserId` FK on all user-owned entities + HMAC pseudonymisation. See `multi-tenancy-strategy.md`.
+- ~~Settings migration~~ — Migrates with the rest of the sentinel data per ADR-0066; onboarding Preferences step handles per-user overrides for subsequent registrations.
+- ~~WCAG 2.1 AA compliance~~ — Full spec in §8 above.
+- ~~MVC → Web API decoupling~~ — Approach locked 2026-04-28. See `planning-phase3-spa-migration.md`.
