@@ -343,3 +343,377 @@ From the same audit doc (§ 15). Once Tier 1 + Stage 5.4 (data-loading rollout) 
 
 ---
 
+## Stage 6 — Identity infrastructure (Batch 3b)
+
+**Status: ❌ Pending.** Server-side plumbing for real authentication. Lands before Stage 7 (multi-tenancy cutover) so the cutover has a real `AspNetUsers` table to remap onto.
+
+> **Goal:** ASP.NET Core Identity is wired with hardened options, password hashing pinned to Argon2id at OWASP minimums, TOTP infrastructure in place (encrypted seed, persistent replay-prevention, hashed backup codes), `UserSession` table and CSRF middleware operational, global authorization fallback policy enforced. **No UI yet — integration tests only.**
+
+### Sub-stages
+
+| # | Sub-stage | Spec / Reference |
+|---|---|---|
+| 6.1 | ASP.NET Core Identity + EF stores | `security-model.md` § ASP.NET Core Identity Hardening |
+| 6.2 | Argon2id password hasher with pinned parameters (m=19456, t=2, p=1) | `security-model.md` § Passwords + `planning-phase3.md` § Password policy |
+| 6.3 | `UserSession` table + token rotation + revocation | [ADR-0019](decisions/ADR-0019-session-management-user-configurable-with-ip-controls.md) + `security-model.md` § Sessions |
+| 6.4 | TOTP enrollment + verification + replay prevention + backup codes | `security-model.md` § TOTP Secrets + § TOTP Backup Codes + `planning-phase3.md` § MFA |
+| 6.5 | CSRF middleware (XSRF-TOKEN double-submit pattern) | [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md) + `security-model.md` § CSRF |
+| 6.6 | Global authorization fallback policy (`RequireAuthenticatedUser`) | `security-model.md` § Global Authorization Policy |
+| 6.7 | Cookie configuration (`__Host-` prefix, `HttpOnly`, `Secure`, `SameSite=Lax`) | ADR-0063 + `security-model.md` § Cookie Configuration |
+| 6.8 | Rate limiting on `/login`, `/register`, `/password-reset` | `security-model.md` § Login + `planning-phase3.md` § Rate limiting |
+| 6.9 | Failed-login logging table | `security-model.md` § Login → Failed login logging |
+| 6.10 | Account lockout policy + self-service unlock signed-token endpoint | `security-model.md` § Login → Account lockout + Self-service unlock |
+| 6.11 | Password reset flow (256-bit token, Argon2id-hashed, 15-min expiry, single-use, MFA-gated, session revocation on success) | `security-model.md` § Password Reset |
+| 6.12 | Email-address-change flow (dual-address verification, 7-day revoke link to old address) | `security-model.md` § Email Address Change |
+| 6.13 | Re-authentication middleware for sensitive operations | `security-model.md` § Login → Reauthentication |
+| 6.14 | Audit log table (`AuditLog` entity + writer service) | `planning-phase3.md` § Audit logging |
+
+### Verification checklist
+
+ASP.NET Identity hardening:
+
+- [ ] `options.Lockout.MaxFailedAccessAttempts = 10`
+- [ ] `options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15)`
+- [ ] `options.Lockout.AllowedForNewUsers = true`
+- [ ] `options.User.RequireUniqueEmail = true`
+- [ ] `options.SignIn.RequireConfirmedEmail = true`
+- [ ] `SecurityStampValidatorOptions.ValidationInterval = TimeSpan.FromMinutes(5)` configured (catches revoked sessions within 5 min)
+
+Password handling:
+
+- [ ] Default `IPasswordHasher<TUser>` replaced with Argon2id implementation pinned to `m=19456, t=2, p=1`
+- [ ] Password policy: minimum 8 characters, no maximum below 64 (NIST SP 800-63B)
+- [ ] No mandatory complexity rules; breached-password check via Have I Been Pwned API or local top-N list
+- [ ] Password reset endpoints always run Argon2id hash (against dummy if user not found) — constant-time enumeration prevention
+- [ ] Login endpoint always runs Argon2id hash (same defence)
+
+`UserSession` table + token rotation:
+
+- [ ] `UserSession` entity exists with: `Id`, `UserId`, `TokenHash`, `IpCreatedAt`, `UserAgent`, `CreatedAt`, `LastUsedAt`, `RevokedAt nullable`, `IsPersistent bool`
+- [ ] Session token regenerated immediately after login (session-fixation prevention)
+- [ ] Logout marks `RevokedAt`; the cookie is cleared; subsequent requests with the cookie are rejected
+- [ ] Persistent ("remember me") sessions: long-lived token in HttpOnly cookie, hash stored in DB, **rotated on each use** (issue new token, invalidate old)
+- [ ] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on)
+- [ ] Per-user IP block list (`UserBlockedIp`) revokes all sessions from that IP on add
+
+TOTP:
+
+- [ ] TOTP seed generated with cryptographically secure RNG
+- [ ] TOTP seed stored encrypted at rest via ASP.NET Core Data Protection (`IDataProtector`)
+- [ ] Replay-prevention table is **persistent** (database or Redis), not in-memory — survives application restart
+- [ ] Replay records auto-purged after 2 minutes
+- [ ] Backup codes hashed with Argon2id (not plaintext) — single-use, regeneration invalidates all previous codes
+- [ ] TOTP enrolment is mandatory; 24-hour grace period for first login; cannot be skipped
+- [ ] Backup-code use during lockout is honoured (lockout protects against password guessing, not TOTP abuse)
+- [ ] No SMS option exposed (SIM-swap vulnerability)
+
+CSRF:
+
+- [ ] `IAntiforgery` middleware registered globally
+- [ ] All `POST`/`PUT`/`PATCH`/`DELETE` API endpoints validate the XSRF-TOKEN
+- [ ] `XSRF-TOKEN` cookie issued: `Secure=true`, `SameSite=Lax`, `HttpOnly=false` (SPA must read it)
+- [ ] Authorization endpoints `[AllowAnonymous]`-marked are exempt from antiforgery only where they have no state side-effect (e.g., GET login page); login POST validates
+- [ ] CSRF token rotation on login/logout
+
+Global authorization:
+
+- [ ] `AddAuthorization` configured with `FallbackPolicy = RequireAuthenticatedUser()`
+- [ ] `[AllowAnonymous]` applied **only** to: `/login`, `/login/totp`, `/register`, `/password-reset`, `/email-verify`, the React SPA static-file catch-all, and the lockout self-service unlock endpoint
+- [ ] Architecture test: any controller without `[Authorize]` or `[AllowAnonymous]` attribute fails the build (catches forgotten attributes)
+
+Cookie configuration:
+
+- [ ] Auth cookie name uses `__Host-` prefix (e.g., `__Host-Session`)
+- [ ] `HttpOnly = true`, `Secure = true`, `SameSite = Lax`
+- [ ] No `Domain` attribute set (forced by `__Host-` prefix)
+- [ ] `Path = /`
+- [ ] Verified in browser DevTools that the cookie has all four attributes after a successful login
+
+Rate limiting:
+
+- [ ] `/login` endpoint: 10 requests/min/IP minimum, fixed-window
+- [ ] `/register` endpoint: 10 requests/min/IP minimum
+- [ ] `/password-reset` endpoint: 10 requests/min/IP minimum, plus per-account rate limit
+- [ ] Account lockout: lock for 15 min after 10 failed attempts; counter resets on successful login
+- [ ] Lockout email includes a time-limited signed unlock link separate from the password-reset flow
+- [ ] `/login/totp` endpoint: rate-limited per user (after credentials valid, before TOTP)
+
+Failed-login logging:
+
+- [ ] Every failed login logs: timestamp, IP, user-agent, whether the failure was credential-based or TOTP-based
+- [ ] Attempted password is NEVER logged
+- [ ] Logs queryable for distributed credential-stuffing detection (multiple accounts, same source IP)
+
+Password reset:
+
+- [ ] Token: 256-bit cryptographically random, base64url-encoded
+- [ ] Stored as Argon2id hash only (never the raw token)
+- [ ] 15-minute expiry from issuance
+- [ ] Single-use: invalidate on first successful submission
+- [ ] On successful reset: revoke all `UserSession` rows for that user
+- [ ] Reset flow requires a valid TOTP code before accepting the new password
+- [ ] Backup codes are the recovery path if TOTP device is lost — NOT a TOTP bypass during reset
+- [ ] Email always sent on reset request (registered or not — same response, same wall-clock timing)
+- [ ] Separate notification email sent on successful password change
+
+Email-address change:
+
+- [ ] Reauthentication required before initiating
+- [ ] Verification link sent to new address (256-bit token, 30-min expiry, single-use)
+- [ ] Notification + revoke link sent to old address (256-bit token, 7-day expiry)
+- [ ] Old address remains the address-of-record until new address verified
+- [ ] Notification email sent to old address on successful change
+
+Reauthentication for sensitive operations:
+
+- [ ] Fresh password entry required before: change password, change email, re-enrol TOTP, view active sessions, GDPR erasure
+- [ ] Persistent sessions ("remember me") do NOT bypass reauthentication
+- [ ] Reauthentication grant is short-lived (e.g., 5 minutes) and scoped to a single sensitive action
+
+Audit logging:
+
+- [ ] `AuditLog` entity: `Id`, `UserId`, `Action`, `EntityType`, `EntityId`, `OccurredAt`, `IpAddress`
+- [ ] Writes for: login, logout, registration, password reset, email change, TOTP enrol/disable, backup-code regeneration, data export request, GDPR erasure
+- [ ] Financial amounts NEVER appear in audit entries
+- [ ] 6-month auto-purge job (registered as `IUserJobRunner` cross-tenant background job — see Stage 7 dependency)
+
+Tests required before Stage 7 begins:
+
+- [ ] Login happy-path integration test (credentials → TOTP → cookie issued)
+- [ ] Login wrong-password test returns identical error message + timing as login with non-existent user
+- [ ] Login wrong-TOTP test returns generic error
+- [ ] Account lockout test: 10 failed attempts locks; 11th returns lockout error
+- [ ] Self-service unlock token test: valid token unlocks; expired token returns error
+- [ ] TOTP replay test: same code used twice within window is rejected on second use
+- [ ] TOTP replay survives app restart (persistent store, not in-memory)
+- [ ] Password reset happy-path integration test (request → email → click link → enter TOTP → set new password → all sessions revoked)
+- [ ] Password reset enumeration test: same response + timing whether email exists or not
+- [ ] CSRF test: state-changing request without XSRF-TOKEN header returns 400/403
+- [ ] Reauthentication test: changing password without fresh password entry returns 401, even with valid session
+
+---
+
+## Stage 7 — Multi-tenancy cutover (Batch 3c)
+
+**Status: ❌ Pending.** Highest-risk change in Phase 3. Touches every existing service. Lands after Stage 6 so the `AspNetUsers` table exists to remap onto.
+
+> **Goal:** the sentinel `SingleUserAccessor` is replaced with a real, HTTP-context-backed `ICurrentUserAccessor`; EF global query filters apply to every user-owned entity; the `IUserScope` + `IUserJobRunner` primitives ship; the sentinel-to-real-user data migration runs on first registration; every existing service is audited for `UserId` scoping; the IDOR integration test suite is green.
+
+### Sub-stages
+
+| # | Sub-stage | Spec / Reference |
+|---|---|---|
+| 7.1 | `IUserScope.EnterAs(userId)` + AsyncLocal storage | [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md) |
+| 7.2 | `IUserJobRunner.ForEachUserAsync(filter, work)` runner | ADR-0067 |
+| 7.3 | New `ICurrentUserAccessor` impl: HTTP context → AsyncLocal scope → throw | ADR-0067 |
+| 7.4 | EF global query filters on every user-owned entity | [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md) |
+| 7.5 | Architecture test gating `IgnoreQueryFilters()` to `Admin/` namespace | ADR-0065 |
+| 7.6 | Sentinel-to-real-user data migration | [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md) |
+| 7.7 | Remove `SingleUserAccessor` and the sentinel UUID constant | ADR-0066 |
+| 7.8 | Service audit (every existing service that performs a query by ID) | `multi-tenancy-strategy.md` § Services to audit for Phase 3 |
+| 7.9 | Remove `ISettingsService.EnsureExistsAsync` from `Program.cs` startup | ADR-0067 |
+| 7.10 | IDOR integration test suite | `multi-tenancy-strategy.md` § Required Integration Tests Before Phase 3 Launch |
+
+### Verification checklist
+
+`IUserScope` + AsyncLocal:
+
+- [ ] `IUserScope` interface has `EnterAs(Guid userId): IDisposable`
+- [ ] Internal storage is `AsyncLocal<Guid?>` (propagates across `await` boundaries within a single logical flow)
+- [ ] `Dispose()` clears the value; nested `EnterAs` calls work correctly via stack semantics
+- [ ] Architecture test: `IUserScope.EnterAs` callers always wrap the call in `using` (no leaked scopes)
+
+`IUserJobRunner`:
+
+- [ ] `ForEachUserAsync(filter, work)` enumerates users with `IgnoreQueryFilters()` (intentionally cross-tenant query)
+- [ ] Per-user iteration enters scope, invokes work, exits scope
+- [ ] Per-user exception isolation: one user's failure does not abort the batch
+- [ ] Per-user logging: each iteration logs success/failure with the user's id
+
+`ICurrentUserAccessor`:
+
+- [ ] Resolves in this order: HTTP context → AsyncLocal scope → throw `InvalidOperationException`
+- [ ] The throw message names both options: "HTTP requests resolve from cookie; background jobs must enter via IUserScope.EnterAs()"
+- [ ] No silent fallback to `Guid.Empty` anywhere
+- [ ] Test: calling `_currentUser.UserId` in a unit-test without setting either context throws
+
+EF global query filters:
+
+- [ ] Filters applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `TransferAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile` (+ any other user-owned entity at cutover time)
+- [ ] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) carry NO filter
+- [ ] Service code continues to write explicit `.Where(t => t.UserId == _currentUser.UserId)` (belt-and-suspenders)
+- [ ] Test: a query against a user-owned table without `IgnoreQueryFilters()`, run as User A, returns zero User B rows even when the explicit `.Where()` is intentionally omitted
+
+`IgnoreQueryFilters()` boundary:
+
+- [ ] Architecture test fails the build if `IgnoreQueryFilters()` appears in any file outside `ProjectCeres/Admin/` or other documented exception paths
+- [ ] Documented exception paths: `IUserJobRunner.ForEachUserAsync` (intentionally cross-tenant), audit-log purge, retention sweeps — each with a comment explaining why
+- [ ] Test: an attempt to add `IgnoreQueryFilters()` to a regular service file fails the architecture test
+
+Sentinel-to-real-user migration:
+
+- [ ] Migration runs inside a single PostgreSQL transaction
+- [ ] Pre-check: exactly one row exists in `AspNetUsers` (the user who just registered)
+- [ ] Pre-check: at least one row tagged with the sentinel UUID exists in user-owned tables
+- [ ] If either pre-check fails, the transaction aborts cleanly (no partial state)
+- [ ] All user-owned tables remapped: `accounts`, `transactions`, `transfers`, `liability_payments`, `categories`, `category_budgets`, `budgets`, `recurring_transactions`, `transaction_attachments`, `transfer_attachments`, `saved_reports`, `csv_import_profiles`, `settings` (+ any other user-owned tables existing at cutover time)
+- [ ] Post-check: `SELECT COUNT(*) WHERE user_id = sentinel` is 0 across all tables
+- [ ] If post-check fails, the transaction rolls back
+- [ ] Migration runs **once only** — gated by a flag or schema-version check; subsequent registrations don't re-run it
+- [ ] Pre-deployment manual gate: a database backup snapshot is taken before the deployment that includes this migration
+
+Sentinel removal:
+
+- [ ] `SingleUserAccessor` class deleted
+- [ ] Sentinel UUID constant (`00000000-0000-0000-0000-000000000001`) removed from production code
+- [ ] Test fixtures updated to use real test user UUIDs
+- [ ] Seed scripts updated
+- [ ] No grep hit for `SingleUserAccessor` or the sentinel constant in production code
+
+Service audit (per `multi-tenancy-strategy.md` § Services to audit for Phase 3):
+
+- [ ] `AccountService` — every method scoped by `UserId`
+- [ ] `TransactionService` — every method scoped
+- [ ] `TransferService` — every method scoped
+- [ ] `LiabilityPaymentService` — every method scoped
+- [ ] `CategoryService` — every method scoped
+- [ ] `CategoryBudgetService` — every method scoped
+- [ ] `BudgetService` (goal budgets) — every method scoped
+- [ ] `RecurringTransactionService` — every method scoped
+- [ ] `TransactionAttachmentService` — every method scoped
+- [ ] `TransferAttachmentService` — every method scoped
+- [ ] `SavedReportService` — every method scoped
+- [ ] `SettingsService` — every method scoped (including the no-longer-singleton path)
+- [ ] `DashboardService` — every method scoped
+- [ ] All 8 report generators (`NetWorth`, `IncomeExpense`, `ExpenseBreakdown`, `TransactionHistory`, `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime`) — scoped
+- [ ] `ImportService` — every method scoped
+- [ ] `CsvImportProfileService` — every method scoped
+- [ ] `TransferReviewService` — every method scoped
+- [ ] `ImportStagedTransactionService` — every method scoped
+- [ ] `ReminderCountProvider` server-side counterpart — scoped
+- [ ] `ReviewCountProvider` server-side counterpart — scoped
+
+Boot-time hooks:
+
+- [ ] `ISettingsService.EnsureExistsAsync` removed from `Program.cs` startup
+- [ ] No remaining `IHostedService`, `IStartupFilter`, or boot-time hook queries user-owned tables
+- [ ] Any boot-time query that needed user data is moved into per-user lifecycle hooks (registration, login)
+- [ ] Test: a smoke test starts the application with zero registered users and confirms no boot-time exception is thrown
+
+IDOR integration test suite (per `multi-tenancy-strategy.md` § Required Integration Tests):
+
+- [ ] User A cannot read User B's accounts (`GET /api/accounts/{B's id}` → 404, NOT 403)
+- [ ] User A cannot read User B's transactions
+- [ ] User A cannot read User B's transfers
+- [ ] User A cannot read User B's liability payments
+- [ ] User A cannot read User B's budgets (CategoryBudget + GoalBudget)
+- [ ] User A cannot read User B's categories
+- [ ] User A cannot read User B's recurring transactions
+- [ ] User A cannot read User B's saved reports
+- [ ] User A cannot read User B's transaction attachments (file content download)
+- [ ] User A cannot read User B's transfer attachments
+- [ ] User A cannot list User B's anything (list endpoints return zero of B's rows when called as A)
+- [ ] User A cannot aggregate over User B's data (sum/count endpoints scoped correctly)
+- [ ] User A cannot delete User B's resources (`DELETE /api/transactions/{B's id}` → 404)
+- [ ] User A cannot edit User B's resources (`PATCH /api/transactions/{B's id}` → 404)
+- [ ] User A cannot upload an attachment against User B's transaction
+- [ ] Cross-tenant tests use real fixtures, not mocked services — the test must touch the real DB to verify global filters apply
+
+---
+
+## Stage 8 — Email service + email security (Batch 3d)
+
+**Status: ❌ Pending.** Lands before Stage 9 (auth UI) because auth flows depend on a working email service.
+
+> **Goal:** a transactional email service is integrated, DNS-level email security is configured (SPF, DKIM, DMARC), application-layer protections (recipient lock, sanitization, rate limiting) are in place, and the EN/ES transactional templates exist for every Phase 3 flow that sends mail.
+
+### Sub-stages
+
+| # | Sub-stage | Spec / Reference |
+|---|---|---|
+| 8.1 | Pick provider (SendGrid / Postmark / AWS SES / Mailgun) | `planning.md` § Open Questions: Email service |
+| 8.2 | `IEmailService` abstraction + provider implementation | New abstraction; provider behind interface for testability |
+| 8.3 | DNS authentication: SPF, DKIM, DMARC | `security-model.md` § Email Security Rules → Layer 1 |
+| 8.4 | Application controls: recipient lock, sanitization, per-user rate limit | `security-model.md` § Email Security Rules → Layer 2 |
+| 8.5 | API key hygiene: secret store, send-only scope, rotation procedure | `security-model.md` § Email Security Rules → Layer 3 |
+| 8.6 | Transactional templates EN + ES | `.resx` files per `planning-phase3.md` § Localization (`Emails.en.resx`, `Emails.es.resx`) |
+| 8.7 | Email delivery telemetry (delivered / bounced / complained) | Provider webhook integration |
+
+### Verification checklist
+
+Provider integration:
+
+- [ ] `IEmailService` interface exists with `SendAsync(EmailMessage)` and is the only entry point for outgoing email
+- [ ] No code outside the email service constructs an SMTP client or provider client directly
+- [ ] Provider API key in environment variable / secret store; never in source control
+- [ ] Send-only scoped key used where the provider supports it
+- [ ] Key rotation procedure documented in `security-model.md` § Secrets Rotation Procedures (or new entry)
+- [ ] Provider client is wrapped in retry logic (provider transient errors retry 3 times with exponential backoff)
+- [ ] Failed sends are logged but never block the user-facing request (queued via `IUserJobRunner`)
+
+DNS authentication (per `security-model.md` § Layer 1 — DNS authentication):
+
+- [ ] SPF record published on the sending domain
+- [ ] DKIM record published with provider-supplied public key; signing active and verified
+- [ ] DMARC record published with at minimum `p=none` at launch
+- [ ] DMARC aggregate report destination configured (e.g., `rua=mailto:dmarc@example.com`)
+- [ ] After 30 days of clean aggregate reports, advance DMARC to `p=quarantine`, then `p=reject`
+- [ ] All three records verified using `dig` and an external tool (e.g., MXToolbox)
+
+Application controls (per `security-model.md` § Layer 2 — Application controls):
+
+- [ ] Outgoing `To:` address ALWAYS resolved server-side from the authenticated user's verified email — never from a request parameter
+- [ ] User-controlled strings rendered into email subject/body are sanitized (HTML-escaped, newline-stripped to prevent header injection)
+- [ ] Per-user rate limit on email-triggering endpoints (e.g., max 5 password-reset requests / hour / user, max 1 GDPR export / 24 hours / user)
+- [ ] Per-IP rate limit on unauthenticated email-triggering endpoints (e.g., password reset request before user is identified)
+- [ ] Test: attempting to send to an arbitrary `To:` parameter is rejected at the service boundary
+
+Transactional templates (EN + ES, per `planning-phase3.md` § Localization):
+
+- [ ] Registration confirmation (verify-email link)
+- [ ] Password reset request
+- [ ] Password changed notification
+- [ ] Email-change verify-new-address link
+- [ ] Email-change revoke-old-address link
+- [ ] TOTP enrolled (security event)
+- [ ] TOTP disabled (security event)
+- [ ] Backup codes regenerated (security event)
+- [ ] Account lockout notification with self-service unlock link
+- [ ] New-session alert (when login from previously-unseen IP for that user)
+- [ ] GDPR data export ready (with 24-hour authenticated download link)
+- [ ] Account-erasure confirmation (per `security-model.md` § Security Event Notifications)
+- [ ] Each template exists in `Emails.en.resx` and `Emails.es.resx`
+- [ ] Templates rendered server-side via `IStringLocalizer<EmailsResource>` keyed by user's `Settings.Language`
+- [ ] No financial amounts in security-event emails (per `security-model.md` § Logging and PII Redaction)
+
+Security event notifications (mandatory regardless of user preferences, per `security-model.md` § Security Event Notifications):
+
+- [ ] New-device/session login email — includes IP, geolocation summary, UA summary, "this wasn't me" link
+- [ ] Password-changed email — timestamp, IP, "revoke all sessions" link
+- [ ] Email-change-initiated email — old + new address, revoke link (7-day TTL)
+- [ ] Email-change-confirmed email
+- [ ] TOTP-re-enrolled email — timestamp, IP, "this wasn't me" link
+- [ ] TOTP-disabled email — timestamp, IP, "re-enable + revoke all sessions" link
+- [ ] Backup-codes-regenerated email
+- [ ] Account-locked-out email — cause, IP, self-service unlock link
+- [ ] GDPR-erasure-initiated email — confirmation of what will be deleted and when
+- [ ] All eight emails verified to actually fire in integration tests with test fixtures
+
+Telemetry + observability:
+
+- [ ] Provider webhook configured for delivered / bounced / complained events
+- [ ] Bounced events disable the user's email (mark `EmailVerified = false`) and surface a notice on next login
+- [ ] Complaints (spam reports) auto-disable digest emails for that user
+- [ ] Webhook endpoint validates provider signature (no spoofed events)
+
+Tests required before Stage 9 begins:
+
+- [ ] Send-email happy-path test mocks the provider client and asserts subject/body/to render correctly in both EN and ES
+- [ ] Recipient-lock test: passing an arbitrary `To:` is rejected
+- [ ] Header-injection test: a user "name" with embedded `\r\n` cannot inject email headers
+- [ ] Rate-limit test: 6th password-reset request within an hour is rejected
+- [ ] DKIM signature presence test (smoke test against staging provider config)
+
+---
+
+
