@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-29
 **Phase:** 3 (Hosted Beta)
-**Status:** Approved
+**Status:** Bug-fix portion shipped 2026-05-06 (commits straight to main). Debit/Credit column feature still pending.
 
 ---
 

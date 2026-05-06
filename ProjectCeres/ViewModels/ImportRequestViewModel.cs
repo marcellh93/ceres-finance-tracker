@@ -21,5 +21,5 @@ public class ImportRequestViewModel
     public string? DescriptionColumn { get; set; }
 
     public string? CategoryColumn { get; set; }
-    public bool FlipDebitSign { get; set; }
+    public bool FlipDebitSign { get; set; } = true;
 }

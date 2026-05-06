@@ -29,7 +29,7 @@ public class TransferDetectionServiceTests
             Row(-100m, "Transfer in"),
         };
 
-        var result = service.Detect(rows, existingCrossAccountTxns: [], exclusionPatterns: [], accountId: AccountId);
+        var result = service.Detect(rows, [], [], [], [], AccountId);
 
         result.StagedRows.Should().HaveCount(2);
         result.StagedRows.Select(s => s.RawAmount).Should().BeEquivalentTo(new[] { 100m, -100m });
@@ -45,7 +45,7 @@ public class TransferDetectionServiceTests
             Row(-100m, "Transfer in"),
         };
 
-        var result = service.Detect(rows, [], [], AccountId);
+        var result = service.Detect(rows, [], [], [], [], AccountId);
 
         result.RowIndicesToSkip.Should().BeEquivalentTo(new[] { 0, 1 });
     }
@@ -60,7 +60,7 @@ public class TransferDetectionServiceTests
             Row(-100m, date: Today.AddDays(5)),
         };
 
-        var result = service.Detect(rows, [], [], AccountId);
+        var result = service.Detect(rows, [], [], [], [], AccountId);
 
         result.StagedRows.Should().BeEmpty();
         result.RowIndicesToSkip.Should().BeEmpty();
@@ -77,7 +77,7 @@ public class TransferDetectionServiceTests
             Row(100m,  "Out 2"),
         };
 
-        var result = service.Detect(rows, [], [], AccountId);
+        var result = service.Detect(rows, [], [], [], [], AccountId);
 
         result.StagedRows.Should().HaveCount(2);
         result.RowIndicesToSkip.Should().BeEquivalentTo(new[] { 0, 1 });
@@ -100,7 +100,7 @@ public class TransferDetectionServiceTests
             AccountId = Guid.NewGuid()
         };
 
-        var result = service.Detect(rows, [crossAccountTxn], [], AccountId);
+        var result = service.Detect(rows, [crossAccountTxn], [], [], [], AccountId);
 
         result.StagedRows.Should().HaveCount(1);
         result.StagedRows[0].CandidateTransactionId.Should().Be(candidateId);
@@ -119,7 +119,7 @@ public class TransferDetectionServiceTests
             Amount = 50m
         };
 
-        var result = service.Detect(rows, [crossAccountTxn], [], AccountId);
+        var result = service.Detect(rows, [crossAccountTxn], [], [], [], AccountId);
 
         result.StagedRows.Should().HaveCount(1);
     }
@@ -136,7 +136,7 @@ public class TransferDetectionServiceTests
             Amount = 50m
         };
 
-        var result = service.Detect(rows, [crossAccountTxn], [], AccountId);
+        var result = service.Detect(rows, [crossAccountTxn], [], [], [], AccountId);
 
         result.StagedRows.Should().BeEmpty();
     }
@@ -153,7 +153,7 @@ public class TransferDetectionServiceTests
             Row(-100m, "bizum payment"),
         };
 
-        var result = service.Detect(rows, [], exclusionPatterns: ["bizum"], AccountId);
+        var result = service.Detect(rows, [], [], [], ["bizum"], AccountId);
 
         result.StagedRows.Should().BeEmpty();
         result.RowIndicesToSkip.Should().BeEmpty();
@@ -169,7 +169,121 @@ public class TransferDetectionServiceTests
             Row(-100m, "Bizum Transfer"),
         };
 
-        var result = service.Detect(rows, [], ["bizum"], AccountId);
+        var result = service.Detect(rows, [], [], [], ["bizum"], AccountId);
+
+        result.StagedRows.Should().BeEmpty();
+    }
+
+    // ── LiabilityPayment / Transfer matching ───────────────────────────────────
+
+    [Fact]
+    public void Detect_LiabilityPaymentMatchesIncomingRowOnLiabilitySide_RowIsSkippedAndStaged()
+    {
+        // Reproduces the BBVA case: a credit-card statement row arrives that is the
+        // payee side of an existing Debt Payment (Checking → Credit Card). Without
+        // matching, the import creates a duplicate income transaction.
+        var service = new TransferDetectionService();
+        var rows = new List<ParsedImportRow> { Row(523.30m, "Ingreso desde cuenta") };
+
+        var payment = new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = Today,
+            Amount             = 523.30m,
+            AssetAccountId     = Guid.NewGuid(), // checking
+            LiabilityAccountId = AccountId       // credit card being imported
+        };
+
+        var result = service.Detect(rows, [], [payment], [], [], AccountId);
+
+        result.StagedRows.Should().HaveCount(1);
+        result.StagedRows[0].CandidateTransactionId.Should().BeNull();
+        result.RowIndicesToSkip.Should().BeEquivalentTo(new[] { 0 });
+    }
+
+    [Fact]
+    public void Detect_LiabilityPaymentMatchesIncomingRowOnAssetSide_RowIsSkippedAndStaged()
+    {
+        // Symmetric: importing the Checking-account statement — outgoing payment row
+        // matches the same Debt Payment record from the asset side.
+        var service = new TransferDetectionService();
+        var rows = new List<ParsedImportRow> { Row(-523.30m, "Pago Tarjeta Abril") };
+
+        var payment = new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = Today,
+            Amount             = 523.30m,
+            AssetAccountId     = AccountId,      // checking being imported
+            LiabilityAccountId = Guid.NewGuid()  // credit card
+        };
+
+        var result = service.Detect(rows, [], [payment], [], [], AccountId);
+
+        result.StagedRows.Should().HaveCount(1);
+        result.RowIndicesToSkip.Should().BeEquivalentTo(new[] { 0 });
+    }
+
+    [Fact]
+    public void Detect_LiabilityPaymentDifferentAccount_NotMatched()
+    {
+        // Same amount + date but neither side touches the importing account.
+        var service = new TransferDetectionService();
+        var rows = new List<ParsedImportRow> { Row(523.30m, "Random income") };
+
+        var payment = new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = Today,
+            Amount             = 523.30m,
+            AssetAccountId     = Guid.NewGuid(),
+            LiabilityAccountId = Guid.NewGuid()
+        };
+
+        var result = service.Detect(rows, [], [payment], [], [], AccountId);
+
+        result.StagedRows.Should().BeEmpty();
+        result.RowIndicesToSkip.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Detect_TransferMatchesIncomingRow_RowIsSkippedAndStaged()
+    {
+        var service = new TransferDetectionService();
+        var rows = new List<ParsedImportRow> { Row(150m, "Savings → Checking") };
+
+        var transfer = new Transfer
+        {
+            Id              = Guid.NewGuid(),
+            Date            = Today,
+            Amount          = 150m,
+            SourceAccountId = Guid.NewGuid(),
+            DestAccountId   = AccountId
+        };
+
+        var result = service.Detect(rows, [], [], [transfer], [], AccountId);
+
+        result.StagedRows.Should().HaveCount(1);
+        result.StagedRows[0].CandidateTransactionId.Should().BeNull();
+        result.RowIndicesToSkip.Should().BeEquivalentTo(new[] { 0 });
+    }
+
+    [Fact]
+    public void Detect_LiabilityPaymentBeyondDateTolerance_NotMatched()
+    {
+        var service = new TransferDetectionService();
+        var rows = new List<ParsedImportRow> { Row(100m, "Income", Today) };
+
+        var payment = new LiabilityPayment
+        {
+            Id                 = Guid.NewGuid(),
+            Date               = Today.AddDays(3),
+            Amount             = 100m,
+            AssetAccountId     = Guid.NewGuid(),
+            LiabilityAccountId = AccountId
+        };
+
+        var result = service.Detect(rows, [], [payment], [], [], AccountId);
 
         result.StagedRows.Should().BeEmpty();
     }
@@ -182,7 +296,7 @@ public class TransferDetectionServiceTests
         var service = new TransferDetectionService();
         var rows = new List<ParsedImportRow> { Row(77m, "Transfer ABC"), Row(-77m, "Transfer XYZ") };
 
-        var result = service.Detect(rows, [], [], AccountId);
+        var result = service.Detect(rows, [], [], [], [], AccountId);
 
         var staged = result.StagedRows[0];
         staged.AccountId.Should().Be(AccountId);

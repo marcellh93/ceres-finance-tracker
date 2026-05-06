@@ -64,11 +64,26 @@ public class ImportService(
                 .ToListAsync()
             : (IReadOnlyList<Transaction>)[];
 
+        // Liability payments and transfers represent two-sided money movements; an
+        // import row that matches one of these is a duplicate of money already booked.
+        var liabilityPayments = transferDetectionService is not null
+            ? await (user is not null ? db.LiabilityPayments.Owned(user) : db.LiabilityPayments)
+                .Where(p => p.AssetAccountId == accountId || p.LiabilityAccountId == accountId)
+                .ToListAsync()
+            : (IReadOnlyList<LiabilityPayment>)[];
+
+        var transfers = transferDetectionService is not null
+            ? await (user is not null ? db.Transfers.Owned(user) : db.Transfers)
+                .Where(t => t.SourceAccountId == accountId || t.DestAccountId == accountId)
+                .ToListAsync()
+            : (IReadOnlyList<Transfer>)[];
+
         // Run transfer detection pass
         HashSet<int> skipIndices = [];
         if (transferDetectionService is not null)
         {
-            var detection = transferDetectionService.Detect(rows, crossAccountTxns, exclusionPatterns, accountId);
+            var detection = transferDetectionService.Detect(
+                rows, crossAccountTxns, liabilityPayments, transfers, exclusionPatterns, accountId);
 
             foreach (var staged in detection.StagedRows)
                 db.ImportStagedTransfers.Add(staged);

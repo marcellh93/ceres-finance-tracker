@@ -64,8 +64,10 @@ public class ImportServiceTests
     }
 
     [Fact]
-    public async Task ParseAsync_NegativeDebitAmount_IsFlippedToPositive()
+    public async Task ParseAsync_NegativeDebitAmount_PreservesSignWithFlipDebitSignTrue()
     {
+        // Per spec 2026-04-29 the parser no longer flips signs. Direction is inferred
+        // downstream from the raw signed amount; the flip used to invert classification.
         var service  = new ImportService(BuildFactory());
         var mappings = new ImportColumnMappings
         {
@@ -75,7 +77,6 @@ public class ImportServiceTests
             FlipDebitSign     = true
         };
 
-        // Build an in-memory CSV with a negative debit value.
         var csv = "Date,Amount,Description\n2024-01-01,-75.50,Supermarket\n";
         var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(csv));
         var file = new Mock<IFormFile>();
@@ -91,7 +92,7 @@ public class ImportServiceTests
         var rows = await service.ParseAsync(file.Object, mappings);
 
         rows.Should().HaveCount(1);
-        rows.First().Amount.Should().Be(75.50m);
+        rows.First().Amount.Should().Be(-75.50m);
     }
 
     [Fact]

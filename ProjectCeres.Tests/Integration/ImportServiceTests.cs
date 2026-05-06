@@ -238,4 +238,34 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
         txn.CategoryId.Should().Be(UncategorizedExpenseId);
         txn.NeedsReview.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task ImportAsync_NegativeAmountWithFlipDebitSignTrue_StaysExpense()
+    {
+        // Required by spec 2026-04-29: this is the case that shipped broken — toggle ON
+        // (negative-debits convention, the user's actual setup) was inverting the sign
+        // and classifying expense rows as income. The pipeline must keep -75 negative.
+        var csv = "Date,Amount,Description\n2024-03-01,-75.00,Coffee\n";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+        var stream = new MemoryStream(bytes);
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("expense.csv");
+        mock.Setup(f => f.Length).Returns(stream.Length);
+        mock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Returns<Stream, CancellationToken>((dest, ct) => { stream.Position = 0; return stream.CopyToAsync(dest, ct); });
+
+        var result = await _service.ImportAsync(mock.Object, _accountId, new ImportColumnMappings
+        {
+            DateColumn        = "Date",
+            AmountColumn      = "Amount",
+            DescriptionColumn = "Description",
+            FlipDebitSign     = true
+        });
+
+        result.RowsImported.Should().Be(1);
+
+        var txn = await _fixture.Db.Transactions.FirstAsync(t => t.AccountId == _accountId);
+        txn.CategoryId.Should().Be(UncategorizedExpenseId);
+        txn.Amount.Should().Be(75.00m); // ImportService stores Math.Abs(rawAmount)
+    }
 }

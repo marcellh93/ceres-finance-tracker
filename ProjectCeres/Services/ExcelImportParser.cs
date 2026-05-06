@@ -58,11 +58,13 @@ public class ExcelImportParser : IImportParser
                         : "The workbook contains no worksheets.", ex);
             }
 
-            // Build column index from header row (row 1)
-            var headerRow = ws.Row(1);
+            // Bank exports often have a logo banner, report title, or metadata above the
+            // table — locate the first row with ≥2 used cells and treat that as the header.
+            var headerRow = ws.RowsUsed().FirstOrDefault(r => r.CellsUsed().Count() >= 2);
             var colIndex  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var cell in headerRow.CellsUsed())
-                colIndex[cell.GetString()] = cell.Address.ColumnNumber;
+            if (headerRow is not null)
+                foreach (var cell in headerRow.CellsUsed())
+                    colIndex[cell.GetString()] = cell.Address.ColumnNumber;
 
             if (!colIndex.TryGetValue(mappings.DateColumn, out var dateCol))
                 throw new InvalidOperationException($"Column '{mappings.DateColumn}' not found in worksheet.");
@@ -75,30 +77,27 @@ public class ExcelImportParser : IImportParser
             if (mappings.CategoryColumn is not null && colIndex.TryGetValue(mappings.CategoryColumn, out var cc))
                 catCol = cc;
 
-            var rows    = new List<ParsedImportRow>();
-            var lastRow = ws.LastRowUsed()?.RowNumber() ?? 1;
+            var rows         = new List<ParsedImportRow>();
+            var headerRowNum = headerRow!.RowNumber();
+            var lastRow      = ws.LastRowUsed()?.RowNumber() ?? headerRowNum;
 
-            for (int r = 2; r <= lastRow; r++)
+            for (int r = headerRowNum + 1; r <= lastRow; r++)
             {
                 var row = ws.Row(r);
 
-                var dateStr   = row.Cell(dateCol).GetString();
-                var amountStr = row.Cell(amountCol).GetString();
-                var desc      = row.Cell(descCol).GetString();
-                var category  = catCol.HasValue ? row.Cell(catCol.Value).GetString() : null;
+                var dateCell   = row.Cell(dateCol);
+                var amountCell = row.Cell(amountCol);
+                var desc       = row.Cell(descCol).GetString();
+                var category   = catCol.HasValue ? row.Cell(catCol.Value).GetString() : null;
 
-                if (string.IsNullOrWhiteSpace(dateStr) && string.IsNullOrWhiteSpace(amountStr))
+                if (dateCell.IsEmpty() && amountCell.IsEmpty())
                     continue;
 
-                if (!DateOnly.TryParseExact(dateStr, ["yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy"], null,
-                        DateTimeStyles.None, out var date))
+                if (!TryReadDate(dateCell, out var date))
                     continue;
 
-                if (!decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
+                if (!TryReadAmount(amountCell, out var amount))
                     continue;
-
-                if (mappings.FlipDebitSign && amount < 0)
-                    amount = -amount;
 
                 rows.Add(new ParsedImportRow
                 {
@@ -111,5 +110,44 @@ public class ExcelImportParser : IImportParser
 
             return rows;
         }
+    }
+
+    // Excel serial-date / numeric / text cells all need to round-trip through
+    // a typed accessor — GetString() formats numbers using the *thread* culture,
+    // which silently corrupts values when the file's convention disagrees with
+    // the host's locale (e.g. 120.54 → "120,54" → 12054).
+    private static bool TryReadDate(IXLCell cell, out DateOnly date)
+    {
+        if (cell.DataType == XLDataType.DateTime)
+        {
+            date = DateOnly.FromDateTime(cell.GetDateTime());
+            return true;
+        }
+
+        var text = cell.GetString();
+        return DateOnly.TryParseExact(text, ["yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy"], null,
+            DateTimeStyles.None, out date);
+    }
+
+    private static bool TryReadAmount(IXLCell cell, out decimal amount)
+    {
+        if (cell.DataType == XLDataType.Number)
+        {
+            amount = (decimal)cell.GetDouble();
+            return true;
+        }
+
+        // Try invariant first WITHOUT allowing thousands separators — otherwise
+        // "120,54" would silently parse as 12054 (comma read as group separator).
+        // Falling back to es-ES handles the legitimate comma-decimal case.
+        var text = cell.GetString();
+        const NumberStyles strict = NumberStyles.AllowDecimalPoint
+                                  | NumberStyles.AllowLeadingSign
+                                  | NumberStyles.AllowLeadingWhite
+                                  | NumberStyles.AllowTrailingWhite;
+        if (decimal.TryParse(text, strict, CultureInfo.InvariantCulture, out amount))
+            return true;
+
+        return decimal.TryParse(text, strict, new CultureInfo("es-ES"), out amount);
     }
 }

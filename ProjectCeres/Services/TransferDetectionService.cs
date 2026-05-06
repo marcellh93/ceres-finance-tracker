@@ -11,6 +11,8 @@ public class TransferDetectionService : ITransferDetectionService
     public TransferDetectionResult Detect(
         IReadOnlyList<ParsedImportRow> rows,
         IReadOnlyList<Transaction> existingCrossAccountTxns,
+        IReadOnlyList<LiabilityPayment> existingLiabilityPayments,
+        IReadOnlyList<Transfer> existingTransfers,
         IReadOnlyList<string> exclusionPatterns,
         Guid accountId)
     {
@@ -50,11 +52,49 @@ public class TransferDetectionService : ITransferDetectionService
             {
                 skipIndices.Add(i);
                 staged.Add(MakeStagedRow(row, accountId, candidateTransactionId: crossMatch.Id));
+                continue;
+            }
+
+            // LiabilityPayment / Transfer matches: the existing record represents both
+            // sides of the movement, so there's no Transaction row to link against.
+            // Stage with no candidate id so the user can confirm/dismiss in the review tab.
+            if (HasMatchingLiabilityPayment(row, existingLiabilityPayments, accountId)
+                || HasMatchingTransfer(row, existingTransfers, accountId))
+            {
+                skipIndices.Add(i);
+                staged.Add(MakeStagedRow(row, accountId, candidateTransactionId: null));
             }
         }
 
         return new TransferDetectionResult(staged.AsReadOnly(), skipIndices);
     }
+
+    private static bool HasMatchingLiabilityPayment(
+        ParsedImportRow row,
+        IReadOnlyList<LiabilityPayment> payments,
+        Guid accountId)
+    {
+        var absAmount = Math.Abs(row.Amount);
+        return payments.Any(p =>
+            (p.AssetAccountId == accountId || p.LiabilityAccountId == accountId) &&
+            p.Amount == absAmount &&
+            WithinDateTolerance(p.Date, row.Date));
+    }
+
+    private static bool HasMatchingTransfer(
+        ParsedImportRow row,
+        IReadOnlyList<Transfer> transfers,
+        Guid accountId)
+    {
+        var absAmount = Math.Abs(row.Amount);
+        return transfers.Any(t =>
+            (t.SourceAccountId == accountId || t.DestAccountId == accountId) &&
+            t.Amount == absAmount &&
+            WithinDateTolerance(t.Date, row.Date));
+    }
+
+    private static bool WithinDateTolerance(DateOnly a, DateOnly b) =>
+        Math.Abs((a.ToDateTime(TimeOnly.MinValue) - b.ToDateTime(TimeOnly.MinValue)).TotalDays) <= DateToleranceDays;
 
     private static int FindIntraFilePartner(
         IReadOnlyList<ParsedImportRow> rows,

@@ -13,6 +13,8 @@ public interface ITransferDetectionService
     TransferDetectionResult Detect(
         IReadOnlyList<ParsedImportRow> rows,
         IReadOnlyList<Transaction> existingCrossAccountTxns,
+        IReadOnlyList<LiabilityPayment> existingLiabilityPayments,
+        IReadOnlyList<Transfer> existingTransfers,
         IReadOnlyList<string> exclusionPatterns,
         Guid accountId);
 }

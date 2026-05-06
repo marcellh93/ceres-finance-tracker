@@ -42,11 +42,8 @@ public class CsvImportParser : IImportParser
                     DateTimeStyles.None, out var date))
                 continue;
 
-            if (!decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
+            if (!TryParseAmount(amountStr, out var amount))
                 continue;
-
-            if (mappings.FlipDebitSign && amount < 0)
-                amount = -amount;
 
             rows.Add(new ParsedImportRow
             {
@@ -58,5 +55,20 @@ public class CsvImportParser : IImportParser
         }
 
         return rows;
+    }
+
+    // Reject thousands separators on the invariant pass — otherwise "120,54"
+    // (legitimate comma decimal) silently parses as 12054. The es-ES fallback
+    // handles bank CSV exports written under a comma-decimal locale.
+    private static bool TryParseAmount(string raw, out decimal amount)
+    {
+        const NumberStyles strict = NumberStyles.AllowDecimalPoint
+                                  | NumberStyles.AllowLeadingSign
+                                  | NumberStyles.AllowLeadingWhite
+                                  | NumberStyles.AllowTrailingWhite;
+        if (decimal.TryParse(raw, strict, CultureInfo.InvariantCulture, out amount))
+            return true;
+
+        return decimal.TryParse(raw, strict, new CultureInfo("es-ES"), out amount);
     }
 }
