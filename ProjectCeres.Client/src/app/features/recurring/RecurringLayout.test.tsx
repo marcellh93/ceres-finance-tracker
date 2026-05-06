@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { RecurringLayout } from './RecurringLayout';
+import { ReminderCountProvider } from '../../layout/ReminderCountProvider';
 
 function renderLayout(path = '/recurring') {
   return render(
@@ -13,6 +14,21 @@ function renderLayout(path = '/recurring') {
         </Route>
       </Routes>
     </MemoryRouter>
+  );
+}
+
+function renderLayoutWithBell(path = '/recurring') {
+  return render(
+    <ReminderCountProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="recurring" element={<RecurringLayout />}>
+            <Route path="new" element={<div>Create form</div>} />
+            <Route path=":id/edit" element={<div>Edit form</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </ReminderCountProvider>
   );
 }
 
@@ -100,5 +116,37 @@ describe('RecurringLayout', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
     renderLayout();
     await waitFor(() => expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument());
+  });
+
+  it('refetches the bell reminder count after a row Confirm completes', async () => {
+    const item = {
+      id: 'r1', name: 'Rent', estimatedAmount: 900, accountId: 'a', accountName: 'Checking',
+      currencySymbol: '€', categoryId: 'c', categoryName: 'Housing', categoryTypeName: 'Expense',
+      frequency: 'Monthly', dayOfPeriod: null, nextDueDate: '2026-05-15',
+      isActive: true, reminderBehaviour: 'SnapToCalendarDay',
+    };
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/confirm') && init?.method === 'POST') {
+        return Promise.resolve({ status: 201, ok: true, json: async () => ({ transactionId: 'tx-1' }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => [item] });
+    });
+    global.fetch = fetchMock;
+
+    renderLayoutWithBell();
+    await waitFor(() => expect(screen.getByText('Rent')).toBeInTheDocument());
+
+    const bellUrl = '/api/recurring-transactions/upcoming?days=0';
+    const bellCallsBefore = fetchMock.mock.calls.filter(([u]) => u === bellUrl).length;
+    expect(bellCallsBefore).toBeGreaterThanOrEqual(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /row actions/i }));
+    fireEvent.click(screen.getByText('Confirm'));
+    fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
+
+    await waitFor(() => {
+      const bellCallsAfter = fetchMock.mock.calls.filter(([u]) => u === bellUrl).length;
+      expect(bellCallsAfter).toBeGreaterThan(bellCallsBefore);
+    });
   });
 });

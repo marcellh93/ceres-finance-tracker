@@ -48,7 +48,7 @@ export function RecurringLayout() {
   const allList = useApi<RecurringTransactionListItemDto[]>('/api/recurring-transactions?includeInactive=true');
 
   const { refresh: refreshBell } = useReminderCount();
-  const refetch = () => { list.refetch(); allList.refetch(); };
+  const refetch = () => { list.refetch(); allList.refetch(); refreshBell(); };
   const ctx: RecurringLayoutCtx = { refetch, refreshBell };
 
   if (childActive) {
