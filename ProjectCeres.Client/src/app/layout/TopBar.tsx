@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { AvatarMenu } from './AvatarMenu';
 import { BrandMark } from './BrandMark';
 import { useReminderCount } from './ReminderCountProvider';
+import { ThemeToggle } from '@/design-system/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -85,6 +86,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
               </Button>
             )}
             <NotificationsButton />
+            <ThemeToggle />
           </>
         )}
         <AvatarMenu />

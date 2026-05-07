@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ThemeToggle } from '@/design-system/components/ThemeToggle';
 import { bottomItems, navGroups, type NavItem } from './nav-items';
 
 type MobileDrawerProps = {
@@ -39,6 +40,10 @@ export function MobileDrawer({ open, onOpenChange }: MobileDrawerProps) {
                 </li>
               ))}
             </ul>
+            <div className="mt-2 flex items-center justify-between px-3 py-2">
+              <span className="text-sm text-foreground">Appearance</span>
+              <ThemeToggle showLabel />
+            </div>
           </div>
         </nav>
       </SheetContent>

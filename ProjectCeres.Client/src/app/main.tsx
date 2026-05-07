@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ThemeProvider } from 'next-themes';
 import { BrowserRouter } from 'react-router-dom';
 import '../index.css';
 import { App } from './App';
@@ -9,8 +10,15 @@ if (!root) throw new Error('app root element missing');
 
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter basename="/app">
-      <App />
-    </BrowserRouter>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <BrowserRouter basename="/app">
+        <App />
+      </BrowserRouter>
+    </ThemeProvider>
   </StrictMode>,
 );
