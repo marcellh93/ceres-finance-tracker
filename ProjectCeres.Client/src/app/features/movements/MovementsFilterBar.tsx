@@ -56,7 +56,7 @@ export function MovementsFilterBar() {
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-      <div className="flex-1 space-y-1.5">
+      <div className="space-y-1.5 sm:flex-[2] sm:min-w-0">
         <Label htmlFor="mov-search">Search</Label>
         <Input
           id="mov-search"
@@ -65,7 +65,7 @@ export function MovementsFilterBar() {
           onChange={(e) => setSearchInput(e.target.value)}
         />
       </div>
-      <div className="space-y-1.5 sm:w-56">
+      <div className="space-y-1.5 sm:flex-1 sm:min-w-0">
         <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Account</div>
         <AccountCombobox
           accounts={filteredAccounts ?? []}
@@ -75,7 +75,7 @@ export function MovementsFilterBar() {
           placeholder="All accounts"
         />
       </div>
-      <div className="space-y-1.5 sm:w-44">
+      <div className="space-y-1.5 sm:flex-1 sm:min-w-0">
         <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Type</div>
         <TypeFilterCombobox
           id="mov-type"
@@ -85,7 +85,7 @@ export function MovementsFilterBar() {
           }}
         />
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 sm:flex-1 sm:min-w-0">
         <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">Date</div>
         <MovementsDateRangePicker />
       </div>
