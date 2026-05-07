@@ -13,11 +13,23 @@ Each task wraps an existing skeleton/error/data branching block in `<DataTransit
 - `error` — error AND no stale data
 - `data` — otherwise (includes empty-state branches)
 
+**The "share fetch → share transition" rule.** When a page has multiple visible sections that all read from a single fetch (e.g., a totals/header card AND a list, both projected from the same array), they MUST share one DataTransition wrapper at the page level. The original Accounts implementation used per-section DataTransitions — different skeleton heights diverged from real-content heights, so when data arrived the list reflowed by more than the totals card, making the totals card appear to "arrive late." Refactored to page-level in commit `4e49f25`. **The canonical reference is now `AccountsLayout.tsx` after that commit, not before.**
+
+Decision tree per page (verified against current code, applied below):
+
+| Shape | Pattern |
+|---|---|
+| Single fetch → single visible section | Section-level wrapper (filter row stays live; only the table area transitions) |
+| Single fetch → multiple visible sections (totals + list, header card + body) | **Page-level wrapper.** Skeleton mirrors the full layout (totals-skeleton + list-skeleton). Filter row rendered inside both skeleton and data slots so it's live during loading. |
+| Multiple parallel fetches feeding one combined view (e.g., form data + dropdown options) | **Page-level wrapper** keyed off combined `loading = a.loading || b.loading`. The form is the data slot. |
+| Multiple fetches feeding alternative tabs (only one shown at a time) | **Per-tab wrapper.** Each tab has its own DataTransition; they're not parallel sections, they're alternatives. |
+| Independent KPI tiles on a dashboard | **Per-card wrapper.** "Filling in" is the expected dashboard pattern; lockstep would actually feel slower. |
+
 **Tech Stack:** React 19, TypeScript, Tailwind CSS v4, Vitest + React Testing Library.
 
-**Spec:** `docs/superpowers/specs/2026-05-04-data-loading-ease-in-design.md` (Accounts reference shipped in `docs/superpowers/plans/2026-05-04-data-loading-ease-in.md`)
+**Spec:** `docs/superpowers/specs/2026-05-04-data-loading-ease-in-design.md` (Accounts primitives reference at `docs/superpowers/plans/2026-05-04-data-loading-ease-in.md`)
 
-**Reference implementation:** Accounts at commits `c6052d0` → `5b7d72e`. Read `AccountsLayout.tsx` lines 115–228 (`SubtotalsArea`, `AccountsBody`, `AccountsDataView`) before each task — they show the canonical shape.
+**Reference implementation:** post-refactor `AccountsLayout.tsx` (commit `4e49f25`). Read it before any multi-section page below — it's the canonical page-level shape.
 
 ---
 
@@ -150,26 +162,32 @@ git commit -m "feat(movements): cross-fade list body skeleton/error/data states"
 
 ---
 
-## Task 3: Recurring list page
+## Task 3: Recurring list page (page-level pattern)
 
 **Files:**
 - Modify: `ProjectCeres.Client/src/app/features/recurring/RecurringLayout.tsx`
 - Modify: `ProjectCeres.Client/src/app/features/recurring/RecurringLayout.test.tsx`
 
-⚠️ **Pre-check:** The user's working tree currently has uncommitted changes in `RecurringLayout.tsx` and `RecurringLayout.test.tsx` (parallel work). Before starting:
+**Pattern:** RecurringLayout has two parallel `useApi` calls (`list` + `allList` for empty-state determination), structurally identical to the post-refactor Accounts page. Use the **page-level wrapper** — single DataTransition keyed off `list.loading && !list.data`. See `AccountsLayout.tsx` (commit `4e49f25`) for the exact shape.
 
-```bash
-git status -- ProjectCeres.Client/src/app/features/recurring/
+- [ ] **Step 1: Read current state.** Note the skeleton testid, any per-row layout choices, and where the filter row + "include archived" Switch live in the JSX.
+
+- [ ] **Step 2: Add the two standard imports** plus `useRef`/`type ReactNode` if needed.
+
+- [ ] **Step 3: Hoist `useDelayedLoading` to the top of the component**, BEFORE the `if (childActive)` early return. (React Rules of Hooks — see Accounts commit for the precedent.)
+
+- [ ] **Step 4: Extract the filter row into a `filterRow: ReactNode` const** (Input + Switch + New button). Render it inside both the skeleton slot and the data slot so it stays live during loading.
+
+- [ ] **Step 5: Build the skeleton slot** — a `<div className="space-y-6">` containing any header-card-skeleton (if Recurring has a totals strip) plus the filter card with the existing list-skeleton. Preserve `data-testid="recurring-skeleton"` on the row-skeleton block.
+
+- [ ] **Step 6: Build the data slot** as a sibling component (e.g., `RecurringDataLayout`) that takes `list`, `allList`, `query`, `filterRow` as props. Mirror `AccountsDataLayout`.
+
+- [ ] **Step 7: Run tests.** `pnpm --dir ProjectCeres.Client test -- RecurringLayout`. Rewrite the synchronous-skeleton test to async (per Task 1 template).
+
+- [ ] **Step 8: Commit.**
+
 ```
-
-If those files are modified, **STOP and report** to the user — do not start this task until the user has either committed or stashed their parallel work. The user's `feedback_ask_before_deviating_from_docs` rule requires surfacing this conflict.
-
-- [ ] **Step 1: Read current state.** Note skeleton testid and any per-row layout choices.
-
-- [ ] **Steps 2–7: Same recipe as Task 1.** Commit message:
-
-```
-feat(recurring): cross-fade list body skeleton/error/data states
+feat(recurring): atomic page-level data transition
 ```
 
 ---
@@ -220,43 +238,57 @@ Examples:
 
 ---
 
-## Task 5: Budgets list page
+## Task 5: Budgets list page (per-tab pattern)
 
 **Files:**
 - Modify: `ProjectCeres.Client/src/app/features/budgets/BudgetsLayout.tsx`
 - Modify: `ProjectCeres.Client/src/app/features/budgets/BudgetsLayout.test.tsx` (if exists)
 
-Same recipe as Task 1.
+**Pattern:** BudgetsLayout has two parallel `useApi` calls (`categoryQuery`, `goalQuery`) that power **two tabs** (Category, Goal). Only one tab is rendered at a time. They are NOT parallel sections — they're alternative views. Use the **per-tab pattern**: each tab gets its own DataTransition keyed off its own query. The other tab's loading state is irrelevant when the user is on this tab.
 
-- [ ] **Steps 1–7: Same as Task 1.** Commit message:
+- [ ] **Step 1: Read current state.** Note where `categoryQuery.loading` and `goalQuery.loading` are checked, which Skeleton renders for each, and how the active tab is selected.
+
+- [ ] **Step 2: Add the two standard imports.**
+
+- [ ] **Step 3: Wrap each tab's body** in its own `<DataTransition>`. State derivation is identical to Task 1's cheat sheet, but applied independently per tab.
+
+- [ ] **Step 4: Run tests.** `pnpm --dir ProjectCeres.Client test -- BudgetsLayout`. Rewrite synchronous-skeleton tests if present.
+
+- [ ] **Step 5: Commit.**
 
 ```
-feat(budgets): cross-fade list body skeleton/error/data states
+feat(budgets): cross-fade per-tab body on data load
 ```
 
 ---
 
-## Task 6: Settings page
+## Task 6: Settings page (page-level, combined loading)
 
 **Files:**
 - Modify: `ProjectCeres.Client/src/app/features/settings/SettingsPage.tsx`
 - Modify: `ProjectCeres.Client/src/app/features/settings/SettingsPage.test.tsx`
 
-Settings is a form page that loads existing settings via `useApi`, then renders a form. The skeleton appears while the initial load resolves. Apply the same wrapper.
+**Pattern:** SettingsPage has two parallel `useApi` calls (`settings` for the form values, `currencies` for a dropdown). The form can't render meaningfully until both are loaded. Use the **page-level wrapper** keyed off a combined boolean: `loading = settings.loading || currencies.loading`, with `hasData = settings.data && currencies.data`.
 
-- [ ] **Step 1: Read current state.** Confirm the form is gated behind a `loading` check and a Skeleton renders during load.
+- [ ] **Step 1: Read current state.** Confirm the form is gated behind both `settings.loading` and `currencies.loading` and a Skeleton renders during load.
 
 - [ ] **Step 2: Add the two standard imports.**
 
-- [ ] **Step 3: Wrap the form area in `<DataTransition>`.** State derivation is the same. The `data` slot is the form itself.
+- [ ] **Step 3: Wrap the form area in `<DataTransition>`** with combined loading:
 
-- [ ] **Step 4: Run tests.** `pnpm --dir ProjectCeres.Client test -- SettingsPage`
+```tsx
+const loading = settings.loading || currencies.loading;
+const hasData = !!settings.data && !!currencies.data;
+const showSkeleton = useDelayedLoading(loading && !hasData);
+let state: DataTransitionState;
+if (showSkeleton && !hasData) state = 'skeleton';
+else if ((settings.error || currencies.error) && !hasData) state = 'error';
+else state = 'data';
+```
 
-- [ ] **Step 5: Rewrite synchronous-skeleton test if present.**
+- [ ] **Step 4: Run tests.** `pnpm --dir ProjectCeres.Client test -- SettingsPage`. Rewrite synchronous-skeleton test if present.
 
-- [ ] **Step 6: Re-run tests.**
-
-- [ ] **Step 7: Commit.**
+- [ ] **Step 5: Commit.**
 
 ```
 feat(settings): cross-fade settings form on data load
@@ -339,7 +371,9 @@ Expected: type-check + production build succeeds.
 
 ## Pattern reference (cheat sheet)
 
-After adding the two imports, every consumer follows this shape:
+### Single-fetch, single-section (Tasks 1, 2, 4, 7)
+
+After adding the two imports, the consumer follows this shape:
 
 ```tsx
 function ConsumerArea({ list }: { list: UseApiResult<...> }) {
@@ -365,6 +399,65 @@ function ConsumerArea({ list }: { list: UseApiResult<...> }) {
     </DataTransition>
   );
 }
+```
+
+### Single-fetch, multiple-section (Tasks 3, plus future page-level adoptions)
+
+For pages where one fetch feeds two visually-parallel sections (totals card + list, header card + body), lift the wrapper to the page level. Mirror `AccountsLayout.tsx` (commit `4e49f25`):
+
+```tsx
+export function PageLayout() {
+  // Hooks at the top, BEFORE any early return.
+  const list = useApi<...>(url);
+  const allList = useApi<...>(otherUrl);
+  const showSkeleton = useDelayedLoading(list.loading && !list.data);
+
+  if (childActive) return <Outlet ... />;
+
+  let state: DataTransitionState;
+  if (showSkeleton && !list.data) state = 'skeleton';
+  else if (list.error && !list.data) state = 'error';
+  else state = 'data';
+
+  // Filter row rendered in BOTH slots so it's live during loading.
+  const filterRow: ReactNode = <>...</>;
+
+  const skeleton = (
+    <div className="space-y-6">
+      <Card><CardContent className="py-3"><Skeleton className="h-5 w-48" /></CardContent></Card>
+      <Card>
+        <CardContent className="space-y-4">
+          {filterRow}
+          <div data-testid="<page>-skeleton" className="space-y-2 py-2">
+            {/* row skeletons */}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header>...</header>
+      <DataTransition state={state} skeleton={skeleton} error={<CardError ... />}>
+        <PageDataLayout list={list} allList={allList} filterRow={filterRow} ... />
+      </DataTransition>
+    </div>
+  );
+}
+```
+
+### Combined loading from N parallel fetches (Task 6)
+
+When the page can't render until N fetches all settle:
+
+```tsx
+const a = useApi<...>(...);
+const b = useApi<...>(...);
+const loading = a.loading || b.loading;
+const hasData = !!a.data && !!b.data;
+const showSkeleton = useDelayedLoading(loading && !hasData);
+// state derivation continues as above, swapping list.data for hasData.
 ```
 
 Synchronous-skeleton test rewrite template:
