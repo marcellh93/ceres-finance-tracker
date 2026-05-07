@@ -5,7 +5,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Numeric } from '@/components/Numeric';
 import { EquationRow } from '@/components/EquationRow';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { HEALTH_URL, type HealthDto } from './api';
 import {
   availableTodayClass,
@@ -18,22 +20,32 @@ import {
 export function FinancialHealthCard() {
   const { data, error, loading, refetch } = useApi<HealthDto>(HEALTH_URL);
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Financial Health</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && <Skeleton className="h-32 w-full" />}
-        {error && <CardError section="Financial Health" onRetry={refetch} />}
-        {data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-6">
-            <SpendablePanel data={data} />
-            <RunwayPanel data={data} />
-            <IncomeDeltaPanel data={data} />
-            <BurnRatePanel data={data} />
-          </div>
-        )}
+        <DataTransition
+          state={state}
+          skeleton={<Skeleton className="h-32 w-full" />}
+          error={<CardError section="Financial Health" onRetry={refetch} />}
+        >
+          {data && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr] gap-6">
+              <SpendablePanel data={data} />
+              <RunwayPanel data={data} />
+              <IncomeDeltaPanel data={data} />
+              <BurnRatePanel data={data} />
+            </div>
+          )}
+        </DataTransition>
       </CardContent>
     </Card>
   );
