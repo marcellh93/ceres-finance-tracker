@@ -247,7 +247,9 @@ Responsive (foundation tier — applies to every later stage):
 
 ## Stage 5 — Frontend polish + data-loading ease-in
 
-**Status: ⚠️ In progress.** Data-loading ease-in is fully rolled out across the SPA (5.2/5.3/5.4 done). Tier 1 polish is done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately deferred). Tier 2–5 of the polish-checklist remain pending.
+**Status: ⚠️ In progress.** Data-loading ease-in fully rolled out (5.2/5.3/5.4). Tier 1 polish done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped). Tier 2 polish done (T2.7–T2.10). Tier 3–5 pending. Plus a batch of ad-hoc UX fixes shipped on top of the planned tiers — see § Ad-hoc UX fixes below.
+
+> **As of 2026-05-08, next up:** Tier 3 (T3.11–T3.15) is the next polish track on this stage. Alternative: switch to launch-critical work (Stage 6 Identity infrastructure). Stage 5 is explicitly *not* blocking Phase 3 launch.
 
 > **Why this is its own stage:** these are app-wide UX fundamentals that touch every page. They can't be picked up under any single Stage 1–4 because they cross all of them. They're explicitly *not* blocking Phase 3 launch — they're the difference between "shipped" and "feels well done."
 
@@ -259,11 +261,12 @@ Responsive (foundation tier — applies to every later stage):
 | 5.2 | Data-loading ease-in — primitives (`useDelayedLoading` + `<DataTransition>`) | ✅ 2026-05-04 | [`docs/superpowers/specs/2026-05-04-data-loading-ease-in-design.md`](superpowers/specs/2026-05-04-data-loading-ease-in-design.md) · [`docs/superpowers/plans/2026-05-04-data-loading-ease-in.md`](superpowers/plans/2026-05-04-data-loading-ease-in.md) |
 | 5.3 | Data-loading ease-in — reference rollout on Accounts page | ✅ 2026-05-04 (commits `c6052d0` → `5b7d72e`) | (above) |
 | 5.4 | Data-loading ease-in — full rollout to remaining pages | ✅ 2026-05-07 (commits `12fdc1e` → `40514b8`; plan revised in `abd912a`) | [`docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`](superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md) |
-| 5.5 | Polish checklist Tier 1 — six small CSS / one library wire-up | ❌ Pending | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) § Tier-ordered action list |
-| 5.6 | Polish checklist Tier 2 — extract shared primitives | ❌ Pending | (above) |
+| 5.5 | Polish checklist Tier 1 — six small CSS / one library wire-up | ✅ 2026-05-07 (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped) | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) § Tier-ordered action list |
+| 5.6 | Polish checklist Tier 2 — extract shared primitives | ✅ 2026-05-08 (T2.7 `fa6c0d7`, T2.8 `496f1e3`, T2.9 `55d2030`, T2.10 superseded by 5.2) | (above) |
 | 5.7 | Polish checklist Tier 3 — production-app polish | ❌ Pending | (above) |
 | 5.8 | Polish checklist Tier 4 — testing and observability | ❌ Pending | (above) |
 | 5.9 | Polish checklist Tier 5 — discretionary | ❌ Pending | (above) |
+| 5.10 | Ad-hoc UX fixes layered on top of the planned tiers | ✅ 2026-05-08 (see § Ad-hoc UX fixes below) | (this doc) |
 
 ### Data-loading ease-in — verification checklist
 
@@ -333,21 +336,39 @@ Tier 5 — discretionary:
 
 ### "Feels well done" gut-check — verification checklist
 
-From the same audit doc (§ 15). Once Tier 1 + Stage 5.4 (data-loading rollout) are done, every line below should be `[x]`:
+From the same audit doc (§ 15). With Tier 1 + Tier 2 + Stage 5.4 done, most boxes are now ticked. Remaining `[ ]` items map onto Tier 3.
 
-- [ ] No element appears or disappears instantly except in response to typing
+- [x] No element appears or disappears instantly except in response to typing — skeleton/data cross-fade ships across the SPA via DataTransition
 - [x] No content jumps when data loads — skeleton heights match reality
 - [~] Hovering any button gives visible feedback within 150 ms (uses `duration-200`, fine; partial)
-- [ ] Pressing any button gives a subtle scale/color change (verify Button primitive)
+- [ ] Pressing any button gives a subtle scale/color change (verify Button primitive — Tier 3)
 - [x] Tab key reveals a clear focus ring on every interactive element
 - [~] Switching themes is smooth, not flashy (T1.1 shipped; T1.5 deliberately not shipped — flip is a clean snap, not flashy)
-- [~] Navigating between pages cross-fades, doesn't snap (browser default until T1.3)
-- [~] Submitting a form shows immediate feedback (T3.12)
-- [ ] No spinners flash for <200 ms (covered by Stage 5.4 rollout)
+- [~] Navigating between pages cross-fades, doesn't snap (T1.3 root rule shipped, dormant until navigation opts in via `<Link viewTransition>` — Tier 3 follow-up)
+- [~] Submitting a form shows immediate feedback (T3.12 SubmitButton)
+- [x] No spinners flash for <200 ms (Stage 5.4 rollout shipped)
 - [x] All icons sized identically in similar contexts
 - [x] Border radii consistent
-- [ ] In Reduce Motion mode, the app still works and animations are subdued (T1.4)
-- [ ] Switch toggle slides smoothly (T1.2)
+- [x] In Reduce Motion mode, the app still works and animations are subdued (T1.4 global override + T2.9 status region)
+- [x] Switch toggle slides smoothly (T1.2 — `transition: translate` on `--motion-duration-base`)
+
+### Ad-hoc UX fixes (sub-stage 5.10)
+
+Polish work that surfaced from real-world use rather than the polish-checklist audit. Shipped 2026-05-08.
+
+| Fix | Commit |
+|---|---|
+| `IsCleared` toggle silently dropped on movement Create across Transactions/Transfers/LiabilityPayments — request DTOs, create VMs, controller mappings, and service entity-construction all missed the field; added with service-level tests + `docs/models.md` sync | `ba2ce8b` |
+| Recurring Edit form stole focus on every keystroke (focus-heading effect ran on every `values` change instead of once after data loaded) | `c5ebb9e` |
+| `AccountCombobox`/`CategoryCombobox` had no clear affordance — added opt-in `onClear?: () => void` prop with an inline ✕ on the trigger; wired at every consumer site (forms set state to null, filter bars delete the URL param) | `5a5b254`, `c7ea718` (visibility tweak) |
+| Movements filter-bar fields were crumped to the right; switched to proportional widths (Search `flex-[2]`, others `flex-1`) so Search/Account/Type/Date spread evenly | `8f067af` |
+| Movements currency-tabs flicker — strip popped in once accounts loaded, pushing the page down; render an `h-8` Skeleton placeholder while loading so single- vs multi-currency uncertainty doesn't shift layout | `c0a3a89` |
+| Movements date-range trigger didn't fill its column after the proportional-width change; pass `className="w-full"` from `MovementsDateRangePicker` | `47c1c95` |
+| Movements pagination was `justify-center` and flush against the table; right-align + add `space-y-4` breathing room | `3b489e0` |
+| Reports pagination (`<ReportTableCard>`) was `justify-center`; right-align to match — propagates across all 8 reports | `dadb667` |
+| Two empty-state CTAs missed `nativeButton={false}` so base-ui logged a warning every render of the empty state; full SPA audit cleared every site | `3454cc8` |
+
+Two of these (`IsCleared on Create` and the Recurring focus-loss) are bug fixes, not polish — they're tracked here so the next session knows the resolution context. The IsCleared bug was wide enough to warrant its own service-level test trio in `IsClearedTests.cs`, `TransactionServiceTests.cs`, and `LiabilityPaymentServiceTests.cs`.
 
 ---
 

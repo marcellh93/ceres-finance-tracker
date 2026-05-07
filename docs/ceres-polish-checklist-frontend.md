@@ -38,7 +38,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 ### 1. Page transitions
 
 - 1.1 [E] ⚠️ `viewTransition` prop on `<Link>`. Cannot verify in `Sidebar.tsx` (not uploaded). Showcase `App.tsx` lines 36–46 lacks it.
-- 1.2 [E] ❌ No `::view-transition-old/new(root)` defaults in `index.css`. You're getting browser default (~250ms ease) instead of your `var(--motion-duration-base)` + `var(--motion-easing-standard)`. Add the rule (with reduced-motion guard — see 4.2).
+- 1.2 [E] ✅ `::view-transition-old/new(root)` defaults shipped (commit `a192c1d`) — `animation-duration: var(--motion-duration-base)` + `animation-timing-function: var(--motion-easing-standard)` + reduced-motion guard. Dormant until navigation opts in via `<Link viewTransition>` or `document.startViewTransition()`. See 1.1.
 - 1.3 [P] ✅ Shared-element view transition naming. Convention documented + applied (`MovementForm.tsx` line 393).
 - 1.4 [E] ❓ `startTransition` for programmatic navigation. Depends on Sidebar/router code.
 - 1.5 [E] ✅ Focus reset on route change (substitutes for live-region announcer). `PagePlaceholder.tsx` and `MovementForm.tsx` both focus `<h1>` on mount via `tabIndex={-1}` + `outline-none` + ref/useEffect.
@@ -53,7 +53,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 - 2.4 [E] ❓ Image aspect-ratio reservations. Not yet visible; verify wherever `<img>` appears.
 - 2.5 [E] ✅ shadcn `<Skeleton>` used everywhere.
 - 2.6 [P] — Shimmer vs pulse. Pulse is fine for base-nova.
-- 2.7 [E] ❌ No `useDelayedLoading` hook. Skeletons render immediately; fast (<200ms) responses look broken. Add the hook, gate every skeleton conditional through it.
+- 2.7 [E] ✅ `useDelayedLoading(loading, options?)` shipped at `src/app/lib/use-delayed-loading.ts` (default 150ms). Used by every `<DataTransition>`-wrapped surface across the SPA after Stage 5.4 rollout. Fast responses no longer flash a skeleton.
 - 2.8 [E] ✅ DataTransition's skeleton slot is wrapped in `role="status" aria-busy="true" aria-live="polite"` with a configurable `loadingLabel` prop (default `"Loading"`). The status region lives at the wrapper, not the leaf `<Skeleton>` primitive — putting it on each shimmer would create N nested status regions for grouped skeletons. (commit `55d2030`)
 - 2.9 [P] ❓ Suspense + skeleton vs conditional rendering. Depends on routes/data layer.
 
@@ -68,25 +68,12 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 - 3.7 [E] ✅ Lucide icon sizing consistent. `h-3/4/5 w-3/4/5` used appropriately, `aria-hidden="true"` set with adjacent text.
 - 3.8 [E] ✅ No `animate-bounce`/`animate-spin` on idle UI.
 - 3.9 [P] — `ease-out` for entrances vs `ease-in` for exits. shadcn defaults are fine.
-- 3.10 [E] ❌ **Switch thumb has no transition.** `index.css` lines 65–68. Add:
-  ```css
-  .switch-thumb {
-    transition: translate var(--motion-duration-fast) var(--motion-easing-standard);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .switch-thumb { transition: none; }
-  }
-  ```
+- 3.10 [E] ✅ Switch thumb animates `translate` with `--motion-duration-base` + `--motion-easing-standard` (commit `481e045`). The thumb position is set via the standalone `translate` property, not `transform`, so the original `transition-transform` className was a no-op.
 
 ### 4. Reduced motion and accessibility
 
-- 4.1 [E] ❌ No `prefers-reduced-motion` rule anywhere. Add a global override or per-element `motion-reduce:` variants. Color-only transitions (Status block) don't need this; transform/translate/scale do, plus view transitions.
-- 4.2 [E] ❌ View transitions don't respect reduced motion. Fold the reduced-motion guard into the same rule from 1.2:
-  ```css
-  @media (prefers-reduced-motion: reduce) {
-    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-  }
-  ```
+- 4.1 [E] ✅ Global `@media (prefers-reduced-motion: reduce)` rule shipped (commit `b38e473`). Collapses every animation/transition to ~instant by setting `animation-duration: 0.01ms` + `animation-iteration-count: 1` + `transition-duration: 0.01ms` + `scroll-behavior: auto` on `*, *::before, *::after`. Catches third-party libs (tw-animate-css, sonner spinner, base-ui dialog enters) without per-call wiring.
+- 4.2 [E] ✅ View-transition root rule has its own reduced-motion guard (commit `a192c1d`) that sets `animation: none` — stricter than the global 0.01ms; redundant but explicit.
 - 4.3 [E] — Autoplay animations >5s. None visible.
 - 4.4 [E] ❓ Keyboard nav full coverage. Trust Base UI primitives; verify with vitest-axe (4.6).
 - 4.5 [E] ✅ Skip link. `AppLayout.tsx` lines 18–23.
@@ -121,7 +108,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 - 7.2 [E] ❓ Error boundaries wrapping Suspense. Pair with `react-error-boundary` if absent.
 - 7.3 [E] ❓ Stale-while-revalidate. `useApi` hook implementation not visible.
 - 7.4 [P] — Progressive partial data. Pattern question.
-- 7.5 [E] ❌ 200ms loader delay. Same as 2.7.
+- 7.5 [E] ✅ Loader delay shipped via `useDelayedLoading` (150ms default) — see 2.7.
 
 ### 8. Form and input feel
 
@@ -143,7 +130,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 ### 10. Color, theme, and visual polish
 
 - 10.1 [E] ⏸ Theme switch is a hard flip. **Tested a global `transition-colors` rule on `*, *::before, *::after`; reverted because it made every hover/focus feel laggy** (it animates all color changes, not just theme flips). Snap is the production default in Vercel/Linear/GitHub. If a smooth flip is wanted later, the cleaner path is wrapping `setTheme()` in `document.startViewTransition()` so the root `::view-transition-old/new(root)` rule (already shipped) handles the cross-fade browser-side.
-- 10.2 [E] ❌ FOUC on reload for dark-mode users. No inline script in `index.html`. Wire `next-themes` (already in `package.json`) — handles FOUC, persistence, system preference.
+- 10.2 [E] ✅ `next-themes` `<ThemeProvider>` mounted in both SPA and design-system entrypoints (commit `1a14118`); ThemeToggle in TopBar + mobile drawer. FOUC handled by next-themes' inline script. `attribute="class"`, `defaultTheme="system"`, `enableSystem`, `disableTransitionOnChange` (latter pairs with the deferred 10.1).
 - 10.3 [E] ✅ Border radius consistent. All `--radius-*` derived from `--radius: 0.625rem`.
 - 10.4 [P] ✅ Shadow scale 4 tiers.
 - 10.5 [E] ✅ Semantic color tokens used everywhere. No `bg-zinc-100`-style raw tokens.
@@ -188,19 +175,19 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 
 Walk the app and check each:
 
-- [ ] No element appears or disappears instantly except in response to typing.
+- [x] No element appears or disappears instantly except in response to typing. (Stage 5.4 cross-fade ships across the SPA via DataTransition)
 - [x] No content jumps when data loads — skeleton heights match reality.
 - [~] Hovering any button gives visible feedback within 150ms (uses `duration-200`, fine).
-- [ ] Pressing any button gives a subtle scale/color change. (verify Button primitive)
+- [ ] Pressing any button gives a subtle scale/color change. (verify Button primitive — Tier 3)
 - [x] Tab key reveals a clear focus ring on every interactive element.
 - [~] Switching themes is smooth, not flashy. (10.2 shipped; 10.1 deliberately not shipped — flip is a clean snap)
-- [~] Navigating between pages cross-fades, doesn't snap. (browser default until 1.2)
-- [~] Submitting a form shows immediate feedback. (8.4)
-- [ ] No spinners flash for <200ms. (2.7)
+- [~] Navigating between pages cross-fades, doesn't snap. (1.2 root rule shipped, dormant until navigation opts in via `<Link viewTransition>` — Tier 3 follow-up)
+- [~] Submitting a form shows immediate feedback. (8.4 SubmitButton — Tier 3)
+- [x] No spinners flash for <200ms. (2.7 `useDelayedLoading` shipped + Stage 5.4 rollout)
 - [x] All icons sized identically in similar contexts.
 - [x] Border radii consistent.
-- [ ] In Reduce Motion mode, the app still works and animations are subdued. (4.1, 4.2)
-- [ ] Switch toggle slides smoothly. (3.10)
+- [x] In Reduce Motion mode, the app still works and animations are subdued. (4.1 global override + 2.8 status region)
+- [x] Switch toggle slides smoothly. (3.10 — `transition: translate` on `--motion-duration-base`)
 
 Legend: `[x]` already correct, `[~]` partial, `[ ]` to fix.
 
@@ -210,14 +197,14 @@ Legend: `[x]` already correct, `[~]` partial, `[ ]` to fix.
 
 Sequencing for handing to Claude Code. Tiers are independent — finish one before starting the next.
 
-**Tier 1 — six small CSS / one library wire-up. ~80% of the visible improvement:**
+**Tier 1 — six small CSS / one library wire-up** (all shipped except T1.5 deliberately deferred):
 
-1. Wire `next-themes` into `ThemeToggle.tsx` (10.2, 10.1 partial)
-2. Add `transition` rule for Switch thumb in `index.css` (3.10)
-3. Add `::view-transition-old/new(root)` defaults in `index.css` (1.2)
-4. Add global `prefers-reduced-motion: reduce` override (4.1, 4.2)
-5. ~~Add global theme-flip `transition-colors` rule (10.1)~~ — **tested and reverted** (made hovers laggy); see 10.1 for the View Transitions API alternative
-6. ✅ Custom `useScrollRestoration(mainRef)` wired in `AppLayout.tsx` (9.1)
+1. ✅ Wire `next-themes` into `ThemeToggle.tsx` (10.2, 10.1 partial) — commit `1a14118`
+2. ✅ Switch thumb transition rule on `translate` (3.10) — commit `481e045`
+3. ✅ `::view-transition-old/new(root)` defaults (1.2) — commit `a192c1d`
+4. ✅ Global `prefers-reduced-motion: reduce` override (4.1, 4.2) — commit `b38e473`
+5. ⏸ ~~Global theme-flip `transition-colors` rule (10.1)~~ — **tested and reverted** (made hovers laggy); see 10.1 for the View Transitions API alternative
+6. ✅ Custom `useScrollRestoration(mainRef)` wired in `AppLayout.tsx` (9.1) — commit `de5e919`
 
 **Tier 2 — extract shared primitives** (all shipped):
 
