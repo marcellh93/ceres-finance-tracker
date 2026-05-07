@@ -70,6 +70,9 @@
 [data-slot="switch"][data-unchecked] .switch-thumb { translate: 0 0; }
 [data-slot="switch"][data-checked] { background-color: var(--primary); }
 [data-slot="switch"][data-unchecked] { background-color: var(--input); }
+.switch-thumb {
+    transition: translate var(--motion-duration-base) var(--motion-easing-standard);
+}
 
 :root {
     --background: oklch(1.000 0.000 0);

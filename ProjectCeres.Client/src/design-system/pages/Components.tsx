@@ -11,6 +11,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/
 import { Kbd } from '@/components/ui/kbd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -116,6 +117,11 @@ export function Components() {
             <Separator />
             <p>Below</p>
           </div>
+        </section>
+
+        <section>
+          <h2 className="mb-4 text-xl font-medium">Switch</h2>
+          <SwitchExamples />
         </section>
 
         <section>
@@ -514,6 +520,27 @@ function DemoPagePlaceholder() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function SwitchExamples() {
+  const [defaultOn, setDefaultOn] = useState(false);
+  const [smOn, setSmOn] = useState(true);
+  return (
+    <div className="flex flex-col gap-4 max-w-md">
+      <label className="flex items-center justify-between gap-4">
+        <span className="text-sm">Default</span>
+        <Switch checked={defaultOn} onCheckedChange={setDefaultOn} />
+      </label>
+      <label className="flex items-center justify-between gap-4">
+        <span className="text-sm">Small</span>
+        <Switch size="sm" checked={smOn} onCheckedChange={setSmOn} />
+      </label>
+      <label className="flex items-center justify-between gap-4 opacity-60">
+        <span className="text-sm">Disabled</span>
+        <Switch disabled checked={false} />
+      </label>
     </div>
   );
 }
