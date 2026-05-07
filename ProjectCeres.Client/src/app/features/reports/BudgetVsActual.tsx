@@ -5,7 +5,9 @@ import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
 import { StatTile } from '@/components/StatTile';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { cn } from '@/lib/utils';
 import { usePagination } from '@/hooks/usePagination';
 import { REPORTS_BUDGET_VS_ACTUAL_URL, type BudgetVsActualRowDto } from './reports-api';
@@ -38,10 +40,18 @@ export function BudgetVsActual() {
   const pctUsed     = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
   const symbol      = data?.[0]?.currencySymbol ?? '€';
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = <Skeleton className="h-[400px] w-full" />;
+  const errorSlot = <CardError section="Budget vs Actual" onRetry={refetch} />;
+
   return (
     <div className="space-y-6">
-      {loading && <Skeleton className="h-[400px] w-full" />}
-      {error && <CardError section="Budget vs Actual" onRetry={refetch} />}
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && data.length === 0 && (
         <p className="text-sm text-muted-foreground">No active budgets for this period.</p>
       )}
@@ -98,6 +108,7 @@ export function BudgetVsActual() {
           </ReportTableCard>
         </>
       )}
+      </DataTransition>
     </div>
   );
 }
