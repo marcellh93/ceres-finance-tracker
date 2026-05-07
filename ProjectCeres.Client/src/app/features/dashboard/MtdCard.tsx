@@ -5,7 +5,9 @@ import { Numeric } from '@/components/Numeric';
 import { StatTile } from '@/components/StatTile';
 import { Tile } from '@/components/Tile';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { formatNumberForDisplay } from '../../lib/amount-format';
 import { useSettings } from '../../lib/use-settings';
 import { type NumberFormat } from '../../lib/amount-format';
@@ -76,20 +78,31 @@ export function MtdCard() {
   const settings = useSettings();
   const numberFormat = settings.data?.numberFormat ?? 'period_decimal';
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = (
+    <div className="space-y-2">
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-5 w-32" />
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Cycle to Date</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && (
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-5 w-32" />
-          </div>
-        )}
-        {error && <CardError section="Cycle to Date" onRetry={refetch} />}
+        <DataTransition
+          state={state}
+          skeleton={skeleton}
+          error={<CardError section="Cycle to Date" onRetry={refetch} />}
+        >
         {data && data.mtd.income === 0 && data.mtd.expenses === 0 && (
           <p className="text-sm text-muted-foreground">No transactions this period yet.</p>
         )}
@@ -182,6 +195,7 @@ export function MtdCard() {
           </dl>
           );
         })()}
+        </DataTransition>
       </CardContent>
     </Card>
   );
