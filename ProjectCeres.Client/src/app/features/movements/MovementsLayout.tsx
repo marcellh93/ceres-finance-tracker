@@ -170,6 +170,7 @@ export function MovementsLayout() {
       <MovementsCurrencyTabs
         availableCurrencies={availableCurrencies}
         activeCurrency={activeCurrency}
+        loading={currencyLoading}
       />
 
       <MovementsFilterBar />

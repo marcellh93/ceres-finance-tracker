@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { useApi } from '../../lib/use-api';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ACCOUNTS_ACTIVE_URL, type AccountOptionDto } from './movements-api';
 import { writeLastCurrency } from './use-active-currency';
@@ -7,9 +8,13 @@ import { writeLastCurrency } from './use-active-currency';
 type Props = {
   availableCurrencies: string[];
   activeCurrency: string | null;
+  /** True while accounts are still loading — render a placeholder of the
+   *  same height so single- vs multi-currency uncertainty doesn't push the
+   *  rest of the page down on data arrival. */
+  loading?: boolean;
 };
 
-export function MovementsCurrencyTabs({ availableCurrencies, activeCurrency }: Props) {
+export function MovementsCurrencyTabs({ availableCurrencies, activeCurrency, loading }: Props) {
   const [params, setParams] = useSearchParams();
   // We need accounts again to know which currency the currently-selected
   // account belongs to, so we can clear ?accountId when it doesn't fit the
@@ -20,6 +25,11 @@ export function MovementsCurrencyTabs({ availableCurrencies, activeCurrency }: P
   // de-duplication via the browser cache is fine here.
   const { data: accounts } = useApi<AccountOptionDto[]>(ACCOUNTS_ACTIVE_URL);
 
+  // Three states:
+  //   loading           → placeholder (we don't know yet whether tabs will show)
+  //   resolved single   → null (single-currency users get no dead space)
+  //   resolved multi    → tabs
+  if (loading) return <Skeleton className="h-8 w-32" />;
   if (availableCurrencies.length < 2) return null;
 
   function handleChange(next: string) {
