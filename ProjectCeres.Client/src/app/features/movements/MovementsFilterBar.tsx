@@ -71,6 +71,7 @@ export function MovementsFilterBar() {
           accounts={filteredAccounts ?? []}
           value={params.get('accountId')}
           onChange={(id) => setParam('accountId', id)}
+          onClear={() => setParam('accountId', null)}
           placeholder="All accounts"
         />
       </div>

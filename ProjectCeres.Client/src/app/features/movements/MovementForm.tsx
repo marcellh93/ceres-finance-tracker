@@ -187,6 +187,7 @@ export function MovementForm({
             accounts={accounts}
             value={values.accountId}
             onChange={(id) => set('accountId', id)}
+            onClear={() => set('accountId', null)}
             placeholder="Select account"
           />
         </Field>
@@ -205,6 +206,7 @@ export function MovementForm({
               accounts={accounts}
               value={values.sourceAccountId}
               onChange={(id) => set('sourceAccountId', id)}
+              onClear={() => set('sourceAccountId', null)}
               placeholder="Select source"
               filter={(a) => a.id !== values.destAccountId}
             />
@@ -214,6 +216,7 @@ export function MovementForm({
               accounts={accounts}
               value={values.destAccountId}
               onChange={(id) => set('destAccountId', id)}
+              onClear={() => set('destAccountId', null)}
               placeholder="Select destination"
               filter={(a) => a.id !== values.sourceAccountId}
             />
@@ -228,6 +231,7 @@ export function MovementForm({
             accounts={accounts}
             value={values.assetAccountId}
             onChange={(id) => set('assetAccountId', id)}
+            onClear={() => set('assetAccountId', null)}
             placeholder="Select asset account"
             filter={(a) => a.accountTypeName !== 'Liability'}
           />
@@ -237,6 +241,7 @@ export function MovementForm({
             accounts={accounts}
             value={values.liabilityAccountId}
             onChange={(id) => set('liabilityAccountId', id)}
+            onClear={() => set('liabilityAccountId', null)}
             placeholder="Select liability account"
             filter={(a) => a.accountTypeName === 'Liability'}
           />
@@ -283,6 +288,7 @@ export function MovementForm({
               categories={categories}
               value={values.categoryId}
               onChange={(id) => set('categoryId', id)}
+              onClear={() => set('categoryId', null)}
               placeholder="Select category"
             />
           </Field>

@@ -1,5 +1,5 @@
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { useState } from 'react';
+import { Check, ChevronsUpDown, X } from 'lucide-react';
+import { useState, type MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -13,11 +13,24 @@ type Props = {
   placeholder: string;
   disabled?: boolean;
   className?: string;
+  /**
+   * When provided AND a value is selected, render an inline ✕ on the trigger
+   * that calls this callback. Click stops propagation so the popover stays
+   * closed. Omit on surfaces where clearing is not allowed.
+   */
+  onClear?: () => void;
 };
 
-export function CategoryCombobox({ categories, value, onChange, placeholder, disabled, className = 'w-full' }: Props) {
+export function CategoryCombobox({ categories, value, onChange, placeholder, disabled, className = 'w-full', onClear }: Props) {
   const [open, setOpen] = useState(false);
   const selected = categories.find((c) => c.id === value) ?? null;
+  const showClear = !!onClear && !!selected && !disabled;
+
+  function handleClear(e: MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+    onClear?.();
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -31,7 +44,19 @@ export function CategoryCombobox({ categories, value, onChange, placeholder, dis
             className={cn('justify-between', className)}
           >
             {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <span className="ml-2 flex shrink-0 items-center gap-1">
+              {showClear && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  aria-label="Clear selection"
+                  className="-mr-1 rounded-sm p-0.5 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <ChevronsUpDown className="h-4 w-4 opacity-50" />
+            </span>
           </Button>
         }
       />

@@ -147,6 +147,7 @@ export function RecurringForm({
           accounts={accounts}
           value={values.accountId || null}
           onChange={(id) => set({ accountId: id })}
+          onClear={() => set({ accountId: '' })}
           placeholder="Select account"
         />
       </Field>
@@ -156,6 +157,7 @@ export function RecurringForm({
           categories={categories}
           value={values.categoryId || null}
           onChange={(id) => set({ categoryId: id })}
+          onClear={() => set({ categoryId: '' })}
           placeholder="Select category"
         />
       </Field>

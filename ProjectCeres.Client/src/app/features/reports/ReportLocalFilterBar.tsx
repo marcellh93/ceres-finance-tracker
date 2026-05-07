@@ -32,6 +32,7 @@ export function ReportLocalFilterBar() {
           accounts={accounts ?? []}
           value={filters.accountId}
           onChange={(id) => setFilter('accountId', id)}
+          onClear={() => setFilter('accountId', null)}
           placeholder="All accounts"
           className="w-full"
         />
@@ -41,6 +42,7 @@ export function ReportLocalFilterBar() {
           categories={categories ?? []}
           value={filters.categoryId}
           onChange={(id) => setFilter('categoryId', id)}
+          onClear={() => setFilter('categoryId', null)}
           placeholder="All categories"
           className="w-full"
         />

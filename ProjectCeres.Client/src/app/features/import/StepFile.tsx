@@ -24,7 +24,7 @@ type Props = {
   file: File | null;
   accountId: string | null;
   onFileChange: (file: File) => void;
-  onAccountChange: (accountId: string) => void;
+  onAccountChange: (accountId: string | null) => void;
   onContinue: (headers: HeaderDetectionResult) => void;
 };
 
@@ -98,6 +98,7 @@ export function StepFile({ file, accountId, onFileChange, onAccountChange, onCon
               accounts={accounts.data}
               value={accountId}
               onChange={onAccountChange}
+              onClear={() => onAccountChange(null)}
               placeholder="Select an account"
             />
           )}

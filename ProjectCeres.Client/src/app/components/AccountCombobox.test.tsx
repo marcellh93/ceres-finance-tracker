@@ -30,6 +30,62 @@ describe('AccountCombobox', () => {
     expect(onChange).toHaveBeenCalledWith('a1');
   });
 
+  it('renders a clear button when onClear is set and a value is selected', () => {
+    const onClear = vi.fn();
+    render(
+      <AccountCombobox
+        accounts={accounts}
+        value="a2"
+        onChange={vi.fn()}
+        onClear={onClear}
+        placeholder="Select"
+      />,
+    );
+    expect(screen.getByRole('button', { name: /clear selection/i })).toBeInTheDocument();
+  });
+
+  it('does not render a clear button when no value is selected', () => {
+    render(
+      <AccountCombobox
+        accounts={accounts}
+        value={null}
+        onChange={vi.fn()}
+        onClear={vi.fn()}
+        placeholder="Select"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /clear selection/i })).toBeNull();
+  });
+
+  it('does not render a clear button when onClear is omitted, even with a value selected', () => {
+    render(
+      <AccountCombobox
+        accounts={accounts}
+        value="a2"
+        onChange={vi.fn()}
+        placeholder="Select"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /clear selection/i })).toBeNull();
+  });
+
+  it('clear button calls onClear and does not open the popover', () => {
+    const onClear = vi.fn();
+    render(
+      <AccountCombobox
+        accounts={accounts}
+        value="a2"
+        onChange={vi.fn()}
+        onClear={onClear}
+        placeholder="Select"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+    expect(onClear).toHaveBeenCalledTimes(1);
+    // Popover should NOT have opened — none of the option labels is in the DOM.
+    expect(screen.queryByText('Checking')).toBeNull();
+  });
+
   it('respects the filter prop to narrow options', () => {
     render(
       <AccountCombobox

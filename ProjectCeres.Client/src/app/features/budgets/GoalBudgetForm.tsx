@@ -202,6 +202,7 @@ export function GoalBudgetForm({ mode, goalType, initialValues, onSubmit, onCanc
               accounts={assetAccounts}
               value={values.linkedAccountId}
               onChange={(id) => set('linkedAccountId', id)}
+              onClear={() => set('linkedAccountId', null)}
               placeholder="Select account"
             />
             {errors.linkedAccountId && <p className="text-xs text-destructive">{errors.linkedAccountId}</p>}

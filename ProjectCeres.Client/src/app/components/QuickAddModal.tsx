@@ -190,10 +190,10 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
               />
             </Field>
             <Field label="Account" error={errors.accountId}>
-              <AccountCombobox accounts={accounts} value={accountId} onChange={setAccountId} placeholder="Select account" />
+              <AccountCombobox accounts={accounts} value={accountId} onChange={setAccountId} onClear={() => setAccountId(null)} placeholder="Select account" />
             </Field>
             <Field label="Category" error={errors.categoryId}>
-              <CategoryCombobox categories={categories} value={categoryId} onChange={setCategoryId} placeholder="Select category" />
+              <CategoryCombobox categories={categories} value={categoryId} onChange={setCategoryId} onClear={() => setCategoryId(null)} placeholder="Select category" />
             </Field>
             <Field label="Description" htmlFor="qa-desc" error={errors.description}>
               <Input id="qa-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -213,10 +213,10 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
               />
             </Field>
             <Field label="Source account" error={errors.sourceAccountId}>
-              <AccountCombobox accounts={accounts} value={sourceAccountId} onChange={setSourceAccountId} placeholder="Select source" />
+              <AccountCombobox accounts={accounts} value={sourceAccountId} onChange={setSourceAccountId} onClear={() => setSourceAccountId(null)} placeholder="Select source" />
             </Field>
             <Field label="Destination account" error={errors.destAccountId}>
-              <AccountCombobox accounts={accounts} value={destAccountId} onChange={setDestAccountId} placeholder="Select destination" />
+              <AccountCombobox accounts={accounts} value={destAccountId} onChange={setDestAccountId} onClear={() => setDestAccountId(null)} placeholder="Select destination" />
             </Field>
             <Field label="Description" htmlFor="qa-tr-desc" error={errors.description}>
               <Input id="qa-tr-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -240,6 +240,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
                 accounts={accounts}
                 value={assetAccountId}
                 onChange={setAssetAccountId}
+                onClear={() => setAssetAccountId(null)}
                 placeholder="Select asset account"
                 filter={(a) => a.accountTypeName !== 'Liability'}
               />
@@ -249,6 +250,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
                 accounts={accounts}
                 value={liabilityAccountId}
                 onChange={setLiabilityAccountId}
+                onClear={() => setLiabilityAccountId(null)}
                 placeholder="Select liability account"
                 filter={(a) => a.accountTypeName === 'Liability'}
               />

@@ -206,6 +206,7 @@ export function CategoryBudgetForm({
             categories={finalCategories}
             value={values.categoryId}
             onChange={(id) => set('categoryId', id)}
+            onClear={() => set('categoryId', null)}
             placeholder="Select category"
           />
           {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId}</p>}
