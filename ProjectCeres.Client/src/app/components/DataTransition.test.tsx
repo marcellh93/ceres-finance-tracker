@@ -82,6 +82,51 @@ describe('DataTransition', () => {
     expect(active.style.transitionDuration).toBe('var(--motion-duration-base)');
   });
 
+  it('wraps the skeleton slot in a polite status region with default "Loading" label', () => {
+    render(
+      <DataTransition
+        state="skeleton"
+        skeleton={<div data-testid="sk">SK</div>}
+        error={<div data-testid="err">ERR</div>}
+      >
+        <div data-testid="data">DATA</div>
+      </DataTransition>,
+    );
+    const status = screen.getByRole('status');
+    expect(status).toBeInTheDocument();
+    expect(status.getAttribute('aria-busy')).toBe('true');
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.getAttribute('aria-label')).toBe('Loading');
+    expect(status.contains(screen.getByTestId('sk'))).toBe(true);
+  });
+
+  it('uses a custom loadingLabel when provided', () => {
+    render(
+      <DataTransition
+        state="skeleton"
+        skeleton={<div>shimmer</div>}
+        error={<div>err</div>}
+        loadingLabel="Loading transactions"
+      >
+        <div>data</div>
+      </DataTransition>,
+    );
+    expect(screen.getByRole('status').getAttribute('aria-label')).toBe('Loading transactions');
+  });
+
+  it('does not render a status region when state is not skeleton', () => {
+    render(
+      <DataTransition
+        state="data"
+        skeleton={<div data-testid="sk">SK</div>}
+        error={<div data-testid="err">ERR</div>}
+      >
+        <div data-testid="data">DATA</div>
+      </DataTransition>,
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('disables transitions when prefers-reduced-motion matches', () => {
     setupMatchMedia(true);
     render(

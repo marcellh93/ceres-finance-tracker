@@ -9,6 +9,12 @@ interface DataTransitionProps {
   skeleton: ReactNode;
   error: ReactNode;
   children: ReactNode;
+  /**
+   * Label announced to screen readers when the skeleton slot is active.
+   * Defaults to "Loading"; pass a richer label (e.g. "Loading transactions")
+   * when context is helpful.
+   */
+  loadingLabel?: string;
 }
 
 const TRANSITION_MS = 180;
@@ -26,6 +32,7 @@ export function DataTransition({
   skeleton,
   error,
   children,
+  loadingLabel = 'Loading',
 }: DataTransitionProps) {
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const [previousState, setPreviousState] = useState<DataTransitionState | null>(null);
@@ -45,7 +52,13 @@ export function DataTransition({
   }, [state, reducedMotion]);
 
   function slotFor(s: DataTransitionState): ReactNode {
-    if (s === 'skeleton') return skeleton;
+    if (s === 'skeleton') {
+      return (
+        <div role="status" aria-busy="true" aria-live="polite" aria-label={loadingLabel}>
+          {skeleton}
+        </div>
+      );
+    }
     if (s === 'error') return error;
     return children;
   }
