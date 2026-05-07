@@ -2,8 +2,10 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { chartColors } from '../../lib/chart-colors';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { ACCOUNT_BALANCES_URL, type AccountBalancesDto } from './charts-api';
 
 const SLOT_COUNT = 8;
@@ -12,14 +14,23 @@ type Slot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export function AccountBalancesChart() {
   const { data, error, loading, refetch } = useApi<AccountBalancesDto>(ACCOUNT_BALANCES_URL);
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Account Balances</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && <Skeleton className="h-[220px] w-full" />}
-        {error && <CardError section="Account Balances" onRetry={refetch} />}
+        <DataTransition
+          state={state}
+          skeleton={<Skeleton className="h-[220px] w-full" />}
+          error={<CardError section="Account Balances" onRetry={refetch} />}
+        >
         {data && data.rows.length === 0 && (
           <p className="text-sm text-muted-foreground">No data yet.</p>
         )}
@@ -37,6 +48,7 @@ export function AccountBalancesChart() {
             </BarChart>
           </ResponsiveContainer>
         )}
+        </DataTransition>
       </CardContent>
     </Card>
   );
