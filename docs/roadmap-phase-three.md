@@ -297,11 +297,11 @@ Rollout to remaining pages — pending. Tasks per `docs/superpowers/plans/2026-0
 
 Tier 1 — six items, ~80% of visible improvement:
 
-- [ ] T1.1 Wire `next-themes` into `ThemeToggle.tsx` (10.2, partial 10.1) — `next-themes` is installed but not used
-- [ ] T1.2 Add `transition` rule for Switch thumb in `index.css` (3.10) — currently snaps with no transition
-- [ ] T1.3 Add `::view-transition-old/new(root)` defaults in `index.css` (1.2) — currently using browser default ~250 ms instead of token-driven 180 ms
-- [ ] T1.4 Add global `prefers-reduced-motion: reduce` override (4.1, 4.2) — no rule anywhere currently
-- [ ] T1.5 Add global theme-flip `transition-colors` rule in `index.css` (10.1) — theme switch is currently a hard flip
+- [x] T1.1 Wire `next-themes` into `ThemeToggle.tsx` (10.2, partial 10.1) — provider mounted, toggle in TopBar + mobile drawer (commit `1a14118`)
+- [x] T1.2 Add `transition` rule for Switch thumb in `index.css` (3.10) — animates `translate` with motion tokens (commit `481e045`)
+- [x] T1.3 Add `::view-transition-old/new(root)` defaults in `index.css` (1.2) — dormant until navigation opts into root view transitions (commit `a192c1d`)
+- [x] T1.4 Add global `prefers-reduced-motion: reduce` override (4.1, 4.2) — collapses every animation/transition to ~instant (commit `b38e473`)
+- [~] T1.5 Add global theme-flip `transition-colors` rule (10.1) — **deliberately not shipped.** A global `*` rule made every hover/focus feel laggy because it animated all color changes, not just theme flips. Reverted before commit. Theme flip snaps, matching Vercel/Linear/GitHub. If smooth theme flips become a priority, the cleaner approach is wrapping `setTheme()` in `document.startViewTransition()` so the T1.3 root rule activates browser-side.
 - [ ] T1.6 Add `<ScrollRestoration getKey={l => l.pathname} />` to `AppLayout.tsx` (9.1) — back-navigation currently loses scroll position
 
 Tier 2 — extract shared primitives:
@@ -340,7 +340,7 @@ From the same audit doc (§ 15). Once Tier 1 + Stage 5.4 (data-loading rollout) 
 - [~] Hovering any button gives visible feedback within 150 ms (uses `duration-200`, fine; partial)
 - [ ] Pressing any button gives a subtle scale/color change (verify Button primitive)
 - [x] Tab key reveals a clear focus ring on every interactive element
-- [ ] Switching themes is smooth, not flashy (T1.5 + T1.1)
+- [~] Switching themes is smooth, not flashy (T1.1 shipped; T1.5 deliberately not shipped — flip is a clean snap, not flashy)
 - [~] Navigating between pages cross-fades, doesn't snap (browser default until T1.3)
 - [~] Submitting a form shows immediate feedback (T3.12)
 - [ ] No spinners flash for <200 ms (covered by Stage 5.4 rollout)

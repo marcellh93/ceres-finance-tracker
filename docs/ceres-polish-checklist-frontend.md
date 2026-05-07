@@ -146,16 +146,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 
 ### 10. Color, theme, and visual polish
 
-- 10.1 [E] ❌ Theme switch is a hard flip. No global `transition-colors` rule. Add to `index.css`:
-  ```css
-  @media (prefers-reduced-motion: no-preference) {
-    *, *::before, *::after {
-      transition-property: background-color, color, border-color, fill, stroke;
-      transition-duration: var(--motion-duration-base);
-      transition-timing-function: var(--motion-easing-standard);
-    }
-  }
-  ```
+- 10.1 [E] ⏸ Theme switch is a hard flip. **Tested a global `transition-colors` rule on `*, *::before, *::after`; reverted because it made every hover/focus feel laggy** (it animates all color changes, not just theme flips). Snap is the production default in Vercel/Linear/GitHub. If a smooth flip is wanted later, the cleaner path is wrapping `setTheme()` in `document.startViewTransition()` so the root `::view-transition-old/new(root)` rule (already shipped) handles the cross-fade browser-side.
 - 10.2 [E] ❌ FOUC on reload for dark-mode users. No inline script in `index.html`. Wire `next-themes` (already in `package.json`) — handles FOUC, persistence, system preference.
 - 10.3 [E] ✅ Border radius consistent. All `--radius-*` derived from `--radius: 0.625rem`.
 - 10.4 [P] ✅ Shadow scale 4 tiers.
@@ -206,7 +197,7 @@ Walk the app and check each:
 - [~] Hovering any button gives visible feedback within 150ms (uses `duration-200`, fine).
 - [ ] Pressing any button gives a subtle scale/color change. (verify Button primitive)
 - [x] Tab key reveals a clear focus ring on every interactive element.
-- [ ] Switching themes is smooth, not flashy. (10.1 + 10.2)
+- [~] Switching themes is smooth, not flashy. (10.2 shipped; 10.1 deliberately not shipped — flip is a clean snap)
 - [~] Navigating between pages cross-fades, doesn't snap. (browser default until 1.2)
 - [~] Submitting a form shows immediate feedback. (8.4)
 - [ ] No spinners flash for <200ms. (2.7)
@@ -229,7 +220,7 @@ Sequencing for handing to Claude Code. Tiers are independent — finish one befo
 2. Add `transition` rule for Switch thumb in `index.css` (3.10)
 3. Add `::view-transition-old/new(root)` defaults in `index.css` (1.2)
 4. Add global `prefers-reduced-motion: reduce` override (4.1, 4.2)
-5. Add global theme-flip `transition-colors` rule (10.1)
+5. ~~Add global theme-flip `transition-colors` rule (10.1)~~ — **tested and reverted** (made hovers laggy); see 10.1 for the View Transitions API alternative
 6. Add `<ScrollRestoration getKey={l => l.pathname} />` to `AppLayout.tsx` (9.1)
 
 **Tier 2 — extract shared primitives:**
