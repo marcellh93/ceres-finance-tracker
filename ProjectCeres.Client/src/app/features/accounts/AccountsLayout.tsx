@@ -114,17 +114,22 @@ export function AccountsLayout() {
 
 function SubtotalsArea({ list }: { list: UseApiResult<AccountListItemDto[]> }) {
   const showSkeleton = useDelayedLoading(list.loading && !list.data);
-  if (!list.data && !showSkeleton) {
-    return null;
-  }
   const state: DataTransitionState =
     showSkeleton && !list.data ? 'skeleton' : 'data';
+
+  const skeleton = (
+    <Card>
+      <CardContent
+        data-testid="subtotals-skeleton"
+        className="py-3"
+      >
+        <Skeleton className="h-5 w-48" />
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <DataTransition
-      state={state}
-      skeleton={<div data-testid="subtotals-skeleton" className="h-12 w-full" />}
-      error={null}
-    >
+    <DataTransition state={state} skeleton={skeleton} error={null}>
       {list.data ? <AccountCurrencySubtotals rows={list.data} /> : null}
     </DataTransition>
   );
