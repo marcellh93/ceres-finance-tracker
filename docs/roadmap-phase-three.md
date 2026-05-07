@@ -306,10 +306,10 @@ Tier 1 — six items, ~80% of visible improvement:
 
 Tier 2 — extract shared primitives:
 
-- [ ] T2.7 Extract `<Field>` to a shared component (8.7) — currently inlined twice in `QuickAddModal.tsx` lines 248–271 and `MovementForm.tsx` lines 105–134
-- [ ] T2.8 Extract `<MoneyInput>` shared component; consume from both forms (8.6) — `QuickAddModal.tsx` violates the locale-aware Money input recipe (uses `type="number" step="0.01"`); breaks `comma_decimal` users
-- [ ] T2.9 Wrap `<Skeleton>` to add `role="status"` + `aria-busy="true"` (2.8) — accessibility gap
-- [ ] T2.10 Add `useDelayedLoading(isLoading, 200)` hook (2.7, 7.5) — note: this is now superseded by Stage 5.2; mark Tier 2 item done
+- [x] T2.7 Extract `<Field>` to a shared component (8.7) — `src/app/components/Field.tsx`; QuickAddModal/MovementForm/RecurringForm migrated (commit `fa6c0d7`)
+- [x] T2.8 Extract `<MoneyInput>` shared component; fixes the QuickAdd `type="number"` locale bug for `comma_decimal` users (8.6) — `src/app/components/MoneyInput.tsx` (commit `496f1e3`)
+- [x] T2.9 Skeleton ARIA — DataTransition emits `role="status" aria-busy="true" aria-live="polite"` on the skeleton slot with a `loadingLabel` prop (2.8) (commit `55d2030`)
+- [x] T2.10 `useDelayedLoading` hook (2.7, 7.5) — superseded; shipped under Stage 5.2 (`useDelayedLoading` at `src/app/lib/use-delayed-loading.ts`)
 
 Tier 3 — production-app polish:
 

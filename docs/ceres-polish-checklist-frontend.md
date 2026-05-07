@@ -54,7 +54,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 - 2.5 [E] ✅ shadcn `<Skeleton>` used everywhere.
 - 2.6 [P] — Shimmer vs pulse. Pulse is fine for base-nova.
 - 2.7 [E] ❌ No `useDelayedLoading` hook. Skeletons render immediately; fast (<200ms) responses look broken. Add the hook, gate every skeleton conditional through it.
-- 2.8 [E] ❌ Skeletons lack `role="status"`, `aria-busy`, `aria-label`. Wrap or extend `<Skeleton>` to require an `aria-label` and emit the ARIA automatically.
+- 2.8 [E] ✅ DataTransition's skeleton slot is wrapped in `role="status" aria-busy="true" aria-live="polite"` with a configurable `loadingLabel` prop (default `"Loading"`). The status region lives at the wrapper, not the leaf `<Skeleton>` primitive — putting it on each shimmer would create N nested status regions for grouped skeletons. (commit `55d2030`)
 - 2.9 [P] ❓ Suspense + skeleton vs conditional rendering. Depends on routes/data layer.
 
 ### 3. Microinteractions and animations
@@ -130,8 +130,8 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 - 8.3 [E] ✅ Error messages render inline, don't snap.
 - 8.4 [E] ❌ Submit button states are idle/loading only. Build shared `<SubmitButton>` with idle/loading/success/error + spinner. Replaces `QuickAddModal.tsx` line 230 and `MovementForm.tsx` lines 548–550.
 - 8.5 [P] ❌ `useOptimistic` for inline auto-save. Same as 5.1.
-- 8.6 [E] ⚠️ **Input conventions inconsistent.** MovementForm Money input is correct. QuickAddModal Money input is wrong (`type="number" step="0.01"`). Extract `<MoneyInput>` to a shared component, consume from both. Add an input conventions table to `design-system.md`.
-- 8.7 [E] ⚠️ `<Field>` inlined twice. `QuickAddModal.tsx` lines 248–271 and `MovementForm.tsx` lines 105–134. Doc itself flags this on line 492. Extract.
+- 8.6 [E] ✅ `<MoneyInput>` extracted at `src/app/components/MoneyInput.tsx` and consumed by MovementForm + all three QuickAddModal amount fields. QuickAdd's `type="number"` locale bug is fixed. design-system.md "Money input" section rewritten as component usage docs. (commit `496f1e3`)
+- 8.7 [E] ✅ `<Field>` extracted at `src/app/components/Field.tsx`. QuickAddModal, MovementForm, and RecurringForm migrated (the third Field implementation, missed by the original audit). (commit `fa6c0d7`)
 
 ### 9. Scrolling and navigation
 
@@ -219,12 +219,12 @@ Sequencing for handing to Claude Code. Tiers are independent — finish one befo
 5. ~~Add global theme-flip `transition-colors` rule (10.1)~~ — **tested and reverted** (made hovers laggy); see 10.1 for the View Transitions API alternative
 6. ✅ Custom `useScrollRestoration(mainRef)` wired in `AppLayout.tsx` (9.1)
 
-**Tier 2 — extract shared primitives:**
+**Tier 2 — extract shared primitives** (all shipped):
 
-7. Extract `<Field>` to a shared component (8.7)
-8. Extract `<MoneyInput>` shared component; consume from both forms (8.6)
-9. Wrap `<Skeleton>` to add `role="status"` + `aria-busy="true"` (2.8)
-10. Add `useDelayedLoading(isLoading, 200)` hook (2.7, 7.5)
+7. ✅ `<Field>` extracted (`src/app/components/Field.tsx`, commit `fa6c0d7`)
+8. ✅ `<MoneyInput>` extracted (`src/app/components/MoneyInput.tsx`, commit `496f1e3`) — fixes the QuickAdd `type="number"` locale bug
+9. ✅ Skeleton ARIA via `DataTransition` `role="status"` wrapper (commit `55d2030`)
+10. ✅ `useDelayedLoading` shipped earlier under Stage 5.2 (`src/app/lib/use-delayed-loading.ts`)
 
 **Tier 3 — production-app polish:**
 
