@@ -180,10 +180,10 @@ export function MovementsLayout() {
           <p className="text-sm text-muted-foreground">No movements found.</p>
         )}
         {data && data.items.length > 0 && (
-          <>
+          <div className="space-y-4">
             <MovementsTable items={data.items} onRefetch={refetch} />
             <MovementsPagination totalCount={data.totalCount} pageSize={data.pageSize} />
-          </>
+          </div>
         )}
       </DataTransition>
     </div>
