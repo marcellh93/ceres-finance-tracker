@@ -35,10 +35,14 @@ describe('ReconciliationList', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows skeletons while loading', () => {
+  it('shows skeletons after the delay window when loading is slow', async () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})) as typeof fetch);
     render(<ReconciliationList onChanged={() => {}} />);
-    expect(screen.getAllByTestId('reconciliation-skeleton').length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId('reconciliation-skeleton').length).toBe(0);
+    await waitFor(
+      () => expect(screen.getAllByTestId('reconciliation-skeleton').length).toBeGreaterThan(0),
+      { timeout: 500 },
+    );
   });
 
   it('renders one card per row', async () => {
