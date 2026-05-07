@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, useMatch, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export function AccountsLayout() {
 
   const list = useApi<AccountListItemDto[]>(buildListUrl(includeInactive));
   const allList = useApi<AccountListItemDto[]>(`${ACCOUNTS_URL}?includeInactive=true`);
+  const showSkeleton = useDelayedLoading(list.loading && !list.data);
 
   if (childActive) {
     return (
@@ -61,6 +62,66 @@ export function AccountsLayout() {
     setSearchInput('');
   }
 
+  const filterRow: ReactNode = (
+    <>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="acc-search" className="sr-only">Filter accounts</Label>
+          <Input
+            id="acc-search"
+            placeholder="Filter accounts…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+        <Button nativeButton={false} render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New account</Link>} />
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch
+          id="include-archived"
+          checked={includeInactive}
+          onCheckedChange={setIncludeInactive}
+        />
+        <Label htmlFor="include-archived" className="text-sm font-normal">
+          Include archived
+        </Label>
+      </div>
+    </>
+  );
+
+  let state: DataTransitionState;
+  if (showSkeleton && !list.data) state = 'skeleton';
+  else if (list.error && !list.data) state = 'error';
+  else state = 'data';
+
+  const skeleton: ReactNode = (
+    <div className="space-y-6">
+      <Card>
+        <CardContent
+          data-testid="subtotals-skeleton"
+          className="py-3"
+        >
+          <Skeleton className="h-5 w-48" />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="space-y-4">
+          {filterRow}
+          <div data-testid="accounts-skeleton" className="space-y-2 py-2">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const errorSlot: ReactNode = (
+    <CardError section="Accounts" onRetry={list.refetch} />
+  );
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <header>
@@ -73,75 +134,27 @@ export function AccountsLayout() {
         </p>
       </header>
 
-      <SubtotalsArea list={list} />
-
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor="acc-search" className="sr-only">Filter accounts</Label>
-              <Input
-                id="acc-search"
-                placeholder="Filter accounts…"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-            </div>
-            <Button nativeButton={false} render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New account</Link>} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="include-archived"
-              checked={includeInactive}
-              onCheckedChange={setIncludeInactive}
-            />
-            <Label htmlFor="include-archived" className="text-sm font-normal">
-              Include archived
-            </Label>
-          </div>
-
-          <AccountsBody
-            list={list}
-            allList={allList}
-            query={debouncedSearch}
-            onClearSearch={clearSearch}
-          />
-        </CardContent>
-      </Card>
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
+        <AccountsDataLayout
+          list={list}
+          allList={allList}
+          query={debouncedSearch}
+          onClearSearch={clearSearch}
+          filterRow={filterRow}
+        />
+      </DataTransition>
     </div>
   );
 }
 
-function SubtotalsArea({ list }: { list: UseApiResult<AccountListItemDto[]> }) {
-  const showSkeleton = useDelayedLoading(list.loading && !list.data);
-  const state: DataTransitionState =
-    showSkeleton && !list.data ? 'skeleton' : 'data';
-
-  const skeleton = (
-    <Card>
-      <CardContent
-        data-testid="subtotals-skeleton"
-        className="py-3"
-      >
-        <Skeleton className="h-5 w-48" />
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <DataTransition state={state} skeleton={skeleton} error={null}>
-      {list.data ? <AccountCurrencySubtotals rows={list.data} /> : null}
-    </DataTransition>
-  );
-}
-
-function AccountsBody({
-  list, allList, query, onClearSearch,
+function AccountsDataLayout({
+  list, allList, query, onClearSearch, filterRow,
 }: {
   list: UseApiResult<AccountListItemDto[]>;
   allList: UseApiResult<AccountListItemDto[]>;
   query: string;
   onClearSearch: () => void;
+  filterRow: ReactNode;
 }) {
   const lower = query.toLowerCase();
 
@@ -152,38 +165,24 @@ function AccountsBody({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [list.data, lower]);
 
-  const showSkeleton = useDelayedLoading(list.loading && !list.data);
-
-  let state: DataTransitionState;
-  if (showSkeleton && !list.data) {
-    state = 'skeleton';
-  } else if (list.error && !list.data) {
-    state = 'error';
-  } else {
-    state = 'data';
-  }
-
-  const skeleton = (
-    <div data-testid="accounts-skeleton" className="space-y-2 py-2">
-      <Skeleton className="h-9 w-full" />
-      <Skeleton className="h-9 w-full" />
-      <Skeleton className="h-9 w-full" />
-      <Skeleton className="h-9 w-full" />
-    </div>
-  );
-
-  const errorSlot = <CardError section="Accounts" onRetry={list.refetch} />;
+  if (!list.data) return null;
 
   return (
-    <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
-      <AccountsDataView
-        list={list}
-        allList={allList}
-        sorted={sorted}
-        query={query}
-        onClearSearch={onClearSearch}
-      />
-    </DataTransition>
+    <div className="space-y-6">
+      {list.data.length > 0 && <AccountCurrencySubtotals rows={list.data} />}
+      <Card>
+        <CardContent className="space-y-4">
+          {filterRow}
+          <AccountsDataView
+            list={list}
+            allList={allList}
+            sorted={sorted}
+            query={query}
+            onClearSearch={onClearSearch}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
