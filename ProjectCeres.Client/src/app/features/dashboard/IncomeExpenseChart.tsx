@@ -2,13 +2,21 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } fro
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { chartColors } from '../../lib/chart-colors';
 import { formatMonth } from '../../lib/format-month';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { INCOME_EXPENSE_URL, type IncomeExpenseDto } from './charts-api';
 
 export function IncomeExpenseChart() {
   const { data, error, loading, refetch } = useApi<IncomeExpenseDto>(INCOME_EXPENSE_URL);
+
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
 
   return (
     <Card>
@@ -17,8 +25,11 @@ export function IncomeExpenseChart() {
         <p className="text-xs text-muted-foreground">Last 12 months</p>
       </CardHeader>
       <CardContent>
-        {loading && <Skeleton className="h-[220px] w-full" />}
-        {error && <CardError section="Income vs Expense" onRetry={refetch} />}
+        <DataTransition
+          state={state}
+          skeleton={<Skeleton className="h-[220px] w-full" />}
+          error={<CardError section="Income vs Expense" onRetry={refetch} />}
+        >
         {data && data.points.length === 0 && (
           <p className="text-sm text-muted-foreground">No data yet.</p>
         )}
@@ -37,6 +48,7 @@ export function IncomeExpenseChart() {
             </BarChart>
           </ResponsiveContainer>
         )}
+        </DataTransition>
       </CardContent>
     </Card>
   );
