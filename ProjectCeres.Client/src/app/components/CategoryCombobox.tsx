@@ -44,15 +44,15 @@ export function CategoryCombobox({ categories, value, onChange, placeholder, dis
             className={cn('justify-between', className)}
           >
             {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
-            <span className="ml-2 flex shrink-0 items-center gap-1">
+            <span className="ml-2 flex shrink-0 items-center gap-1.5">
               {showClear && (
                 <button
                   type="button"
                   onClick={handleClear}
                   aria-label="Clear selection"
-                  className="-mr-1 rounded-sm p-0.5 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-4 w-4" />
                 </button>
               )}
               <ChevronsUpDown className="h-4 w-4 opacity-50" />
