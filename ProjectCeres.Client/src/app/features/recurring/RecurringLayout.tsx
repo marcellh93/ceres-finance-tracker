@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi, type UseApiResult } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { useReminderCount } from '../../layout/ReminderCountProvider';
 import { RecurringTable } from './RecurringTable';
 import { buildListUrl, type RecurringTransactionListItemDto } from './recurring-api';
@@ -131,18 +133,46 @@ function RecurringBody({ list, allList, query, onClearSearch, onChanged }: BodyP
       });
   }, [list.data, lower]);
 
-  if (list.loading && !list.data) {
-    return (
-      <div data-testid="recurring-skeleton" className="space-y-2 py-2">
-        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
-      </div>
-    );
-  }
+  const showSkeleton = useDelayedLoading(list.loading && !list.data);
+  let state: DataTransitionState;
+  if (showSkeleton && !list.data) state = 'skeleton';
+  else if (list.error && !list.data) state = 'error';
+  else state = 'data';
 
-  if (list.error || !list.data) {
-    return <CardError section="Recurring transactions" onRetry={list.refetch} />;
-  }
+  const skeleton = (
+    <div data-testid="recurring-skeleton" className="space-y-2 py-2">
+      {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+    </div>
+  );
 
+  const errorSlot = <CardError section="Recurring transactions" onRetry={list.refetch} />;
+
+  return (
+    <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
+      <RecurringDataView
+        sorted={sorted}
+        allList={allList}
+        query={query}
+        onClearSearch={onClearSearch}
+        onChanged={onChanged}
+      />
+    </DataTransition>
+  );
+}
+
+function RecurringDataView({
+  sorted,
+  allList,
+  query,
+  onClearSearch,
+  onChanged,
+}: {
+  sorted: RecurringTransactionListItemDto[];
+  allList: UseApiResult<RecurringTransactionListItemDto[]>;
+  query: string;
+  onClearSearch: () => void;
+  onChanged: () => void;
+}) {
   if (sorted.length === 0 && query === '') {
     const anyExist = (allList.data?.length ?? 0) > 0;
     if (!anyExist) {

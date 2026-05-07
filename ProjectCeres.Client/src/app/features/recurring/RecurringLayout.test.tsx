@@ -35,10 +35,14 @@ function renderLayoutWithBell(path = '/recurring') {
 describe('RecurringLayout', () => {
   beforeEach(() => { global.fetch = vi.fn(); });
 
-  it('shows skeleton while loading', () => {
+  it('shows skeleton after the delay window when loading is slow', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
     renderLayout();
-    expect(screen.getByTestId('recurring-skeleton')).toBeInTheDocument();
+    expect(screen.queryByTestId('recurring-skeleton')).toBeNull();
+    await waitFor(
+      () => expect(screen.getByTestId('recurring-skeleton')).toBeInTheDocument(),
+      { timeout: 500 },
+    );
   });
 
   it('renders h1 "Recurring transactions"', async () => {
