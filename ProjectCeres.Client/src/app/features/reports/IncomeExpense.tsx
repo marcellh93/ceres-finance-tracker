@@ -4,9 +4,11 @@ import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
 import { StatTile } from '@/components/StatTile';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { ChartContainer } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { REPORTS_INCOME_EXPENSE_URL, type IncomeExpenseSummaryDto } from './reports-api';
 import { formatK } from './chart-format';
 import { ReportTableCard } from './ReportTableCard';
@@ -24,10 +26,18 @@ export function IncomeExpense() {
     ? [{ name: 'Period', income: data.totalIncome, expenses: data.totalExpenses }]
     : [];
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = <Skeleton className="h-[80px] w-full" />;
+  const errorSlot = <CardError section="Income vs Expense" onRetry={refetch} />;
+
   return (
     <div className="space-y-6">
-      {loading && <Skeleton className="h-[80px] w-full" />}
-      {error && <CardError section="Income vs Expense" onRetry={refetch} />}
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
@@ -93,6 +103,7 @@ export function IncomeExpense() {
           </ReportTableCard>
         </>
       )}
+      </DataTransition>
     </div>
   );
 }
