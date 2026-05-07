@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { MobileDrawer } from './MobileDrawer';
@@ -7,10 +7,13 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { ReviewCountProvider } from '../features/review/ReviewCountProvider';
 import { useMediaQuery } from '../lib/use-media-query';
+import { useScrollRestoration } from '../lib/use-scroll-restoration';
 
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 640px)');
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollRestoration(mainRef);
 
   return (
     <ReminderCountProvider>
@@ -33,7 +36,7 @@ export function AppLayout() {
             {!isDesktop && (
               <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
             )}
-            <main id="main-content" className="overflow-y-auto p-6">
+            <main ref={mainRef} id="main-content" className="overflow-y-auto p-6">
               <Outlet />
             </main>
           </div>
