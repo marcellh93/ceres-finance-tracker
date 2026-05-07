@@ -4,7 +4,9 @@ import { Numeric } from '@/components/Numeric';
 import { Badge } from '@/components/ui/badge';
 import { usePagination } from '@/hooks/usePagination';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { useSettings } from '../../lib/use-settings';
 import { formatDate } from '../../lib/date-format';
 import { REPORTS_TRANSACTION_HISTORY_URL, type TransactionHistoryRowDto } from './reports-api';
@@ -20,10 +22,18 @@ export function TransactionHistory() {
   const { data: settings } = useSettings();
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], PAGE_SIZE);
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = <Skeleton className="h-[400px] w-full" />;
+  const errorSlot = <CardError section="Transaction History" onRetry={refetch} />;
+
   return (
     <div className="space-y-6">
-      {loading && <Skeleton className="h-[400px] w-full" />}
-      {error && <CardError section="Transaction History" onRetry={refetch} />}
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && data.length === 0 && (
         <p className="text-sm text-muted-foreground">No transactions for this period.</p>
       )}
@@ -65,6 +75,7 @@ export function TransactionHistory() {
           </Table>
         </ReportTableCard>
       )}
+      </DataTransition>
     </div>
   );
 }
