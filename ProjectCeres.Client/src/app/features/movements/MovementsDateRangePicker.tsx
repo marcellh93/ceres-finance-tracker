@@ -8,5 +8,5 @@ export function readDraftFromParams(params: URLSearchParams): DateRange | undefi
 }
 
 export function MovementsDateRangePicker() {
-  return <DateRangePicker fromKey="from" toKey="to" />;
+  return <DateRangePicker fromKey="from" toKey="to" className="w-full" />;
 }
