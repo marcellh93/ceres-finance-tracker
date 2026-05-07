@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -9,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { DatePickerField } from '../../../components/DatePickerField';
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { CategoryCombobox } from '../../components/CategoryCombobox';
+import { Field } from '../../components/Field';
 import type { AccountOptionDto, CategoryOptionDto } from '../movements/movements-api';
 
 export type RecurringFormValues = {
@@ -54,31 +54,6 @@ function showDayOfWeek(frequency: string, behaviour: string) {
 
 function showDayOfMonth(frequency: string, behaviour: string) {
   return behaviour === 'SnapToCalendarDay' && frequency === 'Monthly';
-}
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      {htmlFor ? (
-        <Label htmlFor={htmlFor} className="text-sm font-medium tracking-wide text-foreground/80">
-          {label}
-        </Label>
-      ) : (
-        <div className="text-sm font-medium tracking-wide text-foreground/80 select-none">
-          {label}
-        </div>
-      )}
-      {children}
-    </div>
-  );
 }
 
 function InlineCombobox({

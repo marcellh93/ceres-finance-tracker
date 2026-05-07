@@ -3,10 +3,10 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountCombobox } from './AccountCombobox';
 import { CategoryCombobox } from './CategoryCombobox';
+import { Field } from './Field';
 import { DatePickerField } from '../../components/DatePickerField';
 import {
   ACCOUNTS_ACTIVE_URL,
@@ -261,28 +261,3 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
   );
 }
 
-function Field({
-  label,
-  htmlFor,
-  error,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      {htmlFor ? (
-        <Label htmlFor={htmlFor}>{label}</Label>
-      ) : (
-        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">
-          {label}
-        </div>
-      )}
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}

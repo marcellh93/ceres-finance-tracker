@@ -8,7 +8,6 @@ import {
   InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -25,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { CategoryCombobox } from '../../components/CategoryCombobox';
+import { Field } from '../../components/Field';
 import { DatePickerField } from '../../../components/DatePickerField';
 import {
   amountPlaceholder,
@@ -101,37 +101,6 @@ function selectedAccountSymbol(
 }
 
 // ---------- Field sub-component ----------
-
-function Field({
-  label,
-  htmlFor,
-  error,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      {htmlFor ? (
-        <Label
-          htmlFor={htmlFor}
-          className="text-sm font-medium tracking-wide text-foreground/80"
-        >
-          {label}
-        </Label>
-      ) : (
-        <div className="flex items-center gap-2 text-sm font-medium tracking-wide text-foreground/80 select-none">
-          {label}
-        </div>
-      )}
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
 
 // ---------- MovementForm ----------
 
