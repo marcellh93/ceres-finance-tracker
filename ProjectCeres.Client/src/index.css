@@ -74,6 +74,20 @@
     transition: translate var(--motion-duration-base) var(--motion-easing-standard);
 }
 
+/* View Transitions API — root cross-fade defaults (only applies when navigation
+   opts in via <Link viewTransition> or document.startViewTransition()) */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: var(--motion-duration-base);
+    animation-timing-function: var(--motion-easing-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
+    }
+}
+
 :root {
     --background: oklch(1.000 0.000 0);
     --foreground: oklch(0.205 0.005 285);
