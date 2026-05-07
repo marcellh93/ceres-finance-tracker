@@ -247,7 +247,7 @@ Responsive (foundation tier — applies to every later stage):
 
 ## Stage 5 — Frontend polish + data-loading ease-in
 
-**Status: ⚠️ In progress.** Two parallel polish tracks: the Tier 1–5 list in `docs/ceres-polish-checklist-frontend.md` (audit doc, commit `5a653d3`) and the data-loading ease-in pattern (`useDelayedLoading` + `<DataTransition>`) — proven on Accounts, rollout to remaining pages still pending.
+**Status: ⚠️ In progress.** Data-loading ease-in is fully rolled out across the SPA (5.2/5.3/5.4 done). Tier 1 polish is done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately deferred). Tier 2–5 of the polish-checklist remain pending.
 
 > **Why this is its own stage:** these are app-wide UX fundamentals that touch every page. They can't be picked up under any single Stage 1–4 because they cross all of them. They're explicitly *not* blocking Phase 3 launch — they're the difference between "shipped" and "feels well done."
 
@@ -258,7 +258,7 @@ Responsive (foundation tier — applies to every later stage):
 | 5.1 | Polish checklist audit doc — file-by-file inventory of frontend gaps | ✅ 2026-05-06 (commit `5a653d3`) | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) |
 | 5.2 | Data-loading ease-in — primitives (`useDelayedLoading` + `<DataTransition>`) | ✅ 2026-05-04 | [`docs/superpowers/specs/2026-05-04-data-loading-ease-in-design.md`](superpowers/specs/2026-05-04-data-loading-ease-in-design.md) · [`docs/superpowers/plans/2026-05-04-data-loading-ease-in.md`](superpowers/plans/2026-05-04-data-loading-ease-in.md) |
 | 5.3 | Data-loading ease-in — reference rollout on Accounts page | ✅ 2026-05-04 (commits `c6052d0` → `5b7d72e`) | (above) |
-| 5.4 | Data-loading ease-in — full rollout to remaining pages | ❌ Pending (committed plan: `fa8b7ff`) | [`docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`](superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md) |
+| 5.4 | Data-loading ease-in — full rollout to remaining pages | ✅ 2026-05-07 (commits `12fdc1e` → `40514b8`; plan revised in `abd912a`) | [`docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`](superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md) |
 | 5.5 | Polish checklist Tier 1 — six small CSS / one library wire-up | ❌ Pending | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) § Tier-ordered action list |
 | 5.6 | Polish checklist Tier 2 — extract shared primitives | ❌ Pending | (above) |
 | 5.7 | Polish checklist Tier 3 — production-app polish | ❌ Pending | (above) |
@@ -281,17 +281,17 @@ Accounts reference — done:
 - [x] `AccountsBody` consolidated into the canonical `<DataTransition>` shape (state derivation + `&& !list.data` stale-data guard)
 - [x] Synchronous-skeleton test rewritten to async with `waitFor` + `{ timeout: 500 }`
 
-Rollout to remaining pages — pending. Tasks per `docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`:
+Rollout to remaining pages — done (2026-05-07). The plan was revised mid-rollout (commit `abd912a`) when Accounts surfaced a "page-level vs per-section" decision: pages whose multiple sections share one fetch must share one DataTransition (atomic swap). Per-page outcomes:
 
-- [ ] Task 1: Categories list page (`CategoriesLayout.tsx`)
-- [ ] Task 2: Movements list page (`MovementsLayout.tsx`)
-- [ ] Task 3: Recurring list page (`RecurringLayout.tsx`)
-- [ ] Task 4: Reports — 8 sub-commits (`BudgetVsActual`, `ExpenseBreakdown`, `IncomeExpense`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorth`, `NetWorthOverTime`, `TransactionHistory`)
-- [ ] Task 5: Budgets list page (`BudgetsLayout.tsx`)
-- [ ] Task 6: Settings page (`SettingsPage.tsx`)
-- [ ] Task 7: Review (`ReconciliationList.tsx`)
-- [ ] Task 8: Dashboard cards — 9 sub-commits (`NetWorthCard`, `MtdCard`, `FinancialHealthCard`, `RemindersCard`, `NetWorthChart`, `CashFlowChart`, `IncomeExpenseChart`, `AccountBalancesChart`, `SpendingByCategoryChart`)
-- [ ] Task 9: Final verification — full client test suite green, production build succeeds, browser sweep on every rolled-out page (fast / slow / reduced-motion paths)
+- [x] Task 1: Categories list page (`CategoriesLayout.tsx`) — single fetch, section-level (commit `12fdc1e`)
+- [x] Task 2: Movements list page (`MovementsLayout.tsx`) — single fetch, page-level wrap with currency-readiness gate (commit `57776c4`)
+- [x] Task 3: Recurring list page (`RecurringLayout.tsx`) — section-level; the second fetch (`allList`) only feeds empty-state copy, so single-section is correct (commit `43654d8`)
+- [x] Task 4: Reports — 8 sub-commits (`f077d30`, `dc9caca`, `a604d1e`, `05de819`, `862985c`, `1a757aa`, `605e457`, `e6eeb17`)
+- [x] Task 5: Budgets list page (`BudgetsLayout.tsx`) — per-tab pattern (commit `e29bad9`)
+- [x] Task 6: Settings page (`SettingsPage.tsx`) — page-level with combined `settings.loading || currencies.loading` (commit `318d6d3`)
+- [x] Task 7: Review (`ReconciliationList.tsx`) — section-level (commit `0ad2f1f`)
+- [x] Task 8: Dashboard cards — 9 sub-commits, per-card "filling-in" pattern (`a13e099`, `69ddf8e`, `c18083f`, `338fed3`, `1ecc595`, `ec2e23d`, `87916a1`, `4f0d6be`, `40514b8`)
+- [x] Task 9: Final verification — full client test suite green (807/807), production build clean
 
 ### Polish checklist (`ceres-polish-checklist-frontend.md`) — verification checklist
 
