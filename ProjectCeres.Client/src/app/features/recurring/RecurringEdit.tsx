@@ -38,8 +38,15 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
     if (detail.error) setNotFound(true);
   }, [detail.data, detail.error]);
 
+  // Focus the heading once when data first arrives. Depending on `values` (an
+  // identity that changes on every keystroke) made the effect re-fire on each
+  // edit and steal focus from the active input.
+  const didFocusHeadingRef = useRef(false);
   useEffect(() => {
-    if (values) headingRef.current?.focus();
+    if (values && !didFocusHeadingRef.current) {
+      headingRef.current?.focus();
+      didFocusHeadingRef.current = true;
+    }
   }, [values]);
 
   const loading = detail.loading || accounts.loading || categories.loading;
