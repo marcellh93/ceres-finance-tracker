@@ -182,7 +182,7 @@ function RecurringDataView({
           <p className="text-sm text-muted-foreground">
             Set up reminders for bills, subscriptions, salary — anything that recurs.
           </p>
-          <Button render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New reminder</Link>} />
+          <Button nativeButton={false} render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New reminder</Link>} />
         </div>
       );
     }

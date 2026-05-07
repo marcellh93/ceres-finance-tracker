@@ -206,7 +206,7 @@ function AccountsDataView({
           <p className="text-sm text-muted-foreground">
             Create your first account to start tracking.
           </p>
-          <Button render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New account</Link>} />
+          <Button nativeButton={false} render={<Link to="new"><Plus className="h-4 w-4 mr-1" />New account</Link>} />
         </div>
       );
     }
