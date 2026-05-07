@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { formatNumberForDisplay } from '../../lib/amount-format';
 import { formatDate } from '../../lib/date-format';
 import { useSettings } from '../../lib/use-settings';
@@ -36,6 +38,12 @@ export function RemindersCard() {
   const items = data?.items ?? [];
   const overflow = total - items.length;
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
   return (
     <Card>
       <CardHeader>
@@ -43,8 +51,11 @@ export function RemindersCard() {
         <p className="text-xs text-muted-foreground">Next 7 days</p>
       </CardHeader>
       <CardContent>
-        {loading && <Skeleton className="h-24 w-full" />}
-        {error && <CardError section="Reminders" onRetry={refetch} />}
+        <DataTransition
+          state={state}
+          skeleton={<Skeleton className="h-24 w-full" />}
+          error={<CardError section="Reminders" onRetry={refetch} />}
+        >
         {data && total === 0 && (
           <div className="flex flex-col items-center justify-center gap-3 min-h-[120px]">
             <CheckCircle2 className="h-12 w-12 text-success" aria-hidden="true" />
@@ -79,6 +90,7 @@ export function RemindersCard() {
             </li>
           </ul>
         )}
+        </DataTransition>
       </CardContent>
     </Card>
   );
