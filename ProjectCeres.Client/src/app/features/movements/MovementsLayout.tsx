@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { MovementsBulkActions } from './MovementsBulkActions';
 import { MovementsCurrencyTabs } from './MovementsCurrencyTabs';
 import { MovementsFilterBar } from './MovementsFilterBar';
@@ -24,6 +25,7 @@ import { MovementsTable } from './MovementsTable';
 import { MOVEMENTS_URL, type MovementsPageDto } from './movements-api';
 import { MOVEMENT_TYPE_HINT, MOVEMENT_TYPE_LABEL } from './movement-type-display';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { useActiveCurrency } from './use-active-currency';
 
 function buildUrl(params: URLSearchParams, activeCurrency: string | null): string {
@@ -59,6 +61,10 @@ export function MovementsLayout() {
   const url = buildUrl(params, hasAccounts ? activeCurrency : null);
   const { data, error, loading, refetch } = useApi<MovementsPageDto>(url);
 
+  // Hooks before any early return.
+  const isLoadingForTransition = !currencyReady || (loading && !data);
+  const showSkeleton = useDelayedLoading(isLoadingForTransition);
+
   const navigate = useNavigate();
   const onCreateRoute = !!useMatch('/movements/new');
   const onEditRoute = !!useMatch('/movements/:id/edit');
@@ -71,6 +77,19 @@ export function MovementsLayout() {
       </div>
     );
   }
+
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (currencyReady && error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = (
+    <div data-testid="movements-skeleton">
+      <Skeleton className="h-[400px] w-full" />
+    </div>
+  );
+
+  const errorSlot = <CardError section="Movements" onRetry={refetch} />;
 
   return (
     <div className="space-y-6">
@@ -155,17 +174,17 @@ export function MovementsLayout() {
 
       <MovementsFilterBar />
 
-      {(!currencyReady || (loading && !data)) && <Skeleton className="h-[400px] w-full" />}
-      {currencyReady && error && <CardError section="Movements" onRetry={refetch} />}
-      {currencyReady && data && data.items.length === 0 && (
-        <p className="text-sm text-muted-foreground">No movements found.</p>
-      )}
-      {currencyReady && data && data.items.length > 0 && (
-        <>
-          <MovementsTable items={data.items} onRefetch={refetch} />
-          <MovementsPagination totalCount={data.totalCount} pageSize={data.pageSize} />
-        </>
-      )}
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
+        {data && data.items.length === 0 && (
+          <p className="text-sm text-muted-foreground">No movements found.</p>
+        )}
+        {data && data.items.length > 0 && (
+          <>
+            <MovementsTable items={data.items} onRefetch={refetch} />
+            <MovementsPagination totalCount={data.totalCount} pageSize={data.pageSize} />
+          </>
+        )}
+      </DataTransition>
     </div>
   );
 }
