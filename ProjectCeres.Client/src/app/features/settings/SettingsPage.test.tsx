@@ -43,11 +43,15 @@ beforeEach(() => {
 afterEach(() => vi.resetAllMocks());
 
 describe('SettingsPage', () => {
-  it('renders skeleton while loading', () => {
+  it('renders skeleton after the delay window when loading is slow', async () => {
     // Make both fetches hang forever for this test.
     mockFetch.mockImplementation(() => new Promise(() => {}));
     render(<SettingsPage />);
-    expect(screen.getByTestId('settings-skeleton')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-skeleton')).toBeNull();
+    await waitFor(
+      () => expect(screen.getByTestId('settings-skeleton')).toBeInTheDocument(),
+      { timeout: 500 },
+    );
   });
 
   it('renders the form when data arrives', async () => {

@@ -2,7 +2,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { refetchSettings } from '../../lib/use-settings';
 import { SettingsForm } from './SettingsForm';
 import {
@@ -18,59 +20,20 @@ export function SettingsPage() {
   const settings = useApi<SettingsDto>(SETTINGS_URL);
   const currencies = useApi<CurrencyOptionDto[]>(CURRENCIES_URL);
 
-  if (settings.loading || currencies.loading) {
-    return (
-      <PageShell>
-        <Card data-testid="settings-skeleton">
-          <CardHeader>
-            <CardTitle>Display preferences</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-9 w-full" />
-          </CardContent>
-        </Card>
-      </PageShell>
-    );
-  }
+  const loading = settings.loading || currencies.loading;
+  const hasData = !!settings.data && !!currencies.data;
+  const hasError = !!(settings.error || currencies.error);
+  const showSkeleton = useDelayedLoading(loading && !hasData);
 
-  if (settings.error || currencies.error || !settings.data || !currencies.data) {
-    return (
-      <PageShell>
-        <Card>
-          <CardContent>
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              Couldn't load settings.
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-4"
-              onClick={() => {
-                settings.refetch();
-                currencies.refetch();
-              }}
-            >
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </PageShell>
-    );
-  }
+  let state: DataTransitionState;
+  if (showSkeleton && !hasData) state = 'skeleton';
+  else if (hasError && !hasData) state = 'error';
+  else state = 'data';
 
-  // Convert the SettingsDto (which carries the currency code/symbol for
-  // display) into form values (which carry the currency *id* for editing).
-  const initialValues: SettingsFormValues = {
-    numberFormat:      settings.data.numberFormat,
-    dateFormat:        settings.data.dateFormat,
-    defaultCurrencyId: currencies.data.find(
-                         (c) => c.code === settings.data!.defaultCurrencyCode,
-                       )?.id ?? currencies.data[0].id,
-    periodStartDay:    settings.data.periodStartDay,
-  };
+  function retry() {
+    settings.refetch();
+    currencies.refetch();
+  }
 
   async function handleSubmit(values: SettingsFormValues) {
     const body: UpdateSettingsRequest = {
@@ -103,22 +66,68 @@ export function SettingsPage() {
     }
   }
 
+  const skeleton = (
+    <Card data-testid="settings-skeleton">
+      <CardHeader>
+        <CardTitle>Display preferences</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-full" />
+      </CardContent>
+    </Card>
+  );
+
+  const errorSlot = (
+    <Card>
+      <CardContent>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Couldn't load settings.
+        </div>
+        <Button type="button" variant="outline" className="mt-4" onClick={retry}>
+          Retry
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <PageShell>
-      <Card>
-        <CardHeader>
-          <CardTitle>Display preferences</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SettingsForm
-            initialValues={initialValues}
-            currencies={currencies.data}
-            onSubmit={handleSubmit}
-          />
-        </CardContent>
-      </Card>
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
+        {settings.data && currencies.data && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Display preferences</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SettingsForm
+                initialValues={buildInitialValues(settings.data, currencies.data)}
+                currencies={currencies.data}
+                onSubmit={handleSubmit}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </DataTransition>
     </PageShell>
   );
+}
+
+// Convert the SettingsDto (which carries the currency code/symbol for
+// display) into form values (which carry the currency *id* for editing).
+function buildInitialValues(
+  settings: SettingsDto,
+  currencies: CurrencyOptionDto[],
+): SettingsFormValues {
+  return {
+    numberFormat:      settings.numberFormat,
+    dateFormat:        settings.dateFormat,
+    defaultCurrencyId: currencies.find((c) => c.code === settings.defaultCurrencyCode)?.id
+                       ?? currencies[0].id,
+    periodStartDay:    settings.periodStartDay,
+  };
 }
 
 /**
