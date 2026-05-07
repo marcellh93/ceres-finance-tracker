@@ -3,11 +3,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Numeric } from '@/components/Numeric';
 import { StatRow } from '@/components/StatRow';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { SUMMARY_URL, type NetWorthEntry, type SummaryDto } from './api';
 
 export function NetWorthCard() {
   const { data, error, loading, refetch } = useApi<SummaryDto>(SUMMARY_URL);
+
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = (
+    <div className="space-y-2">
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-5 w-32" />
+      <Skeleton className="h-5 w-32" />
+    </div>
+  );
 
   return (
     <Card>
@@ -15,21 +31,19 @@ export function NetWorthCard() {
         <CardTitle>Net Worth</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading && (
-          <div className="space-y-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-5 w-32" />
-          </div>
-        )}
-        {error && <CardError section="Net Worth" onRetry={refetch} />}
-        {data && data.netWorth.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No accounts yet. Add one to see your net worth.
-          </p>
-        )}
-        {data && data.netWorth.length === 1 && <SingleCurrency entry={data.netWorth[0]} />}
-        {data && data.netWorth.length > 1 && <MultiCurrency entries={data.netWorth} />}
+        <DataTransition
+          state={state}
+          skeleton={skeleton}
+          error={<CardError section="Net Worth" onRetry={refetch} />}
+        >
+          {data && data.netWorth.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No accounts yet. Add one to see your net worth.
+            </p>
+          )}
+          {data && data.netWorth.length === 1 && <SingleCurrency entry={data.netWorth[0]} />}
+          {data && data.netWorth.length > 1 && <MultiCurrency entries={data.netWorth} />}
+        </DataTransition>
       </CardContent>
     </Card>
   );
