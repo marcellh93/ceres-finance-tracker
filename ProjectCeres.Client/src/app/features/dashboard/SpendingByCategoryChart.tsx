@@ -2,8 +2,10 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { chartColors } from '../../lib/chart-colors';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { SPENDING_BY_CATEGORY_URL, type SpendingByCategoryDto } from './charts-api';
 
 const SLOT_COUNT = 8;
@@ -14,6 +16,12 @@ export function SpendingByCategoryChart() {
 
   const top = data?.slices.slice(0, 10) ?? [];
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
   return (
     <Card>
       <CardHeader>
@@ -21,8 +29,11 @@ export function SpendingByCategoryChart() {
         <p className="text-xs text-muted-foreground">This period</p>
       </CardHeader>
       <CardContent>
-        {loading && <Skeleton className="h-[220px] w-full" />}
-        {error && <CardError section="Spending by Category" onRetry={refetch} />}
+        <DataTransition
+          state={state}
+          skeleton={<Skeleton className="h-[220px] w-full" />}
+          error={<CardError section="Spending by Category" onRetry={refetch} />}
+        >
         {data && data.slices.length === 0 && (
           <p className="text-sm text-muted-foreground">No data yet.</p>
         )}
@@ -46,6 +57,7 @@ export function SpendingByCategoryChart() {
             </BarChart>
           </ResponsiveContainer>
         )}
+        </DataTransition>
       </CardContent>
     </Card>
   );
