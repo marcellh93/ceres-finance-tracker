@@ -4,8 +4,10 @@ import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
 import { StatTile } from '@/components/StatTile';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { ChartContainer } from '@/components/ui/chart';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { usePagination } from '@/hooks/usePagination';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { REPORTS_NET_WORTH_OVER_TIME_URL, type NetWorthSnapshotRowDto } from './reports-api';
@@ -42,10 +44,18 @@ export function NetWorthOverTime() {
     liabilities: row.liabilities,
   }));
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = <Skeleton className="h-[400px] w-full" />;
+  const errorSlot = <CardError section="Net Worth Over Time" onRetry={refetch} />;
+
   return (
     <div className="space-y-6">
-      {loading && <Skeleton className="h-[400px] w-full" />}
-      {error && <CardError section="Net Worth Over Time" onRetry={refetch} />}
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && data.length === 0 && (
         <p className="text-sm text-muted-foreground">No data for this period.</p>
       )}
@@ -141,6 +151,7 @@ export function NetWorthOverTime() {
           </ReportTableCard>
         </>
       )}
+      </DataTransition>
     </div>
   );
 }
