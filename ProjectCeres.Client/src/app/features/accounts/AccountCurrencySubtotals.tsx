@@ -13,7 +13,7 @@ type CurrencyTotal = {
 
 export function AccountCurrencySubtotals({ rows }: Props) {
   const totals = computeNetPerCurrency(rows);
-  if (totals.length < 2) return null;
+  if (totals.length === 0) return null;
 
   return (
     <Card>

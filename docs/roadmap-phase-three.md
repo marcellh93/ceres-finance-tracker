@@ -159,7 +159,7 @@ Responsive (foundation tier — applies to every later stage):
 - [x] AlertDialog-confirmed archive flow on Categories with 409 in-use error surfaced in toast
 - [x] System category rows pinned with leading lock icon
 - [x] `Save` + `Cancel` form pattern shared across all management pages
-- [x] Accounts: per-currency subtotal strip rendered when 2+ currencies present
+- [x] Accounts: per-currency subtotal strip rendered whenever the user has at least one account (single- and multi-currency)
 - [x] Accounts: type-driven balance colour (Liability rows always render in destructive)
 - [x] Accounts: conditional Asset/Liability fields with two-layer interest-rate normalisation (SPA submit-time clears rate when not Amortising; server policy rejects null repaymentType + non-null rate)
 - [x] Accounts: SPA-side payoff projection for amortising-liability accounts (`projection.ts`)

@@ -15,13 +15,19 @@ function row(over: Partial<AccountListItemDto>): AccountListItemDto {
 }
 
 describe('AccountCurrencySubtotals', () => {
-  it('renders nothing when accounts span only one currency', () => {
-    const rows = [
-      row({ id: 'a', balance: 1000, currencyCode: 'EUR' }),
-      row({ id: 'b', balance: 500, currencyCode: 'EUR' }),
-    ];
-    const { container } = render(<AccountCurrencySubtotals rows={rows} />);
+  it('renders nothing when there are no accounts', () => {
+    const { container } = render(<AccountCurrencySubtotals rows={[]} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders a single entry when accounts span only one currency', () => {
+    const rows = [
+      row({ id: 'a', balance: 1000, currencyCode: 'EUR', currencySymbol: '€' }),
+      row({ id: 'b', balance: 500,  currencyCode: 'EUR', currencySymbol: '€' }),
+    ];
+    render(<AccountCurrencySubtotals rows={rows} />);
+    expect(screen.getByText(/EUR/)).toBeInTheDocument();
+    expect(screen.getByText(/€1,500\.00/)).toBeInTheDocument();
   });
 
   it('renders one entry per currency when 2+ currencies are present', () => {
