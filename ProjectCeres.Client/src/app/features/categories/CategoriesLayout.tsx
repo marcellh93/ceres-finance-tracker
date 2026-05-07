@@ -9,8 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi, type UseApiResult } from '../../lib/use-api';
 import { useDebounced } from '../../lib/use-debounced';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { CategoriesTable } from './CategoriesTable';
 import {
   buildListUrl,
@@ -179,20 +181,50 @@ function CategoriesBody({
     return [...userActive, ...userArchived, ...system];
   }, [list.data, typeName, lower]);
 
-  if (list.loading && !list.data) {
-    return (
-      <div data-testid="categories-skeleton" className="space-y-2 py-2">
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-      </div>
-    );
-  }
+  const showSkeleton = useDelayedLoading(list.loading && !list.data);
+  let state: DataTransitionState;
+  if (showSkeleton && !list.data) state = 'skeleton';
+  else if (list.error && !list.data) state = 'error';
+  else state = 'data';
 
-  if (list.error || !list.data) {
-    return <CardError section="Categories" onRetry={list.refetch} />;
-  }
+  const skeleton = (
+    <div data-testid="categories-skeleton" className="space-y-2 py-2">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+    </div>
+  );
+
+  const errorSlot = <CardError section="Categories" onRetry={list.refetch} />;
+
+  return (
+    <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
+      <CategoriesDataView
+        list={list}
+        sorted={sorted}
+        includeInactive={includeInactive}
+        query={query}
+        onClearSearch={onClearSearch}
+      />
+    </DataTransition>
+  );
+}
+
+function CategoriesDataView({
+  list,
+  sorted,
+  includeInactive,
+  query,
+  onClearSearch,
+}: {
+  list: UseApiResult<CategoryListItemDto[]>;
+  sorted: CategoryListItemDto[];
+  includeInactive: boolean;
+  query: string;
+  onClearSearch: () => void;
+}) {
+  if (!list.data) return null;
 
   if (sorted.length === 0 && query) {
     return (

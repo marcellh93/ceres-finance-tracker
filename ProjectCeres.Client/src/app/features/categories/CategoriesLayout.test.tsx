@@ -57,10 +57,14 @@ function renderAt(path: string) {
 }
 
 describe('CategoriesLayout', () => {
-  it('renders skeleton while loading', () => {
+  it('renders skeleton after the delay window when loading is slow', async () => {
     mockFetch.mockImplementation(() => new Promise(() => {}));
     renderAt('/categories');
-    expect(screen.getByTestId('categories-skeleton')).toBeInTheDocument();
+    expect(screen.queryByTestId('categories-skeleton')).toBeNull();
+    await waitFor(
+      () => expect(screen.getByTestId('categories-skeleton')).toBeInTheDocument(),
+      { timeout: 500 },
+    );
   });
 
   it('defaults to the Expense tab', async () => {
