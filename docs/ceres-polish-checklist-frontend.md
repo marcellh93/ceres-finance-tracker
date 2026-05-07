@@ -135,11 +135,7 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 
 ### 9. Scrolling and navigation
 
-- 9.1 [E] ❌ No `<ScrollRestoration />`. Add to `AppLayout.tsx`:
-  ```tsx
-  <ScrollRestoration getKey={(location) => location.pathname} />
-  ```
-  Per-pathname keying so changing filters on the same page doesn't reset scroll.
+- 9.1 [E] ✅ Custom `useScrollRestoration(mainRef)` hook wired in `AppLayout.tsx`. Restores `<main>` scrollTop on browser back across every `/app/*` route. The framework `<ScrollRestoration />` component doesn't fit — it's data-router-only and watches `window`, while this app uses `<BrowserRouter>` and scrolls via `<main>`. Hook lives at `src/app/lib/use-scroll-restoration.ts`; persists positions in sessionStorage keyed by pathname.
 - 9.2 [E] ❓ Smooth anchor scroll with reduced-motion guard. Verify `html { scroll-behavior }`.
 - 9.3 [P] ✅ Sticky header pattern is documented + correct (no animating `top`/`transform`).
 - 9.4 [P] ❓ `scroll-margin-top` for in-page anchors. Verify if any.
@@ -221,7 +217,7 @@ Sequencing for handing to Claude Code. Tiers are independent — finish one befo
 3. Add `::view-transition-old/new(root)` defaults in `index.css` (1.2)
 4. Add global `prefers-reduced-motion: reduce` override (4.1, 4.2)
 5. ~~Add global theme-flip `transition-colors` rule (10.1)~~ — **tested and reverted** (made hovers laggy); see 10.1 for the View Transitions API alternative
-6. Add `<ScrollRestoration getKey={l => l.pathname} />` to `AppLayout.tsx` (9.1)
+6. ✅ Custom `useScrollRestoration(mainRef)` wired in `AppLayout.tsx` (9.1)
 
 **Tier 2 — extract shared primitives:**
 

@@ -302,7 +302,7 @@ Tier 1 — six items, ~80% of visible improvement:
 - [x] T1.3 Add `::view-transition-old/new(root)` defaults in `index.css` (1.2) — dormant until navigation opts into root view transitions (commit `a192c1d`)
 - [x] T1.4 Add global `prefers-reduced-motion: reduce` override (4.1, 4.2) — collapses every animation/transition to ~instant (commit `b38e473`)
 - [~] T1.5 Add global theme-flip `transition-colors` rule (10.1) — **deliberately not shipped.** A global `*` rule made every hover/focus feel laggy because it animated all color changes, not just theme flips. Reverted before commit. Theme flip snaps, matching Vercel/Linear/GitHub. If smooth theme flips become a priority, the cleaner approach is wrapping `setTheme()` in `document.startViewTransition()` so the T1.3 root rule activates browser-side.
-- [ ] T1.6 Add `<ScrollRestoration getKey={l => l.pathname} />` to `AppLayout.tsx` (9.1) — back-navigation currently loses scroll position
+- [x] T1.6 Restore `<main>` scroll on browser back via custom `useScrollRestoration` hook (commit `de5e919`). Wired in `AppLayout`, so it covers every `/app/*` route (dashboard, movements, accounts, categories, budgets, recurring, import, reports, review, settings, support, profile, security). React-router's `<ScrollRestoration>` doesn't fit — it's data-router-only and watches `window`, while this app uses `<BrowserRouter>` and scrolls via `<main>`.
 
 Tier 2 — extract shared primitives:
 
