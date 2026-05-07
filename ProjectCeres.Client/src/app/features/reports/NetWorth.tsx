@@ -3,7 +3,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Numeric } from '@/components/Numeric';
 import { usePagination } from '@/hooks/usePagination';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { useApi } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { REPORTS_NET_WORTH_URL, type NetWorthEntryDto } from './reports-api';
 import { ReportTableCard } from './ReportTableCard';
 import { useReportsFilters } from './useReportsFilters';
@@ -15,10 +17,18 @@ export function NetWorth() {
   const { data, error, loading, refetch } = useApi<NetWorthEntryDto[]>(REPORTS_NET_WORTH_URL);
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], PAGE_SIZE);
 
+  const showSkeleton = useDelayedLoading(loading && !data);
+  let state: DataTransitionState;
+  if (showSkeleton && !data) state = 'skeleton';
+  else if (error && !data) state = 'error';
+  else state = 'data';
+
+  const skeleton = <Skeleton className="h-[400px] w-full" />;
+  const errorSlot = <CardError section="Net Worth" onRetry={refetch} />;
+
   return (
     <div className="space-y-6">
-      {loading && <Skeleton className="h-[400px] w-full" />}
-      {error && <CardError section="Net Worth" onRetry={refetch} />}
+      <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && data.length === 0 && (
         <p className="text-sm text-muted-foreground">No accounts found.</p>
       )}
@@ -54,6 +64,7 @@ export function NetWorth() {
           </Table>
         </ReportTableCard>
       )}
+      </DataTransition>
     </div>
   );
 }

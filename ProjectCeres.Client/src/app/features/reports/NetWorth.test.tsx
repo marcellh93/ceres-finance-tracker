@@ -26,10 +26,14 @@ describe('NetWorth report', () => {
     expect(screen.getByRole('heading', { name: 'Net Worth' })).toBeInTheDocument();
   });
 
-  it('renders skeleton while loading', () => {
+  it('renders skeleton after the delay window when loading is slow', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
     renderPage();
-    expect(document.querySelector('[data-slot="skeleton"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="skeleton"]')).toBeNull();
+    await waitFor(
+      () => expect(document.querySelector('[data-slot="skeleton"]')).toBeInTheDocument(),
+      { timeout: 500 },
+    );
   });
 
   it('renders empty state when data is []', async () => {
