@@ -309,19 +309,19 @@ This table lists what the API will expose. It is not a full endpoint specificati
 | Cash flow trend chart | GET | `/api/dashboard/cash-flow` | `CashFlowDto { currencyCode, currencySymbol, points: CashFlowPoint[12] }` — `CashFlowPoint { month: "yyyy-MM", netFlow }` |
 | Movements cleared toggle | PATCH | `/api/movements/{id}/cleared` | Toggle `IsCleared` on a Transaction, Transfer, or LiabilityPayment — body: `{ "type": "transaction"\|"transfer"\|"liabilitypayment", "cleared": bool }`. The `type` field accepts `"transaction"`, `"transfer"`, or `"liabilitypayment"`. |
 | Movements list | GET | `/api/movements` | Returns `MovementsPageDto { items: MovementListItemDto[], totalCount, page, pageSize }`. Query params: `q` (text search), `accountId`, `from`, `to`, `page`, `pageSize` (default 50, max 200). |
-| Create transaction | POST | `/api/transactions` | Body: `CreateTransactionRequest { date, amount, accountId, categoryId, description? }`. Returns `201 Created` with `{ id }`. Returns `422 Unprocessable Entity` with `ValidationProblemDetails` on invalid input. |
+| Create transaction | POST | `/api/transactions` | Body: `CreateTransactionRequest { date, amount, accountId, categoryId, description?, isCleared? }`. `isCleared` defaults to `false` when omitted (matches the QuickAdd-modal contract); the full Create form sends the toggle's actual value. Returns `201 Created` with `{ id }`. Returns `422 Unprocessable Entity` with `ValidationProblemDetails` on invalid input. |
 | Get transaction | GET | `/api/transactions/{id}` | Returns `TransactionEditDto { id, date, amount, accountId, categoryId, description, isCleared, attachments[] }`. `404` if missing. |
 | Update transaction | PUT | `/api/transactions/{id}` | Body: `UpdateTransactionRequest`. `200` on success, `422` on validation, `404` on missing. |
 | Delete transaction | DELETE | `/api/transactions/{id}` | Hard delete. `204` on success, `404` on missing. |
 | Upload transaction attachment | POST | `/api/transactions/{id}/attachments` | Multipart upload. Returns `AttachmentDto`. |
 | Delete transaction attachment | DELETE | `/api/transactions/attachments/{attachmentId}` | `204` on success, `404` on missing. |
-| Create transfer | POST | `/api/transfers` | Body: `CreateTransferRequest { date, amount, sourceAccountId, destAccountId, description? }`. Returns `201 Created` with `{ id }`. Returns `422` if source == destination, cross-currency, or other validation failures. |
+| Create transfer | POST | `/api/transfers` | Body: `CreateTransferRequest { date, amount, sourceAccountId, destAccountId, description?, isCleared? }`. `isCleared` defaults to `false` when omitted. Returns `201 Created` with `{ id }`. Returns `422` if source == destination, cross-currency, or other validation failures. |
 | Get transfer | GET | `/api/transfers/{id}` | Returns transfer edit DTO `{ id, date, amount, sourceAccountId, destAccountId, description, isCleared, attachments[] }`. `404` if missing. |
 | Update transfer | PUT | `/api/transfers/{id}` | Body: `UpdateTransferRequest`. `200` on success, `422` on validation, `404` on missing. |
 | Delete transfer | DELETE | `/api/transfers/{id}` | Hard delete. `204` on success, `404` on missing. |
 | Upload transfer attachment | POST | `/api/transfers/{id}/attachments` | Multipart upload. Returns `AttachmentDto`. |
 | Delete transfer attachment | DELETE | `/api/transfers/attachments/{attachmentId}` | `204` on success, `404` on missing. |
-| Create liability payment | POST | `/api/liability-payments` | Body: `CreateLiabilityPaymentRequest { date, amount, assetAccountId, liabilityAccountId, description? }`. Returns `201 Created` with `{ id }`. Returns `422` on validation failures. |
+| Create liability payment | POST | `/api/liability-payments` | Body: `CreateLiabilityPaymentRequest { date, amount, assetAccountId, liabilityAccountId, description?, isCleared? }`. `isCleared` defaults to `false` when omitted. Returns `201 Created` with `{ id }`. Returns `422` on validation failures. |
 | Get liability payment | GET | `/api/liability-payments/{id}` | Returns liability payment edit DTO `{ id, date, amount, assetAccountId, liabilityAccountId, description, isCleared }`. `404` if missing. No attachments. |
 | Update liability payment | PUT | `/api/liability-payments/{id}` | Body: `UpdateLiabilityPaymentRequest`. `200` on success, `422` on validation, `404` on missing. |
 | Delete liability payment | DELETE | `/api/liability-payments/{id}` | Hard delete. `204` on success, `404` on missing. |

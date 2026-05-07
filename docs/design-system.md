@@ -487,31 +487,21 @@ When tabs, header, and filters are pinned together at the top of the scroll cont
 
 Every form in the SPA renders against the project's 422 validation envelope — `{ error: { code: "VALIDATION_ERROR", details: [{ field, message }] } }`. Two pieces work together: a **Field wrapper** that pairs a label with its inline error, and a normalisation step that flattens the envelope into a `Record<string, string>` keyed by camelCase field name.
 
-### Field wrapper recipe
+### `<Field>` primitive
 
-The field-wrapper component is currently inlined in `QuickAddModal.tsx` (and again in `MovementForm.tsx` with minor variation). Treat the recipe below as canonical until a shared `<Field>` primitive lands:
+`<Field>` (`src/app/components/Field.tsx`) is the single label + control + inline-error wrapper used by every form in the SPA. Three local copies (QuickAddModal, MovementForm, RecurringForm) collapsed into this primitive in commit `fa6c0d7`.
 
 ```tsx
-function Field({
-  label, htmlFor, error, children,
-}: { label: string; htmlFor?: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      {htmlFor ? (
-        <Label htmlFor={htmlFor}>{label}</Label>
-      ) : (
-        <div className="flex items-center gap-2 text-sm leading-none font-medium select-none">
-          {label}
-        </div>
-      )}
-      {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
+<Field label="Description" htmlFor="mf-desc" error={errors.description}>
+  <Input id="mf-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+</Field>
+
+<Field label="Account" error={errors.accountId}>
+  <AccountCombobox accounts={accounts} value={accountId} onChange={setAccountId} />
+</Field>
 ```
 
-Use `<Label htmlFor>` when the control accepts an `id` (Input, Textarea, native Select). Use the bare-div label form for composite controls without a single focusable target (Combobox, DatePickerField — they own their own focus).
+Use `<Field htmlFor>` when the control accepts an `id` (Input, Textarea, native Select, MoneyInput). Omit `htmlFor` for composite controls without a single focusable target (Combobox, DatePickerField — they own their own focus); the label renders as styled text instead of `<Label htmlFor>` (avoids the "no associated control" a11y warning). The `error` slot renders an inline `<p class="text-xs text-destructive">` below the control when set.
 
 ### Form-level error banner
 
@@ -596,6 +586,8 @@ The canonical "searchable dropdown" recipe: shadcn `<Popover>` wrapping a `<Comm
 - Always include a `CommandEmpty` fallback ("No X found.") — never let the list be silently empty.
 - The `Check` icon is rendered for every row with `opacity-100` on the selected item and `opacity-0` otherwise (not conditionally rendered) — keeps row heights stable.
 - Right-aligned metadata (e.g. CategoryCombobox shows the category type) goes in a `text-muted-foreground` `<span>` after the label.
+
+**Inline clear (`onClear`):** opt-in via `onClear?: () => void`. When passed AND a value is selected, the trigger renders a small ✕ button next to the chevron; clicking calls `onClear()` and stops propagation so the popover stays closed. Use it on filter bars (delete the URL param) and on form fields (set state to null/`''`). Omit on surfaces where clearing doesn't make sense.
 
 **When to deviate:** if you need multi-select, use shadcn `<Command>` checkbox patterns rather than this recipe. If you need a non-searchable picker for a small fixed set (≤5 options), prefer a native `<Select>` or `<RadioGroup>`.
 
