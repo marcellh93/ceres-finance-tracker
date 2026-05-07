@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { CardError } from '../../components/CardError';
+import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { CategoryBudgetsTable } from './CategoryBudgetsTable';
 import { GoalBudgetsTable } from './GoalBudgetsTable';
 import {
@@ -26,7 +27,8 @@ import {
   type CategoryBudgetListItemDto,
   type GoalBudgetListItemDto,
 } from './budgets-api';
-import { useApi } from '../../lib/use-api';
+import { useApi, type UseApiResult } from '../../lib/use-api';
+import { useDelayedLoading } from '../../lib/use-delayed-loading';
 
 type Tab = 'category' | 'goal';
 
@@ -160,30 +162,58 @@ export function BudgetsLayout() {
       </div>
 
       {tab === 'category' && (
-        <>
-          {categoryQuery.loading && !categoryQuery.data && <Skeleton className="h-[300px] w-full" />}
-          {categoryQuery.error && <CardError section="Category Budgets" onRetry={categoryQuery.refetch} />}
-          {categoryQuery.data && categoryQuery.data.length === 0 && (
-            <p className="text-sm text-muted-foreground">No category budgets.</p>
-          )}
-          {categoryQuery.data && categoryQuery.data.length > 0 && (
-            <CategoryBudgetsTable items={categoryQuery.data} onChanged={categoryQuery.refetch} />
-          )}
-        </>
+        <CategoryTabBody query={categoryQuery} />
       )}
 
       {tab === 'goal' && (
-        <>
-          {goalQuery.loading && !goalQuery.data && <Skeleton className="h-[300px] w-full" />}
-          {goalQuery.error && <CardError section="Goal Budgets" onRetry={goalQuery.refetch} />}
-          {goalQuery.data && goalQuery.data.length === 0 && (
-            <p className="text-sm text-muted-foreground">No goal budgets.</p>
-          )}
-          {goalQuery.data && goalQuery.data.length > 0 && (
-            <GoalBudgetsTable items={goalQuery.data} onChanged={goalQuery.refetch} />
-          )}
-        </>
+        <GoalTabBody query={goalQuery} />
       )}
     </div>
+  );
+}
+
+function CategoryTabBody({ query }: { query: UseApiResult<CategoryBudgetListItemDto[]> }) {
+  const showSkeleton = useDelayedLoading(query.loading && !query.data);
+  let state: DataTransitionState;
+  if (showSkeleton && !query.data) state = 'skeleton';
+  else if (query.error && !query.data) state = 'error';
+  else state = 'data';
+
+  return (
+    <DataTransition
+      state={state}
+      skeleton={<Skeleton className="h-[300px] w-full" />}
+      error={<CardError section="Category Budgets" onRetry={query.refetch} />}
+    >
+      {query.data && query.data.length === 0 && (
+        <p className="text-sm text-muted-foreground">No category budgets.</p>
+      )}
+      {query.data && query.data.length > 0 && (
+        <CategoryBudgetsTable items={query.data} onChanged={query.refetch} />
+      )}
+    </DataTransition>
+  );
+}
+
+function GoalTabBody({ query }: { query: UseApiResult<GoalBudgetListItemDto[]> }) {
+  const showSkeleton = useDelayedLoading(query.loading && !query.data);
+  let state: DataTransitionState;
+  if (showSkeleton && !query.data) state = 'skeleton';
+  else if (query.error && !query.data) state = 'error';
+  else state = 'data';
+
+  return (
+    <DataTransition
+      state={state}
+      skeleton={<Skeleton className="h-[300px] w-full" />}
+      error={<CardError section="Goal Budgets" onRetry={query.refetch} />}
+    >
+      {query.data && query.data.length === 0 && (
+        <p className="text-sm text-muted-foreground">No goal budgets.</p>
+      )}
+      {query.data && query.data.length > 0 && (
+        <GoalBudgetsTable items={query.data} onChanged={query.refetch} />
+      )}
+    </DataTransition>
   );
 }
