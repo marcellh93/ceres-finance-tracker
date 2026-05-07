@@ -2,14 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from '@/components/ui/input-group';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
@@ -25,17 +18,8 @@ import {
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { CategoryCombobox } from '../../components/CategoryCombobox';
 import { Field } from '../../components/Field';
+import { MoneyInput } from '../../components/MoneyInput';
 import { DatePickerField } from '../../../components/DatePickerField';
-import {
-  amountPlaceholder,
-  formatAmountForDisplay,
-  formatNumberForDisplay,
-  parseAmountToNumber,
-  sanitizeAmountInput,
-  stripThousandSeparators,
-  type NumberFormat,
-} from '../../lib/amount-format';
-import { useSettings } from '../../lib/use-settings';
 import { useApi } from '../../lib/use-api';
 import type { AccountOptionDto, CategoryOptionDto, MovementType } from './movements-api';
 import type { GoalBudgetListItemDto } from '../budgets/budgets-api';
@@ -119,20 +103,11 @@ export function MovementForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const settings = useSettings();
-  const numberFormat: NumberFormat | undefined = settings.data?.numberFormat;
-
   // Spending-Goal picker data — only consumed by the Transaction variant.
   // Fetched unconditionally so the hook order stays stable across renders.
   const { data: goalBudgets } = useApi<GoalBudgetListItemDto[]>(
     '/api/goal-budgets?type=spending&includeArchived=true',
   );
-
-  // ── Amount field display state ──
-  // values.amount is the *wire* format (JS-number string, period decimal).
-  // displayAmount is what the user sees: raw while focused, grouped on blur.
-  const [displayAmount, setDisplayAmount] = useState('');
-  const [amountFocused, setAmountFocused] = useState(false);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
@@ -143,47 +118,8 @@ export function MovementForm({
     setErrors({});
   }, [initialValues]);
 
-  // Whenever the format becomes known or the wire value changes (e.g. Edit
-  // load), re-render the display to match the user's locale.
-  useEffect(() => {
-    if (!numberFormat) return;
-    if (amountFocused) return; // don't overwrite mid-edit
-    const wire = values.amount;
-    if (!wire) {
-      setDisplayAmount('');
-      return;
-    }
-    const asNumber = Number(wire);
-    setDisplayAmount(
-      Number.isFinite(asNumber) ? formatNumberForDisplay(asNumber, numberFormat) : '',
-    );
-  }, [values.amount, numberFormat, amountFocused]);
-
   function set<K extends keyof MovementFormValues>(key: K, value: MovementFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function handleAmountChange(input: string) {
-    if (!numberFormat) return;
-    const sanitized = sanitizeAmountInput(input, numberFormat);
-    setDisplayAmount(sanitized);
-    // Mirror to wire format so submit always has the right value.
-    const parsed = parseAmountToNumber(sanitized, numberFormat);
-    set('amount', Number.isFinite(parsed) ? String(parsed) : '');
-  }
-
-  function handleAmountFocus() {
-    if (!numberFormat) return;
-    setAmountFocused(true);
-    // Strip thousands separators so editing is easier.
-    setDisplayAmount(stripThousandSeparators(displayAmount, numberFormat));
-  }
-
-  function handleAmountBlur() {
-    if (!numberFormat) return;
-    setAmountFocused(false);
-    // Insert thousands separators for display.
-    setDisplayAmount(formatAmountForDisplay(displayAmount, numberFormat));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -232,37 +168,14 @@ export function MovementForm({
   });
   const showBudgetPicker = type === 'Transaction' && matchingGoals.length > 0;
 
-  // Render the Amount input — or a Skeleton while settings load,
-  // since the field's behavior depends on the user's number format.
-  // The Skeleton carries the id so the Amount label's htmlFor stays valid
-  // during the loading window (otherwise the browser flags an
-  // unresolved <label for=…>).
-  const amountInput =
-    numberFormat === undefined ? (
-      <Skeleton id="mf-amount" className="h-8 w-full" />
-    ) : (
-      <InputGroup>
-        {symbol && (
-          <InputGroupAddon align="inline-start">
-            <InputGroupText className="text-base font-medium text-muted-foreground">
-              {symbol}
-            </InputGroupText>
-          </InputGroupAddon>
-        )}
-        <InputGroupInput
-          id="mf-amount"
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder={amountPlaceholder(numberFormat)}
-          value={displayAmount}
-          onChange={(e) => handleAmountChange(e.target.value)}
-          onFocus={handleAmountFocus}
-          onBlur={handleAmountBlur}
-          className="text-base font-medium"
-        />
-      </InputGroup>
-    );
+  const amountInput = (
+    <MoneyInput
+      id="mf-amount"
+      value={values.amount}
+      onChange={(wire) => set('amount', wire)}
+      currencySymbol={symbol}
+    />
+  );
 
   // Type-specific account fields — extracted so they can render before the
   // Date+Amount row (Account is the prerequisite for the currency symbol).

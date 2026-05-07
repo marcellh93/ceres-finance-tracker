@@ -7,6 +7,19 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+// Stub the settings hook so MoneyInput renders synchronously in tests.
+vi.mock('../lib/use-settings', () => ({
+  useSettings: () => ({
+    data: {
+      numberFormat: 'period_decimal' as const,
+      dateFormat: 'MM/DD/YYYY',
+      defaultCurrencyCode: 'EUR',
+      defaultCurrencySymbol: '€',
+    },
+    loading: false,
+  }),
+}));
+
 const mockFetch = vi.fn();
 
 const accountsResponse = {

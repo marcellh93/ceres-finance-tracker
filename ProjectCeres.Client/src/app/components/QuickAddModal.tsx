@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountCombobox } from './AccountCombobox';
 import { CategoryCombobox } from './CategoryCombobox';
 import { Field } from './Field';
+import { MoneyInput } from './MoneyInput';
 import { DatePickerField } from '../../components/DatePickerField';
 import {
   ACCOUNTS_ACTIVE_URL,
@@ -181,10 +182,12 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
               <DatePickerField id="qa-date" value={date || null} onChange={(v) => setDate(v ?? '')} hideClear />
             </Field>
             <Field label="Amount" htmlFor="qa-amount" error={errors.amount}>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground w-6">{selectedAccountSymbol()}</span>
-                <Input id="qa-amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
+              <MoneyInput
+                id="qa-amount"
+                value={amount}
+                onChange={setAmount}
+                currencySymbol={selectedAccountSymbol() || null}
+              />
             </Field>
             <Field label="Account" error={errors.accountId}>
               <AccountCombobox accounts={accounts} value={accountId} onChange={setAccountId} placeholder="Select account" />
@@ -202,10 +205,12 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
               <DatePickerField id="qa-tr-date" value={date || null} onChange={(v) => setDate(v ?? '')} hideClear />
             </Field>
             <Field label="Amount" htmlFor="qa-tr-amount" error={errors.amount}>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground w-6">{selectedAccountSymbol()}</span>
-                <Input id="qa-tr-amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
+              <MoneyInput
+                id="qa-tr-amount"
+                value={amount}
+                onChange={setAmount}
+                currencySymbol={selectedAccountSymbol() || null}
+              />
             </Field>
             <Field label="Source account" error={errors.sourceAccountId}>
               <AccountCombobox accounts={accounts} value={sourceAccountId} onChange={setSourceAccountId} placeholder="Select source" />
@@ -223,10 +228,12 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
               <DatePickerField id="qa-lp-date" value={date || null} onChange={(v) => setDate(v ?? '')} hideClear />
             </Field>
             <Field label="Amount" htmlFor="qa-lp-amount" error={errors.amount}>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground w-6">{selectedAccountSymbol()}</span>
-                <Input id="qa-lp-amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
+              <MoneyInput
+                id="qa-lp-amount"
+                value={amount}
+                onChange={setAmount}
+                currencySymbol={selectedAccountSymbol() || null}
+              />
             </Field>
             <Field label="Asset account" error={errors.assetAccountId}>
               <AccountCombobox

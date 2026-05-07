@@ -641,7 +641,7 @@ The canonical date input. A shadcn `<Popover>` triggered by an outline `<Button>
 
 ## Money input
 
-The money/currency input is a composite recipe, not a standalone component — it uses `<InputGroup>` for the currency-symbol addon and three `amount-format.ts` helpers to manage the raw/display/wire model. Every monetary field in the SPA follows this shape.
+`<MoneyInput>` (`src/app/components/MoneyInput.tsx`) is the single primitive for money/currency entry. It encapsulates the raw/display/wire model and the locale-aware sanitize/format helpers. Every monetary field in the SPA uses it.
 
 ### The raw / display / wire model
 
@@ -653,56 +653,35 @@ A money field has three string forms, defined in `src/app/lib/amount-format.ts`:
 | **display** | `1.234,56` | While the field is blurred — raw with thousands separators inserted |
 | **wire** | `1234.56` | Crossing the network — JS number, period decimal |
 
-The user's chosen number format (stored in Settings) decides which separator is which: `comma_decimal` ⇒ `.` thousands / `,` decimal; `period_decimal` ⇒ `,` thousands / `.` decimal. Convert with the helpers — never substitute by hand.
+The user's chosen number format (stored in Settings) decides which separator is which: `comma_decimal` ⇒ `.` thousands / `,` decimal; `period_decimal` ⇒ `,` thousands / `.` decimal. `<MoneyInput>` does the conversion internally; consumers only ever see the wire format.
 
-### Recipe
+### Usage
 
 ```tsx
-const settings = useSettings();
-const numberFormat = settings.data?.numberFormat;
-const symbol = currency?.symbol;
-
-const amountInput =
-  numberFormat === undefined ? (
-    <Skeleton id="mf-amount" className="h-8 w-full" />
-  ) : (
-    <InputGroup>
-      {symbol && (
-        <InputGroupAddon align="inline-start">
-          <InputGroupText className="text-base font-medium text-muted-foreground">
-            {symbol}
-          </InputGroupText>
-        </InputGroupAddon>
-      )}
-      <InputGroupInput
-        id="mf-amount"
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        placeholder={amountPlaceholder(numberFormat)}
-        value={displayAmount}
-        onChange={(e) => handleAmountChange(e.target.value)}
-        onFocus={handleAmountFocus}
-        onBlur={handleAmountBlur}
-        className="text-base font-medium"
-      />
-    </InputGroup>
-  );
+<Field label="Amount" htmlFor="my-amount" error={errors.amount}>
+  <MoneyInput
+    id="my-amount"
+    value={values.amount}            // wire format ("123.45")
+    onChange={(wire) => set('amount', wire)}
+    currencySymbol={selectedAccount?.currencySymbol}
+  />
+</Field>
 ```
 
-### Conventions
+The `id` prop is required and forwarded onto the underlying input — pair with `<Field htmlFor={...}>` so the label/control association is correct. The component renders a Skeleton (carrying the same id) while `useSettings` resolves, so the htmlFor stays valid throughout.
 
-- **`type="text"` with `inputMode="decimal"`**, never `type="number"`. `type="number"` strips trailing zeros, doesn't honour locale separators, and exposes a useless spinner control. `inputMode="decimal"` is the part that brings up the right mobile keyboard.
-- **Filter the keystroke.** `handleAmountChange` runs the new value through `sanitizeAmountInput(value, format)` — drops letters, normalises a wrongly-typed separator, blocks a second separator. Don't validate format; just refuse the bad keystroke.
-- **Format on blur, raw-only on focus.** `handleAmountFocus` strips thousands separators with `stripThousandSeparators`; `handleAmountBlur` re-applies them with `formatAmountForDisplay`. The user types digits + decimal; commas/periods appear when they leave the field.
-- **Skeleton while settings load.** The field's behaviour depends on `numberFormat`, so `displayAmount` cannot be parsed until settings arrive. Render a `<Skeleton id="mf-amount">` carrying the same `id` so the surrounding `<Label htmlFor="mf-amount">` stays valid through the loading window.
-- **Currency symbol via `<InputGroupAddon align="inline-start">`.** The symbol is a label, not part of the value — it lives in the addon, never in the input string. The addon's text style is `text-muted-foreground` so it doesn't compete with the typed amount.
-- **Wire conversion on submit.** Run `parseAmountToNumber(raw, format)` to get the JS number; send that. Reverse with `formatNumberForDisplay` when prefilling Edit forms.
+### Conventions enforced by the component
 
-### When *not* to use this recipe
+- **`type="text"` with `inputMode="decimal"`**, never `type="number"`. `type="number"` strips trailing zeros, doesn't honour locale separators, and exposes a useless spinner control. `inputMode="decimal"` brings up the right mobile keyboard.
+- **Keystrokes are filtered** through `sanitizeAmountInput` — drops letters, normalises a wrongly-typed separator, blocks a second separator. Don't validate format; refuse the bad keystroke.
+- **Display formatted on blur, raw on focus.** Thousands separators strip on focus, re-apply on blur. The user types digits + decimal; commas/periods appear when they leave the field.
+- **Currency symbol via `<InputGroupAddon align="inline-start">`.** Pass `currencySymbol` and the prefix renders in the addon (not part of the input string). The addon's text style is `text-muted-foreground` so it doesn't compete with the typed amount.
+- **Wire format on the boundary.** `value` and `onChange` always speak wire format. Submit `Number(values.amount)`; reverse with `formatNumberForDisplay` only when *displaying* a number outside an input (KPI tiles, table cells).
+
+### When *not* to use `<MoneyInput>`
 
 - **Read-only money display** (KPI tiles, table cells, summary rows) — use `<Numeric>` with the value pre-formatted via `formatNumberForDisplay`. The input recipe is for *entry*, not *display*.
-- **Budget percentages, savings rates** — those are unitless ratios; render them directly as `${(fraction * 100).toFixed(1)}%`. The money recipe is currency-specific.
+- **Budget percentages, savings rates** — those are unitless ratios; render them directly as `${(fraction * 100).toFixed(1)}%`. `<MoneyInput>` is currency-specific.
 
 ---
 
