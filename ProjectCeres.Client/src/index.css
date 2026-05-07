@@ -187,6 +187,21 @@ html.sidebar-collapsed {
     --sidebar-w: 56px;
 }
 
+/* Global reduced-motion override — collapses every animation and transition
+   to ~instant for users who request it. Per-feature guards (Switch thumb,
+   view-transition root) further set their animations to `none` for fully
+   static behaviour. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground; }

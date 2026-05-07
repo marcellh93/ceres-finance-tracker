@@ -18,23 +18,7 @@ export function Toasts() {
 
       <section>
         <h2 className="mb-4 text-xl font-medium">Variants</h2>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={() => toast.success('Saved.')}>
-            Success
-          </Button>
-          <Button onClick={() => toast.error("Couldn't save. Try again.")}>
-            Error
-          </Button>
-          <Button onClick={() => toast.info('Heads up.')}>
-            Info
-          </Button>
-          <Button onClick={() => toast.warning('Watch out.')}>
-            Warning
-          </Button>
-          <Button onClick={() => toast('Plain notification.')}>
-            Plain
-          </Button>
-        </div>
+        <VariantsSection />
       </section>
 
       <section>
@@ -111,6 +95,45 @@ export function Toasts() {
       </section>
 
       <Toaster />
+    </div>
+  );
+}
+
+function VariantsSection() {
+  const [loadingId, setLoadingId] = useState<string | number | null>(null);
+
+  function fireLoading() {
+    if (loadingId !== null) toast.dismiss(loadingId);
+    const id = toast.loading('Working on it… (60s)', { duration: 60_000 });
+    setLoadingId(id);
+  }
+
+  function dismissLoading() {
+    if (loadingId !== null) {
+      toast.dismiss(loadingId);
+      setLoadingId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Button onClick={() => toast.success('Saved.')}>Success</Button>
+      <Button onClick={() => toast.error("Couldn't save. Try again.")}>
+        Error
+      </Button>
+      <Button onClick={() => toast.info('Heads up.')}>Info</Button>
+      <Button onClick={() => toast.warning('Watch out.')}>Warning</Button>
+      <Button onClick={() => toast('Plain notification.')}>Plain</Button>
+      <Button variant="outline" onClick={fireLoading}>
+        Loading (60s)
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={dismissLoading}
+        disabled={loadingId === null}
+      >
+        Dismiss loading
+      </Button>
     </div>
   );
 }
