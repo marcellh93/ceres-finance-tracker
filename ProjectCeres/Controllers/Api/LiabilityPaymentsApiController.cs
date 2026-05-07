@@ -27,7 +27,8 @@ public class LiabilityPaymentsApiController(
             Amount             = request.Amount,
             AccountId          = request.AssetAccountId,
             LiabilityAccountId = request.LiabilityAccountId,
-            Description        = request.Description
+            Description        = request.Description,
+            IsCleared          = request.IsCleared
         };
 
         var payment = await liabilityPaymentService.CreateAsync(vm);

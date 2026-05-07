@@ -165,6 +165,24 @@ public class IsClearedTests : IAsyncLifetime
         saved!.IsCleared.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CreateTransfer_PersistsIsClearedFromVm(bool isCleared)
+    {
+        var transfer = await _trService.CreateAsync(new TransferCreateViewModel
+        {
+            Date            = DateOnly.FromDateTime(DateTime.Today),
+            Amount          = 200m,
+            SourceAccountId = _accountId,
+            DestAccountId   = _account2Id,
+            IsCleared       = isCleared
+        });
+
+        var saved = await _fixture.Db.Transfers.FindAsync(transfer.Id);
+        saved!.IsCleared.Should().Be(isCleared);
+    }
+
     // -------------------------------------------------------------------------
     // Transfer — MarkClearedAsync sets IsCleared = true
     // -------------------------------------------------------------------------

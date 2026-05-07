@@ -115,6 +115,24 @@ public class LiabilityPaymentServiceTests : IAsyncLifetime
         reloaded.Description.Should().Be("Test payment");
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CreateAsync_PersistsIsClearedFromVm(bool isCleared)
+    {
+        var assetId     = await CreateAssetAccountAsync();
+        var liabilityId = await CreateLiabilityAccountAsync();
+
+        var vm = MakeCreateVm(assetId, liabilityId);
+        vm.IsCleared = isCleared;
+
+        var payment = await _service.CreateAsync(vm);
+
+        var reloaded = await _fixture.Db.LiabilityPayments.FindAsync(payment.Id);
+        reloaded.Should().NotBeNull();
+        reloaded!.IsCleared.Should().Be(isCleared);
+    }
+
     // -------------------------------------------------------------------------
     // CreateAsync — validation guards
     // -------------------------------------------------------------------------

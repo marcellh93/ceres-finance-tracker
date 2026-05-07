@@ -113,6 +113,24 @@ public class TransactionServiceTests : IAsyncLifetime
         saved.AccountId.Should().Be(_accountId);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CreateAsync_PersistsIsClearedFromVm(bool isCleared)
+    {
+        var vm = CreateVm(amount: 150m, description: $"cleared={isCleared}");
+        vm.IsCleared = isCleared;
+
+        await _service.CreateAsync(vm);
+
+        var saved = await _fixture.Db.Transactions
+            .Where(t => t.AccountId == _accountId && t.Description == vm.Description)
+            .FirstOrDefaultAsync();
+
+        saved.Should().NotBeNull();
+        saved!.IsCleared.Should().Be(isCleared);
+    }
+
     [Fact]
     public async Task UpdateAsync_ChangesFieldsOnExistingTransaction()
     {

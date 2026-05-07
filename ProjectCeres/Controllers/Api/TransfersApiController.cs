@@ -43,7 +43,8 @@ public class TransfersApiController(
             Amount          = request.Amount,
             SourceAccountId = request.SourceAccountId,
             DestAccountId   = request.DestAccountId,
-            Description     = request.Description
+            Description     = request.Description,
+            IsCleared       = request.IsCleared
         };
 
         try

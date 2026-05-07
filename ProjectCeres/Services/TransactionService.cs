@@ -191,6 +191,7 @@ public class TransactionService(
             AccountId   = vm.AccountId!.Value,
             CategoryId  = vm.CategoryId!.Value,
             BudgetId    = vm.BudgetId,
+            IsCleared   = vm.IsCleared,
             CreatedAt   = DateTime.UtcNow
         };
 

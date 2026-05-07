@@ -39,6 +39,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
             SourceAccountId = vm.SourceAccountId!.Value,
             DestAccountId   = vm.DestAccountId!.Value,
             Description     = vm.Description,
+            IsCleared       = vm.IsCleared,
             CreatedAt       = DateTime.UtcNow
         };
 

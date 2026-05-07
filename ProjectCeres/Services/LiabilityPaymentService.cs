@@ -28,6 +28,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
             AssetAccountId     = vm.AccountId!.Value,
             LiabilityAccountId = vm.LiabilityAccountId!.Value,
             Description        = vm.Description,
+            IsCleared          = vm.IsCleared,
             CreatedAt          = DateTime.UtcNow
         };
 

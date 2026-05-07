@@ -19,6 +19,8 @@ public class CreateTransactionRequest
 
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
     public string? Description { get; set; }
+
+    public bool IsCleared { get; set; }
 }
 
 public class CreateTransferRequest
@@ -38,6 +40,8 @@ public class CreateTransferRequest
 
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
     public string? Description { get; set; }
+
+    public bool IsCleared { get; set; }
 }
 
 public class CreateLiabilityPaymentRequest
@@ -57,4 +61,6 @@ public class CreateLiabilityPaymentRequest
 
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
     public string? Description { get; set; }
+
+    public bool IsCleared { get; set; }
 }

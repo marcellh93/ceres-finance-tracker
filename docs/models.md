@@ -372,15 +372,15 @@ One Transaction links to exactly one Category. Split transactions (one payment a
 multiple categories) are not supported in Phase 1 or Phase 2. Revisit at Phase 3 scope
 definition — outcome may be implement, defer again, or discard. See ADR-0041.
 
-**Cleared / reconciliation status (Phase 2):**
+**Cleared / reconciliation status (Phase 2; SPA surfaces in Phase 3):**
 `IsCleared bool NOT NULL DEFAULT false` — added in Phase 2. Marks a transaction as
 verified against a bank statement. Set automatically on clean CSV imports; held false
 for potential duplicates pending reconciliation review. See ADR-0039.
-Can be toggled from three surfaces: (1) the `ToggleCleared` POST action on the Transactions
-Index view (inline, preserves filter state); (2) the `BulkMarkCleared` POST action that sets
-all transactions in a date range to cleared; (3) the `IsClearedSwitch` React component
-embedded in the Transaction Edit form, which writes to a hidden field submitted with the
-standard form POST.
+Can be set from four surfaces: (1) the `MovementClearedToggle` inline switch on the
+Movements list (PATCHes `/api/movements/{id}/cleared`); (2) the bulk-cleared button on
+the Movements list (POSTs `/api/movements/bulk-cleared`); (3) the `IsClearedSwitch`
+inside `MovementForm` on the Edit page (sent as a JSON field on PUT); (4) the same
+switch on the Create page (sent on POST). Surfaces 3 + 4 share the same form component.
 
 **Needs review flag (Phase 2):**
 `NeedsReview bool NOT NULL DEFAULT false` — set to `true` automatically on every transaction
@@ -484,11 +484,12 @@ from all income/expense report calculations. Both accounts must share the same c
 **Constraint:** SourceAccountId and DestAccountId must reference accounts with the same currency.
 Cross-currency transfers are not supported — they would require a conversion rate, which is out of scope.
 
-**Cleared / reconciliation status (Phase 2):**
+**Cleared / reconciliation status (Phase 2; SPA surfaces in Phase 3):**
 `IsCleared bool NOT NULL DEFAULT false` — added in Phase 2. Same semantics as Transaction.
 Transfers are internal movements and are not reconciled against CSV imports. See ADR-0039.
-Can be toggled from two surfaces: (1) the `ToggleCleared` POST action on the Transfers Index
-view; (2) the `IsClearedSwitch` React component embedded in the Transfer Edit form.
+Set from three surfaces: (1) the inline `MovementClearedToggle` on the Movements list;
+(2) the `IsClearedSwitch` inside `MovementForm` on the Edit page; (3) the same switch on
+the Create page.
 
 **File attachments on transfers (Phase 2):**
 `TransferAttachment` entity added in Phase 2 — mirrors `TransactionAttachment` with a

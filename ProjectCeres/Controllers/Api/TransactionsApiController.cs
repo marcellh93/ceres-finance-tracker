@@ -25,7 +25,8 @@ public class TransactionsApiController(
             Amount = request.Amount,
             AccountId = request.AccountId,
             CategoryId = request.CategoryId,
-            Description = request.Description
+            Description = request.Description,
+            IsCleared = request.IsCleared
         };
 
         var id = await transactionService.CreateAsync(vm);

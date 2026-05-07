@@ -35,4 +35,6 @@ public class TransactionCreateViewModel
 
     [Display(Name = "Attachments")]
     public List<IFormFile>? Attachments { get; set; }
+
+    public bool IsCleared { get; set; }
 }
