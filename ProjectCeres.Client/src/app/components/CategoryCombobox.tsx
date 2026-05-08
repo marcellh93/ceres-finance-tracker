@@ -42,10 +42,9 @@ export function CategoryCombobox({ categories, value, onChange, placeholder, dis
               role="combobox"
               aria-expanded={open}
               disabled={disabled}
-              className={cn('w-full justify-between', showClear && 'pr-12')}
+              className={cn('w-full justify-start text-left font-normal', showClear ? 'pr-14' : 'pr-8')}
             >
-              {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              {selected ? <span className="truncate">{selected.name}</span> : <span className="text-muted-foreground">{placeholder}</span>}
             </Button>
           }
         />
@@ -59,6 +58,7 @@ export function CategoryCombobox({ categories, value, onChange, placeholder, dis
             <X className="h-4 w-4" />
           </button>
         )}
+        <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
       </div>
       <PopoverContent className="p-0" align="start">
         <Command>
