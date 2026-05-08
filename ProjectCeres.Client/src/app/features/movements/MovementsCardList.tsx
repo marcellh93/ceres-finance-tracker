@@ -67,7 +67,7 @@ export function MovementsCardList({ items, onRefetch }: Props) {
               >
                 {/* Line 1: type pill + date (left) | amount + kebab (right) */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex min-w-0 items-baseline gap-2 text-xs text-muted-foreground">
                     {typePill(item)}
                     <span className="truncate">{dateLabel}</span>
                   </div>
@@ -92,7 +92,7 @@ export function MovementsCardList({ items, onRefetch }: Props) {
                   </div>
                 </div>
                 {/* Line 2: description (left) | status badge (right) */}
-                <div className="mt-1.5 flex items-center justify-between gap-2">
+                <div className="mt-1.5 flex items-baseline justify-between gap-2">
                   <span className="truncate text-sm font-medium">{primary}</span>
                   <span
                     onClick={(e) => {
