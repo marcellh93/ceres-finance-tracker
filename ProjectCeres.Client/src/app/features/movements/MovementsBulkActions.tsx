@@ -99,10 +99,11 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(true)}
+                aria-label="Mark visible cleared"
                 className="gap-2"
               >
                 <CheckCheck className="h-4 w-4" />
-                Mark visible cleared
+                <span className="sr-only sm:not-sr-only">Mark visible cleared</span>
               </Button>
             }
           />
@@ -126,10 +127,11 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
         href={exportHref}
         rel="noopener"
         onClick={handleExportClick}
+        aria-label="Export CSV"
         className={cn(buttonVariants({ variant: 'outline' }), 'gap-2 no-underline')}
       >
         <Download className="h-4 w-4" />
-        Export CSV
+        <span className="sr-only sm:not-sr-only">Export CSV</span>
       </a>
 
 
