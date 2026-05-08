@@ -8,6 +8,7 @@ import { AccountCombobox } from './AccountCombobox';
 import { CategoryCombobox } from './CategoryCombobox';
 import { Field } from './Field';
 import { MoneyInput } from './MoneyInput';
+import { SubmitButton } from './SubmitButton';
 import { DatePickerField } from '../../components/DatePickerField';
 import {
   ACCOUNTS_ACTIVE_URL,
@@ -34,7 +35,6 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
   const [tab, setTab] = useState<TabKey>('transaction');
   const [accounts, setAccounts] = useState<AccountOptionDto[]>([]);
   const [categories, setCategories] = useState<CategoryOptionDto[]>([]);
-  const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   // Shared fields
@@ -111,8 +111,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
     setLiabilityAccountId(null);
   }
 
-  async function submit() {
-    setSubmitting(true);
+  async function submit(): Promise<boolean> {
     setErrors({});
     try {
       const url =
@@ -136,9 +135,8 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
       if (response.ok) {
         toast.success('Saved.');
         resetForm();
-        onOpenChange(false);
         onSaved?.();
-        return;
+        return true;
       }
 
       if (response.status === 422) {
@@ -152,14 +150,17 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
           }
         }
         setErrors(flat);
-        return;
+        throw new Error('validation');
       }
 
       toast.error("Couldn't save. Try again.");
-    } catch {
+      throw new Error('server');
+    } catch (err) {
+      if (err instanceof Error && (err.message === 'validation' || err.message === 'server')) {
+        throw err;
+      }
       toast.error("Couldn't save. Try again.");
-    } finally {
-      setSubmitting(false);
+      throw new Error('server');
     }
   }
 
@@ -263,7 +264,14 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</Button>
+          <SubmitButton
+            onClick={async () => {
+              await submit();
+              onOpenChange(false);
+            }}
+          >
+            Save
+          </SubmitButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
