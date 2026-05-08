@@ -423,11 +423,20 @@ export function BudgetCombobox({
 
 ### Static HTML entry changes
 
-The Vite build has three HTML entry points (verified 2026-05-08 against `vite.config.ts`):
+**Important:** The dev server (and production server) serves **Razor views**, not Vite's HTML files. Vite's HTML files (`app.html`, `index.html`) are dev-only fallbacks and production-build sources, but the actual served HTML at every route comes from the .NET app.
 
-- `ProjectCeres.Client/app.html` — the SPA at `/app/` (loads `src/app/main.tsx`). **Primary target.**
-- `ProjectCeres.Client/design-system.html` — the design-system showcase (loads `src/design-system/main.tsx`).
-- `ProjectCeres.Client/index.html` — the Razor-coexistence islands shell (loads `src/main.tsx`). Goes away with Stage 11 cleanup; we still harden it because it's user-visible until then.
+Two layers therefore need hardening:
+
+**Razor shells (the actually-served HTML — primary target):**
+
+- `ProjectCeres/Views/App/Index.cshtml` — served at `/app/*`, bootstraps `src/app/main.tsx`. **Primary SPA shell.**
+- `ProjectCeres/Views/Shared/_Layout.cshtml` — wraps every legacy Razor page (Dashboard, Movements pre-cutover, etc.) and bootstraps `src/main.tsx` for islands. Goes away with Stage 11 cleanup; we still harden it because it's user-visible until then.
+
+**Vite HTML entries (build-time + Vite-direct dev):**
+
+- `ProjectCeres.Client/app.html` — used by `pnpm dev` direct (rare) and the production build pipeline.
+- `ProjectCeres.Client/design-system.html` — design-system showcase.
+- `ProjectCeres.Client/index.html` — legacy islands shell counterpart (production fallback).
 
 Each entry gets the same hardening: `description` meta, `theme-color` meta (light + dark), and a top-level `<title>` that the SPA's per-route hook will override after mount. Default titles per entry:
 
