@@ -105,17 +105,15 @@ const isDesktop = useMediaQuery('(min-width: 768px)');
 
 `useMediaQuery` synchronously reads `matchMedia` on first render in the browser (per its source), so there is no flash on initial load. Cross-breakpoint resize triggers a re-render that swaps the rendered component.
 
-## Edit URL helper
+## Edit URL
 
-Existing routes are `/movements/:id/edit`. The DTO carries `movementType` which the Edit page needs to resolve which sub-form to render — pass it as a query string consistent with how `MovementCreate` resolves type:
+Existing routes are `/movements/:id/edit`. The Edit page (`MovementEdit.tsx`) resolves the movement type by fetching the movement by id from the API; no query string needed. The card link is therefore:
 
 ```tsx
-function editHrefFor(item: MovementListItemDto): string {
-  return `/movements/${item.id}/edit?type=${typeForApi(item.movementType)}`;
-}
+<Link to={`/movements/${item.id}/edit`}>…</Link>
 ```
 
-`typeForApi` already exists in `MovementClearedToggle.tsx` — lift it into `movement-type-display.ts` as a shared helper if it's not already there. Verify during implementation.
+This matches the existing `MovementRowMenu.tsx:75` pattern.
 
 ## Action-zone tap isolation
 
@@ -148,7 +146,7 @@ Tap target sizes:
 3. Transfer card shows "source → destination" form; no category.
 4. LiabilityPayment card shows "asset → liability" form; no category.
 5. Amount sign and color match the existing `amountColor` rules (Income green, Expense red, Transfer chart-6, LiabilityPayment chart-7, opening balance neutral).
-6. Card link `href` is `/movements/${id}/edit?type=${typeParam}`.
+6. Card link `href` is `/movements/${id}/edit`.
 7. Click on status toggle does NOT navigate to the link (stopPropagation works).
 8. Click on ⋮ menu does NOT navigate.
 9. Container has the implicit list role (or explicit `role="list"`); each item is reachable via `getByRole('listitem')`.
