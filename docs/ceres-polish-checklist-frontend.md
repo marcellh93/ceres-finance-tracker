@@ -221,11 +221,11 @@ Sequencing for handing to Claude Code. Tiers are independent — finish one befo
 14. ✅ MovementForm budget `<select>` replaced with `BudgetCombobox` (commit `1394db6`); clear-✕ structural fix in `eeb0c13`/`d3702bd`/`182dd08`
 15. ✅ HTML entries hardened — `theme-color` + description meta + per-route titles via `useDocumentTitle` (commit `d828161`); served-HTML correction (Razor shells) in `ff362fc`/`de28b8a`; favicon wired in `54a8451`
 
-**Tier 4 — testing and observability:**
+**Tier 4 — testing and observability:** ✅ all shipped 2026-05-08
 
-16. Disable CSS animations in `test-setup.ts` (12.1)
-17. Add `vitest-axe` (4.6, 12.5)
-18. Add bundle visualizer + size limit to CI (5.5)
+16. ✅ Disabled CSS animations in `test-setup.ts` (commit `9f61771`)
+17. ✅ `vitest-axe` with `expectNoA11yViolations` helper, gating on serious + critical severities; coverage on MovementForm, QuickAddModal, AppLayout (commit `e96d898`)
+18. ✅ Bundle visualizer (`rollup-plugin-visualizer`) emits `dist/stats.html` on every build; per-asset gzip budgets enforced via `pnpm check-size` chained into `pnpm build` (commit `c37f4eb`)
 
 **Tier 5 — discretionary:**
 

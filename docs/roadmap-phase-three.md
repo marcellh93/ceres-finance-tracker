@@ -247,7 +247,7 @@ Responsive (foundation tier — applies to every later stage):
 
 ## Stage 5 — Frontend polish + data-loading ease-in
 
-**Status: ⚠️ In progress.** Data-loading ease-in fully rolled out (5.2/5.3/5.4). Tier 1 polish done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped). Tier 2 polish done (T2.7–T2.10). Tier 3 polish done (T3.11–T3.15 shipped 2026-05-08). Tier 4–5 pending. Plus a batch of ad-hoc UX fixes shipped on top of the planned tiers — see § Ad-hoc UX fixes below.
+**Status: ⚠️ In progress.** Data-loading ease-in fully rolled out (5.2/5.3/5.4). Tier 1 polish done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped). Tier 2 polish done (T2.7–T2.10). Tier 3 polish done (T3.11–T3.15 shipped 2026-05-08). Tier 4 testing-infrastructure done (T4.16–T4.18 shipped 2026-05-08). Tier 5 pending. Plus a batch of ad-hoc UX fixes shipped on top of the planned tiers — see § Ad-hoc UX fixes below.
 
 > **As of 2026-05-08, next up:** Tier 4 (testing infrastructure) and Tier 5 (discretionary polish) remain. Alternative: switch to launch-critical work (Stage 6 Identity infrastructure). Stage 5 is explicitly *not* blocking Phase 3 launch.
 
@@ -264,7 +264,7 @@ Responsive (foundation tier — applies to every later stage):
 | 5.5 | Polish checklist Tier 1 — six small CSS / one library wire-up | ✅ 2026-05-07 (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped) | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) § Tier-ordered action list |
 | 5.6 | Polish checklist Tier 2 — extract shared primitives | ✅ 2026-05-08 (T2.7 `fa6c0d7`, T2.8 `496f1e3`, T2.9 `55d2030`, T2.10 superseded by 5.2) | (above) |
 | 5.7 | Polish checklist Tier 3 — production-app polish | ✅ 2026-05-08 (T3.11 `c372b89`, T3.12 `8b4c731`, T3.13 `0c5c1b0`, T3.14 `1394db6`, T3.15 `d828161` + 17 follow-up commits during browser-pass) | (above) |
-| 5.8 | Polish checklist Tier 4 — testing and observability | ❌ Pending | (above) |
+| 5.8 | Polish checklist Tier 4 — testing and observability | ✅ 2026-05-08 (T4.16 `9f61771`, T4.17 `e96d898`, T4.18 `c37f4eb`) | (above) |
 | 5.9 | Polish checklist Tier 5 — discretionary | ❌ Pending | (above) |
 | 5.10 | Ad-hoc UX fixes layered on top of the planned tiers | ✅ 2026-05-08 (see § Ad-hoc UX fixes below) | (this doc) |
 
@@ -322,11 +322,11 @@ Tier 3 — production-app polish:
 - [x] T3.14 Replace MovementForm budget `<select>` with Combobox, or document the rule — shipped 2026-05-08 (commit `1394db6`); clear-✕ structural fix in `eeb0c13`/`d3702bd`/`182dd08`
 - [x] T3.15 Harden `index.html` — `theme-color` meta, description meta, per-route titles (1.7) — shipped 2026-05-08 (commit `d828161`); served-HTML correction (Razor shells, not Vite's app.html) in `ff362fc`/`de28b8a`; favicon wired in `54a8451`
 
-Tier 4 — testing and observability:
+Tier 4 — testing and observability: ✅ all shipped 2026-05-08
 
-- [ ] T4.16 Disable CSS animations in `test-setup.ts` (12.1) — animations not currently disabled in tests
-- [ ] T4.17 Add `vitest-axe` (4.6, 12.5) — minimum coverage: `MovementForm`, `QuickAddModal`, `AppLayout`
-- [ ] T4.18 Add bundle visualizer (`rollup-plugin-visualizer`) + size budget on `dist/assets/*.js` (5.5)
+- [x] T4.16 Disable CSS animations in `test-setup.ts` (12.1) — shipped 2026-05-08 (commit `9f61771`); injects a global stylesheet zeroing animation/transition durations + scroll-behavior, removing JSDOM event-timer flakiness introduced after T3.11's motion-token migration
+- [x] T4.17 Add `vitest-axe` (4.6, 12.5) — shipped 2026-05-08 (commit `e96d898`); coverage on MovementForm (3 modes), QuickAddModal (3 tabs), AppLayout shell; `expectNoA11yViolations` helper gates on `serious`/`critical` severities; surfaced `button-name` violations on AccountCombobox/CategoryCombobox/BudgetCombobox triggers and fixed via `aria-label={selected?.name ?? placeholder}`
+- [x] T4.18 Add bundle visualizer (`rollup-plugin-visualizer`) + size budget on `dist/assets/*.js` (5.5) — shipped 2026-05-08 (commit `c37f4eb`); emits `dist/stats.html` treemap on every build; `scripts/check-bundle-size.mjs` enforces gzip budgets on the seven largest chunks at current+20% headroom; chained into `pnpm build`
 
 Tier 5 — discretionary:
 
