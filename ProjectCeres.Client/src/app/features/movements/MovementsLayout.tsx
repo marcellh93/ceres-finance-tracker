@@ -22,7 +22,9 @@ import { MovementsBulkActions } from './MovementsBulkActions';
 import { MovementsCurrencyTabs } from './MovementsCurrencyTabs';
 import { MovementsFilterBar } from './MovementsFilterBar';
 import { MovementsPagination } from './MovementsPagination';
+import { MovementsCardList } from './MovementsCardList';
 import { MovementsTable } from './MovementsTable';
+import { useMediaQuery } from '../../lib/use-media-query';
 import { MOVEMENTS_URL, type MovementsPageDto } from './movements-api';
 import { MOVEMENT_TYPE_HINT, MOVEMENT_TYPE_LABEL } from './movement-type-display';
 import { useApi } from '../../lib/use-api';
@@ -62,6 +64,7 @@ export function MovementsLayout() {
   const currencyReady = !currencyLoading && (!hasAccounts || activeCurrency !== null);
   const url = buildUrl(params, hasAccounts ? activeCurrency : null);
   const { data, error, loading, refetch } = useApi<MovementsPageDto>(url);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
 
   // Hooks before any early return.
   const isLoadingForTransition = !currencyReady || (loading && !data);
@@ -183,7 +186,9 @@ export function MovementsLayout() {
         )}
         {data && data.items.length > 0 && (
           <div className="space-y-4">
-            <MovementsTable items={data.items} onRefetch={refetch} />
+            {isDesktop
+              ? <MovementsTable items={data.items} onRefetch={refetch} />
+              : <MovementsCardList items={data.items} onRefetch={refetch} />}
             <MovementsPagination totalCount={data.totalCount} pageSize={data.pageSize} />
           </div>
         )}

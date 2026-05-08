@@ -1,4 +1,4 @@
-import type { MovementType } from './movements-api';
+import type { MovementType, MovementListItemDto } from './movements-api';
 
 /**
  * User-facing labels for movement types.
@@ -62,3 +62,23 @@ export const MOVEMENT_TYPE_FORM_HELPER: Record<MovementType, string> = {
   LiabilityPayment:
     'Use this when you pay a credit card bill, mortgage, loan, or any account you owe.',
 };
+
+/**
+ * Tailwind text-color class for a movement's amount in lists / cards.
+ *
+ * - Transaction Income → success (green)
+ * - Transaction Expense → destructive (red)
+ * - Transaction with no category type → foreground neutral
+ * - Transfer → chart-6 token
+ * - LiabilityPayment → chart-7 token
+ */
+export function amountColor(item: MovementListItemDto): string {
+  if (item.movementType === 'Transaction') {
+    if (item.categoryTypeName === 'Income') return 'text-success';
+    if (item.categoryTypeName === 'Expense') return 'text-destructive';
+    return 'text-foreground';
+  }
+  if (item.movementType === 'Transfer') return 'text-chart-6';
+  if (item.movementType === 'LiabilityPayment') return 'text-chart-7';
+  return 'text-foreground';
+}

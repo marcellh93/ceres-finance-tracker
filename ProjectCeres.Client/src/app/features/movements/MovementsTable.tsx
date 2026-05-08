@@ -3,23 +3,12 @@ import { Numeric } from '@/components/Numeric';
 import { MovementClearedToggle } from './MovementClearedToggle';
 import { MovementRowMenu } from './MovementRowMenu';
 import type { MovementListItemDto } from './movements-api';
-import { MOVEMENT_TYPE_LABEL } from './movement-type-display';
+import { MOVEMENT_TYPE_LABEL, amountColor } from './movement-type-display';
 import { formatNumberForDisplay } from '../../lib/amount-format';
 import { formatDate } from '../../lib/date-format';
 import { useSettings } from '../../lib/use-settings';
 
 type Props = { items: MovementListItemDto[]; onRefetch: () => void };
-
-function amountColor(item: MovementListItemDto): string {
-  if (item.movementType === 'Transaction') {
-    if (item.categoryTypeName === 'Income') return 'text-success';
-    if (item.categoryTypeName === 'Expense') return 'text-destructive';
-    return 'text-foreground';
-  }
-  if (item.movementType === 'Transfer') return 'text-chart-6';
-  if (item.movementType === 'LiabilityPayment') return 'text-chart-7';
-  return 'text-foreground';
-}
 
 export function MovementsTable({ items, onRefetch }: Props) {
   const settings = useSettings();
