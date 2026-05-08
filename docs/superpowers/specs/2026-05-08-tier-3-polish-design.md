@@ -18,7 +18,7 @@ Five polish items shipped together, each landing as its own commit:
 
 ## Decisions captured during brainstorm
 
-- **SubmitButton state count:** 4 states (idle / loading / success / error) with an 800 ms success flash that the parent `await`s before navigating or closing.
+- **SubmitButton state count:** 4 states (idle / loading / success / error) with a 1500 ms success-state dwell that the parent `await`s before navigating or closing. (Originally specced at 800 ms; bumped to 1500 ms 2026-05-08 after the dwell was perceived as too short. Industry consensus puts post-success dwell in the 1500–3000 ms range; we sit at the short end because the QuickAddModal also closes after, adding its own perceived delay.)
 - **Optimistic toggle visual:** Silent — `useOptimistic` is a pure correctness refactor, no in-flight visual signal added.
 - **Budget Combobox unselect UX:** `onClear` ✕ on the trigger + `placeholder="No budget"`. Mirrors `AccountCombobox` / `CategoryCombobox` exactly.
 - **Title mechanism:** Custom `useDocumentTitle` hook (no third-party dependency).
@@ -86,7 +86,7 @@ type SubmitButtonProps = Omit<ButtonProps, 'onClick' | 'type'> & {
   loadingLabel?: string;    // default 'Saving…'
   successLabel?: string;    // default 'Saved'
   errorLabel?: string;      // default 'Try again'
-  successDuration?: number; // default 800 (ms)
+  successDuration?: number; // default 1500 (ms)
   children: React.ReactNode; // idle label
 };
 ```
@@ -117,7 +117,7 @@ export function SubmitButton({
   loadingLabel = 'Saving…',
   successLabel = 'Saved',
   errorLabel = 'Try again',
-  successDuration = 800,
+  successDuration = 1500,
   children,
   ...rest
 }: SubmitButtonProps) {

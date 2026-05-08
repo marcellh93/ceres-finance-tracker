@@ -22,7 +22,7 @@ export function SubmitButton({
   loadingLabel = 'Saving…',
   successLabel = 'Saved',
   errorLabel = 'Try again',
-  successDuration = 800,
+  successDuration = 1500,
   children,
   variant,
   disabled,
