@@ -16,6 +16,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { AccountCombobox } from '../../components/AccountCombobox';
+import { BudgetCombobox } from '../../components/BudgetCombobox';
 import { CategoryCombobox } from '../../components/CategoryCombobox';
 import { Field } from '../../components/Field';
 import { MoneyInput } from '../../components/MoneyInput';
@@ -296,20 +297,14 @@ export function MovementForm({
 
         {showBudgetPicker && (
           <Field label="Budget (optional)" htmlFor="mf-budget">
-            <select
+            <BudgetCombobox
               id="mf-budget"
-              value={values.budgetId ?? ''}
-              onChange={(e) => set('budgetId', e.target.value || null)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <option value="">None</option>
-              {matchingGoals.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                  {!g.isActive ? ' (archived)' : ''}
-                </option>
-              ))}
-            </select>
+              budgets={matchingGoals}
+              value={values.budgetId}
+              onChange={(id) => set('budgetId', id)}
+              onClear={() => set('budgetId', null)}
+              placeholder="No budget"
+            />
           </Field>
         )}
 

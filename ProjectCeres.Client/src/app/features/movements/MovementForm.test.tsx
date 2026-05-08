@@ -433,9 +433,12 @@ describe('MovementForm', () => {
         onCancel={noopCancel}
       />,
     );
-    const select = (await screen.findByLabelText(/budget \(optional\)/i)) as HTMLSelectElement;
-    expect(select).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Trip' })).toBeInTheDocument();
+    // Wait for the budget combobox trigger to appear (labelled via Field's htmlFor → id="mf-budget")
+    const trigger = await screen.findByRole('combobox', { name: /budget \(optional\)/i });
+    expect(trigger).toBeInTheDocument();
+    // Open the popover and verify 'Trip' is listed
+    fireEvent.click(trigger);
+    expect(await screen.findByText('Trip')).toBeInTheDocument();
   });
 
   it('Test 15: Selecting a goal updates values.budgetId on submit', async () => {
@@ -452,8 +455,10 @@ describe('MovementForm', () => {
         onCancel={noopCancel}
       />,
     );
-    const select = (await screen.findByLabelText(/budget \(optional\)/i)) as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: 'g1' } });
+    // Open the budget combobox and pick 'Trip'
+    const trigger = await screen.findByRole('combobox', { name: /budget \(optional\)/i });
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByText('Trip'));
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
@@ -477,8 +482,11 @@ describe('MovementForm', () => {
         onCancel={noopCancel}
       />,
     );
-    const select = (await screen.findByLabelText(/budget \(optional\)/i)) as HTMLSelectElement;
-    expect(select).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /Old Trip \(archived\)/ })).toBeInTheDocument();
+    // The trigger should exist once goals load
+    const trigger = await screen.findByRole('combobox', { name: /budget \(optional\)/i });
+    expect(trigger).toBeInTheDocument();
+    // Open the popover and verify the archived suffix is shown
+    fireEvent.click(trigger);
+    expect(await screen.findByText('Old Trip (archived)')).toBeInTheDocument();
   });
 });
