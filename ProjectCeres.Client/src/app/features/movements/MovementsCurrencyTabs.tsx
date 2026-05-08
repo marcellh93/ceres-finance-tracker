@@ -58,9 +58,9 @@ export function MovementsCurrencyTabs({ availableCurrencies, activeCurrency, loa
       value={activeCurrency ?? availableCurrencies[0]}
       onValueChange={(v) => handleChange(String(v))}
     >
-      <TabsList>
+      <TabsList className="w-full md:w-auto">
         {availableCurrencies.map((code) => (
-          <TabsTrigger key={code} value={code}>
+          <TabsTrigger key={code} value={code} className="flex-1 md:flex-none">
             {code}
           </TabsTrigger>
         ))}

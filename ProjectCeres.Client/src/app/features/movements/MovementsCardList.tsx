@@ -54,7 +54,7 @@ export function MovementsCardList({ items, onRefetch }: Props) {
           <li key={`${item.movementType}-${item.id}`}>
             <article
               className={cn(
-                'group relative rounded-lg border border-border bg-card text-card-foreground',
+                'group rounded-lg border border-border bg-card text-card-foreground',
                 'transition-colors [transition-duration:var(--motion-duration-base)]',
                 'hover:bg-accent/40 focus-within:ring-2 focus-within:ring-ring',
               )}
@@ -65,45 +65,56 @@ export function MovementsCardList({ items, onRefetch }: Props) {
                 aria-label={`Edit ${MOVEMENT_TYPE_LABEL[item.movementType]} on ${dateLabel}`}
                 className="block px-4 py-3 focus:outline-none"
               >
-                <div className="flex items-center justify-between gap-2 pr-10">
+                {/* Line 1: type pill + date (left) | amount + kebab (right) */}
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                     {typePill(item)}
                     <span className="truncate">{dateLabel}</span>
                   </div>
-                  <Numeric className={cn('shrink-0 text-sm font-medium', amountColor(item))}>
-                    {item.currencySymbol} {formatNumberForDisplay(item.amount, numberFormat)}
-                  </Numeric>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Numeric className={cn('text-sm font-medium', amountColor(item))}>
+                      {item.currencySymbol} {formatNumberForDisplay(item.amount, numberFormat)}
+                    </Numeric>
+                    <span
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center"
+                    >
+                      <MovementRowMenu
+                        movementId={item.id}
+                        movementType={item.movementType}
+                        isOpeningBalance={item.isOpeningBalance}
+                        onDeleted={onRefetch}
+                      />
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-1.5 truncate pr-28 text-sm font-medium">
-                  {primary}
+                {/* Line 2: description (left) | status badge (right) */}
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium">{primary}</span>
+                  <span
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="shrink-0"
+                  >
+                    <MovementClearedToggle
+                      id={item.id}
+                      type={item.movementType}
+                      isCleared={item.isCleared}
+                    />
+                  </span>
                 </div>
+                {/* Line 3: account info (full width) */}
                 {showAccountLine && (
-                  <div className="mt-1.5 truncate pr-28 text-xs text-muted-foreground">
+                  <div className="mt-1.5 truncate text-xs text-muted-foreground">
                     {account}
                   </div>
                 )}
               </Link>
-              <div
-                className="absolute right-2 top-2 flex min-h-11 min-w-11 items-center justify-center"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MovementRowMenu
-                  movementId={item.id}
-                  movementType={item.movementType}
-                  isOpeningBalance={item.isOpeningBalance}
-                  onDeleted={onRefetch}
-                />
-              </div>
-              <div
-                className="absolute right-3 bottom-2 flex min-h-11 min-w-11 items-center justify-end"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MovementClearedToggle
-                  id={item.id}
-                  type={item.movementType}
-                  isCleared={item.isCleared}
-                />
-              </div>
             </article>
           </li>
         );

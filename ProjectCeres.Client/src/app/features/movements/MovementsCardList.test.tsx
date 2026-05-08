@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { MovementsCardList } from './MovementsCardList';
 import type { MovementListItemDto } from './movements-api';
@@ -140,13 +140,21 @@ describe('MovementsCardList', () => {
   });
 
   it('clicking the status toggle does NOT navigate (stopPropagation)', () => {
-    renderList([transaction]);
+    function LocationDisplay() {
+      const loc = useLocation();
+      return <div data-testid="loc">{loc.pathname}</div>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/movements']}>
+        <MovementsCardList items={[transaction]} onRefetch={vi.fn()} />
+        <LocationDisplay />
+      </MemoryRouter>,
+    );
     const toggle = screen.getByRole('button', { name: /mark as pending/i });
-    const link = screen.getByRole('link');
-    const linkClickSpy = vi.fn();
-    link.addEventListener('click', linkClickSpy);
     fireEvent.click(toggle);
-    expect(linkClickSpy).not.toHaveBeenCalled();
+    // Path should still be /movements — the toggle's stopPropagation kept the
+    // <Link> from firing its react-router navigation.
+    expect(screen.getByTestId('loc')).toHaveTextContent('/movements');
   });
 
   it('renders pending badge for an uncleared movement', () => {
