@@ -303,6 +303,31 @@ export function MovementClearedToggle({ id, type, isCleared: initial }: Props) {
 - Server error → badge reverts + toast (same as today, but rollback is automatic via `useOptimistic`)
 - Rapid clicks → badge always reflects the latest committed server state plus the latest pending optimistic flip (better than today, where rollbacks could land out of order)
 
+### Implementation note: `pendingRef` is required
+
+The naive form `const next = !serverCleared` inside `toggle()` is **buggy** for rapid clicks. With two clicks fired before the first fetch resolves, `serverCleared` is still the original value, so both clicks compute the same `next` — the second click cannot toggle back. The shipped implementation (commit `0c5c1b0`, 2026-05-08) tracks the latest in-flight intent in a `useRef<boolean | null>(null)`:
+
+```tsx
+const pendingRef = useRef<boolean | null>(null);
+
+function toggle() {
+  const current = pendingRef.current !== null ? pendingRef.current : serverCleared;
+  const next = !current;
+  pendingRef.current = next;
+
+  startTransition(async () => {
+    applyOptimistic(next);
+    // …fetch
+    if (response.ok) {
+      setServerCleared(next);
+      if (pendingRef.current === next) pendingRef.current = null;
+    }
+  });
+}
+```
+
+The `pendingRef.current === next` guard prevents an out-of-order success response from clearing a *newer* in-flight intent. On error the ref is intentionally NOT cleared — `useOptimistic` reverts automatically when the transition ends without `setServerCleared`.
+
 ### Tests
 
 `MovementClearedToggle.test.tsx` exists with 5 cases — all should pass unchanged because user-visible behavior is identical. Add one new test:
