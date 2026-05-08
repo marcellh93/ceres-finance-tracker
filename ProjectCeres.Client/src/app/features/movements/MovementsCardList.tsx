@@ -13,13 +13,16 @@ import { useSettings } from '../../lib/use-settings';
 type Props = { items: MovementListItemDto[]; onRefetch: () => void };
 
 function typePill(item: MovementListItemDto) {
+  // -ml-2 cancels the Badge's internal px-2 (8px) so the pill's TEXT aligns
+  // with the left edge of the lines below it (description, account info)
+  // instead of being inset by the pill's own left padding.
   if (item.movementType === 'Transaction') {
-    return <Badge variant="info">{MOVEMENT_TYPE_LABEL.Transaction}</Badge>;
+    return <Badge variant="info" className="-ml-2">{MOVEMENT_TYPE_LABEL.Transaction}</Badge>;
   }
   if (item.movementType === 'Transfer') {
-    return <Badge className="bg-chart-6/10 text-chart-6">{MOVEMENT_TYPE_LABEL.Transfer}</Badge>;
+    return <Badge className="-ml-2 bg-chart-6/10 text-chart-6">{MOVEMENT_TYPE_LABEL.Transfer}</Badge>;
   }
-  return <Badge className="bg-chart-7/10 text-chart-7">{MOVEMENT_TYPE_LABEL.LiabilityPayment}</Badge>;
+  return <Badge className="-ml-2 bg-chart-7/10 text-chart-7">{MOVEMENT_TYPE_LABEL.LiabilityPayment}</Badge>;
 }
 
 function accountLine(item: MovementListItemDto): string {
