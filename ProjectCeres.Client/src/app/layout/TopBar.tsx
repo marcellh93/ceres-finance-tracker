@@ -73,18 +73,18 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-1">
+        {!onMovements && (
+          <Button
+            variant="default"
+            size="icon"
+            onClick={() => setQuickAddOpen(true)}
+            aria-label="Quick add"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
         {isDesktop && (
           <>
-            {!onMovements && (
-              <Button
-                variant="default"
-                size="icon"
-                onClick={() => setQuickAddOpen(true)}
-                aria-label="Quick add"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            )}
             <NotificationsButton />
             <ThemeToggle />
           </>
