@@ -108,10 +108,11 @@ export function MovementsLayout() {
             <DropdownMenuTrigger
               render={
                 <Button
+                  aria-label="New movement"
                   className="gap-2 transition-colors hover:bg-primary/90 data-[popup-open]:bg-primary/90"
                 >
                   <Plus className="h-4 w-4" />
-                  New
+                  <span className="sr-only sm:not-sr-only">New</span>
                   <ChevronDown className="h-4 w-4 opacity-70 transition-transform [transition-duration:var(--motion-duration-base)] group-data-[popup-open]/button:rotate-180" />
                 </Button>
               }
