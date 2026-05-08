@@ -2,6 +2,7 @@ import path from 'path'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -36,6 +37,14 @@ export default defineConfig({
         designSystem: path.resolve(__dirname, 'design-system.html'),
         app: path.resolve(__dirname, 'app.html'),
       },
+      plugins: [
+        visualizer({
+          filename: 'dist/stats.html',
+          template: 'treemap',
+          gzipSize: true,
+          brotliSize: false,
+        }),
+      ],
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor-react'
