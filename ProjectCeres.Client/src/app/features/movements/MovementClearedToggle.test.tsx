@@ -64,4 +64,28 @@ describe('MovementClearedToggle', () => {
       expect(body.type).toBe('liabilitypayment');
     });
   });
+
+  it('two rapid clicks settle in the second click direction even if responses arrive out of order', async () => {
+    let resolveFirst!: (value: { ok: boolean }) => void;
+    let resolveSecond!: (value: { ok: boolean }) => void;
+    const responses = [
+      new Promise<{ ok: boolean }>((r) => { resolveFirst = r; }),
+      new Promise<{ ok: boolean }>((r) => { resolveSecond = r; }),
+    ];
+    let call = 0;
+    global.fetch = vi.fn(() => responses[call++]) as unknown as typeof fetch;
+
+    render(<MovementClearedToggle id="m1" type="Transaction" isCleared={false} />);
+    const btn = screen.getByRole('button');
+
+    fireEvent.click(btn); // optimistic: true (next = true)
+    fireEvent.click(btn); // optimistic: false (next = false, since serverCleared still false)
+
+    resolveSecond({ ok: true });  // second click succeeds → serverCleared stays false
+    resolveFirst({ ok: false });  // first click fails → toast, no state change
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending')).toBeInTheDocument();
+    });
+  });
 });

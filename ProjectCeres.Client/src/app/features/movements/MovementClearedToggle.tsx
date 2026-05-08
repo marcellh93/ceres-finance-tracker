@@ -1,5 +1,5 @@
 import { CheckCircle, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { useOptimistic, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import type { MovementType } from './movements-api';
@@ -18,36 +18,48 @@ function typeForApi(type: MovementType): string {
 }
 
 export function MovementClearedToggle({ id, type, isCleared: initial }: Props) {
-  const [cleared, setCleared] = useState(initial);
+  const [serverCleared, setServerCleared] = useState(initial);
+  const [optimisticCleared, applyOptimistic] = useOptimistic(serverCleared);
+  const [, startTransition] = useTransition();
+  // Track the latest intended value so rapid clicks toggle from the current
+  // optimistic state rather than the (stale) server state.
+  const pendingRef = useRef<boolean | null>(null);
 
-  async function toggle() {
-    const next = !cleared;
-    setCleared(next);
+  function toggle() {
+    // Derive next from the latest in-flight intent (if any) or the server state.
+    const current = pendingRef.current !== null ? pendingRef.current : serverCleared;
+    const next = !current;
+    pendingRef.current = next;
 
-    try {
-      const response = await fetch(MOVEMENTS_CLEARED_URL(id), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: typeForApi(type), cleared: next }),
-      });
-      if (!response.ok) {
-        setCleared(!next);
+    startTransition(async () => {
+      applyOptimistic(next);
+      try {
+        const response = await fetch(MOVEMENTS_CLEARED_URL(id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: typeForApi(type), cleared: next }),
+        });
+        if (response.ok) {
+          setServerCleared(next);
+          // Only clear the ref if this was the last in-flight intent.
+          if (pendingRef.current === next) pendingRef.current = null;
+        } else {
+          toast.error("Couldn't update status.");
+        }
+      } catch {
         toast.error("Couldn't update status.");
       }
-    } catch {
-      setCleared(!next);
-      toast.error("Couldn't update status.");
-    }
+    });
   }
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={cleared ? 'Mark as pending' : 'Mark as cleared'}
+      aria-label={optimisticCleared ? 'Mark as pending' : 'Mark as cleared'}
       className="inline-flex cursor-pointer items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {cleared ? (
+      {optimisticCleared ? (
         <Badge variant="success">
           <CheckCircle size={12} aria-hidden="true" />
           Cleared
