@@ -227,11 +227,11 @@ Sequencing for handing to Claude Code. Tiers are independent — finish one befo
 17. ✅ `vitest-axe` with `expectNoA11yViolations` helper, gating on serious + critical severities; coverage on MovementForm, QuickAddModal, AppLayout (commit `e96d898`)
 18. ✅ Bundle visualizer (`rollup-plugin-visualizer`) emits `dist/stats.html` on every build; per-asset gzip budgets enforced via `pnpm check-size` chained into `pnpm build` (commit `c37f4eb`)
 
-**Tier 5 — discretionary:**
+**Tier 5 — discretionary:** ✅ T5.20/T5.21 shipped 2026-05-09; T5.19 deferred
 
-19. `@formkit/auto-animate` for lists that reorder (0.3, 3.6)
-20. OKLCH support in `parseRgb()` so showcase shows live contrast ratios
-21. Add motion rules to "Working rules" section in `design-system.md`
+19. ⏸ `@formkit/auto-animate` for lists that reorder — **deferred 2026-05-09: no candidate consumer.** Reopens when a real reordering surface emerges.
+20. ✅ OKLCH support in `parseRgb()` (commit `17d6e93`); SwatchGrid try/catch fallback removed.
+21. ✅ Motion rule indexed in design-system.md Working rules as rule 7 (commit `37f55fe`).
 
 ---
 
