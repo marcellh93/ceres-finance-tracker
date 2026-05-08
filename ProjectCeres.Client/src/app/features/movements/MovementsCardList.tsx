@@ -65,20 +65,20 @@ export function MovementsCardList({ items, onRefetch }: Props) {
                 aria-label={`Edit ${MOVEMENT_TYPE_LABEL[item.movementType]} on ${dateLabel}`}
                 className="block px-4 py-3 focus:outline-none"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-2 pr-10">
+                  <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                     {typePill(item)}
-                    <span>{dateLabel}</span>
+                    <span className="truncate">{dateLabel}</span>
                   </div>
-                  <Numeric className={cn('text-sm font-medium', amountColor(item))}>
+                  <Numeric className={cn('shrink-0 text-sm font-medium', amountColor(item))}>
                     {item.currencySymbol} {formatNumberForDisplay(item.amount, numberFormat)}
                   </Numeric>
                 </div>
-                <div className="mt-1.5 pr-10 text-sm font-medium">
+                <div className="mt-1.5 truncate pr-28 text-sm font-medium">
                   {primary}
                 </div>
                 {showAccountLine && (
-                  <div className="mt-1.5 pr-28 text-xs text-muted-foreground">
+                  <div className="mt-1.5 truncate pr-28 text-xs text-muted-foreground">
                     {account}
                   </div>
                 )}
