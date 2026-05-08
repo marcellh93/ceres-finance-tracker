@@ -24,7 +24,14 @@ type Props = {
 
 export function AccountCombobox({ accounts, value, onChange, placeholder, filter, disabled, className = 'w-full', onClear }: Props) {
   const [open, setOpen] = useState(false);
-  const filtered = filter ? accounts.filter(filter) : accounts;
+  const [search, setSearch] = useState('');
+
+  const typeFiltered = filter ? accounts.filter(filter) : accounts;
+  const trimmed = search.trim().toLowerCase();
+  const filtered = trimmed === ''
+    ? typeFiltered
+    : typeFiltered.filter((a) => a.name.toLowerCase().includes(trimmed));
+
   const selected = accounts.find((a) => a.id === value) ?? null;
   const showClear = !!onClear && !!selected && !disabled;
 
@@ -64,8 +71,12 @@ export function AccountCombobox({ accounts, value, onChange, placeholder, filter
         <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
       </div>
       <PopoverContent className="p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search accounts…" />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search accounts…"
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>No accounts found.</CommandEmpty>
             <CommandGroup>
@@ -76,6 +87,7 @@ export function AccountCombobox({ accounts, value, onChange, placeholder, filter
                   onSelect={() => {
                     onChange(account.id);
                     setOpen(false);
+                    setSearch('');
                   }}
                 >
                   <Check className={cn('mr-2 h-4 w-4', value === account.id ? 'opacity-100' : 'opacity-0')} />

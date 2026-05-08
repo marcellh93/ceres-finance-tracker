@@ -28,4 +28,22 @@ describe('CategoryCombobox', () => {
 
     expect(onChange).toHaveBeenCalledWith('c2');
   });
+
+  it('preserves the input order during search instead of cmdk relevance reorder', () => {
+    const sorted: CategoryOptionDto[] = [
+      { id: 'c1', name: 'Apparel', categoryTypeName: 'Expense' },
+      { id: 'c2', name: 'Auto', categoryTypeName: 'Expense' },
+      { id: 'c3', name: 'Bills', categoryTypeName: 'Expense' },
+    ];
+    render(<CategoryCombobox categories={sorted} value={null} onChange={vi.fn()} placeholder="Select" />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+
+    const searchInput = screen.getByPlaceholderText('Search categories…');
+    fireEvent.change(searchInput, { target: { value: 'a' } });
+
+    // Both Apparel and Auto match 'a'; Bills filtered out. Order preserved.
+    const items = screen.getAllByRole('option');
+    expect(items.map((el) => el.textContent?.replace(/Expense$/, '').trim())).toEqual(['Apparel', 'Auto']);
+  });
 });

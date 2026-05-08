@@ -34,6 +34,13 @@ export function BudgetCombobox({
   id,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const trimmed = search.trim().toLowerCase();
+  const filtered = trimmed === ''
+    ? budgets
+    : budgets.filter((b) => b.name.toLowerCase().includes(trimmed));
+
   const selected = budgets.find((b) => b.id === value) ?? null;
   const showClear = !!onClear && !!selected && !disabled;
 
@@ -74,18 +81,23 @@ export function BudgetCombobox({
         <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
       </div>
       <PopoverContent className="p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search budgets…" />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search budgets…"
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>No budgets found.</CommandEmpty>
             <CommandGroup>
-              {budgets.map((b) => (
+              {filtered.map((b) => (
                 <CommandItem
                   key={b.id}
                   value={b.name}
                   onSelect={() => {
                     onChange(b.id);
                     setOpen(false);
+                    setSearch('');
                   }}
                 >
                   <Check className={cn('mr-2 h-4 w-4', value === b.id ? 'opacity-100' : 'opacity-0')} />

@@ -23,6 +23,13 @@ type Props = {
 
 export function CategoryCombobox({ categories, value, onChange, placeholder, disabled, className = 'w-full', onClear }: Props) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const trimmed = search.trim().toLowerCase();
+  const filtered = trimmed === ''
+    ? categories
+    : categories.filter((c) => c.name.toLowerCase().includes(trimmed));
+
   const selected = categories.find((c) => c.id === value) ?? null;
   const showClear = !!onClear && !!selected && !disabled;
 
@@ -62,18 +69,23 @@ export function CategoryCombobox({ categories, value, onChange, placeholder, dis
         <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
       </div>
       <PopoverContent className="p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search categories…" />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search categories…"
+            value={search}
+            onValueChange={setSearch}
+          />
           <CommandList>
             <CommandEmpty>No categories found.</CommandEmpty>
             <CommandGroup>
-              {categories.map((category) => (
+              {filtered.map((category) => (
                 <CommandItem
                   key={category.id}
                   value={category.name}
                   onSelect={() => {
                     onChange(category.id);
                     setOpen(false);
+                    setSearch('');
                   }}
                 >
                   <Check className={cn('mr-2 h-4 w-4', value === category.id ? 'opacity-100' : 'opacity-0')} />

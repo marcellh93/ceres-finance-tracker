@@ -55,4 +55,23 @@ describe('BudgetCombobox', () => {
     render(<BudgetCombobox budgets={budgets} value="b1" onChange={vi.fn()} onClear={vi.fn()} disabled />);
     expect(screen.queryByRole('button', { name: /clear selection/i })).toBeNull();
   });
+
+  it('preserves the input order during search instead of cmdk relevance reorder', () => {
+    const sorted: GoalBudgetListItemDto[] = [
+      { id: 'b1', name: 'Apartment Fund', goalType: 'Spending', currencyCode: 'EUR', currencySymbol: '€', targetAmount: 5000, startDate: '2026-01-01', endDate: null, description: null, isActive: true, linkedAccountId: null, linkedAccountName: null, progress: 0 },
+      { id: 'b2', name: 'Auto Repair', goalType: 'Spending', currencyCode: 'EUR', currencySymbol: '€', targetAmount: 1000, startDate: '2026-01-01', endDate: null, description: null, isActive: true, linkedAccountId: null, linkedAccountName: null, progress: 0 },
+      { id: 'b3', name: 'Bonds Portfolio', goalType: 'Spending', currencyCode: 'EUR', currencySymbol: '€', targetAmount: 500, startDate: '2026-01-01', endDate: null, description: null, isActive: true, linkedAccountId: null, linkedAccountName: null, progress: 0 },
+    ];
+    render(<BudgetCombobox budgets={sorted} value={null} onChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+
+    const searchInput = screen.getByPlaceholderText('Search budgets…');
+    // 'a' matches "Apartment Fund" and "Auto Repair" but not "Bonds Portfolio".
+    // Order must match input, not cmdk's relevance score.
+    fireEvent.change(searchInput, { target: { value: 'a' } });
+
+    const items = screen.getAllByRole('option');
+    expect(items.map((el) => el.textContent)).toEqual(['Apartment Fund', 'Auto Repair']);
+  });
 });

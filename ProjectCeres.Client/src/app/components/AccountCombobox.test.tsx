@@ -101,4 +101,23 @@ describe('AccountCombobox', () => {
     expect(screen.getByText('Savings')).toBeInTheDocument();
     expect(screen.queryByText('Credit Card')).not.toBeInTheDocument();
   });
+
+  it('preserves the input order during search instead of cmdk relevance reorder', () => {
+    const sorted = [
+      { id: 'a1', name: 'Apple Bank', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
+      { id: 'a2', name: 'Acorn Account', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
+      { id: 'a3', name: 'Banana Bank', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
+    ];
+    render(<AccountCombobox accounts={sorted} value={null} onChange={vi.fn()} placeholder="Select" />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+
+    const searchInput = screen.getByPlaceholderText('Search accounts…');
+    fireEvent.change(searchInput, { target: { value: 'a' } });
+
+    // All three names contain 'a' (case-insensitive). Order must match input
+    // (Apple Bank → Acorn Account → Banana Bank), not cmdk's relevance score.
+    const items = screen.getAllByRole('option');
+    expect(items.map((el) => el.textContent)).toEqual(['Apple Bank', 'Acorn Account', 'Banana Bank']);
+  });
 });
