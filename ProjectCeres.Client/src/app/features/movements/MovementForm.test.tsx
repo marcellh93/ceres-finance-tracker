@@ -433,8 +433,8 @@ describe('MovementForm', () => {
         onCancel={noopCancel}
       />,
     );
-    // Wait for the budget combobox trigger to appear (labelled via Field's htmlFor → id="mf-budget")
-    const trigger = await screen.findByRole('combobox', { name: /budget \(optional\)/i });
+    // Wait for the budget combobox trigger to appear (aria-label="No budget" when unselected)
+    const trigger = await screen.findByRole('combobox', { name: /^No budget$/i });
     expect(trigger).toBeInTheDocument();
     // Open the popover and verify 'Trip' is listed
     fireEvent.click(trigger);
@@ -456,7 +456,7 @@ describe('MovementForm', () => {
       />,
     );
     // Open the budget combobox and pick 'Trip'
-    const trigger = await screen.findByRole('combobox', { name: /budget \(optional\)/i });
+    const trigger = await screen.findByRole('combobox', { name: /^No budget$/i });
     fireEvent.click(trigger);
     fireEvent.click(await screen.findByText('Trip'));
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
@@ -482,8 +482,8 @@ describe('MovementForm', () => {
         onCancel={noopCancel}
       />,
     );
-    // The trigger should exist once goals load
-    const trigger = await screen.findByRole('combobox', { name: /budget \(optional\)/i });
+    // The trigger should exist once goals load (aria-label="Old Trip" when archived goal selected)
+    const trigger = await screen.findByRole('combobox', { name: /^Old Trip$/i });
     expect(trigger).toBeInTheDocument();
     // Open the popover and verify the archived suffix is shown
     fireEvent.click(trigger);

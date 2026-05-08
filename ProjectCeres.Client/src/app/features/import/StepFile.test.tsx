@@ -53,7 +53,7 @@ describe('StepFile', () => {
         onContinue={() => {}}
       />,
     );
-    await screen.findByRole('combobox', { name: '' }); // accounts loaded
+    await screen.findByRole('combobox', { name: /select an account/i }); // accounts loaded
     expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
   });
 

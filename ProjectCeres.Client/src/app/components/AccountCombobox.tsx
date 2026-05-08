@@ -42,6 +42,7 @@ export function AccountCombobox({ accounts, value, onChange, placeholder, filter
             <Button
               variant="outline"
               role="combobox"
+              aria-label={selected?.name ?? placeholder}
               aria-expanded={open}
               disabled={disabled}
               className={cn('w-full justify-start text-left font-normal', showClear ? 'pr-14' : 'pr-8')}
