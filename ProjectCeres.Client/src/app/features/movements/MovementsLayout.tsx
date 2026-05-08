@@ -102,7 +102,7 @@ export function MovementsLayout() {
         <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-semibold outline-none">
           Movements
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <MovementsBulkActions totalCount={data?.totalCount ?? 0} onAfterBulk={refetch} />
           <DropdownMenu>
             <DropdownMenuTrigger
