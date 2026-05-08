@@ -187,7 +187,7 @@ Components must reference these tokens via `transitionDuration: 'var(--motion-du
 
 Motion tokens are defined only on `:root` and intentionally not redefined on `.dark` — they don't change with theme.
 
-> **Status of the rule (2026-05-02):** the rule is aspirational — most existing components still use Tailwind literal durations (`duration-200`). New components should reference the tokens directly, and the existing literals are tracked for migration in a future cleanup pass. See [Known limitations](#known-limitations).
+> **Status of the rule (2026-05-08):** enforced — every app and showcase component uses the motion tokens. The shadcn-vendored `sheet.tsx` retains its literal because it is a vendored primitive.
 
 ### View transition naming
 
@@ -876,7 +876,7 @@ A reusable side-panel recipe for *binary state with affordance*: an icon + headi
 ```tsx
 <div
   className={
-    'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors duration-200 ' +
+    'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors [transition-duration:var(--motion-duration-base)] ' +
     (values.isCleared
       ? 'border-success/30 bg-success/10'
       : 'border-border bg-muted/30')
@@ -885,7 +885,7 @@ A reusable side-panel recipe for *binary state with affordance*: an icon + headi
   <div className="flex items-start gap-3">
     <div
       className={
-        'mt-0.5 transition-colors duration-200 ' +
+        'mt-0.5 transition-colors [transition-duration:var(--motion-duration-base)] ' +
         (values.isCleared ? 'text-success' : 'text-muted-foreground')
       }
       aria-hidden="true"
@@ -895,7 +895,7 @@ A reusable side-panel recipe for *binary state with affordance*: an icon + headi
     <div className="space-y-0.5">
       <div
         className={
-          'text-sm font-medium tracking-wide transition-colors duration-200 ' +
+          'text-sm font-medium tracking-wide transition-colors [transition-duration:var(--motion-duration-base)] ' +
           (values.isCleared ? 'text-success' : 'text-foreground/80')
         }
       >
@@ -903,7 +903,7 @@ A reusable side-panel recipe for *binary state with affordance*: an icon + headi
       </div>
       <p
         className={
-          'text-xs transition-colors duration-200 ' +
+          'text-xs transition-colors [transition-duration:var(--motion-duration-base)] ' +
           (values.isCleared ? 'text-success/80' : 'text-muted-foreground')
         }
       >
@@ -925,7 +925,7 @@ A reusable side-panel recipe for *binary state with affordance*: an icon + headi
 - **Icon swaps with state.** Pick two icons that signal the same axis (`CheckCircle2` ↔ `Clock` for done/not-done; could equally be `Lock` ↔ `Unlock` for sealed/open).
 - **Two text rows.** The bold heading is fixed-text ("Status", "Reconciliation", etc.). The caption changes wording with state, in plain past-tense for the "done" case ("Cleared the bank.") and present-imperfect for the "not yet" case ("Hasn't cleared the bank yet.").
 - **Affordance on the right.** A `<Switch>` lives flush-right; it's the only interactive thing in the block. Don't pair this recipe with a button — the affordance is *settings-like*, not *action-like*.
-- **`transition-colors duration-200`** is currently a literal; this is one of the components flagged for [migration to motion tokens](#motion).
+- **`transition-colors [transition-duration:var(--motion-duration-base)]`** uses the motion-base token directly. New components should follow the same pattern.
 
 ### When *not* to use this
 
@@ -1122,6 +1122,6 @@ These are accepted trade-offs in the current foundation. Track here so future wo
 
 - **Showcase contrast ratios are not displayed when tokens are defined as `oklch()`.** `getComputedStyle()` returns `oklch(...)` strings for CSS custom properties whose source value is OKLCH, and the WCAG contrast helper currently only parses `rgb()` / `rgba()`. The Colors and Charts swatches still render correctly (the page no longer crashes, and the rgb display row shows whatever the browser returned), but the "vs --foreground: X.XX : 1 (AA)" line is suppressed. Fix path: extend `parseRgb()` in `src/design-system/lib/contrast.ts` to handle OKLCH (either via `culori`/`colorjs.io` or a small inline OKLCH→sRGB conversion).
 
-- **Motion tokens are not yet enforced in older components.** Files like `MovementForm.tsx` still use Tailwind literal durations (`duration-200`) instead of `var(--motion-duration-base)`. The rule in [Motion](#motion) applies to new code; existing literals are tracked for a migration sweep. Don't introduce new literals.
+- ✅ **Motion tokens are now enforced everywhere** (migrated 2026-05-08). All app and showcase components use `[transition-duration:var(--motion-duration-base)]`. The shadcn-vendored `sheet.tsx` retains its literal because it is a vendored primitive — do not migrate it. Don't introduce new literals in app code.
 
 - **`<ConfirmDialog>` legacy primitive.** `src/components/ConfirmDialog.tsx` is a pre-SPA artefact that submits via a hidden form id. The SPA standard is shadcn `<AlertDialog>` used inline at the call site (see `AttachmentDropzone.tsx`, `MovementForm.tsx`). Don't add new consumers; the existing ones will be migrated.

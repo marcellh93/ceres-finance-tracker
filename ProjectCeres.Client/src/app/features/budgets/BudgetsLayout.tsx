@@ -90,7 +90,7 @@ export function BudgetsLayout() {
               >
                 <Plus className="h-4 w-4" />
                 New
-                <ChevronDown className="h-4 w-4 opacity-70 transition-transform duration-200 group-data-[popup-open]/button:rotate-180" />
+                <ChevronDown className="h-4 w-4 opacity-70 transition-transform [transition-duration:var(--motion-duration-base)] group-data-[popup-open]/button:rotate-180" />
               </Button>
             }
           />

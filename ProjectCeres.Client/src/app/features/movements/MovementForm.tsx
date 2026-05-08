@@ -345,7 +345,7 @@ export function MovementForm({
         {/* ── Status row: distinct from data fields, color-shifts on cleared ── */}
         <div
           className={
-            'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors duration-200 ' +
+            'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors [transition-duration:var(--motion-duration-base)] ' +
             (values.isCleared
               ? 'border-success/30 bg-success/10'
               : 'border-border bg-muted/30')
@@ -354,7 +354,7 @@ export function MovementForm({
           <div className="flex items-start gap-3">
             <div
               className={
-                'mt-0.5 transition-colors duration-200 ' +
+                'mt-0.5 transition-colors [transition-duration:var(--motion-duration-base)] ' +
                 (values.isCleared ? 'text-success' : 'text-muted-foreground')
               }
               aria-hidden="true"
@@ -368,7 +368,7 @@ export function MovementForm({
             <div className="space-y-0.5">
               <div
                 className={
-                  'text-sm font-medium tracking-wide transition-colors duration-200 ' +
+                  'text-sm font-medium tracking-wide transition-colors [transition-duration:var(--motion-duration-base)] ' +
                   (values.isCleared ? 'text-success' : 'text-foreground/80')
                 }
               >
@@ -376,7 +376,7 @@ export function MovementForm({
               </div>
               <p
                 className={
-                  'text-xs transition-colors duration-200 ' +
+                  'text-xs transition-colors [transition-duration:var(--motion-duration-base)] ' +
                   (values.isCleared ? 'text-success/80' : 'text-muted-foreground')
                 }
               >
