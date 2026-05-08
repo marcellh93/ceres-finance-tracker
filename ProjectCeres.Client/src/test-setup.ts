@@ -46,3 +46,19 @@ Element.prototype.getBoundingClientRect = () => ({
   y: 0,
   toJSON: () => {},
 })
+
+// Disable CSS animations and transitions in tests so visual state is
+// deterministic by the time render() returns. JSDOM does not animate
+// pixels, but transitionend/animationend events still fire on a timer
+// — zeroing out durations removes that timing variance.
+const noMotionStyle = document.createElement('style')
+noMotionStyle.textContent = `
+  *, *::before, *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+`
+document.head.appendChild(noMotionStyle)
