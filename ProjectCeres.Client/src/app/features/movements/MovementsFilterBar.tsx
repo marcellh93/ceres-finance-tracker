@@ -94,7 +94,11 @@ export function MovementsFilterBar() {
           variant="outline"
           onClick={() => {
             setSearchInput('');
-            setParams(new URLSearchParams(), { replace: true });
+            // Preserve the active currency tab — Clear wipes filters, not the
+            // tab the user is on.
+            const next = new URLSearchParams();
+            if (activeCurrency) next.set('currency', activeCurrency);
+            setParams(next, { replace: true });
           }}
         >
           Clear
