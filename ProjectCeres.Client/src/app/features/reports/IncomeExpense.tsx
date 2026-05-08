@@ -41,7 +41,7 @@ export function IncomeExpense() {
     <div className="space-y-6">
       <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && (
-        <>
+        <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             <Tile>
               <StatTile label="Income" value={<Numeric className="text-xl text-success">{symbol} {data.totalIncome.toFixed(2)}</Numeric>} />
@@ -103,7 +103,7 @@ export function IncomeExpense() {
               </TableBody>
             </Table>
           </ReportTableCard>
-        </>
+        </div>
       )}
       </DataTransition>
     </div>

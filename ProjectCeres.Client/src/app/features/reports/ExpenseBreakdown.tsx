@@ -46,7 +46,7 @@ export function ExpenseBreakdown() {
       <DataTransition state={state} skeleton={skeleton} error={errorSlot}>
       {data && data.categories.length === 0 && <p className="text-sm text-muted-foreground">No expense transactions for this period.</p>}
       {data && data.categories.length > 0 && (
-        <>
+        <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Tile>
               <StatTile
@@ -101,7 +101,7 @@ export function ExpenseBreakdown() {
               </TableBody>
             </Table>
           </ReportTableCard>
-        </>
+        </div>
       )}
       </DataTransition>
     </div>

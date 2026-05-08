@@ -62,7 +62,7 @@ export function NetWorthOverTime() {
         <p className="text-sm text-muted-foreground">No data for this period.</p>
       )}
       {data && data.length > 0 && last && first && (
-        <>
+        <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Tile>
               <StatTile
@@ -151,7 +151,7 @@ export function NetWorthOverTime() {
               </TableBody>
             </Table>
           </ReportTableCard>
-        </>
+        </div>
       )}
       </DataTransition>
     </div>

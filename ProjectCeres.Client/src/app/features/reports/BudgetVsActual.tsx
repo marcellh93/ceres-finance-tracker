@@ -58,7 +58,7 @@ export function BudgetVsActual() {
         <p className="text-sm text-muted-foreground">No active budgets for this period.</p>
       )}
       {data && data.length > 0 && (
-        <>
+        <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Tile>
               <StatTile label="Total Budget" value={<Numeric className="text-xl">{symbol} {totalBudget.toFixed(2)}</Numeric>} />
@@ -108,7 +108,7 @@ export function BudgetVsActual() {
               </TableBody>
             </Table>
           </ReportTableCard>
-        </>
+        </div>
       )}
       </DataTransition>
     </div>
