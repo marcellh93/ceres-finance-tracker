@@ -263,7 +263,7 @@ Responsive (foundation tier — applies to every later stage):
 | 5.4 | Data-loading ease-in — full rollout to remaining pages | ✅ 2026-05-07 (commits `12fdc1e` → `40514b8`; plan revised in `abd912a`) | [`docs/superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md`](superpowers/plans/2026-05-04-data-loading-ease-in-rollout.md) |
 | 5.5 | Polish checklist Tier 1 — six small CSS / one library wire-up | ✅ 2026-05-07 (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped) | [`docs/ceres-polish-checklist-frontend.md`](ceres-polish-checklist-frontend.md) § Tier-ordered action list |
 | 5.6 | Polish checklist Tier 2 — extract shared primitives | ✅ 2026-05-08 (T2.7 `fa6c0d7`, T2.8 `496f1e3`, T2.9 `55d2030`, T2.10 superseded by 5.2) | (above) |
-| 5.7 | Polish checklist Tier 3 — production-app polish | ❌ Pending | (above) |
+| 5.7 | Polish checklist Tier 3 — production-app polish | ✅ 2026-05-08 (T3.11 `c372b89`, T3.12 `8b4c731`, T3.13 `0c5c1b0`, T3.14 `1394db6`, T3.15 `d828161` + 17 follow-up commits during browser-pass) | (above) |
 | 5.8 | Polish checklist Tier 4 — testing and observability | ❌ Pending | (above) |
 | 5.9 | Polish checklist Tier 5 — discretionary | ❌ Pending | (above) |
 | 5.10 | Ad-hoc UX fixes layered on top of the planned tiers | ✅ 2026-05-08 (see § Ad-hoc UX fixes below) | (this doc) |
@@ -345,7 +345,7 @@ From the same audit doc (§ 15). With Tier 1 + Tier 2 + Stage 5.4 done, most box
 - [x] Tab key reveals a clear focus ring on every interactive element
 - [~] Switching themes is smooth, not flashy (T1.1 shipped; T1.5 deliberately not shipped — flip is a clean snap, not flashy)
 - [~] Navigating between pages cross-fades, doesn't snap (T1.3 root rule shipped, dormant until navigation opts in via `<Link viewTransition>` — Tier 3 follow-up)
-- [~] Submitting a form shows immediate feedback (T3.12 SubmitButton)
+- [x] Submitting a form shows immediate feedback (T3.12 SubmitButton shipped 2026-05-08)
 - [x] No spinners flash for <200 ms (Stage 5.4 rollout shipped)
 - [x] All icons sized identically in similar contexts
 - [x] Border radii consistent

@@ -182,7 +182,7 @@ Walk the app and check each:
 - [x] Tab key reveals a clear focus ring on every interactive element.
 - [~] Switching themes is smooth, not flashy. (10.2 shipped; 10.1 deliberately not shipped — flip is a clean snap)
 - [~] Navigating between pages cross-fades, doesn't snap. (1.2 root rule shipped, dormant until navigation opts in via `<Link viewTransition>` — Tier 3 follow-up)
-- [~] Submitting a form shows immediate feedback. (8.4 SubmitButton — Tier 3)
+- [x] Submitting a form shows immediate feedback. (T3.12 SubmitButton shipped 2026-05-08)
 - [x] No spinners flash for <200ms. (2.7 `useDelayedLoading` shipped + Stage 5.4 rollout)
 - [x] All icons sized identically in similar contexts.
 - [x] Border radii consistent.
@@ -213,13 +213,13 @@ Sequencing for handing to Claude Code. Tiers are independent — finish one befo
 9. ✅ Skeleton ARIA via `DataTransition` `role="status"` wrapper (commit `55d2030`)
 10. ✅ `useDelayedLoading` shipped earlier under Stage 5.2 (`src/app/lib/use-delayed-loading.ts`)
 
-**Tier 3 — production-app polish:**
+**Tier 3 — production-app polish:** ✅ all shipped 2026-05-08
 
-11. Migrate `duration-200` literals to motion tokens (3.1, 3.4 — already on roadmap)
-12. Build `<SubmitButton>` with all 4 states + spinner (8.4)
-13. `useOptimistic` for the Status block toggle on table rows (5.1)
-14. Replace MovementForm budget `<select>` with Combobox (or document the rule)
-15. Harden `index.html` — `theme-color` meta, description meta, per-route titles (1.7)
+11. ✅ Migrated `duration-200` literals to motion tokens (commit `c372b89`); Tabs primitive bound to `--motion-duration-base` in follow-up `014f7e3`
+12. ✅ `<SubmitButton>` with idle/loading/success/error + spinner (commit `8b4c731`); QuickAddModal-only consumer; success-flash dwell tuned to 1500 ms in `d462eec` after research
+13. ✅ `useOptimistic` for the Status block toggle (commit `0c5c1b0`); spec corrected with `pendingRef` requirement (`52d2c17`)
+14. ✅ MovementForm budget `<select>` replaced with `BudgetCombobox` (commit `1394db6`); clear-✕ structural fix in `eeb0c13`/`d3702bd`/`182dd08`
+15. ✅ HTML entries hardened — `theme-color` + description meta + per-route titles via `useDocumentTitle` (commit `d828161`); served-HTML correction (Razor shells) in `ff362fc`/`de28b8a`; favicon wired in `54a8451`
 
 **Tier 4 — testing and observability:**
 
