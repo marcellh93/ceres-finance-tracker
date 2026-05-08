@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { ArrowLeftRight, ChevronDown, CreditCard, Plus, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +43,7 @@ function buildNewMovementUrl(type: string, activeCurrency: string | null): strin
 }
 
 export function MovementsLayout() {
+  useDocumentTitle('Movements');
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
 

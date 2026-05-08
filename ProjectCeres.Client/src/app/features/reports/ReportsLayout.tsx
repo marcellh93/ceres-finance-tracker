@@ -1,4 +1,5 @@
 import { Outlet, useMatch } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { ReportsTabBar } from './ReportsTabBar';
 import { ReportsSharedFilterBar } from './ReportsSharedFilterBar';
 import { ReportLocalFilterBar } from './ReportLocalFilterBar';
@@ -7,6 +8,7 @@ import { reportMetaBySlug } from './reports-api';
 import { useReportsFilters } from './useReportsFilters';
 
 export function ReportsLayout() {
+  useDocumentTitle('Reports');
   const match = useMatch('/reports/:slug');
   const slug = match?.params.slug ?? '';
   const meta = reportMetaBySlug(slug);

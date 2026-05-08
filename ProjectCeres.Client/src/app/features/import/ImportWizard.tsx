@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { StepFile } from './StepFile';
 import { StepMapping } from './StepMapping';
 import { StepReview } from './StepReview';
@@ -53,6 +54,7 @@ const EMPTY_STATE = {
 };
 
 export function ImportWizard() {
+  useDocumentTitle('Import');
   const [step, setStep] = useState<WizardStep>(EMPTY_STATE.step);
   const [file, setFile] = useState<File | null>(EMPTY_STATE.file);
   const [accountId, setAccountId] = useState<string | null>(EMPTY_STATE.accountId);

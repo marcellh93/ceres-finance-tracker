@@ -2,6 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { StatTile } from '@/components/StatTile';
 import { CardError } from '../../components/CardError';
 import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
@@ -28,6 +29,7 @@ function formatDelta(value: number, symbol: string): string {
 }
 
 export function NetWorthOverTime() {
+  useDocumentTitle('Net Worth Over Time');
   const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<NetWorthSnapshotRowDto[]>(REPORTS_NET_WORTH_OVER_TIME_URL(qs));

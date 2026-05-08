@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
@@ -30,6 +31,7 @@ const initialValues: AccountFormValues = {
 };
 
 export function AccountCreate() {
+  useDocumentTitle('New Account');
   const navigate = useNavigate();
   const ctx = useOutletContext<LayoutContext>();
   const types = useApi<AccountTypeDto[]>(ACCOUNT_TYPES_URL);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +11,7 @@ import { RECURRING_BY_ID_URL, type RecurringTransactionDetailDto } from './recur
 import type { RecurringPageCtx } from './RecurringCreate';
 
 export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
+  useDocumentTitle('Edit Recurring');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);

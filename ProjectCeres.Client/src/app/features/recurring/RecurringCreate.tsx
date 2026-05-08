@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +22,7 @@ const DEFAULTS: RecurringFormValues = {
 };
 
 export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
+  useDocumentTitle('New Recurring');
   const navigate = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);

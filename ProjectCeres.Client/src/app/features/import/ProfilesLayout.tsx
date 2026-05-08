@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useMatch, useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import {
 } from './import-api';
 
 export function ProfilesLayout() {
+  useDocumentTitle('Import Profiles');
   const [params, setParams] = useSearchParams();
 
   const onCreate = !!useMatch('/import/profiles/new');

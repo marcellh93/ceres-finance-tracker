@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useMatch, useOutletContext, useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,6 +26,7 @@ export function useRecurringLayoutCtx() {
 }
 
 export function RecurringLayout() {
+  useDocumentTitle('Recurring');
   const [params, setParams] = useSearchParams();
   const onNew  = !!useMatch('/recurring/new');
   const onEdit = !!useMatch('/recurring/:id/edit');

@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +18,7 @@ import {
 type LayoutContext = { refetch: () => void };
 
 export function CategoryEdit() {
+  useDocumentTitle('Edit Category');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const ctx = useOutletContext<LayoutContext>();

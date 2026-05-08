@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
@@ -30,6 +31,7 @@ function BudgetProgressCell({ limit, actual }: { limit: number; actual: number }
 }
 
 export function BudgetVsActual() {
+  useDocumentTitle('Budget vs. Actual');
   const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<BudgetVsActualRowDto[]>(REPORTS_BUDGET_VS_ACTUAL_URL(qs));

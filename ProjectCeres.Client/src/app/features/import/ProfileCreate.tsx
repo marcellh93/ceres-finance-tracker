@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileForm } from './ProfileForm';
 import {
@@ -21,6 +22,7 @@ const initialValues: ProfileFormValues = {
 };
 
 export function ProfileCreate() {
+  useDocumentTitle('New Import Profile');
   const navigate = useNavigate();
   const ctx = useOutletContext<LayoutContext>();
 

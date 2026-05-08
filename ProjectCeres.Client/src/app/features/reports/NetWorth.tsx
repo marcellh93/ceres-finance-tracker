@@ -1,6 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Numeric } from '@/components/Numeric';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { usePagination } from '@/hooks/usePagination';
 import { CardError } from '../../components/CardError';
 import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
@@ -13,6 +14,7 @@ import { useReportsFilters } from './useReportsFilters';
 const PAGE_SIZE = 10;
 
 export function NetWorth() {
+  useDocumentTitle('Net Worth');
   const { toQueryString } = useReportsFilters();
   const { data, error, loading, refetch } = useApi<NetWorthEntryDto[]>(REPORTS_NET_WORTH_URL);
   const { paginatedItems, currentPage, totalPages, next, prev } = usePagination(data ?? [], PAGE_SIZE);

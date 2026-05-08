@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
@@ -21,6 +22,7 @@ const initialValues: CategoryFormValues = {
 };
 
 export function CategoryCreate() {
+  useDocumentTitle('New Category');
   const navigate = useNavigate();
   const ctx = useOutletContext<LayoutContext>();
   const types = useApi<CategoryTypeDto[]>(CATEGORY_TYPES_URL);

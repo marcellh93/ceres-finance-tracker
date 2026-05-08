@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
@@ -17,6 +18,7 @@ import {
 } from './settings-api';
 
 export function SettingsPage() {
+  useDocumentTitle('Settings');
   const settings = useApi<SettingsDto>(SETTINGS_URL);
   const currencies = useApi<CurrencyOptionDto[]>(CURRENCIES_URL);
 

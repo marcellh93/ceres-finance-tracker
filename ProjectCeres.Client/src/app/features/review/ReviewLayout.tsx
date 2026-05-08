@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useReviewCount } from './ReviewCountProvider';
 import { ReconciliationList } from './ReconciliationList';
@@ -19,6 +20,7 @@ function readTabParam(value: string | null): TabKey | null {
 }
 
 export function ReviewLayout() {
+  useDocumentTitle('Review');
   const [searchParams, setSearchParams] = useSearchParams();
   const { reconciliationCount, transferCount, loading, refresh } = useReviewCount();
 

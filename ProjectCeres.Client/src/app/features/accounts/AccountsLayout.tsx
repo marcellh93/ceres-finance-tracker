@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, useMatch, useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import { AccountsTable } from './AccountsTable';
 import { ACCOUNTS_URL, buildListUrl, type AccountListItemDto } from './accounts-api';
 
 export function AccountsLayout() {
+  useDocumentTitle('Accounts');
   const [params, setParams] = useSearchParams();
 
   const onCreate = !!useMatch('/accounts/new');

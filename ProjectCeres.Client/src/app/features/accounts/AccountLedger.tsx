@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import {
 import { project, type ProjectionResult } from './projection';
 
 export function AccountLedger() {
+  useDocumentTitle('Account Ledger');
   const { id } = useParams<{ id: string }>();
   const account = useApi<AccountDetailDto>(id ? ACCOUNT_BY_ID_URL(id) : '/api/accounts/__missing__');
   const ledger = useApi<AccountLedgerDto>(id ? ACCOUNT_LEDGER_URL(id) : '/api/accounts/__missing__/ledger');

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { CategoryBudgetForm, type CategoryBudgetFormValues } from './CategoryBudgetForm';
 import { GoalBudgetForm, type GoalBudgetFormValues } from './GoalBudgetForm';
@@ -15,6 +16,7 @@ import { parseValidationErrors } from '../movements/movement-validation';
 import { useApi } from '../../lib/use-api';
 
 export function BudgetEdit() {
+  useDocumentTitle('Edit Budget');
   const { id } = useParams<{ id: string }>();
   const resolvedId = id ?? '';
 

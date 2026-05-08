@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { CategoryBudgetForm, type CategoryBudgetFormValues } from './CategoryBudgetForm';
 import { GoalBudgetForm, type GoalBudgetFormValues } from './GoalBudgetForm';
@@ -26,6 +27,7 @@ type Conflict = {
 };
 
 export function BudgetCreate() {
+  useDocumentTitle('New Budget');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const typeParam = parseTypeParam(searchParams.get('type'));

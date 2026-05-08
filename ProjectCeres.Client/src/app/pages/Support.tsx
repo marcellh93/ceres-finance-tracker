@@ -1,6 +1,8 @@
 import { PagePlaceholder } from '../components/PagePlaceholder';
+import { useDocumentTitle } from '../lib/use-document-title';
 
 export function Support() {
+  useDocumentTitle('Support');
   return (
     <PagePlaceholder
       title="Support"

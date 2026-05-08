@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AccountBalancesChart } from '../features/dashboard/AccountBalancesChart';
+import { useDocumentTitle } from '../lib/use-document-title';
 import { CashFlowChart } from '../features/dashboard/CashFlowChart';
 import { CategoryBudgetsCard } from '../features/dashboard/CategoryBudgetsCard';
 import { FinancialHealthCard } from '../features/dashboard/FinancialHealthCard';
@@ -10,6 +11,7 @@ import { NetWorthChart } from '../features/dashboard/NetWorthChart';
 import { SpendingByCategoryChart } from '../features/dashboard/SpendingByCategoryChart';
 
 export function Dashboard() {
+  useDocumentTitle('Dashboard');
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { headingRef.current?.focus(); }, []);
 

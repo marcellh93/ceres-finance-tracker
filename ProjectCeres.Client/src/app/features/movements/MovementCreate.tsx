@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { MovementForm, type MovementFormValues } from './MovementForm';
 import { AttachmentDropzone } from './AttachmentDropzone';
@@ -24,6 +25,7 @@ function urlToMovementType(t: string | null): MovementType | null {
 }
 
 export function MovementCreate() {
+  useDocumentTitle('New Movement');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { refetch } = useOutletContext<{ refetch: () => void }>();

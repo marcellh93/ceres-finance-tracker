@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
 import { StatTile } from '@/components/StatTile';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { CardError } from '../../components/CardError';
 import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { ChartContainer } from '@/components/ui/chart';
@@ -15,6 +16,7 @@ import { ReportTableCard } from './ReportTableCard';
 import { useReportsFilters } from './useReportsFilters';
 
 export function IncomeExpense() {
+  useDocumentTitle('Income vs. Expense');
   const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<IncomeExpenseSummaryDto>(REPORTS_INCOME_EXPENSE_URL(qs));

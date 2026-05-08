@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Numeric } from '@/components/Numeric';
 import { Tile } from '@/components/Tile';
 import { StatTile } from '@/components/StatTile';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { CardError } from '../../components/CardError';
 import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
 import { ChartContainer } from '@/components/ui/chart';
@@ -18,6 +19,7 @@ import { useReportsFilters } from './useReportsFilters';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export function MonthlyCashFlow() {
+  useDocumentTitle('Monthly Cash Flow');
   const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<MonthlyCashFlowRowDto[]>(REPORTS_MONTHLY_CASH_FLOW_URL(qs));

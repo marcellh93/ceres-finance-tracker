@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { MovementForm, type MovementFormValues } from './MovementForm';
 import { AttachmentDropzone } from './AttachmentDropzone';
@@ -288,6 +289,7 @@ function MovementEditInner({
 // ── MovementEdit: resolves discriminator, then delegates ──
 
 export function MovementEdit() {
+  useDocumentTitle('Edit Movement');
   const { id } = useParams<{ id: string }>();
   const resolvedId = id ?? '';
 

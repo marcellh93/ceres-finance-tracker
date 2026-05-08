@@ -2,6 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Numeric } from '@/components/Numeric';
 import { Badge } from '@/components/ui/badge';
+import { useDocumentTitle } from '../../lib/use-document-title';
 import { usePagination } from '@/hooks/usePagination';
 import { CardError } from '../../components/CardError';
 import { DataTransition, type DataTransitionState } from '../../components/DataTransition';
@@ -16,6 +17,7 @@ import { useReportsFilters } from './useReportsFilters';
 const PAGE_SIZE = 50;
 
 export function TransactionHistory() {
+  useDocumentTitle('Transaction History');
   const { toQueryString } = useReportsFilters();
   const qs = toQueryString();
   const { data, error, loading, refetch } = useApi<TransactionHistoryRowDto[]>(REPORTS_TRANSACTION_HISTORY_URL(qs));
