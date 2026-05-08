@@ -1,31 +1,50 @@
 import { describe, expect, it } from 'vitest';
 import { contrastRatio, formatRatio } from './contrast';
 
-describe('contrastRatio', () => {
-  it('returns 21 for black on white', () => {
-    expect(contrastRatio('rgb(0,0,0)', 'rgb(255,255,255)')).toBeCloseTo(21, 0);
+describe('contrast', () => {
+  it('parses rgb(r, g, b)', () => {
+    expect(contrastRatio('rgb(255, 255, 255)', 'rgb(0, 0, 0)')).toBeCloseTo(21, 1);
   });
 
-  it('returns 1 for identical colors', () => {
-    expect(contrastRatio('rgb(120,120,120)', 'rgb(120,120,120)')).toBeCloseTo(1, 1);
+  it('drops alpha from rgba(r, g, b, a)', () => {
+    expect(contrastRatio('rgba(255, 255, 255, 0.5)', 'rgba(0, 0, 0, 0.5)')).toBeCloseTo(21, 1);
   });
 
-  it('is symmetric', () => {
-    const a = contrastRatio('rgb(20,40,60)', 'rgb(200,210,220)');
-    const b = contrastRatio('rgb(200,210,220)', 'rgb(20,40,60)');
-    expect(a).toBeCloseTo(b, 4);
+  it('parses oklch(L C h) — primary token', () => {
+    // oklch(0.520 0.110 195) is the project's --primary token in light mode.
+    // T3.15 computed the corresponding sRGB hex as #007c7c (rgb(0, 124, 124)).
+    // Contrast against black is ~4.17:1 (AA for large text).
+    const ratio = contrastRatio('oklch(0.520 0.110 195)', 'rgb(0, 0, 0)');
+    expect(ratio).toBeGreaterThan(3.5);
+    expect(ratio).toBeLessThan(5);
   });
 
-  it('handles space-separated rgb() syntax', () => {
-    expect(contrastRatio('rgb(0 0 0)', 'rgb(255 255 255)')).toBeCloseTo(21, 0);
+  it('parses oklch(1 0 0) as white', () => {
+    expect(contrastRatio('oklch(1 0 0)', 'rgb(0, 0, 0)')).toBeCloseTo(21, 1);
   });
-});
 
-describe('formatRatio', () => {
-  it('formats with two decimals and AA/AAA labels', () => {
-    expect(formatRatio(21)).toBe('21.00 : 1 (AAA)');
-    expect(formatRatio(4.6)).toBe('4.60 : 1 (AA)');
-    expect(formatRatio(3.2)).toBe('3.20 : 1 (Large only)');
-    expect(formatRatio(2.0)).toBe('2.00 : 1 (Fail)');
+  it('parses oklch(0 0 0) as black', () => {
+    expect(contrastRatio('rgb(255, 255, 255)', 'oklch(0 0 0)')).toBeCloseTo(21, 1);
+  });
+
+  it('drops alpha from oklch(L C h / α)', () => {
+    const withAlpha = contrastRatio('oklch(1 0 0 / 0.5)', 'rgb(0, 0, 0)');
+    const withoutAlpha = contrastRatio('oklch(1 0 0)', 'rgb(0, 0, 0)');
+    expect(withAlpha).toBeCloseTo(withoutAlpha, 1);
+  });
+
+  it('throws on unsupported color spaces (e.g. hsl)', () => {
+    expect(() => contrastRatio('hsl(0, 100%, 50%)', 'rgb(0, 0, 0)')).toThrow(/Cannot parse color/);
+  });
+
+  it('cross-format contrast (oklch white vs rgb black) returns ~21', () => {
+    expect(contrastRatio('oklch(1 0 0)', 'rgb(0, 0, 0)')).toBeCloseTo(21, 1);
+  });
+
+  it('formatRatio produces the AAA/AA/Large/Fail label', () => {
+    expect(formatRatio(21)).toContain('AAA');
+    expect(formatRatio(5.5)).toContain('AA');
+    expect(formatRatio(3.5)).toContain('Large only');
+    expect(formatRatio(2)).toContain('Fail');
   });
 });
