@@ -72,7 +72,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         {!onMovements && (
           <Button
             variant="default"
