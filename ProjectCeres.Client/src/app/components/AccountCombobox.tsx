@@ -36,32 +36,32 @@ export function AccountCombobox({ accounts, value, onChange, placeholder, filter
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            disabled={disabled}
-            className={cn('justify-between', className)}
+      <div className={cn('relative', className)}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              disabled={disabled}
+              className={cn('w-full justify-between', showClear && 'pr-12')}
+            >
+              {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          }
+        />
+        {showClear && (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Clear selection"
+            className="absolute right-8 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            {selected ? selected.name : <span className="text-muted-foreground">{placeholder}</span>}
-            <span className="ml-2 flex shrink-0 items-center gap-1.5">
-              {showClear && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  aria-label="Clear selection"
-                  className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-              <ChevronsUpDown className="h-4 w-4 opacity-50" />
-            </span>
-          </Button>
-        }
-      />
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
       <PopoverContent className="p-0" align="start">
         <Command>
           <CommandInput placeholder="Search accounts…" />
