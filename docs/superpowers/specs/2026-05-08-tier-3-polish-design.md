@@ -396,30 +396,49 @@ export function BudgetCombobox({
 
 ## T3.15 — index.html hardening + per-route titles
 
-### Static index.html changes
+### Static HTML entry changes
 
-`ProjectCeres.Client/index.html` becomes:
+The Vite build has three HTML entry points (verified 2026-05-08 against `vite.config.ts`):
+
+- `ProjectCeres.Client/app.html` — the SPA at `/app/` (loads `src/app/main.tsx`). **Primary target.**
+- `ProjectCeres.Client/design-system.html` — the design-system showcase (loads `src/design-system/main.tsx`).
+- `ProjectCeres.Client/index.html` — the Razor-coexistence islands shell (loads `src/main.tsx`). Goes away with Stage 11 cleanup; we still harden it because it's user-visible until then.
+
+Each entry gets the same hardening: `description` meta, `theme-color` meta (light + dark), and a top-level `<title>` that the SPA's per-route hook will override after mount. Default titles per entry:
+
+- `app.html`: `Project Ceres` (overridden per route)
+- `design-system.html`: keep its existing `Project Ceres — Design System`
+- `index.html`: keep its existing `projectceres-client` value replaced with `Project Ceres`
+
+Example (`app.html` after the changes):
 
 ```html
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Personal finance tracker for individuals and freelancers. Track assets, liabilities, net worth, income, expenses, and goal budgets." />
-    <meta name="theme-color" content="#134e4a" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0a2625" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#1aa39e" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a3838" media="(prefers-color-scheme: dark)" />
     <title>Project Ceres</title>
+    <script>
+      (function () {
+        try {
+          var c = localStorage.getItem('ceres.sidebar.collapsed');
+          if (c === 'true') document.documentElement.classList.add('sidebar-collapsed');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>
 ```
 
-The two `theme-color` hex values shown above are placeholders. During implementation, resolve them from the `--primary` token in `index.css` (deep-teal primary in light mode; the corresponding dark-mode background token).
+The `theme-color` values above are approximate sRGB conversions of the `--primary` OKLCH token (`oklch(0.520 0.110 195)` light; the dark `--background` `oklch(0.155 0.005 285)` for dark mode). Final values resolved via a one-line OKLCH→hex conversion during implementation.
 
 ### useDocumentTitle hook
 
@@ -441,39 +460,49 @@ export function useDocumentTitle(page: string) {
 
 ### Page-level wiring
 
-One `useDocumentTitle('Page Name')` call at the top of each top-level page component. ~27 sites:
+One `useDocumentTitle('Page Name')` call at the top of each top-level page component. The route inventory below mirrors `src/app/App.tsx` lines 54–98 exactly (verified 2026-05-08):
 
-| Route | Title page name |
-|---|---|
-| `/app/` | `Dashboard` |
-| `/app/movements` | `Movements` |
-| `/app/movements/new` | `New Movement` |
-| `/app/movements/:id/edit` | `Edit Movement` |
-| `/app/budgets` | `Budgets` |
-| `/app/accounts` | `Accounts` |
-| `/app/categories` | `Categories` |
-| `/app/recurring` | `Recurring` |
-| `/app/reports` | `Reports` |
-| `/app/reports/net-worth` | `Net Worth` |
-| `/app/reports/income-expense` | `Income vs. Expense` |
-| `/app/reports/expense-breakdown` | `Expense Breakdown` |
-| `/app/reports/transaction-history` | `Transaction History` |
-| `/app/reports/budget-vs-actual` | `Budget vs. Actual` |
-| `/app/reports/largest-expenses` | `Largest Expenses` |
-| `/app/reports/monthly-cash-flow` | `Monthly Cash Flow` |
-| `/app/reports/net-worth-over-time` | `Net Worth Over Time` |
-| `/app/review` | `Review` |
-| `/app/import` | `Import` |
-| `/app/import/profiles` | `Import Profiles` |
-| `/app/import/profiles/new` | `New Import Profile` |
-| `/app/import/profiles/:id/edit` | `Edit Import Profile` |
-| `/app/settings` | `Settings` |
-| `/app/profile` | `Profile` |
-| `/app/security` | `Security` |
-| `/app/support` | `Support` |
-| `/design-system` | `Design System` |
+| Route | Page component | Title page name |
+|---|---|---|
+| `/app/` | `Dashboard` | `Dashboard` |
+| `/app/movements` | `MovementsLayout` | `Movements` |
+| `/app/movements/new` | `MovementCreate` | `New Movement` |
+| `/app/movements/:id/edit` | `MovementEdit` | `Edit Movement` |
+| `/app/review` | `Review` | `Review` |
+| `/app/accounts` | `Accounts` | `Accounts` |
+| `/app/accounts/new` | `AccountCreate` | `New Account` |
+| `/app/accounts/:id/edit` | `AccountEdit` | `Edit Account` |
+| `/app/accounts/:id/ledger` | `AccountLedger` | `Account Ledger` |
+| `/app/categories` | `Categories` | `Categories` |
+| `/app/categories/new` | `CategoryCreate` | `New Category` |
+| `/app/categories/:id/edit` | `CategoryEdit` | `Edit Category` |
+| `/app/budgets` | `Budgets` | `Budgets` |
+| `/app/budgets/new` | `BudgetCreate` | `New Budget` |
+| `/app/budgets/:id/edit` | `BudgetEdit` | `Edit Budget` |
+| `/app/recurring` | `Recurring` | `Recurring` |
+| `/app/recurring/new` | `RecurringCreate` (via bridge) | `New Recurring` |
+| `/app/recurring/:id/edit` | `RecurringEdit` (via bridge) | `Edit Recurring` |
+| `/app/import` | `Import` | `Import` |
+| `/app/import/profiles` | `ProfilesLayout` | `Import Profiles` |
+| `/app/import/profiles/new` | `ProfileCreate` | `New Import Profile` |
+| `/app/import/profiles/:id/edit` | `ProfileEdit` | `Edit Import Profile` |
+| `/app/reports` | `ReportsLayout` (redirect) | `Reports` |
+| `/app/reports/net-worth` | `NetWorth` | `Net Worth` |
+| `/app/reports/net-worth-over-time` | `NetWorthOverTime` | `Net Worth Over Time` |
+| `/app/reports/income-expense` | `IncomeExpense` | `Income vs. Expense` |
+| `/app/reports/monthly-cash-flow` | `MonthlyCashFlow` | `Monthly Cash Flow` |
+| `/app/reports/expense-breakdown` | `ExpenseBreakdown` | `Expense Breakdown` |
+| `/app/reports/budget-vs-actual` | `BudgetVsActual` | `Budget vs. Actual` |
+| `/app/reports/largest-expenses` | `LargestExpenses` | `Largest Expenses` |
+| `/app/reports/transaction-history` | `TransactionHistory` | `Transaction History` |
+| `/app/settings` | `Settings` | `Settings` |
+| `/app/support` | `Support` | `Support` |
+| `/app/profile` | `Profile` | `Profile` |
+| `/app/security` | `Security` | `Security` |
 
-The list above is approximate — the exact route inventory will be confirmed against `src/app/AppRoutes.tsx` (or equivalent) during implementation.
+35 routes total. The catch-all `*` `NotFound` route gets `Not Found` as its title.
+
+The design-system showcase (`design-system.html`) is a separate Vite entry with its own static `<title>`; it does not need `useDocumentTitle` because it is a single-page surface within that entry.
 
 ### Tests
 
