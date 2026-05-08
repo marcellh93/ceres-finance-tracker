@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { CategoryBudgetForm, type CategoryBudgetFormValues } from './CategoryBudgetForm';
@@ -40,8 +40,11 @@ export function BudgetEdit() {
   return <GoalEdit id={resolvedId} />;
 }
 
+type LayoutContext = { refetch: () => void };
+
 function CategoryEdit({ id }: { id: string }) {
   const navigate = useNavigate();
+  const ctx = useOutletContext<LayoutContext | null>();
   const [currencySymbol, setCurrencySymbol] = useState('');
 
   const { data: dto, loading } = useApi<CategoryBudgetEditDto>(CATEGORY_BUDGET_BY_ID_URL(id));
@@ -74,6 +77,7 @@ function CategoryEdit({ id }: { id: string }) {
 
     if (response.status === 204) {
       toast.success('Saved.');
+      ctx?.refetch();
       navigate('/budgets?type=category');
       return { ok: true } as const;
     }
@@ -106,6 +110,7 @@ function CategoryEdit({ id }: { id: string }) {
 
 function GoalEdit({ id }: { id: string }) {
   const navigate = useNavigate();
+  const ctx = useOutletContext<LayoutContext | null>();
   const { data: dto, loading } = useApi<GoalBudgetEditDto>(GOAL_BUDGET_BY_ID_URL(id));
 
   if (loading || !dto) return <div className="text-sm text-muted-foreground">Loading…</div>;
@@ -140,6 +145,7 @@ function GoalEdit({ id }: { id: string }) {
 
     if (response.status === 204) {
       toast.success('Saved.');
+      ctx?.refetch();
       navigate('/budgets?type=goal');
       return { ok: true } as const;
     }

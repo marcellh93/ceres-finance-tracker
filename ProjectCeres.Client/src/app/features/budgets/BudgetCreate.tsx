@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
 import { CategoryBudgetForm, type CategoryBudgetFormValues } from './CategoryBudgetForm';
@@ -26,10 +26,13 @@ type Conflict = {
   existingIsActive: boolean;
 };
 
+type LayoutContext = { refetch: () => void };
+
 export function BudgetCreate() {
   useDocumentTitle('New Budget');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const ctx = useOutletContext<LayoutContext | null>();
   const typeParam = parseTypeParam(searchParams.get('type'));
 
   // Bounce back if missing/invalid.
@@ -66,6 +69,7 @@ export function BudgetCreate() {
 
       if (response.status === 201) {
         toast.success('Created.');
+        ctx?.refetch();
         navigate('/budgets?type=category');
         return { ok: true } as const;
       }
@@ -179,6 +183,7 @@ export function BudgetCreate() {
 
     if (response.status === 201) {
       toast.success('Created.');
+      ctx?.refetch();
       navigate('/budgets?type=goal');
       return { ok: true } as const;
     }
