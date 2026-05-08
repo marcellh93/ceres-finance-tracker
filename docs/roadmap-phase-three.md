@@ -247,9 +247,9 @@ Responsive (foundation tier — applies to every later stage):
 
 ## Stage 5 — Frontend polish + data-loading ease-in
 
-**Status: ⚠️ In progress.** Data-loading ease-in fully rolled out (5.2/5.3/5.4). Tier 1 polish done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped). Tier 2 polish done (T2.7–T2.10). Tier 3–5 pending. Plus a batch of ad-hoc UX fixes shipped on top of the planned tiers — see § Ad-hoc UX fixes below.
+**Status: ⚠️ In progress.** Data-loading ease-in fully rolled out (5.2/5.3/5.4). Tier 1 polish done (T1.1–T1.4 + T1.6 shipped; T1.5 deliberately not shipped). Tier 2 polish done (T2.7–T2.10). Tier 3 polish done (T3.11–T3.15 shipped 2026-05-08). Tier 4–5 pending. Plus a batch of ad-hoc UX fixes shipped on top of the planned tiers — see § Ad-hoc UX fixes below.
 
-> **As of 2026-05-08, next up:** Tier 3 (T3.11–T3.15) is the next polish track on this stage. Alternative: switch to launch-critical work (Stage 6 Identity infrastructure). Stage 5 is explicitly *not* blocking Phase 3 launch.
+> **As of 2026-05-08, next up:** Tier 4 (testing infrastructure) and Tier 5 (discretionary polish) remain. Alternative: switch to launch-critical work (Stage 6 Identity infrastructure). Stage 5 is explicitly *not* blocking Phase 3 launch.
 
 > **Why this is its own stage:** these are app-wide UX fundamentals that touch every page. They can't be picked up under any single Stage 1–4 because they cross all of them. They're explicitly *not* blocking Phase 3 launch — they're the difference between "shipped" and "feels well done."
 
@@ -316,11 +316,11 @@ Tier 2 — extract shared primitives:
 
 Tier 3 — production-app polish:
 
-- [ ] T3.11 Migrate `duration-200` literals to motion tokens (3.1, 3.4) — already on roadmap (Known Limitation in `design-system.md` line 1154)
-- [ ] T3.12 Build `<SubmitButton>` with idle/loading/success/error + spinner (8.4) — replaces `QuickAddModal.tsx` line 230 and `MovementForm.tsx` lines 548–550
-- [ ] T3.13 `useOptimistic` for the Status block toggle on table rows (5.1)
-- [ ] T3.14 Replace MovementForm budget `<select>` with Combobox, or document the rule
-- [ ] T3.15 Harden `index.html` — `theme-color` meta, description meta, per-route titles (1.7)
+- [x] T3.11 Migrate `duration-200` literals to motion tokens (3.1, 3.4) — shipped 2026-05-08 (commit `c372b89`); Tabs primitive bound to `--motion-duration-base` in follow-up `014f7e3`
+- [x] T3.12 Build `<SubmitButton>` with idle/loading/success/error + spinner (8.4) — shipped 2026-05-08 (commit `8b4c731`); QuickAddModal-only consumer, MovementForm form-aware variant deferred per spec; success-flash dwell tuned to 1500 ms in `d462eec` after research
+- [x] T3.13 `useOptimistic` for the Status block toggle on table rows (5.1) — shipped 2026-05-08 (commit `0c5c1b0`); spec corrected with `pendingRef` requirement (`52d2c17`)
+- [x] T3.14 Replace MovementForm budget `<select>` with Combobox, or document the rule — shipped 2026-05-08 (commit `1394db6`); clear-✕ structural fix in `eeb0c13`/`d3702bd`/`182dd08`
+- [x] T3.15 Harden `index.html` — `theme-color` meta, description meta, per-route titles (1.7) — shipped 2026-05-08 (commit `d828161`); served-HTML correction (Razor shells, not Vite's app.html) in `ff362fc`/`de28b8a`; favicon wired in `54a8451`
 
 Tier 4 — testing and observability:
 
@@ -369,6 +369,30 @@ Polish work that surfaced from real-world use rather than the polish-checklist a
 | Two empty-state CTAs missed `nativeButton={false}` so base-ui logged a warning every render of the empty state; full SPA audit cleared every site | `3454cc8` |
 
 Two of these (`IsCleared on Create` and the Recurring focus-loss) are bug fixes, not polish — they're tracked here so the next session knows the resolution context. The IsCleared bug was wide enough to warrant its own service-level test trio in `IsClearedTests.cs`, `TransactionServiceTests.cs`, and `LiabilityPaymentServiceTests.cs`.
+
+#### Tier 3 follow-up fixes (2026-05-08, post browser-pass)
+
+A second wave of fixes surfaced during the Tier 3 verification browser-pass on iPhone SE. Shipped same day.
+
+| Fix | Commit |
+|---|---|
+| Budgets list showed stale data after Create/Edit — only Budgets pair lacked the `useOutletContext().refetch()` call before navigate-back; Accounts, Categories, Recurring, Import Profiles already had it | `5ee1021` |
+| QuickAddModal `+` button was hidden on mobile (gated behind `isDesktop`); lifted out of the desktop-only group so the modal is reachable on phones | `b3af129` |
+| Movements header overflowed at 375 px; collapsed bulk-action button labels to icon-only below `sm` and added `flex-wrap` as fallback | `f90fff3` |
+| Combobox clear ✕ rendered as a `<button>` inside the Popover trigger's `<button>`, triggering React's nested-button hydration warning; hoisted ✕ as an absolute sibling outside the trigger | `eeb0c13` |
+| Combobox icons stopped hugging the right edge after the hoist; restored chevron + ✕ inset by reorganising the relative wrapper | `d3702bd` |
+| Movements filter bar's global Clear button wiped `?currency`, briefly losing the active currency tab and unfiltering the Account dropdown — preserve `currency` when clearing filters | `5b4d50a` |
+| SubmitButton success-flash dwell felt too short at 800 ms; bumped default to 1500 ms after research (industry consensus 1500–3000 ms for post-success dwell) | `d462eec` |
+| TopBar `+` and avatar were practically touching with `gap-1`; bumped to `gap-2` for proper breathing room | `0bcab20` |
+| MovementsCardList — new mobile card layout below `md`, replacing the desktop table with stacked cards (Smashing/Pencil & Paper/UXmatters consensus pattern for mobile transaction lists); shared `amountColor` helper extracted to `movement-type-display.ts` | `42b05e3` |
+| Mobile card collisions — kebab overlapped amount on Line 1; mobile gutters reduced to `p-4` below `md`; long text now truncates instead of running behind the status badge | `228a1f1` |
+| Mobile card actions inlined as flex siblings (instead of absolute-positioned) for natural alignment; currency tabs span full width on mobile | `f0776d5` |
+| Type pill text wasn't left-aligned with the description below it on the card; `-ml-[9px]` cancels the Badge's internal `px-2` + 1 px border so pill text shares the lines-below x-position | `a5a2093`, `182dd08` |
+| Movements header buttons cluster sat left-aligned when wrapped on mobile; `ml-auto` right-aligns the cluster | `55807f8` |
+| `+ New` dropdown trigger label collapsed to icon-only below `sm` so the cluster fits beside the h1 on the same row | `96c2cd5` |
+| TabsTrigger transition was Tailwind's default 150 ms (not migrated by T3.11); bound to `--motion-duration-base` for consistency with the rest of the app | `014f7e3` |
+| TabsList stretched full-width on desktop after the mobile fix; `md:w-fit` restores the chip-style strip at md+ | `5e84207` |
+| Razor SPA shells (`Views/App/Index.cshtml`, `Views/Shared/_Layout.cshtml`) had no favicon link, causing browser fallback to `/favicon.ico` 404; copied SVG to `wwwroot/` and wired explicit `<link rel="icon">` tags | `54a8451` |
 
 ---
 
