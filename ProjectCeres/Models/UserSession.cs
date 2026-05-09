@@ -1,0 +1,14 @@
+namespace ProjectCeres.Models;
+
+public sealed class UserSession
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string? PersistentTokenHash { get; set; }
+    public string IpCreatedAt { get; set; } = "";
+    public string UserAgent { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+    public DateTime LastUsedAt { get; set; }
+    public DateTime? RevokedAt { get; set; }
+    public bool IsPersistent { get; set; }
+}

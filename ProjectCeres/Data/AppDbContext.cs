@@ -31,13 +31,37 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<ImportStagedTransfer> ImportStagedTransfers => Set<ImportStagedTransfer>();
     public DbSet<ImportTransferExclusion> ImportTransferExclusions => Set<ImportTransferExclusion>();
     public DbSet<ImportStagedTransaction> ImportStagedTransactions => Set<ImportStagedTransaction>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<UserBlockedIp> UserBlockedIps => Set<UserBlockedIp>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         ConfigureRelationships(modelBuilder);
         ConfigureUserOwnership(modelBuilder);
+        ConfigureSessionEntities(modelBuilder);
         SeedData(modelBuilder);
+    }
+
+    private static void ConfigureSessionEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserSession>(b =>
+        {
+            b.HasKey(s => s.Id);
+            b.HasIndex(s => new { s.UserId, s.RevokedAt });
+            b.HasIndex(s => s.LastUsedAt);
+            b.Property(s => s.IpCreatedAt).HasMaxLength(45);
+            b.Property(s => s.UserAgent).HasMaxLength(512);
+            b.Property(s => s.PersistentTokenHash).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<UserBlockedIp>(b =>
+        {
+            b.HasKey(i => i.Id);
+            b.HasIndex(i => new { i.UserId, i.IpAddress }).IsUnique();
+            b.Property(i => i.IpAddress).HasMaxLength(45);
+            b.Property(i => i.Reason).HasMaxLength(256);
+        });
     }
 
     /// <summary>
