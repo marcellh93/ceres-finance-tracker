@@ -77,12 +77,99 @@ public sealed class AuthController : ControllerBase
         var signIn = await _signInManager.PasswordSignInAsync(
             user, request.Password, isPersistent: false, lockoutOnFailure: true);
 
+        if (signIn.RequiresTwoFactor)
+        {
+            // Identity has set Identity.TwoFactorUserId scoped cookie automatically.
+            // No __Host-Session, no UserSession row — those wait for /login/totp.
+            // Stash rememberMe so the TOTP step can honour it (HttpContext is per-request,
+            // we cache it via a short-lived data-protected cookie).
+            HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+            _antiforgery.GetAndStoreTokens(HttpContext);
+            // Forward rememberMe via a small cookie scoped to /api/auth/login/totp
+            Response.Cookies.Append(
+                "Mfa.RememberMe",
+                request.RememberMe.ToString(),
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/api/auth/login",
+                    Expires = DateTimeOffset.UtcNow.AddMinutes(10),
+                });
+            return Ok(new { requiresTotp = true });
+        }
+
+        if (signIn.IsLockedOut)
+        {
+            HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+            return Unauthorized(new { error = "locked_out" });
+        }
+
         if (!signIn.Succeeded)
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
             return Unauthorized();
         }
 
+        await IssueSessionAndCookiesAsync(user, sessionId, request.RememberMe);
+        return NoContent();
+    }
+
+    [HttpPost("login/totp"), AllowAnonymous]
+    public async Task<IActionResult> LoginTotp(
+        [FromBody] LoginTotpRequest request,
+        [FromServices] TotpReplayGuard replayGuard,
+        [FromServices] MfaBackupCodeService backupCodes)
+    {
+        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+        // Identity reads Identity.TwoFactorUserId from request cookies
+        // and resolves the half-authenticated user.
+        var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
+        if (user is null) return Unauthorized();
+
+        var rememberMe = ReadRememberMeCookie();
+        var sessionId = Guid.NewGuid();
+        HttpContext.Items[SessionConstants.PendingSessionItemKey] = sessionId;
+
+        if (MfaConstants.TotpCodeShape.IsMatch(request.Code))
+        {
+            var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(
+                request.Code, isPersistent: false, rememberClient: false);
+            if (result.IsLockedOut) return Unauthorized(new { error = "locked_out" });
+            if (!result.Succeeded) return Unauthorized();
+
+            var accepted = await replayGuard.TryAcceptAsync(user.Id, request.Code, HttpContext.RequestAborted);
+            if (!accepted)
+            {
+                await _signInManager.SignOutAsync();
+                return Unauthorized(new { error = "replay" });
+            }
+
+            await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
+            ClearRememberMeCookie();
+            return NoContent();
+        }
+
+        var stripped = request.Code.Replace("-", "").Replace(" ", "").ToUpperInvariant();
+        if (MfaConstants.BackupCodeShape.IsMatch(stripped))
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+            var ok = await backupCodes.VerifyAndConsumeAsync(user.Id, request.Code, ip, HttpContext.RequestAborted);
+            if (!ok) return Unauthorized();
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
+            await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
+            ClearRememberMeCookie();
+            return NoContent();
+        }
+
+        return Unauthorized();
+    }
+
+    private async Task IssueSessionAndCookiesAsync(ApplicationUser user, Guid sessionId, bool rememberMe)
+    {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
         var ua = Request.Headers.UserAgent.ToString();
 
@@ -94,10 +181,10 @@ public sealed class AuthController : ControllerBase
             UserAgent = ua,
             CreatedAt = DateTime.UtcNow,
             LastUsedAt = DateTime.UtcNow,
-            IsPersistent = request.RememberMe,
+            IsPersistent = rememberMe,
         };
 
-        if (request.RememberMe)
+        if (rememberMe)
         {
             var rawToken = _tokens.Generate();
             session.PersistentTokenHash = _tokens.Hash(rawToken);
@@ -117,10 +204,21 @@ public sealed class AuthController : ControllerBase
         _db.UserSessions.Add(session);
         await _db.SaveChangesAsync();
 
-        // Rotate CSRF cookie on login.
         _antiforgery.GetAndStoreTokens(HttpContext);
+    }
 
-        return NoContent();
+    private bool ReadRememberMeCookie() =>
+        Request.Cookies.TryGetValue("Mfa.RememberMe", out var raw) && bool.TryParse(raw, out var b) && b;
+
+    private void ClearRememberMeCookie()
+    {
+        Response.Cookies.Delete("Mfa.RememberMe", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Path = "/api/auth/login",
+        });
     }
 
     /// <summary>
