@@ -103,11 +103,18 @@ builder.Services.AddScoped<PersistentTokenService>();
 
 builder.Services.AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>();
 
+// SecurePolicy: Always in production (browser enforces __Host- prefix Secure attribute);
+// SameAsRequest outside production so WebApplicationFactory tests over HTTP can exercise
+// the antiforgery + cookie pipeline. Browsers don't enter the picture in tests.
+var cookieSecurePolicy = builder.Environment.IsProduction()
+    ? CookieSecurePolicy.Always
+    : CookieSecurePolicy.SameAsRequest;
+
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = SessionConstants.SessionCookieName;
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.Path = "/";
     options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
@@ -135,7 +142,7 @@ builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = SessionConstants.CsrfCookieName;
     options.Cookie.HttpOnly = false;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.Path = "/";
     options.HeaderName = SessionConstants.CsrfHeaderName;
