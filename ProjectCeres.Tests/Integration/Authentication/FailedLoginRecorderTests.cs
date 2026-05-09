@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
@@ -159,5 +160,71 @@ public class FailedLoginRecorderTests : IAsyncLifetime
             .Where(e => e.EmailAttempted == "ip-null@recorder-test.local")
             .SingleOrDefaultAsync();
         row!.IpAddress.Should().Be("unknown");
+    }
+
+    [Fact]
+    public async Task Login_BadCredentials_WritesOneRow_ViaHttp()
+    {
+        await AuthTestFixture.RegisterUserAsync(_factory, "bad@recorder-test.local");
+        var client = _factory.CreateClient();
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = "bad@recorder-test.local", password = "wrong-but-long-enough-pwd", rememberMe = false });
+
+        resp.StatusCode.Should().Be(System.Net.HttpStatusCode.Unauthorized);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var rows = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "bad@recorder-test.local")
+            .ToListAsync();
+        rows.Should().ContainSingle().Which.Reason.Should().Be(FailedLoginReason.BadCredentials);
+    }
+
+    [Fact]
+    public async Task Login_LockoutRejection_WritesOneRow_NotTwo()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "lockout@recorder-test.local");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var fresh = await um.FindByIdAsync(user.Id.ToString());
+            await um.SetLockoutEndDateAsync(fresh!, DateTimeOffset.UtcNow.AddMinutes(15));
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.FailedLoginAttempts
+                .Where(e => e.EmailAttempted == "lockout@recorder-test.local")
+                .ExecuteDeleteAsync();
+        }
+
+        var client = _factory.CreateClient();
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = "lockout@recorder-test.local", password = AuthTestFixture.ValidPassword, rememberMe = false });
+
+        using var scope2 = _factory.Services.CreateScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var rows = await db2.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "lockout@recorder-test.local")
+            .ToListAsync();
+        rows.Should().ContainSingle().Which.Reason.Should().Be(FailedLoginReason.LockedOut);
+    }
+
+    [Fact]
+    public async Task Login_UnknownUser_WritesRowWithNullUserIdAndReasonUnknownUser()
+    {
+        var client = _factory.CreateClient();
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = "ghost@recorder-test.local", password = "anything-long-enough-pwd", rememberMe = false });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "ghost@recorder-test.local")
+            .SingleOrDefaultAsync();
+        row.Should().NotBeNull();
+        row!.UserId.Should().BeNull();
+        row.Reason.Should().Be(FailedLoginReason.UnknownUser);
     }
 }

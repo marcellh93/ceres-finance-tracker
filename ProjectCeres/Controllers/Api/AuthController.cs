@@ -24,6 +24,7 @@ public sealed class AuthController : ControllerBase
     private readonly Argon2idPasswordHasher _argon;
     private readonly PersistentTokenService _tokens;
     private readonly IAntiforgery _antiforgery;
+    private readonly FailedLoginRecorder _failedLogins;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -31,7 +32,8 @@ public sealed class AuthController : ControllerBase
         AppDbContext db,
         Argon2idPasswordHasher argon,
         PersistentTokenService tokens,
-        IAntiforgery antiforgery)
+        IAntiforgery antiforgery,
+        FailedLoginRecorder failedLogins)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -39,7 +41,12 @@ public sealed class AuthController : ControllerBase
         _argon = argon;
         _tokens = tokens;
         _antiforgery = antiforgery;
+        _failedLogins = failedLogins;
     }
+
+    private (string ip, string ua) RequestContext() =>
+        (HttpContext.Connection.RemoteIpAddress?.ToString() ?? "",
+         Request.Headers.UserAgent.ToString());
 
     [HttpPost("register"), AllowAnonymous]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
@@ -71,6 +78,8 @@ public sealed class AuthController : ControllerBase
         {
             // Constant-time enumeration prevention: still pay the Argon2id cost.
             _argon.RunDummyHash();
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(request.Email, null, FailedLoginReason.UnknownUser, ip, ua, HttpContext.RequestAborted);
             return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
@@ -106,12 +115,16 @@ public sealed class AuthController : ControllerBase
         if (signIn.IsLockedOut)
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(request.Email, user.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
             return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
         }
 
         if (!signIn.Succeeded)
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(request.Email, user.Id, FailedLoginReason.BadCredentials, ip, ua, HttpContext.RequestAborted);
             return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
