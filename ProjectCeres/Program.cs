@@ -100,6 +100,8 @@ builder.Services.Configure<SecurityStampValidatorOptions>(o =>
 builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, Argon2idPasswordHasher>();
 builder.Services.AddScoped<Argon2idPasswordHasher>();
 builder.Services.AddScoped<PersistentTokenService>();
+builder.Services.AddScoped<MfaBackupCodeService>();
+builder.Services.AddScoped<TotpReplayGuard>();
 
 builder.Services.AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>();
 
