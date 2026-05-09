@@ -46,6 +46,41 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             foreach (var d in existing) services.Remove(d);
             services.AddSingleton<IBreachedPasswordChecker, HibpStubBreachedPasswordChecker>();
 
+            // Stage 6b.2: replace the rate limiter with no-ops so existing 6a/6b.1
+            // integration tests don't trip the limiter on burst. Tests that need to
+            // verify the real limiter use RateLimitedAuthTestWebApplicationFactory.
+            //
+            // Implementation note: RateLimiterOptions stores lambda-based policies in
+            // PolicyMap and DI-activated typed policies in UnactivatedPolicyMap. Both are
+            // internal properties, so we clear them via reflection before re-registering
+            // the policy names as GetNoLimiter partitions. PostConfigure runs after all
+            // Configure callbacks (including the production AddRateLimiter call), so the
+            // keys already exist when we get here — we must remove before re-adding.
+            services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(opts =>
+            {
+                var type = opts.GetType();
+                var flags = System.Reflection.BindingFlags.Public
+                          | System.Reflection.BindingFlags.NonPublic
+                          | System.Reflection.BindingFlags.Instance;
+
+                var policyMapProp     = type.GetProperty("PolicyMap",          flags)!;
+                var unactivatedProp   = type.GetProperty("UnactivatedPolicyMap", flags)!;
+
+                var policyMap      = policyMapProp.GetValue(opts)!;
+                var unactivatedMap = unactivatedProp.GetValue(opts)!;
+
+                var removeFromPolicy     = policyMap.GetType()     .GetMethod("Remove", new[] { typeof(string) })!;
+                var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
+
+                foreach (var name in new[] { AuthRateLimitPolicies.AuthLoginByIp, AuthRateLimitPolicies.AuthTotpByUser })
+                {
+                    removeFromPolicy.Invoke(policyMap,         new object[] { name });
+                    removeFromUnactivated.Invoke(unactivatedMap, new object[] { name });
+                    opts.AddPolicy(name,
+                        _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter("test"));
+                }
+            });
+
             if (!UseTestAuthHandler) return;
 
             // ===== Pre-Stage-6a-test bypass =====
