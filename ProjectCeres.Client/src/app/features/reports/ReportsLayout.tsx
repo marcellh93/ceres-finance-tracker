@@ -16,7 +16,7 @@ export function ReportsLayout() {
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 -mx-4 -mt-4 bg-background md:-mx-6 md:-mt-6">
+      <div className="sticky top-0 z-10 -mx-4 -mt-4 bg-background pt-4 md:-mx-6 md:-mt-6 md:pt-6">
         <ReportsTabBar />
         <div className="mx-4 md:mx-6">
           {meta && (
