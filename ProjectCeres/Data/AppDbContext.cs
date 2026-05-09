@@ -35,6 +35,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<UserBlockedIp> UserBlockedIps => Set<UserBlockedIp>();
     public DbSet<UserMfaBackupCode> UserMfaBackupCodes => Set<UserMfaBackupCode>();
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
+    public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -87,6 +88,18 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasIndex(i => new { i.UserId, i.IpAddress }).IsUnique();
             b.Property(i => i.IpAddress).HasMaxLength(45);
             b.Property(i => i.Reason).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<FailedLoginAttempt>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.IpAddress, e.OccurredAt });
+            b.HasIndex(e => new { e.EmailAttempted, e.OccurredAt });
+            b.HasIndex(e => e.OccurredAt);
+            b.Property(e => e.EmailAttempted).HasMaxLength(256);
+            b.Property(e => e.IpAddress).HasMaxLength(45);
+            b.Property(e => e.UserAgent).HasMaxLength(512);
+            b.Property(e => e.Reason).HasConversion<string>();
         });
     }
 
