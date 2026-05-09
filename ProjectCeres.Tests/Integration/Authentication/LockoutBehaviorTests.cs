@@ -62,4 +62,27 @@ public class LockoutBehaviorTests : IAsyncLifetime
         fresh!.AccessFailedCount.Should().Be(0,
             "wrong TOTP codes must not increment the password lockout counter");
     }
+
+    [Fact]
+    public async Task WrongBackupCode_DoesNotIncrementPasswordLockoutCounter()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "wrong-bc@lockout-test.local");
+        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+
+        var client = _factory.CreateClient();
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+
+        for (int i = 0; i < 5; i++)
+        {
+            var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login/totp",
+                new { code = "AAAA-AAAA-AAAA-AAAA" });
+            resp.StatusCode.Should().Be(System.Net.HttpStatusCode.Unauthorized);
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var fresh = await um.FindByIdAsync(user.Id.ToString());
+        fresh!.AccessFailedCount.Should().Be(0);
+    }
 }

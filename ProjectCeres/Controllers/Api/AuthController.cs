@@ -178,7 +178,16 @@ public sealed class AuthController : ControllerBase
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
             var ok = await backupCodes.VerifyAndConsumeAsync(user.Id, request.Code, ip, HttpContext.RequestAborted);
-            if (!ok) return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
+            if (!ok)
+                return UnauthorizedEnvelope("INVALID_MFA_CODE",
+                    "The verification code is invalid or expired.");
+
+            // Backup-code success during lockout clears the lock — same policy as TOTP.
+            if (user.LockoutEnd.HasValue)
+            {
+                await _userManager.ResetAccessFailedCountAsync(user);
+                await _userManager.SetLockoutEndDateAsync(user, null);
+            }
 
             await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
