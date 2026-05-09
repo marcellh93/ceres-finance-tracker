@@ -139,18 +139,35 @@ public sealed class AuthController : ControllerBase
 
         if (MfaConstants.TotpCodeShape.IsMatch(request.Code))
         {
-            var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(
-                request.Code, isPersistent: false, rememberClient: false);
-            if (result.IsLockedOut) return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
-            if (!result.Succeeded) return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
+            // Stage 6b.2: replaced TwoFactorAuthenticatorSignInAsync (which silently
+            // calls AccessFailedAsync on miss) with VerifyTwoFactorTokenAsync +
+            // manual SignInAsync. TOTP misses no longer poison the password
+            // lockout counter; brute-force defense is the per-user 10/min limiter
+            // plus 30-second TOTP rotation.
+            var ok = await _userManager.VerifyTwoFactorTokenAsync(
+                user, TokenOptions.DefaultAuthenticatorProvider, request.Code);
+            if (!ok)
+            {
+                return UnauthorizedEnvelope("INVALID_MFA_CODE",
+                    "The verification code is invalid or expired.");
+            }
 
             var accepted = await replayGuard.TryAcceptAsync(user.Id, request.Code, HttpContext.RequestAborted);
             if (!accepted)
             {
                 await _signInManager.SignOutAsync();
-                return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
+                return UnauthorizedEnvelope("INVALID_MFA_CODE",
+                    "The verification code is invalid or expired.");
             }
 
+            // If the account was locked, the TOTP success clears the lock.
+            if (user.LockoutEnd.HasValue)
+            {
+                await _userManager.ResetAccessFailedCountAsync(user);
+                await _userManager.SetLockoutEndDateAsync(user, null);
+            }
+
+            await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
             return NoContent();
