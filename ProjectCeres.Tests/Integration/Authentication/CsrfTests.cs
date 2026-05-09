@@ -8,9 +8,9 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class CsrfTests
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
 
-    public CsrfTests(TestWebApplicationFactory factory) => _factory = factory;
+    public CsrfTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
     public async Task State_changing_request_without_csrf_token_returns_400()

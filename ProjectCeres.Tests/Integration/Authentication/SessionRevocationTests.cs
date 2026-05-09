@@ -14,9 +14,9 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class SessionRevocationTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
 
-    public SessionRevocationTests(TestWebApplicationFactory factory) => _factory = factory;
+    public SessionRevocationTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

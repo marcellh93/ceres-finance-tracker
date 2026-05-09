@@ -13,9 +13,9 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class CookieAttributesTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
 
-    public CookieAttributesTests(TestWebApplicationFactory factory) => _factory = factory;
+    public CookieAttributesTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

@@ -9,10 +9,10 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class RegisterEndpointTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public RegisterEndpointTests(TestWebApplicationFactory factory)
+    public RegisterEndpointTests(AuthTestWebApplicationFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient();

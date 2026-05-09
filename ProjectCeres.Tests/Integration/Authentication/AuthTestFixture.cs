@@ -20,7 +20,7 @@ public static class AuthTestFixture
     public const string ValidPassword = "correct horse battery staple";
 
     public static async Task<ApplicationUser> RegisterUserAsync(
-        TestWebApplicationFactory factory, string email, string password = ValidPassword)
+        AuthTestWebApplicationFactory factory, string email, string password = ValidPassword)
     {
         using var scope = factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -42,7 +42,7 @@ public static class AuthTestFixture
     /// user. If userId is null, the pair is anonymous-bound.
     /// </summary>
     public static (string CookieValue, string HeaderValue) MintCsrf(
-        TestWebApplicationFactory factory, Guid? userId = null)
+        AuthTestWebApplicationFactory factory, Guid? userId = null)
     {
         using var scope = factory.Services.CreateScope();
         var antiforgery = scope.ServiceProvider.GetRequiredService<IAntiforgery>();
@@ -67,7 +67,7 @@ public static class AuthTestFixture
     /// in a test where the user is not yet authenticated (login, register).
     /// </summary>
     public static Task<HttpResponseMessage> PostJsonWithCsrfAsync<T>(
-        TestWebApplicationFactory factory, HttpClient client, string url, T body)
+        AuthTestWebApplicationFactory factory, HttpClient client, string url, T body)
     {
         var (cookie, header) = MintCsrf(factory);
         var req = new HttpRequestMessage(HttpMethod.Post, url)

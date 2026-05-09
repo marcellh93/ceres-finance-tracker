@@ -14,9 +14,9 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class UserBlockedIpTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
 
-    public UserBlockedIpTests(TestWebApplicationFactory factory) => _factory = factory;
+    public UserBlockedIpTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

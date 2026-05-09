@@ -7,9 +7,9 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class GlobalFallbackPolicyTests
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
 
-    public GlobalFallbackPolicyTests(TestWebApplicationFactory factory) => _factory = factory;
+    public GlobalFallbackPolicyTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
     public async Task Anonymous_GET_to_authed_endpoint_returns_401()

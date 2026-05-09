@@ -11,9 +11,9 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 [Collection("IntegrationTests")]
 public class LoginEndpointTests : IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly AuthTestWebApplicationFactory _factory;
 
-    public LoginEndpointTests(TestWebApplicationFactory factory) => _factory = factory;
+    public LoginEndpointTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 
