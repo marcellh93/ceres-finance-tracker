@@ -33,6 +33,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<ImportStagedTransaction> ImportStagedTransactions => Set<ImportStagedTransaction>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<UserBlockedIp> UserBlockedIps => Set<UserBlockedIp>();
+    public DbSet<UserMfaBackupCode> UserMfaBackupCodes => Set<UserMfaBackupCode>();
+    public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,7 +42,31 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureRelationships(modelBuilder);
         ConfigureUserOwnership(modelBuilder);
         ConfigureSessionEntities(modelBuilder);
+        ConfigureMfaEntities(modelBuilder);
         SeedData(modelBuilder);
+    }
+
+    private static void ConfigureMfaEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserMfaBackupCode>(b =>
+        {
+            b.HasKey(c => c.Id);
+            b.HasIndex(c => c.UserId);
+            // Postgres partial index: only the unused codes (the hot path in verify).
+            b.HasIndex(c => new { c.UserId, c.UsedAt })
+                .HasFilter(@"""UsedAt"" IS NULL")
+                .HasDatabaseName("IX_UserMfaBackupCodes_UserId_Unused");
+            b.Property(c => c.CodeHash).HasMaxLength(512);
+            b.Property(c => c.UsedFromIp).HasMaxLength(45);
+        });
+
+        modelBuilder.Entity<TotpReplayEntry>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => e.UserId);
+            b.HasIndex(e => e.AcceptedAt);
+            b.Property(e => e.CodeHash).HasMaxLength(512);
+        });
     }
 
     private static void ConfigureSessionEntities(ModelBuilder modelBuilder)
