@@ -4,7 +4,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Common.Authentication;
 
-public sealed class FailedLoginRecorder
+public class FailedLoginRecorder
 {
     private readonly IServiceScopeFactory _scopeFactory;
 
@@ -18,7 +18,7 @@ public sealed class FailedLoginRecorder
     // the contaminated context entirely.
     public FailedLoginRecorder(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
 
-    public async Task RecordAsync(
+    public virtual async Task RecordAsync(
         string? emailAttempted,
         Guid? userId,
         FailedLoginReason reason,

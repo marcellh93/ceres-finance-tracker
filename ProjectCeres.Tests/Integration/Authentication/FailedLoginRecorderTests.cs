@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
@@ -276,4 +277,56 @@ public class FailedLoginRecorderTests : IAsyncLifetime
             .FirstOrDefaultAsync();
         row.Should().NotBeNull();
     }
+
+    [Fact]
+    public async Task SaveChangesFailure_BubblesAs500_DoesNotIssueSession()
+    {
+        // Build a one-off factory that overrides FailedLoginRecorder with a throwing stub.
+        // We construct directly (not via the collection fixture) so this test owns
+        // the factory lifecycle and disposes when done.
+        await using var factory = new ThrowingRecorderFactory();
+        await AuthTestFixture.RegisterUserAsync(factory, "boom@recorder-test.local");
+        var client = factory.CreateClient();
+
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+            new { email = "boom@recorder-test.local", password = "wrong-but-long-enough", rememberMe = false });
+
+        resp.StatusCode.Should().Be(System.Net.HttpStatusCode.InternalServerError);
+
+        var setCookies = resp.Headers.TryGetValues("Set-Cookie", out var cookies) ? cookies.ToList() : new List<string>();
+        setCookies.Should().NotContain(c => c.StartsWith("__Host-Session="),
+            "recorder failure must not silently let the attacker through with a session cookie");
+    }
+}
+
+/// <summary>
+/// Sibling factory used only by SaveChangesFailure_BubblesAs500_DoesNotIssueSession.
+/// Overrides FailedLoginRecorder DI registration with a throwing stub via
+/// ConfigureTestServices (which runs after ConfigureServices). Inherits the real
+/// auth pipeline from AuthTestWebApplicationFactory so Identity, cookies, antiforgery,
+/// and the rest of the controller pipeline behave normally — only the recorder throws.
+/// </summary>
+public sealed class ThrowingRecorderFactory : ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory
+{
+    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+        {
+            // Replace the registration with the throwing subclass.
+            var existing = services.Where(d => d.ServiceType == typeof(FailedLoginRecorder)).ToList();
+            foreach (var d in existing) services.Remove(d);
+            services.AddScoped<FailedLoginRecorder, ThrowingFailedLoginRecorder>();
+        });
+    }
+}
+
+internal sealed class ThrowingFailedLoginRecorder : FailedLoginRecorder
+{
+    public ThrowingFailedLoginRecorder(IServiceScopeFactory scopeFactory) : base(scopeFactory) { }
+
+    public override Task RecordAsync(
+        string? emailAttempted, Guid? userId, FailedLoginReason reason,
+        string ipAddress, string userAgent, CancellationToken ct = default)
+        => throw new InvalidOperationException("simulated DB failure for SaveChangesFailure test");
 }
