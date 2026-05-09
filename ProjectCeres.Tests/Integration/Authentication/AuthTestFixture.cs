@@ -78,4 +78,75 @@ public static class AuthTestFixture
         req.Headers.Add(SessionConstants.CsrfHeaderName, header);
         return client.SendAsync(req);
     }
+
+    /// <summary>
+    /// Enrolls a user's TOTP via Identity's built-in flow. Generates an authenticator
+    /// key, computes a current TOTP code, and flips TwoFactorEnabled to true. Returns
+    /// the seed (base32 string) so subsequent test code can compute fresh codes for
+    /// login attempts.
+    /// </summary>
+    public static async Task<string> EnrollUserMfaAsync(
+        AuthTestWebApplicationFactory factory, ApplicationUser user)
+    {
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var freshUser = await userManager.FindByIdAsync(user.Id.ToString())
+            ?? throw new InvalidOperationException("user vanished between Register + Enroll");
+
+        await userManager.ResetAuthenticatorKeyAsync(freshUser);
+        var seed = await userManager.GetAuthenticatorKeyAsync(freshUser)
+            ?? throw new InvalidOperationException("authenticator key not set after generate");
+
+        var code = ComputeCurrentTotpCode(seed);
+        var verified = await userManager.VerifyTwoFactorTokenAsync(
+            freshUser, TokenOptions.DefaultAuthenticatorProvider, code);
+        verified.Should().BeTrue("freshly-generated code must verify");
+
+        await userManager.SetTwoFactorEnabledAsync(freshUser, true);
+        return seed;
+    }
+
+    /// <summary>
+    /// Computes the current 6-digit TOTP code for a base32-encoded seed using the
+    /// standard RFC 6238 algorithm with 30-second period and SHA1. Mirrors what
+    /// Identity does internally; we replicate it here so tests can produce codes
+    /// without standing up an authenticator app.
+    /// </summary>
+    public static string ComputeCurrentTotpCode(string base32Seed)
+    {
+        var key = DecodeBase32(base32Seed);
+        var counter = (long)Math.Floor(DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30.0);
+        var counterBytes = BitConverter.GetBytes(counter);
+        if (BitConverter.IsLittleEndian) Array.Reverse(counterBytes);
+
+        using var hmac = new System.Security.Cryptography.HMACSHA1(key);
+        var hash = hmac.ComputeHash(counterBytes);
+        var offset = hash[^1] & 0x0F;
+        var binary = ((hash[offset] & 0x7F) << 24)
+                   | ((hash[offset + 1] & 0xFF) << 16)
+                   | ((hash[offset + 2] & 0xFF) << 8)
+                   | (hash[offset + 3] & 0xFF);
+        return (binary % 1_000_000).ToString("D6");
+    }
+
+    private static byte[] DecodeBase32(string input)
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        var output = new List<byte>();
+        int buffer = 0, bits = 0;
+        foreach (var c in input.ToUpperInvariant())
+        {
+            if (c == '=') break;
+            var idx = alphabet.IndexOf(c);
+            if (idx < 0) continue;
+            buffer = (buffer << 5) | idx;
+            bits += 5;
+            if (bits >= 8)
+            {
+                bits -= 8;
+                output.Add((byte)((buffer >> bits) & 0xFF));
+            }
+        }
+        return output.ToArray();
+    }
 }
