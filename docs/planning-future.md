@@ -263,6 +263,20 @@ Migration path: introduce `QueryClientProvider` in `src/app/main.tsx`, replace `
 
 ---
 
+### Session-validation per-request DB write — performance review
+
+- **What:** Re-evaluate the `SessionRevocationValidator` cost model. Today it runs `OnValidatePrincipal` on every authenticated request: `SELECT` the `UserSession` row by `SessionId`, validate `RevokedAt`, write back `LastUsedAt = DateTime.UtcNow`, `SaveChangesAsync`. That is one round-trip + one write per authenticated request — independent of whether the request is a 1ms idempotent GET or a heavy mutation.
+- **Why deferred:** at solo-developer scale and Phase 3 private-beta traffic, the cost is irrelevant. The write amplification is real but invisible. The trade-off only flips when (a) a dashboard refresh fans out to a dozen authenticated GETs, (b) the user count grows enough that aggregate write rate dominates Postgres' WAL, or (c) request-latency profiling shows the validator as a top-N consumer.
+- **Mitigations to consider when revisiting (in order of preference):**
+  1. **In-memory cache + periodic flush.** Cache `(SessionId → UserSession)` in `IMemoryCache` keyed by SessionId, evict on `RevokedAt` set or on session end. Flush `LastUsedAt` to DB every 60s instead of per request. Preserves "active sessions" UI granularity. Loses some accuracy if the app crashes between flushes (acceptable — `LastUsedAt` is informational, not security-critical).
+  2. **Drop the per-request `LastUsedAt` write entirely.** Recompute idle expiry from the Identity ticket's `IssuedUtc` claim, not from the DB. Sacrifices the "last seen" granularity in the active-sessions UI. Cheapest in DB load.
+  3. **Hand-rolled SQL.** Replace EF read+write with a single `UPDATE "UserSessions" SET "LastUsedAt" = NOW() WHERE "Id" = @id AND "RevokedAt" IS NULL RETURNING 1` — bypasses EF change-tracking overhead but keeps the per-request round-trip.
+- **What is NOT acceptable as a "fix":** weakening the revocation guarantee. The reason `OnValidatePrincipal` reads from the DB on every request is precisely so a logged-out session is rejected within milliseconds, not eventually. Any optimisation must preserve "logout takes effect on next request."
+- **Triggered by:** Stage 6a design (`docs/superpowers/specs/2026-05-09-stage-6a-identity-foundation-design.md`, §4 SessionRevocationValidator).
+- **Gate:** revisit when production traffic justifies measurement, or when request-latency profiling shows the validator as a top-N consumer. **Not a Phase 3 blocker.**
+
+---
+
 ### Receivables — money owed to the user, with optional interest accrual
 
 **What:** A first-class way to track "someone owes me money" — symmetric to the existing Liability + amortising-interest construct, but mirrored: interest accrues on what's owed *to* the user, the borrower's payments reduce the balance, and the user can review an aging schedule of outstanding receivables. Closes a real gap in the data model where the only workaround today is an Asset account with a "Loan to X" description and manually recorded Income entries — which loses automatic interest accrual and conflates receivables with cash.

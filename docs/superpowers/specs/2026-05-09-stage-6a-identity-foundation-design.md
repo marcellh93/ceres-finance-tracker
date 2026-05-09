@@ -220,12 +220,7 @@ public static async Task ValidateAsync(CookieValidatePrincipalContext ctx)
 
 `LastUsedAt` is updated on every authenticated request. This is one extra DB round-trip per request — acceptable for a personal-finance app at solo-developer scale.
 
-> ⚠ **Performance trade-off flagged for future review.** Every authenticated request hits the DB for a `UserSession` lookup + `LastUsedAt` write. At low traffic this is irrelevant; under load, the write amplification on `UserSession` can dominate the hot path. Mitigations to consider when (and if) it matters:
-> - In-memory cache of `(SessionId → UserSession)` with periodic flush of `LastUsedAt` (e.g. flush every 60s or on logout).
-> - Drop the per-request `LastUsedAt` write entirely and recompute idle expiry from `Identity`'s `IssuedUtc` claim — sacrifices "last seen" granularity in the active-sessions UI.
-> - Replace the EF query with a hand-rolled `SELECT 1 FROM "UserSessions" WHERE "Id" = @id AND "RevokedAt" IS NULL` followed by an unconditional `UPDATE` — bypasses EF change-tracking overhead.
->
-> No mitigation is taken in 6a. Revisit when (a) production traffic justifies measurement or (b) request-latency profiling shows the validator as a top-N consumer. Tracked as future-work; not a Stage 6 blocker.
+> ⚠ **Performance trade-off flagged for future review.** Every authenticated request hits the DB for a `UserSession` lookup + `LastUsedAt` write. At low traffic this is irrelevant; under load, the write amplification on `UserSession` can dominate the hot path. No mitigation is taken in 6a — tracked durably in `docs/planning-future.md` § *Session-validation per-request DB write — performance review*, including three candidate mitigations and the constraint that any optimisation must preserve the "logout takes effect on next request" guarantee.
 
 #### IUserClaimsPrincipalFactory
 
