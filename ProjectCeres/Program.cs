@@ -1,8 +1,13 @@
+using System.Globalization;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
@@ -160,6 +165,43 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, ct) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+        }
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            error = new
+            {
+                code = "RATE_LIMITED",
+                message = "Too many requests. Please retry shortly.",
+            }
+        }, ct);
+    };
+
+    options.AddPolicy(AuthRateLimitPolicies.AuthLoginByIp, httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromSeconds(60),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0,
+        });
+    });
+
+    options.AddPolicy<string, TotpByUserPartitioner>(AuthRateLimitPolicies.AuthTotpByUser);
+});
+
 // === End Stage 6a wiring ===
 
 builder.Services.AddScoped<ISettingsService, SettingsService>();
@@ -210,6 +252,8 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseRateLimiter();
+
 app.UseMiddleware<PersistentCookieRotationMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -234,3 +278,27 @@ app.MapControllerRoute(
 app.Run();
 
 public partial class Program { }
+
+internal sealed class TotpByUserPartitioner : IRateLimiterPolicy<string>
+{
+    public Func<OnRejectedContext, CancellationToken, ValueTask>? OnRejected => null;
+
+    public RateLimitPartition<string> GetPartition(HttpContext httpContext)
+    {
+        // Synchronous partition derivation by blocking on the cookie decode.
+        // Cookie is Identity.TwoFactorUserId — a scoped cookie issued by SignInManager
+        // when RequiresTwoFactor. We resolve it via AuthenticateAsync inline.
+        var task = httpContext.AuthenticateAsync(IdentityConstants.TwoFactorUserIdScheme);
+        task.Wait();
+        var userId = task.Result.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? AuthRateLimitPolicies.AnonymousTotpPartition;
+
+        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromSeconds(60),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0,
+        });
+    }
+}
