@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
@@ -41,6 +42,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("register"), AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
@@ -59,6 +61,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("login"), AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
@@ -237,6 +240,7 @@ public sealed class AuthController : ControllerBase
     /// to be GET.
     /// </summary>
     [HttpGet("csrf"), AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public IActionResult Csrf()
     {
         _antiforgery.GetAndStoreTokens(HttpContext);
