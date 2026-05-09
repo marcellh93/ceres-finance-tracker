@@ -1,6 +1,6 @@
 # ADR 0001: Authentication Deferred to Phase 3
 
-## Status: Accepted
+## Status: Accepted (the inline "MFA via TOTP... is mandatory" clause in § Decision is superseded by [ADR-0069](ADR-0069-mfa-opt-in-for-personal-users.md), which moves MFA to opt-in. The surrounding decision — defer authentication to Phase 3 — remains accepted unchanged.)
 
 ## Context
 During planning, the question arose of whether to build user authentication from the start.

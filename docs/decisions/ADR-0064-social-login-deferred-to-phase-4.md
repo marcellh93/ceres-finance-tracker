@@ -42,7 +42,7 @@ The architecture is left open to social login without building anything behind t
 
 **Rationale:**
 
-The friction-reduction case for social login is real but partially neutralized by mandatory TOTP, which is the slow step in onboarding. The maintenance case against social login is substantial and ongoing, and a solo developer in beta does not have the operational headroom to absorb four parallel provider integrations on top of the rest of Phase 3.
+The friction-reduction case for social login is real. The original ADR also leaned on mandatory TOTP being "the slow step in onboarding" to argue that social login's value was partially neutralized — that supporting argument no longer holds since [ADR-0069](ADR-0069-mfa-opt-in-for-personal-users.md) moved MFA to opt-in. The remaining case for deferral stands on its own: the maintenance case against social login is substantial and ongoing, and a solo developer in beta does not have the operational headroom to absorb four parallel provider integrations on top of the rest of Phase 3.
 
 Deferring lets the decision be made after beta launch with actual user signal — at that point, the right move may be to add one provider (probably Google for the autónomo audience) rather than four. The architectural cost of keeping the door open is essentially zero.
 
@@ -51,7 +51,7 @@ Deferring lets the decision be made after beta launch with actual user signal �
 - Phase 3 auth UI contains only email + password forms; the auth-screen design (`planning-phase3.md` § 10) reflects this.
 - The user model carries a `password_hash` column (Argon2id, ADR-pending parameters m=19456, t=2, p=1). This is not throwaway — email + password is required permanently regardless of whether social login is added later.
 - When Phase 4 adds social login, the work required will be: add `ExternalLogin` table, add OAuth provider configuration (per chosen providers), add account-linking logic for cases where a user signs up via provider with an email already in `users`, update the auth UI. None of these blocked at the Phase 3 architecture level.
-- Beta users tolerate the email + password + TOTP flow; this is a reasonable assumption for invite-only beta but should be re-evaluated before any open registration window.
+- Beta users tolerate the email + password + (opt-in TOTP per ADR-0069) flow; this is a reasonable assumption for invite-only beta but should be re-evaluated before any open registration window.
 
 **Cross-references:**
 

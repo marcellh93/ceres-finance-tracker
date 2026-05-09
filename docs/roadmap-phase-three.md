@@ -469,7 +469,7 @@ TOTP:
 - [ ] Replay-prevention table is **persistent** (database or Redis), not in-memory — survives application restart
 - [ ] Replay records auto-purged after 2 minutes
 - [ ] Backup codes hashed with Argon2id (not plaintext) — single-use, regeneration invalidates all previous codes
-- [ ] TOTP enrolment is mandatory; 24-hour grace period for first login; cannot be skipped
+- [ ] TOTP enrollment is **opt-in** per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md). Users enable from Settings → Security; once enabled, MFA is enforced on every subsequent login. Login does not block on enrollment, no grace period, no enforcement deadline. Onboarding presents MFA as recommended-but-skippable.
 - [ ] Backup-code use during lockout is honoured (lockout protects against password guessing, not TOTP abuse)
 - [ ] No SMS option exposed (SIM-swap vulnerability)
 
