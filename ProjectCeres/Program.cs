@@ -183,11 +183,14 @@ builder.Services.AddRateLimiter(options =>
 
     options.OnRejected = async (context, ct) =>
     {
-        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-        {
-            context.HttpContext.Response.Headers.RetryAfter =
-                ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
-        }
+        // SlidingWindowRateLimiter does not populate RetryAfter metadata on its denied
+        // lease. Fall back to the segment duration (Window / SegmentsPerWindow = 15 s)
+        // so the header is always present, as required by the API contract.
+        var retryAfterSeconds = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+            ? (int)retryAfter.TotalSeconds
+            : 15;
+        context.HttpContext.Response.Headers.RetryAfter =
+            retryAfterSeconds.ToString(CultureInfo.InvariantCulture);
         context.HttpContext.Response.ContentType = "application/json";
         await context.HttpContext.Response.WriteAsJsonAsync(new
         {
