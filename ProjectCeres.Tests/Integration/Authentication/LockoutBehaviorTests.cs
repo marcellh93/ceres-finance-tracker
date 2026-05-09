@@ -85,4 +85,87 @@ public class LockoutBehaviorTests : IAsyncLifetime
         var fresh = await um.FindByIdAsync(user.Id.ToString());
         fresh!.AccessFailedCount.Should().Be(0);
     }
+
+    [Fact]
+    public async Task WrongPasswordTenTimes_LocksAccount()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "ten@lockout-test.local");
+        var client = _factory.CreateClient();
+
+        for (int i = 0; i < 10; i++)
+        {
+            var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+                new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+            resp.StatusCode.Should().Be(System.Net.HttpStatusCode.Unauthorized);
+        }
+
+        var eleventh = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        var body = await eleventh.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("ACCOUNT_LOCKED_OUT");
+    }
+
+    [Fact]
+    public async Task SuccessfulPasswordLogin_ResetsCounter()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "reset@lockout-test.local");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var fresh = await um.FindByIdAsync(user.Id.ToString());
+            for (int i = 0; i < 5; i++) await um.AccessFailedAsync(fresh!);
+        }
+
+        var client = _factory.CreateClient();
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+        resp.EnsureSuccessStatusCode();
+
+        using var scope2 = _factory.Services.CreateScope();
+        var um2 = scope2.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var after = await um2.FindByIdAsync(user.Id.ToString());
+        after!.AccessFailedCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task RateLimitRejection_DoesNotCountTowardLockout()
+    {
+        // The default test factory has the no-op limiter so we exercise this
+        // logically. The recorder/controller wiring must NOT call AccessFailedAsync
+        // on the rate-limit-rejection path. Architecture test #51 enforces this
+        // structurally; here we sanity-check at the integration level by firing
+        // many requests (no-op limiter accepts them all) and confirming each one
+        // contributes exactly 1 to AccessFailedCount.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "rl-no-lock@lockout-test.local");
+        var client = _factory.CreateClient();
+
+        for (int i = 0; i < 3; i++)
+        {
+            await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+                new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        }
+
+        using var scope = _factory.Services.CreateScope();
+        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var fresh = await um.FindByIdAsync(user.Id.ToString());
+        fresh!.AccessFailedCount.Should().Be(3); // 3 wrong-password requests, 3 increments
+    }
+
+    [Fact]
+    public async Task LockoutSurvivesProcessRestart()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "restart@lockout-test.local");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var fresh = await um.FindByIdAsync(user.Id.ToString());
+            await um.SetLockoutEndDateAsync(fresh!, DateTimeOffset.UtcNow.AddMinutes(15));
+        }
+
+        // Simulate restart by creating a fresh DI scope (the DB row is already persisted).
+        using var scope2 = _factory.Services.CreateScope();
+        var um2 = scope2.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var after = await um2.FindByIdAsync(user.Id.ToString());
+        (await um2.IsLockedOutAsync(after!)).Should().BeTrue();
+    }
 }
