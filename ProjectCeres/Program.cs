@@ -143,6 +143,18 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 });
 
+builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(
+    IdentityConstants.TwoFactorUserIdScheme,
+    options =>
+    {
+        // Stage 6b.2: tighten the gap between password step and TOTP step.
+        // Default inherited 30-min sliding TTL is far too long — a phisher who
+        // captures the password could try ~hundreds of TOTP codes within that
+        // window. 5 min with no sliding extension = strict human-timescale gate.
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+        options.SlidingExpiration = false;
+    });
+
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = SessionConstants.CsrfCookieName;
