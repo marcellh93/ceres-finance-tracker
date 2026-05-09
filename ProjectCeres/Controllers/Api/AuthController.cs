@@ -120,6 +120,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("login/totp"), AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthTotpByUser)]
     public async Task<IActionResult> LoginTotp(
         [FromBody] LoginTotpRequest request,
         [FromServices] TotpReplayGuard replayGuard,
