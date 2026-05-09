@@ -218,7 +218,14 @@ public static async Task ValidateAsync(CookieValidatePrincipalContext ctx)
 }
 ```
 
-`LastUsedAt` is updated on every authenticated request. This is one extra DB round-trip per request — acceptable for a personal-finance app at solo-developer scale; revisit if profiling later shows it as a bottleneck (likely candidate: in-memory cache with periodic flush).
+`LastUsedAt` is updated on every authenticated request. This is one extra DB round-trip per request — acceptable for a personal-finance app at solo-developer scale.
+
+> ⚠ **Performance trade-off flagged for future review.** Every authenticated request hits the DB for a `UserSession` lookup + `LastUsedAt` write. At low traffic this is irrelevant; under load, the write amplification on `UserSession` can dominate the hot path. Mitigations to consider when (and if) it matters:
+> - In-memory cache of `(SessionId → UserSession)` with periodic flush of `LastUsedAt` (e.g. flush every 60s or on logout).
+> - Drop the per-request `LastUsedAt` write entirely and recompute idle expiry from `Identity`'s `IssuedUtc` claim — sacrifices "last seen" granularity in the active-sessions UI.
+> - Replace the EF query with a hand-rolled `SELECT 1 FROM "UserSessions" WHERE "Id" = @id AND "RevokedAt" IS NULL` followed by an unconditional `UPDATE` — bypasses EF change-tracking overhead.
+>
+> No mitigation is taken in 6a. Revisit when (a) production traffic justifies measurement or (b) request-latency profiling shows the validator as a top-N consumer. Tracked as future-work; not a Stage 6 blocker.
 
 #### IUserClaimsPrincipalFactory
 
@@ -279,7 +286,15 @@ To preserve the invariant that GETs never mutate state — without which CSRF pr
 [Fact]
 public void HttpGet_actions_must_not_have_write_verb_names()
 {
-    var forbiddenPrefixes = new[] { "Create", "Update", "Delete", "Archive", "Restore", "Reset", "Send", "Approve", "Reject" };
+    var forbiddenPrefixes = new[]
+    {
+        "Create", "Update", "Delete", "Remove",
+        "Archive", "Deactivate", "Disable", "Enable", "Restore",
+        "Reset", "Submit", "Send", "Process",
+        "Approve", "Reject", "Confirm", "Dispute", "Cancel",
+        "Upload", "Set"
+    };
+
     var violations = typeof(Program).Assembly.GetTypes()
         .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
         .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance))
@@ -288,9 +303,13 @@ public void HttpGet_actions_must_not_have_write_verb_names()
         .Select(m => $"{m.DeclaringType!.Name}.{m.Name}")
         .ToList();
 
-    violations.Should().BeEmpty(because: "GET endpoints must be side-effect-free");
+    violations.Should().BeEmpty(because: "GET endpoints must be side-effect-free per RFC 9110");
 }
 ```
+
+The forbidden-prefix list was derived by sampling existing `Controllers/` action names plus the standard CRUD/lifecycle verbs from the .NET MVC convention. It is **English-only** — and that is correct for this codebase, not an omission to fix.
+
+> **Why the architecture test is English-only:** C# method names are language-level identifiers compiled into IL; they are not user-facing strings and are not subject to localization. Microsoft's MVC documentation, every `dotnet new` template, and the entire .NET ecosystem use English PascalCase for action names. This codebase already follows that convention without exception (every controller in `Controllers/` was sampled). Internationalization in REST APIs applies to *content* — `Accept-Language` headers, response payloads, error messages — never to method or class identifiers (per Google Cloud's API design guidance and RFC 9110 § 12 Content Negotiation). The hazard the test prevents is "a developer adds `[HttpGet] Delete(...)` because that's how a legacy app worked." The defence against the (unlikely, hypothetical) "non-English write-verb method name" is the convention itself, not a regex of multilingual verbs.
 
 ### 6. Global authorization fallback policy
 
@@ -399,9 +418,40 @@ Three new endpoints in a new `AuthController`:
 - Validates email format, runs HIBP check, runs all `IPasswordValidator<>`s.
 - Calls `UserManager.CreateAsync(user, password)` — Identity uses the registered `Argon2idPasswordHasher`.
 - Returns `204 No Content` on success. Returns `400` with `{ errors: [...] }` shape on validation failure (matches `api-contract.md` envelope).
-- **Does not auto-sign-in.** User must call `/api/auth/login` after registration. Email verification flow ships in Stage 6c; 6a leaves `EmailConfirmed = false` and the login endpoint will reject unconfirmed users — see acceptance below.
+- **Does not auto-sign-in.** This is the Microsoft-canonical flow when `RequireConfirmedAccount/Email = true` — see "Production registration flow" below for full sequence and rationale.
+
+##### Production registration flow (canonical, applies once Stage 6c ships)
+
+The Microsoft Learn documentation for ASP.NET Core 10 is explicit on this:
+
+> *"To require a confirmed account and prevent immediate login at registration, set `DisplayConfirmAccountLink = false`... When a user registers, if `_userManager.Options.SignIn.RequireConfirmedAccount` is true, the user is redirected to a `RegisterConfirmation` page instead of being automatically logged in."*
+> — [Account confirmation and password recovery in ASP.NET Core](https://learn.microsoft.com/en-us/aspnet/core/security/authentication/accconfirm?view=aspnetcore-10.0)
+
+The full production flow has **four** steps:
+
+1. `POST /api/auth/register` → `UserManager.CreateAsync(user, password)` succeeds. `EmailConfirmed = false`. Server generates a token via `GenerateEmailConfirmationTokenAsync` and sends a confirmation email. Response: `204 No Content`. **No session cookie issued.** *(Token generation + email send ship in Stage 6c.)*
+2. User clicks the link → `GET /api/auth/confirm-email?userId={id}&token={token}` → server calls `UserManager.ConfirmEmailAsync(user, token)`, flips `EmailConfirmed = true`. *(Endpoint ships in Stage 6c.)*
+3. User goes to the login page → `POST /api/auth/login` → `SignInManager.PasswordSignInAsync` succeeds (now that `EmailConfirmed = true`).
+4. The `UserSession` row is inserted on this first successful login, not on register.
+
+##### Why no auto-sign-in?
+
+Auto-sign-in **before** email confirmation defeats the entire point of email confirmation. The confirmation step exists to prove the registrant controls the email address. If registration auto-issues a session, an attacker who registers `victim@example.com` (a typo or deliberate impersonation) gets a working session before the real victim ever sees a confirmation email — even if the session is short-lived, that's a real attack window. With `SignIn.RequireConfirmedEmail = true`, `SignInManager.PasswordSignInAsync` returns `SignInResult.NotAllowed` until `EmailConfirmed = true`, blocking that path.
+
+The "register and you're logged in" pattern that some apps ship is what happens when:
+- The app sets `RequireConfirmedAccount/Email = false` (lower bar, more friction-free onboarding).
+- The app uses passwordless magic-link sign-up, where registration *is* the confirmation step.
+- The app issues a session immediately and *defers* email verification ("verify within 7 days or your account is locked"). This is a deliberate UX trade-off — `security-model.md` explicitly does not take this path.
+
+Project Ceres takes the secure path: confirm-first, then sign-in. The local-dev gap during Stage 6a is a known consequence of merging the two halves of the auth feature in a single stage but shipping them in two — it is closed when 6c ships the email-send + `ConfirmEmail` handler.
 
 **6a transitional rule:** `SignIn.RequireConfirmedEmail = true` is set globally, which means logins fail until email verification ships in 6c. To allow integration tests to exercise the login pipeline in 6a, the test fixture's `RegisterUserAsync(email, password)` helper calls `UserManager.SetEmailConfirmedAsync(user, true)` immediately after creation — bypassing the verification flow per-user, without toggling the global option. **Real local dev cannot log in until 6c.** This is documented in the spec acceptance criteria below; nothing user-facing relies on this gap.
+
+> **Test-fixture shortcut tracked for 6c removal.** `RegisterUserAsync` bypasses the production-canonical email-confirmation flow because in 6a there is no `IEmailSender` and no `ConfirmEmail` handler to drive. When Stage 6c ships those, the fixture must be revisited:
+> - Either: replace `SetEmailConfirmedAsync` with a real test path that drives the registration → token-generation → confirmation handler flow (closer to production, more brittle, more code).
+> - Or: keep `SetEmailConfirmedAsync` as the *fixture* path (registers a confirmed user fast for unrelated tests) **and** add a separate test class that exercises the full register → confirm → login pipeline end-to-end through the actual endpoints.
+>
+> The latter is the recommended path — splits "I need a confirmed user" (most tests) from "the email-confirmation pipeline works" (one focused test class). Tracked as a Stage 6c spec input.
 
 #### `POST /api/auth/login`
 
