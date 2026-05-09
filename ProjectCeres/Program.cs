@@ -303,9 +303,12 @@ internal sealed class TotpByUserPartitioner : IRateLimiterPolicy<string>
         // Synchronous partition derivation by blocking on the cookie decode.
         // Cookie is Identity.TwoFactorUserId — a scoped cookie issued by SignInManager
         // when RequiresTwoFactor. We resolve it via AuthenticateAsync inline.
+        // Identity stores the user-id under ClaimTypes.Name on this scoped principal,
+        // not ClaimTypes.NameIdentifier — the full Identity scheme adds NameIdentifier
+        // separately. So we read Identity.Name (which Identity maps to ClaimTypes.Name).
         var task = httpContext.AuthenticateAsync(IdentityConstants.TwoFactorUserIdScheme);
         task.Wait();
-        var userId = task.Result.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+        var userId = task.Result.Principal?.Identity?.Name
                   ?? AuthRateLimitPolicies.AnonymousTotpPartition;
 
         return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions

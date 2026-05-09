@@ -67,7 +67,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                 {
                     var task = httpContext.AuthenticateAsync(IdentityConstants.TwoFactorUserIdScheme);
                     task.Wait();
-                    var userId = task.Result.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                    var userId = task.Result.Principal?.Identity?.Name
                               ?? AuthRateLimitPolicies.AnonymousTotpPartition;
 
                     return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
