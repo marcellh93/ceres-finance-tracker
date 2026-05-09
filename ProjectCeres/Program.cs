@@ -153,6 +153,15 @@ builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAut
         // window. 5 min with no sliding extension = strict human-timescale gate.
         options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
         options.SlidingExpiration = false;
+        // Force IsPersistent so the browser receives an explicit Expires/max-age
+        // header instead of a session-scoped cookie. Without this, ExpireTimeSpan
+        // is enforced server-side but invisible to the client and to tests.
+        options.Events.OnSigningIn = ctx =>
+        {
+            ctx.Properties.IsPersistent = true;
+            ctx.Properties.ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5);
+            return Task.CompletedTask;
+        };
     });
 
 builder.Services.AddAntiforgery(options =>
