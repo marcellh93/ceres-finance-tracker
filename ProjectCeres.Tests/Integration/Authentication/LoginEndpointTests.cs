@@ -47,7 +47,12 @@ public class LoginEndpointTests : IAsyncLifetime
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var session = await db.UserSessions.FirstOrDefaultAsync();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.FindByEmailAsync("ok@login-test.local");
+        var session = await db.UserSessions
+            .Where(s => s.UserId == user!.Id)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
         session.Should().NotBeNull();
         session!.IsPersistent.Should().BeFalse();
         session.RevokedAt.Should().BeNull();
@@ -102,7 +107,12 @@ public class LoginEndpointTests : IAsyncLifetime
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var session = await db.UserSessions.FirstAsync();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.FindByEmailAsync("remember@login-test.local");
+        var session = await db.UserSessions
+            .Where(s => s.UserId == user!.Id)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstAsync();
         session.IsPersistent.Should().BeTrue();
         session.PersistentTokenHash.Should().StartWith("$argon2id$v=19$");
     }
