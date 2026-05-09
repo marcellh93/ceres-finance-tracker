@@ -1,7 +1,7 @@
 ---
 name: sync-docs
 description: >
-  Sync project documentation after a coding session by reviewing git diffs and updating the correct doc files. Covers planning.md, models.md, architecture.md, security-model.md, api-contract.md, multi-tenancy-strategy.md, testing.md, docs/guide/, and ADRs in docs/decisions/. Use this skill at the end of any session where code was written or a design decision was made. Also trigger when the user says "sync docs", "update the docs", "document what we did", or "write up what changed".
+  Sync project documentation after a coding session by reviewing git diffs and updating the correct doc files. Covers all project docs under `docs/` and ADRs under `docs/decisions/` per the routing table in `references/doc-agent-instructions.md` (the source of truth for what goes where — including the supersession-sweep rule when a change overturns a prior decision). Use this skill at the end of any session where code was written or a design decision was made. Also trigger when the user says "sync docs", "update the docs", "document what we did", or "write up what changed".
 ---
 
 # sync-docs
@@ -34,7 +34,9 @@ If that also returns nothing (e.g. there's only one commit, or git isn't initial
 ## Step 3 — Decide what to update
 
 Apply the routing table from `doc-agent-instructions.md` to each changed file.
-Ask: does this change affect schema, behavior, architecture, security, API shape,testing strategy, or a significant decision?
+Ask: does this change affect schema, behavior, architecture, security, API shape, testing strategy, or a significant decision?
+
+**Supersession check:** before updating any single doc, ask whether the change *overturns* a previously documented decision (a prior ADR, a Resolved entry, a Batch table row). If yes, the routing rule is not "update one doc" but "sweep the whole `docs/` tree for references to the original decision and update every match in the same commit." See `doc-agent-instructions.md` § *When superseding a previous decision* for the procedure.
 
 Do **not** update documentation for:
 
