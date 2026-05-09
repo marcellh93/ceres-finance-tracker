@@ -464,14 +464,14 @@ Password handling:
 
 TOTP:
 
-- [ ] TOTP seed generated with cryptographically secure RNG
-- [ ] TOTP seed stored encrypted at rest via ASP.NET Core Data Protection (`IDataProtector`)
-- [ ] Replay-prevention table is **persistent** (database or Redis), not in-memory — survives application restart
-- [ ] Replay records auto-purged after 2 minutes
-- [ ] Backup codes hashed with Argon2id (not plaintext) — single-use, regeneration invalidates all previous codes
-- [ ] TOTP enrollment is **opt-in** per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md). Users enable from Settings → Security; once enabled, MFA is enforced on every subsequent login. Login does not block on enrollment, no grace period, no enforcement deadline. Onboarding presents MFA as recommended-but-skippable.
-- [ ] Backup-code use during lockout is honoured (lockout protects against password guessing, not TOTP abuse)
-- [ ] No SMS option exposed (SIM-swap vulnerability)
+- [x] TOTP seed generated with cryptographically secure RNG
+- [ ] TOTP seed stored encrypted at rest via ASP.NET Core Data Protection (`IDataProtector`) — wiring correct in 6b.1; production key-storage hardening deferred to Stage 16 (Hosting + ops)
+- [x] Replay-prevention table is **persistent** (database or Redis), not in-memory — survives application restart
+- [x] Replay records auto-purged after 2 minutes
+- [x] Backup codes hashed with Argon2id (not plaintext) — single-use, regeneration invalidates all previous codes
+- [x] TOTP enrollment is **opt-in** per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md). Users enable from Settings → Security; once enabled, MFA is enforced on every subsequent login. Login does not block on enrollment, no grace period, no enforcement deadline. Onboarding presents MFA as recommended-but-skippable.
+- [ ] Backup-code use during lockout is honoured (lockout protects against password guessing, not TOTP abuse) — depends on lockout, ships in 6b.2
+- [x] No SMS option exposed (SIM-swap vulnerability)
 
 CSRF:
 
