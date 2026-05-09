@@ -1,5 +1,8 @@
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Common.Authentication;
+using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Integration;
 
@@ -16,6 +19,15 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:DefaultConnection", TestConnectionString);
+
+        builder.ConfigureServices(services =>
+        {
+            // Replace the HttpClient-backed HIBP checker with the deterministic stub
+            // so password-validation tests do not hit api.pwnedpasswords.com.
+            var existing = services.Where(d => d.ServiceType == typeof(IBreachedPasswordChecker)).ToList();
+            foreach (var d in existing) services.Remove(d);
+            services.AddSingleton<IBreachedPasswordChecker, HibpStubBreachedPasswordChecker>();
+        });
     }
 }
 
