@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
@@ -35,22 +36,35 @@ public static class AuthTestFixture
     }
 
     /// <summary>
-    /// Mints a fresh antiforgery token pair from the running factory and returns
-    /// (cookieValue, headerValue). The test then forwards the cookie + the X-XSRF-TOKEN
-    /// header on the POST/PUT/PATCH/DELETE request — same shape the React client uses.
+    /// Mints an antiforgery token pair from the running factory. If userId is non-null,
+    /// the synthetic HttpContext used for minting carries that user's NameIdentifier
+    /// claim, so the resulting token validates against authenticated requests for that
+    /// user. If userId is null, the pair is anonymous-bound.
     /// </summary>
-    public static (string CookieValue, string HeaderValue) MintCsrf(TestWebApplicationFactory factory)
+    public static (string CookieValue, string HeaderValue) MintCsrf(
+        TestWebApplicationFactory factory, Guid? userId = null)
     {
         using var scope = factory.Services.CreateScope();
         var antiforgery = scope.ServiceProvider.GetRequiredService<IAntiforgery>();
-        var ctx = new DefaultHttpContext();
+        var ctx = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        if (userId is { } id)
+        {
+            var identity = new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, id.ToString()),
+                    new Claim(ClaimTypes.Name, id.ToString()),
+                },
+                authenticationType: "Test");
+            ctx.User = new ClaimsPrincipal(identity);
+        }
         var tokens = antiforgery.GetAndStoreTokens(ctx);
         return (tokens.CookieToken!, tokens.RequestToken!);
     }
 
     /// <summary>
-    /// POSTs JSON with a valid CSRF token attached. Mirrors what the React client does:
-    /// read the __Host-XSRF cookie value and forward it as X-XSRF-TOKEN.
+    /// POSTs JSON with a valid anonymous CSRF token attached. For the first POST
+    /// in a test where the user is not yet authenticated (login, register).
     /// </summary>
     public static Task<HttpResponseMessage> PostJsonWithCsrfAsync<T>(
         TestWebApplicationFactory factory, HttpClient client, string url, T body)

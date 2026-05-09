@@ -1,8 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -120,6 +123,50 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// GET endpoint that refreshes the __Host-XSRF cookie. State-changing endpoints
+    /// require a CSRF cookie + matching X-XSRF-TOKEN header; this endpoint is the
+    /// idiomatic way for the SPA (and integration tests) to ensure both are present
+    /// and bound to the current authentication context. Side-effect-free, allowed
+    /// to be GET.
+    /// </summary>
+    [HttpGet("csrf"), AllowAnonymous]
+    public IActionResult Csrf()
+    {
+        _antiforgery.GetAndStoreTokens(HttpContext);
+        return NoContent();
+    }
+
     [HttpPost("logout"), Authorize]
-    public Task<IActionResult> Logout() => throw new NotImplementedException();
+    public async Task<IActionResult> Logout()
+    {
+        if (Guid.TryParse(User.FindFirstValue(SessionConstants.SessionIdClaim), out var sid))
+        {
+            var session = await _db.UserSessions.FirstOrDefaultAsync(s => s.Id == sid);
+            if (session is not null && session.RevokedAt is null)
+            {
+                session.RevokedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        if (Request.Cookies.TryGetValue(SessionConstants.PersistentCookieName, out var rawToken)
+            && !string.IsNullOrWhiteSpace(rawToken))
+        {
+            var candidates = await _db.UserSessions
+                .Where(s => s.IsPersistent && s.RevokedAt == null && s.PersistentTokenHash != null)
+                .ToListAsync();
+            var match = candidates.FirstOrDefault(c => _tokens.Verify(rawToken, c.PersistentTokenHash!));
+            if (match is not null)
+            {
+                match.RevokedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+            Response.Cookies.Delete(SessionConstants.PersistentCookieName);
+        }
+
+        await _signInManager.SignOutAsync();
+        _antiforgery.GetAndStoreTokens(HttpContext);
+        return NoContent();
+    }
 }
