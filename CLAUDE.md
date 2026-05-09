@@ -109,3 +109,7 @@ After finishing a stage implementation, regardless of phase:
 3. Find the completed stage's section in that roadmap and its verification checklist items
 4. Mark any items now covered by automated tests as `[x]`; leave manual browser-only items as `[ ]`
 5. Flag explicitly any checklist items the implementation did not address
+
+## Before Writing a New Spec
+
+Any new file under `docs/superpowers/specs/*.md` is gated by a `PreToolUse` hook (`.claude/hooks/require-verify-against-codebase-before-spec.js`) that **denies the Write tool call** unless the `verify-against-codebase` skill has been invoked earlier in the session. The hook exists because Stage 6b.1's first spec draft proposed a homegrown `MfaTicketService` + "issue then undo" pattern that duplicated framework features — the skill catches that class of error. Bypass: invoke `verify-against-codebase` before retrying the Write, or rewrite an existing spec (the hook allows path-already-exists writes).

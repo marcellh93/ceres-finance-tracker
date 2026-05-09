@@ -42,7 +42,7 @@ Every entity that represents a user's own data must have a direct `UserId` FK. R
 | `Currency`, `AccountType`, `CategoryType`, `ReportType` | System lookup tables — not user data |
 | `Category` (IsSystem = true rows) | Seeded by the system, shared across all users |
 | `TransactionAttachment` | Scoped through its parent Transaction (which has UserId) |
-| `UserSession`, `UserBlockedIp` | Already scoped to a user via their own FK structure |
+| `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry` | Already scoped to a user via their own FK structure |
 
 ---
 
@@ -143,7 +143,7 @@ Service code continues to write `.Where(t => t.UserId == _currentUser.UserId)` e
 
 The global filter expression resolves `_currentUser.UserId` via `ICurrentUserAccessor`, which reads from HTTP context first, then from the background scope set by `IUserScope.EnterAs` (see ADR-0067), then throws if neither is available. Raw SQL queries against user-owned tables are not subject to the filter — either avoid raw SQL on user-owned tables or always include an explicit `WHERE UserId` clause. PostgreSQL Row-Level Security in Phase 3 (Stage 7.5, ADR-0068) catches this category at the database level as the final defence-in-depth layer.
 
-Filters are applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `Settings`, `SupportTicket`, `AuditLog`, and any future user-owned entities. System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) receive no filter.
+Filters are applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `Settings`, `SupportTicket`, `AuditLog`, and any future user-owned entities. System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) receive no filter.
 
 ---
 

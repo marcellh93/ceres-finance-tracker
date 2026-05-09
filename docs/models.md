@@ -33,7 +33,7 @@
 9. [Phase 2 — Schema Additions](#phase-2--schema-additions)
    - [ImportStagedTransfer](#importstagedtransfer-new-entity--phase-2-stage-35)
    - [ImportTransferExclusion](#importtransferexclusion-new-entity--phase-2-stage-35)
-10. [Phase 3 — Entities To Be Defined](#phase-3--entities-to-be-defined)
+10. [Phase 3 — Auth + MFA Entities](#phase-3--auth--mfa-entities)
     - [SavedSearch](#savedsearch-phase-3)
     - [SupportTicket](#supportticket-phase-3)
     - [UserSession](#usersession-phase-3)
@@ -959,48 +959,103 @@ definition based on whether the user actively uses investment accounts.
 
 ---
 
-## Phase 3 — Entities To Be Defined
+## Phase 3 — Auth + MFA Entities
 
-### UserSession (Phase 3)
+### ApplicationUser (Phase 3, Stage 6a)
 
-Tracks active authenticated sessions server-side. Enables multi-device support, user-visible session management, per-session revocation, and per-session IP enforcement. One row per active session per device.
+ASP.NET Core Identity user. Inherits `IdentityUser<Guid>` — the standard Identity columns (`Email`, `NormalizedEmail`, `EmailConfirmed`, `PasswordHash`, `SecurityStamp`, `ConcurrencyStamp`, `PhoneNumber`, `PhoneNumberConfirmed`, `TwoFactorEnabled`, `LockoutEnd`, `LockoutEnabled`, `AccessFailedCount`) live on `AspNetUsers`. The Project-Ceres-specific column is below.
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| Id | uuid | PK | UUID — not int, prevents sequential ID enumeration |
-| UserId | int | FK, NOT NULL | → User (Phase 3 auth entity) |
-| TokenHash | varchar | NOT NULL | Hash of the session token — raw token is never stored |
-| DeviceName | varchar | nullable | User-provided label shown on the Security settings page (e.g. "MacBook Pro") |
-| IpAddress | varchar | NOT NULL | IP at session creation — stored for display and IP enforcement checks |
-| CreatedAt | datetime | NOT NULL | When the session was created |
-| LastActivityAt | datetime | NOT NULL | Updated on each authenticated request |
-| ExpiresAt | datetime | NOT NULL | Short sessions: idle or browser-close expiry. Persistent ("remember me"): e.g. 30 days rolling |
-| IsRevoked | bit | NOT NULL | True = session terminated (logout, user-revoked, IP blocked, or admin action) |
-| IsPersistent | bit | NOT NULL | True = "remember me" session with long-lived rotating token |
+| CreatedAt | timestamp with time zone | NOT NULL DEFAULT current_timestamp | Phase 3, Stage 6b.1. Audit-only — when the account was created. No behavioural role in the login flow per ADR-0069 (MFA opt-in, no grace cliff). Useful for analytics and the eventual user-list admin surface. |
 
-**IP enforcement is per session:** when the user has IP enforcement enabled, each incoming request is validated against the `IpAddress` of its own session row — not against a single account-wide IP. This means multiple devices with different IPs are fully compatible with IP enforcement on, since each device has its own session anchored to its own creation IP. See planning.md Phase 3 for the full behavioral specification.
+**Password storage:** `PasswordHash` is an Argon2id PHC string (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`) per `Argon2idPasswordHasher` registered as the default `IPasswordHasher<ApplicationUser>`. See `security-model.md` § Passwords.
 
-**Token rotation:** on each request using a persistent session token, issue a new token and invalidate the old one, storing only the hash of the new token. This limits replay exposure if a token is intercepted.
+**TwoFactorEnabled:** flipped to `true` only after the user successfully verifies their first TOTP code against a candidate authenticator key (Identity's two-step `GenerateNewAuthenticatorKey` → `VerifyTwoFactorTokenAsync` → `SetTwoFactorEnabledAsync(true)` flow). MFA is opt-in per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md).
+
+**TOTP seed storage:** Identity stores the authenticator seed in `AspNetUserTokens` (one row per user keyed under `[AspNetUserStore].AuthenticatorKey`), encrypted at rest via ASP.NET Core Data Protection. Production key-storage hardening (KMS / encrypted external volume) is a Stage 16 (Hosting + ops) launch gate.
 
 ---
 
-### UserBlockedIp (Phase 3)
+### UserSession (Phase 3, Stage 6a)
 
-Records IP addresses explicitly blocked by a user. Any request from a blocked IP is rejected and all active sessions from that IP are revoked immediately. Users manage this list from the Security settings page, informed by the login/logout audit log.
+Tracks active authenticated sessions server-side. Enables multi-device support, user-visible session management, per-session revocation, IP enforcement, and the `__Host-Persist` "remember me" rotation flow. One row per active session per device. Inserted on successful login (or successful TOTP step in the MFA flow); marked `RevokedAt = now` on logout, IP block, or persistent-token rotation.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | The "sid" claim value embedded in the auth ticket. UUID prevents sequential ID enumeration. |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7 (sentinel-to-real-user remap, ADR-0066). |
+| PersistentTokenHash | varchar(512) | nullable | Argon2id-hashed `__Host-Persist` token (256-bit base64url-encoded raw value). Null for non-persistent sessions. Rotated on each use of the persistent cookie. |
+| IpCreatedAt | varchar(45) | NOT NULL | IP at session creation. Used for IP enforcement (per-session, not per-user) and for matching against `UserBlockedIp` entries. IPv6-sized. |
+| UserAgent | varchar(512) | NOT NULL | UA header at session creation. Displayed in active-sessions UI. 90-day retention cap per `security-model.md` § Sensitive Fields at Rest — purge job is a Stage 7 deliverable via `IUserJobRunner`. |
+| CreatedAt | timestamp | NOT NULL | When the session was created. |
+| LastUsedAt | timestamp | NOT NULL | Updated on each authenticated request via `SessionRevocationValidator.OnValidatePrincipal`. Future-work flag tracked in `planning-future.md` § *Session-validation per-request DB write*. |
+| RevokedAt | timestamp | nullable | Stamped when the session is terminated. Non-null = session no longer accepted (the next request with this cookie returns 401). |
+| IsPersistent | bool | NOT NULL | True = "remember me" session paired with a `__Host-Persist` cookie + `PersistentTokenHash` row. |
+
+**Indexes:** `(UserId, RevokedAt)` for the revocation lookup; `(LastUsedAt)` for the eventual purge job.
+
+**IP enforcement is per session:** when the user has IP enforcement enabled (the toggle UI ships in 6c), each incoming request is validated against the `IpCreatedAt` of its own session row — not against a single account-wide IP. Multiple devices with different IPs are fully compatible with enforcement on, because each device has its own session anchored to its own creation IP.
+
+**Persistent token rotation:** on each request that arrives with a `__Host-Persist` cookie but no valid `__Host-Session` cookie, `PersistentCookieRotationMiddleware` (runs before `UseAuthentication`) verifies the raw token against `PersistentTokenHash`, rotates the token (issue new + replace the hash), inserts a fresh `UserSession` row, and signs the user back in via the regular Identity scheme. Old `__Host-Persist` cookie value replayed after rotation returns 401.
+
+---
+
+### UserBlockedIp (Phase 3, Stage 6a)
+
+Records IP addresses explicitly blocked by a user. Any authenticated request from a blocked IP is rejected with 403 and all active `UserSession` rows from that IP for that user are revoked immediately. Users manage this list from the Security settings page (UI ships in Stage 6c onwards), informed by the login/logout audit log.
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | uuid | PK | |
-| UserId | uuid | FK, NOT NULL | → User |
-| IpAddress | varchar | NOT NULL | The blocked IP address |
-| BlockedAt | datetime | NOT NULL | When the user added this block |
-| Note | varchar | nullable | User-provided reason (e.g. "suspicious login from unknown location") |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7. |
+| IpAddress | varchar(45) | NOT NULL | The blocked IP address. IPv6-sized. |
+| BlockedAt | timestamp | NOT NULL | When the user added this block. |
+| Reason | varchar(256) | nullable | User-provided reason (e.g. "suspicious login from unknown location"). |
 
-**Uniqueness constraint:** one active block per (UserId, IpAddress) combination.
+**Uniqueness constraint:** unique on `(UserId, IpAddress)`.
 
-**Effect on existing sessions:** when a block is created, all `UserSession` rows for that user where `IpAddress` matches must be set to `IsRevoked = true` immediately.
+**Effect on existing sessions:** `UserBlockedIpMiddleware` (runs after authentication) checks every authenticated request against `UserBlockedIps` for the current user. On match, all `UserSession` rows for that user where `IpCreatedAt = blocked_ip` are stamped `RevokedAt = now`, and the request returns 403.
 
 **Relationship to IP enforcement toggle:** IP blocking is always active regardless of whether the user has IP enforcement enabled. Blocking is a manual, explicit action; enforcement is an automatic per-request check. They are independent.
+
+---
+
+### UserMfaBackupCode (Phase 3, Stage 6b.1)
+
+One row per MFA backup code. Generated in batches of 10 at first MFA enrollment + on explicit regenerate. Single-use: `UsedAt` is stamped on first successful verify. Regeneration deletes all rows for the user and inserts 10 new ones. See [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md) for MFA opt-in policy.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7. |
+| CodeHash | varchar(512) | NOT NULL | Argon2id PHC string of the raw 16-char Crockford base-32 code (un-formatted, hyphens stripped before hashing). Same hasher pinned to `m=19456 t=2 p=1` as passwords + persistent-cookie tokens. |
+| CreatedAt | timestamp | NOT NULL | When the code was generated. |
+| UsedAt | timestamp | nullable | Stamped on first successful verify. Single-use. |
+| UsedFromIp | varchar(45) | nullable | IP from which the code was redeemed. For audit trail. |
+
+**Indexes:** `(UserId)` plus a Postgres partial index on `(UserId, UsedAt)` filtered to `WHERE "UsedAt" IS NULL` (named `IX_UserMfaBackupCodes_UserId_Unused`) — speeds up the unused-codes lookup, which is the hot path during verify.
+
+**Code format:** raw codes are 16 characters from the Crockford base-32 alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I/L/O/U) → ~80 bits of entropy. Displayed as `XXXX-XXXX-XXXX-XXXX` to the user; hyphens are stripped server-side before hashing, so verify accepts both hyphenated and unhyphenated inputs.
+
+**Format validation regex:** `^[0-9A-HJKMNP-TV-Z]{16}$` (case-insensitive, after stripping `-` and ` `). Per `security-model.md` § TOTP Backup Codes.
+
+---
+
+### TotpReplayEntry (Phase 3, Stage 6b.1)
+
+One row per TOTP code accepted within the 2-minute replay window. Per `security-model.md` § Login → TOTP replay prevention: a 6-digit code is cryptographically valid for ~30 seconds plus Identity's tolerance window, so the same code might verify twice if it isn't tracked. Argon2id-hashed (per-row salt). Opportunistic purge runs on every `TryAcceptAsync` call — no scheduled job needed at single-user-beta scale.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7. Replay scoping is per-user; different users with the same numeric code don't collide. |
+| CodeHash | varchar(512) | NOT NULL | Argon2id PHC string of the 6-digit numeric code. **Argon2id, not SHA-256**: the 1M-value TOTP code space is rainbow-tableable from a database dump if hashed with an unsalted fast hash. Per-row Argon2id salt closes that gap. The ~50ms cost is below the human latency-perception threshold. See `2026-05-09-stage-6b-1-totp-mfa-design.md` § Sub-decision 1 for the full reasoning. |
+| AcceptedAt | timestamp | NOT NULL | When the code was first accepted. Window is `now - 2 minutes`. |
+
+**Indexes:** `(UserId)` for the per-user replay scan; `(AcceptedAt)` for the purge query.
+
+**Lifecycle:** `TotpReplayGuard.TryAcceptAsync` (a) verifies the new code does not match any existing row in the 2-min window for this user, (b) inserts the new row + executes a single `DELETE FROM "TotpReplayEntries" WHERE "AcceptedAt" < now - 2min` against the table-wide rows (cheap, idempotent, runs on every accept call). This pattern replaces a scheduled background job.
 
 ### CustomerArchive (Phase 3)
 

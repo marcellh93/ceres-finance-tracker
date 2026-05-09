@@ -426,4 +426,34 @@ Returned by `POST /api/category-budgets` and `PATCH /api/category-budgets/{id}/r
 | SupportTickets | POST (submit), GET list, GET by ID | User-facing; admin management surface is separate |
 | Sessions | List active sessions, revoke session | Security settings |
 | BlockedIps | List, add, remove | Security settings |
-| Auth | Register, login (`POST /auth/login`), logout, TOTP verify (`POST /auth/totp`), MFA setup, MFA enroll verify, backup codes generate, password change, password reset request, password reset confirm | Cookie-based; sets HttpOnly session cookie on successful login |
+| Auth | See § *Auth endpoints* below | Cookie-based; sets `__Host-Session` HttpOnly cookie on successful login (or after second-step TOTP for MFA users). MFA is opt-in per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md). |
+
+#### Auth endpoints
+
+Stage 6a (shipped 2026-05-09) introduced register/login/logout. Stage 6b.1 (shipped 2026-05-09) added the TOTP MFA flow. Endpoints below are mounted at the route base shown — Stage 6a uses `/api/auth` directly; the `/api/v1/` prefix kicks in alongside Stage 11's URL cleanup.
+
+| Endpoint | Method | Auth | Body | Response |
+|---|---|---|---|---|
+| `/api/auth/register` | POST | Anonymous, CSRF-validated | `{ email, password }` | `204 No Content` on success. `400` with `{ errors: [...] }` envelope on validation failure (HIBP breach screening, length policy, duplicate email). Does not auto-sign-in — production flow is register → email-confirm (Stage 6c) → login. |
+| `/api/auth/login` | POST | Anonymous, CSRF-validated | `{ email, password, rememberMe }` | `204` + `__Host-Session` cookie if MFA off. `200 { requiresTotp: true }` + scoped `Identity.TwoFactorUserId` cookie if MFA on (no session cookie issued — second-step required). `401` on bad credentials, locked-out, unconfirmed-email. Always runs Argon2id (dummy hash on user-not-found) for constant-time enumeration prevention. |
+| `/api/auth/login/totp` | POST | Anonymous (relies on `Identity.TwoFactorUserId` scoped cookie set by `/login`), CSRF-validated | `{ code }` — 6-digit TOTP **or** 16-char Crockford backup code (with or without `-` separators) | `204` + `__Host-Session` cookie on success. Replayed code → `401 { error: "replay" }`. Wrong code → `401`. Missing/expired scoped cookie → `401`. |
+| `/api/auth/logout` | POST | Authenticated, CSRF-validated | (empty) | `204`. Stamps `UserSession.RevokedAt`, revokes paired `__Host-Persist` row if present, signs out via Identity, rotates CSRF cookie. |
+| `/api/auth/csrf` | GET | Anonymous (safe method, no antiforgery validation needed) | — | `204` + fresh `__Host-XSRF` cookie. SPA + integration-test helper for binding the CSRF token to the current authentication context (anonymous before login; authenticated after). |
+| `/api/auth/mfa/enroll` | POST | Authenticated, CSRF-validated | (empty) | `200 { otpAuthUri, manualEntryKey }`. `Cache-Control: no-store, no-cache`. Generates a fresh authenticator key (overwriting any prior unverified candidate). |
+| `/api/auth/mfa/enroll/verify` | POST | Authenticated, CSRF-validated | `{ code }` — 6-digit TOTP | `200 { backupCodes: [...10 strings] }` on success — flips `TwoFactorEnabled = true` and returns the freshly-generated batch of 10 backup codes once. `400 { error: "code_did_not_verify" }` on wrong code. `Cache-Control: no-store, no-cache`. |
+| `/api/auth/mfa/backup-codes/regenerate` | POST | Authenticated (reauth gate added in 6c), CSRF-validated | (empty) | `200 { backupCodes: [...10 strings] }` — invalidates all existing codes and returns a new batch once. `400 { error: "mfa_not_enabled" }` if user hasn't enrolled. `Cache-Control: no-store, no-cache`. |
+
+**Cookies in play:**
+- `__Host-Session` — short-lived Identity session cookie (sliding 30-min). HttpOnly, Secure (Production; SameAsRequest in dev/test), SameSite=Lax, Path=/.
+- `__Host-Persist` — 30-day rotated remember-me token. HttpOnly, Secure, SameSite=Lax, Path=/. Issued only when `rememberMe=true`. Hashed in `UserSession.PersistentTokenHash`.
+- `__Host-XSRF` — antiforgery double-submit cookie. JS-readable (not HttpOnly), Secure, SameSite=Lax, Path=/.
+- `Identity.TwoFactorUserId` — framework-managed scoped auth cookie, set by `PasswordSignInAsync` when `RequiresTwoFactor=true`. Not a session — only valid for `/api/auth/login/totp`. Cleared on successful TOTP verify. (Other authenticated endpoints reject this cookie.)
+- `Mfa.RememberMe` — transient cookie (`Path=/api/auth/login`, 10-min TTL) carrying the `rememberMe` preference between the credentials step and the TOTP step. HttpOnly, Secure (per-environment), SameSite=Lax. Cleared after the second-step succeeds.
+
+**Out of scope for 6a/6b.1 (deferred to 6b.2 + 6c):**
+- Lockout self-service unlock signed-token endpoint (6b.2).
+- Rate limiting on `/login`, `/login/totp`, `/register`, `/mfa/*` (6b.2).
+- Password reset request + confirm endpoints (6c).
+- Email verification + email-change endpoints (6c).
+- MFA disable endpoint (6c).
+- Reauth gate on `/mfa/enroll/verify` re-enrollment + `/mfa/backup-codes/regenerate` (6c).

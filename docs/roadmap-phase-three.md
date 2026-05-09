@@ -605,7 +605,7 @@ Tests required before Stage 7 begins:
 
 EF global query filters:
 
-- [ ] Filters applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `TransferAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile` (+ any other user-owned entity at cutover time)
+- [ ] Filters applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `TransferAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile` (+ any other user-owned entity at cutover time)
 - [ ] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) carry NO filter
 - [ ] Service code continues to write explicit `.Where(t => t.UserId == _currentUser.UserId)` (belt-and-suspenders)
 - [ ] Test: a query against a user-owned table without `IgnoreQueryFilters()`, run as User A, returns zero User B rows even when the explicit `.Where()` is intentionally omitted
@@ -726,7 +726,7 @@ Postgres roles + connection strings:
 
 RLS policies on every user-owned table:
 
-- [ ] `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile`, `ImportStagedTransaction`, `ImportStagedTransfer`, `ImportTransferExclusion` all have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`
+- [ ] `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile`, `ImportStagedTransaction`, `ImportStagedTransfer`, `ImportTransferExclusion` all have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`
 - [ ] Each user-owned table has a `user_isolation` policy with both `USING ("UserId" = current_setting('app.current_user_ref')::uuid)` and `WITH CHECK (...)` clauses
 - [ ] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) have **no** RLS — verified by SQL query against `pg_policies`
 - [ ] Admin tables that are intentionally cross-tenant (e.g. failed-login log if scoped this way) are documented and intentionally excluded

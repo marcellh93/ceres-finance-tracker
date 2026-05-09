@@ -91,11 +91,13 @@ In Phase 1–3 the application has no third-party banking integrations, so it is
 
 - The TOTP seed (generated during MFA setup and encoded in the QR code) must be stored **encrypted at rest** in the database.
 - A plaintext seed in a database dump allows offline generation of valid TOTP codes, bypassing MFA entirely.
-- ASP.NET Core Identity stores TOTP secrets via `IUserTwoFactorTokenProvider` — verify that ASP.NET Core Data Protection encryption is applied before Phase 3 launch.
-- **Data Protection key storage:** Data Protection keys encrypt TOTP secrets. By default they are written to the local filesystem — if the server is compromised, the attacker gets both the ciphertext and the decryption keys. Before Phase 3 launch, configure a Data Protection key storage backend external to the application server (Azure Key Vault, AWS KMS, or an encrypted volume with access controls independent of the app). Never leave Data Protection keys co-located with the data they protect.
-- **TOTP seed exposure at enrollment:** the QR code response contains the raw `otpauth://` URI. This response must include `Cache-Control: no-store, no-cache` headers. The seed must never be logged (application logs, request logs, or error tracking). After the user completes enrollment verification, the seed must not be retrievable via any endpoint.
-- **TOTP enrollment verification:** MFA must only be marked active (`MfaEnabled = true`) after the user successfully enters their first valid TOTP code against the new seed. A two-step flow is required: (1) display QR code, (2) require a valid code to confirm enrollment. Until step 2 succeeds, `MfaEnabled` remains false. This prevents a user from being locked out due to a misconfigured authenticator app.
-- **TOTP re-enrollment:** when a user re-enrolls TOTP (e.g., new phone), the old TOTP secret must be invalidated before the new one is marked active. The user must reauthenticate (enter current password) before starting re-enrollment.
+- **Implementation (Stage 6b.1, shipped 2026-05-09):** ASP.NET Core Identity stores TOTP secrets in `AspNetUserTokens` (one row per user keyed under `[AspNetUserStore].AuthenticatorKey`), encrypted via ASP.NET Core Data Protection. We use the framework's built-in `UserManager.GenerateNewAuthenticatorKey` / `GetAuthenticatorKeyAsync` / `VerifyTwoFactorTokenAsync` flow — see `2026-05-09-stage-6b-1-totp-mfa-design.md` § 4 for why we did not roll our own.
+- **Data Protection key storage:** Data Protection keys encrypt TOTP secrets. By default they are written to the local filesystem — if the server is compromised, the attacker gets both the ciphertext and the decryption keys. **Stage 6b.1 ships with the filesystem default** (acceptable for local dev + integration tests). Before Phase 3 launch, configure a Data Protection key storage backend external to the application server (Azure Key Vault, AWS KMS, or an encrypted volume with access controls independent of the app) — this is a **Stage 16 (Hosting + ops) launch gate**. Never leave Data Protection keys co-located with the data they protect once a real production deployment exists.
+- **TOTP seed exposure at enrollment:** the QR code response contains the raw `otpauth://` URI. This response must include `Cache-Control: no-store, no-cache` headers. The seed must never be logged (application logs, request logs, or error tracking). After the user completes enrollment verification, the seed must not be retrievable via any endpoint. Stage 6b.1's `MfaController` sets these headers on `/enroll`, `/enroll/verify`, and `/backup-codes/regenerate`.
+- **TOTP enrollment verification:** MFA is only marked active (`TwoFactorEnabled = true` on `AspNetUsers`) after the user successfully enters their first valid TOTP code against the new seed. A two-step flow is required: (1) `POST /api/auth/mfa/enroll` (display QR code), (2) `POST /api/auth/mfa/enroll/verify` (require a valid code to confirm enrollment). Until step 2 succeeds, `TwoFactorEnabled` remains false. This prevents a user from being locked out due to a misconfigured authenticator app.
+- **TOTP replay prevention:** every successful TOTP verify is recorded in `TotpReplayEntry` with an Argon2id hash of the code (per-row salt) and a 2-min sliding window. The same code submitted twice within that window is rejected with 401, even if the framework's verify still accepts it (Identity allows ±1 30-second slot). See `models.md` § TotpReplayEntry.
+- **Backup-code recovery path:** `POST /api/auth/login/totp` accepts either a 6-digit TOTP code or a 16-char Crockford base-32 backup code (with or without `-` separators). The endpoint shape-detects and routes accordingly. Backup codes are hashed in our own `UserMfaBackupCode` table — Identity's built-in recovery codes store as plaintext in `AspNetUserTokens` (`dotnet/aspnetcore#5815`), which fails this document's § TOTP Backup Codes Argon2id requirement, so we keep our own.
+- **TOTP re-enrollment:** when a user re-enrolls TOTP (e.g., new phone), `UserManager.ResetAuthenticatorKeyAsync` overwrites the candidate seed before the new one is marked active. The user must reauthenticate (enter current password) before starting re-enrollment — **reauth gate is added in Stage 6c** alongside the reauth middleware. In 6b.1, the `/enroll` and `/enroll/verify` endpoints require an authenticated session but no fresh-password reauth.
 
 ### TOTP Backup Codes
 
@@ -339,7 +341,19 @@ Authentication cookies must be set with:
 - `__Host-` prefix — forces `Secure`, no `Domain` attribute, `Path=/`; modern browsers enforce these constraints and reject non-compliant cookies
 - `SameSite = Lax` — resolved by [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md). Strict was rejected because it blocks the cookie on the first navigation from email links (security alerts, password reset, GDPR export ready, "this wasn't me" links) and would also block OAuth top-level-navigation callbacks if social login is added in Phase 4 (per [ADR-0064](decisions/ADR-0064-social-login-deferred-to-phase-4.md)). The remaining CSRF gap is fully closed by the XSRF-TOKEN double-submit pattern (mandatory regardless of `SameSite` choice — see CSRF section below).
 
-The CSRF token cookie (XSRF-TOKEN) does not use `HttpOnly` — the double-submit pattern depends on JavaScript reading it. It must be `Secure` and at minimum `SameSite=Lax`.
+**SecurePolicy: environment-conditional.** In Production: `Always` (the `__Host-` prefix browser-side already enforces `Secure`). Outside Production: `SameAsRequest`, so `WebApplicationFactory` integration tests over plain HTTP can exercise the antiforgery + cookie pipeline without tripping the framework's `CheckSSLConfig` SSL-required guard.
+
+**Cookies in play after Stage 6a + 6b.1:**
+
+| Cookie | Set by | HttpOnly | Purpose |
+|---|---|---|---|
+| `__Host-Session` | Identity (`SignInManager.SignInAsync`) | yes | Short-lived (sliding 30-min) authenticated session. Carries the `"sid"` claim that points at the `UserSession` row. |
+| `__Host-Persist` | `AuthController.Login` / `PersistentCookieRotationMiddleware` (when `rememberMe=true`) | yes | 30-day rolling remember-me token. Argon2id-hashed in `UserSession.PersistentTokenHash`. Rotated on every use. |
+| `__Host-XSRF` | `IAntiforgery` | **no** (SPA must read it) | Antiforgery double-submit cookie. Rotated on login and logout. |
+| `Identity.TwoFactorUserId` | Identity (`SignInManager.PasswordSignInAsync` when `RequiresTwoFactor=true`) | yes | Scoped half-auth cookie — only valid for `/api/auth/login/totp`. Other endpoints reject it. Cleared on successful TOTP verify. Stage 6b.1. |
+| `Mfa.RememberMe` | `AuthController.Login` (Path=`/api/auth/login`, 10-min TTL) | yes | Transient carrier of the `rememberMe` preference between credentials step and TOTP step. Cleared on successful TOTP verify. Stage 6b.1. |
+
+The CSRF token cookie (`__Host-XSRF`) does not use `HttpOnly` — the double-submit pattern depends on JavaScript reading it. It must be `Secure` and at minimum `SameSite=Lax`.
 
 ### Authentication Model — Cookie vs. JWT
 
@@ -363,7 +377,13 @@ options.FallbackPolicy = new AuthorizationPolicyBuilder()
     .Build();
 ```
 
-This means any endpoint without an explicit authorization attribute requires authentication by default. Apply `[AllowAnonymous]` only to: login, register, password reset, and the React SPA static file catch-all. This inverts the default — a forgotten `[Authorize]` attribute is safe rather than dangerous.
+This means any endpoint without an explicit authorization attribute requires authentication by default. Apply `[AllowAnonymous]` only at the **method level** on API controllers (a class-level allow on a controller in `Controllers/Api/*` is forbidden by an architecture test). The current whitelist (Stage 6a + 6b.1):
+
+- `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/login/totp`, `GET /api/auth/csrf`
+- `GET/POST /api/health` (method-level `[AllowAnonymous]`)
+- Legacy Razor SPA-shell controllers (`AppController`, `HomeController`) carry class-level `[AllowAnonymous]` because they have no API surface and are slated for **Batch 4 deletion** (Stage 11). The architecture test restriction on class-level `[AllowAnonymous]` will widen back to all controllers once Stage 11 deletes those — see `planning-phase3-spa-migration.md` § Final cleanup plan.
+
+Stage 6c expands the whitelist with `/api/auth/password-reset/*`, `/api/auth/email-verify/*`, and `/api/auth/lockout-unlock`. This inverts the default — a forgotten `[Authorize]` attribute is safe rather than dangerous.
 
 ### ASP.NET Core Identity Hardening
 
