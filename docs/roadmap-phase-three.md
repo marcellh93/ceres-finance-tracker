@@ -434,31 +434,33 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 ### Verification checklist
 
+> **Stage 6a (2026-05-09):** Identity wiring + Argon2id + sessions + cookies + CSRF + global authorization fallback are shipped (24 integration tests in `ProjectCeres.Tests/Integration/Authentication/`). Items below are marked `[x]` for 6a; remaining items are scoped to 6b (TOTP, lockout, rate-limit, failed-login logging) and 6c (password reset, email change, reauth, audit log).
+
 ASP.NET Identity hardening:
 
-- [ ] `options.Lockout.MaxFailedAccessAttempts = 10`
-- [ ] `options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15)`
-- [ ] `options.Lockout.AllowedForNewUsers = true`
-- [ ] `options.User.RequireUniqueEmail = true`
-- [ ] `options.SignIn.RequireConfirmedEmail = true`
-- [ ] `SecurityStampValidatorOptions.ValidationInterval = TimeSpan.FromMinutes(5)` configured (catches revoked sessions within 5 min)
+- [x] `options.Lockout.MaxFailedAccessAttempts = 10`
+- [x] `options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15)`
+- [x] `options.Lockout.AllowedForNewUsers = true`
+- [x] `options.User.RequireUniqueEmail = true`
+- [x] `options.SignIn.RequireConfirmedEmail = true`
+- [x] `SecurityStampValidatorOptions.ValidationInterval = TimeSpan.FromMinutes(5)` configured (catches revoked sessions within 5 min)
 
 Password handling:
 
-- [ ] Default `IPasswordHasher<TUser>` replaced with Argon2id implementation pinned to `m=19456, t=2, p=1`
-- [ ] Password policy: minimum 8 characters, no maximum below 64 (NIST SP 800-63B)
-- [ ] No mandatory complexity rules; breached-password check via Have I Been Pwned API or local top-N list
-- [ ] Password reset endpoints always run Argon2id hash (against dummy if user not found) — constant-time enumeration prevention
-- [ ] Login endpoint always runs Argon2id hash (same defence)
+- [x] Default `IPasswordHasher<TUser>` replaced with Argon2id implementation pinned to `m=19456, t=2, p=1`
+- [x] Password policy: minimum 8 characters, no maximum below 64 (NIST SP 800-63B)
+- [x] No mandatory complexity rules; breached-password check via Have I Been Pwned API or local top-N list
+- [ ] Password reset endpoints always run Argon2id hash (against dummy if user not found) — constant-time enumeration prevention *(deferred to 6c)*
+- [x] Login endpoint always runs Argon2id hash (same defence)
 
 `UserSession` table + token rotation:
 
-- [ ] `UserSession` entity exists with: `Id`, `UserId`, `TokenHash`, `IpCreatedAt`, `UserAgent`, `CreatedAt`, `LastUsedAt`, `RevokedAt nullable`, `IsPersistent bool`
-- [ ] Session token regenerated immediately after login (session-fixation prevention)
-- [ ] Logout marks `RevokedAt`; the cookie is cleared; subsequent requests with the cookie are rejected
-- [ ] Persistent ("remember me") sessions: long-lived token in HttpOnly cookie, hash stored in DB, **rotated on each use** (issue new token, invalidate old)
-- [ ] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on)
-- [ ] Per-user IP block list (`UserBlockedIp`) revokes all sessions from that IP on add
+- [x] `UserSession` entity exists with: `Id`, `UserId`, `TokenHash`, `IpCreatedAt`, `UserAgent`, `CreatedAt`, `LastUsedAt`, `RevokedAt nullable`, `IsPersistent bool`
+- [x] Session token regenerated immediately after login (session-fixation prevention)
+- [x] Logout marks `RevokedAt`; the cookie is cleared; subsequent requests with the cookie are rejected
+- [x] Persistent ("remember me") sessions: long-lived token in HttpOnly cookie, hash stored in DB, **rotated on each use** (issue new token, invalidate old)
+- [ ] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on) *(toggle wired with default-off; UI deferred to 6c)*
+- [x] Per-user IP block list (`UserBlockedIp`) revokes all sessions from that IP on add
 
 TOTP:
 
@@ -473,25 +475,25 @@ TOTP:
 
 CSRF:
 
-- [ ] `IAntiforgery` middleware registered globally
-- [ ] All `POST`/`PUT`/`PATCH`/`DELETE` API endpoints validate the XSRF-TOKEN
-- [ ] `XSRF-TOKEN` cookie issued: `Secure=true`, `SameSite=Lax`, `HttpOnly=false` (SPA must read it)
-- [ ] Authorization endpoints `[AllowAnonymous]`-marked are exempt from antiforgery only where they have no state side-effect (e.g., GET login page); login POST validates
-- [ ] CSRF token rotation on login/logout
+- [x] `IAntiforgery` middleware registered globally
+- [x] All `POST`/`PUT`/`PATCH`/`DELETE` API endpoints validate the XSRF-TOKEN
+- [x] `XSRF-TOKEN` cookie issued: `Secure=true`, `SameSite=Lax`, `HttpOnly=false` (SPA must read it)
+- [x] Authorization endpoints `[AllowAnonymous]`-marked are exempt from antiforgery only where they have no state side-effect (e.g., GET login page); login POST validates
+- [x] CSRF token rotation on login/logout
 
 Global authorization:
 
-- [ ] `AddAuthorization` configured with `FallbackPolicy = RequireAuthenticatedUser()`
-- [ ] `[AllowAnonymous]` applied **only** to: `/login`, `/login/totp`, `/register`, `/password-reset`, `/email-verify`, the React SPA static-file catch-all, and the lockout self-service unlock endpoint
-- [ ] Architecture test: any controller without `[Authorize]` or `[AllowAnonymous]` attribute fails the build (catches forgotten attributes)
+- [x] `AddAuthorization` configured with `FallbackPolicy = RequireAuthenticatedUser()`
+- [x] `[AllowAnonymous]` applied **only** to: `/api/auth/register`, `/api/auth/login`, `/api/auth/csrf`, `/api/health`, the legacy Razor SPA-shell controllers (App, Home), and the legacy 302-redirect controllers slated for Batch-4 deletion. Stage 6c expands the whitelist with `/api/auth/password-reset/*`, `/api/auth/email-verify/*`, and `/api/auth/lockout-unlock`.
+- [x] Architecture test: any controller without `[Authorize]` or `[AllowAnonymous]` attribute fails the build (catches forgotten attributes)
 
 Cookie configuration:
 
-- [ ] Auth cookie name uses `__Host-` prefix (e.g., `__Host-Session`)
-- [ ] `HttpOnly = true`, `Secure = true`, `SameSite = Lax`
-- [ ] No `Domain` attribute set (forced by `__Host-` prefix)
-- [ ] `Path = /`
-- [ ] Verified in browser DevTools that the cookie has all four attributes after a successful login
+- [x] Auth cookie name uses `__Host-` prefix (e.g., `__Host-Session`)
+- [x] `HttpOnly = true`, `Secure = true`, `SameSite = Lax` *(Secure is `Always` in Production, `SameAsRequest` outside Production for WAF tests; the `__Host-` prefix browser-side enforces Secure regardless)*
+- [x] No `Domain` attribute set (forced by `__Host-` prefix)
+- [x] `Path = /`
+- [ ] Verified in browser DevTools that the cookie has all four attributes after a successful login *(deferred to Stage 9 — first stage with login UI)*
 
 Rate limiting:
 
