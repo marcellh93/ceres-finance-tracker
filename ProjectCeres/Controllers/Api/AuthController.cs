@@ -18,6 +18,14 @@ namespace ProjectCeres.Controllers.Api;
 [Route("api/auth")]
 public sealed class AuthController : ControllerBase
 {
+    // Per-user semaphore: serializes concurrent PasswordSignInAsync calls for the same
+    // user within this process. Without serialization, concurrent bad-password requests
+    // race on the Identity ConcurrencyStamp: all load the user simultaneously, all try
+    // to UPDATE AspNetUsers WHERE ConcurrencyStamp = @old, only one wins, and the
+    // AccessFailedCount barely increments. This prevents lockout from engaging reliably.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim>
+        _loginLocks = new();
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly AppDbContext _db;
@@ -73,8 +81,12 @@ public sealed class AuthController : ControllerBase
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
 
-        var user = await _userManager.FindByEmailAsync(request.Email);
-        if (user is null)
+        // First pass: resolve the user record to get the ID for the per-user lock key.
+        // We intentionally do NOT call PasswordSignInAsync here — Identity would load
+        // the user a second time inside AccessFailedAsync anyway, and we need to pass
+        // a freshly-loaded user object AFTER acquiring the lock (see comment below).
+        var userStub = await _userManager.FindByEmailAsync(request.Email);
+        if (userStub is null)
         {
             // Constant-time enumeration prevention: still pay the Argon2id cost.
             _argon.RunDummyHash();
@@ -86,8 +98,29 @@ public sealed class AuthController : ControllerBase
         var sessionId = Guid.NewGuid();
         HttpContext.Items[SessionConstants.PendingSessionItemKey] = sessionId;
 
-        var signIn = await _signInManager.PasswordSignInAsync(
-            user, request.Password, isPersistent: false, lockoutOnFailure: true);
+        // Serialize concurrent login attempts for the same user with an in-process
+        // per-user semaphore. Without serialization, concurrent bad-password requests
+        // race on the Identity ConcurrencyStamp in AspNetUsers: all read the user
+        // simultaneously, all try to UPDATE WHERE ConcurrencyStamp = @old, only one
+        // UPDATE wins, and AccessFailedCount barely increments — lockout never engages.
+        //
+        // We also reload the user inside the semaphore (via EF ReloadAsync) so
+        // PasswordSignInAsync / AccessFailedAsync sees the current ConcurrencyStamp.
+        // The userStub loaded above may be stale: a prior request may have incremented
+        // AccessFailedCount between our FindByEmail and our semaphore acquisition.
+        var loginSem = _loginLocks.GetOrAdd(userStub.Id, _ => new SemaphoreSlim(1, 1));
+        await loginSem.WaitAsync(HttpContext.RequestAborted);
+        Microsoft.AspNetCore.Identity.SignInResult signIn;
+        try
+        {
+            await _db.Entry(userStub).ReloadAsync();
+            signIn = await _signInManager.PasswordSignInAsync(
+                userStub, request.Password, isPersistent: false, lockoutOnFailure: true);
+        }
+        finally
+        {
+            loginSem.Release();
+        }
 
         if (signIn.RequiresTwoFactor)
         {
@@ -116,7 +149,7 @@ public sealed class AuthController : ControllerBase
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
             var (ip, ua) = RequestContext();
-            await _failedLogins.RecordAsync(request.Email, user.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
+            await _failedLogins.RecordAsync(request.Email, userStub.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
             return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
         }
 
@@ -124,11 +157,11 @@ public sealed class AuthController : ControllerBase
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
             var (ip, ua) = RequestContext();
-            await _failedLogins.RecordAsync(request.Email, user.Id, FailedLoginReason.BadCredentials, ip, ua, HttpContext.RequestAborted);
+            await _failedLogins.RecordAsync(request.Email, userStub.Id, FailedLoginReason.BadCredentials, ip, ua, HttpContext.RequestAborted);
             return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
-        await IssueSessionAndCookiesAsync(user, sessionId, request.RememberMe);
+        await IssueSessionAndCookiesAsync(userStub, sessionId, request.RememberMe);
         return NoContent();
     }
 

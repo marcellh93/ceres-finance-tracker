@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
@@ -5,9 +6,17 @@ namespace ProjectCeres.Common.Authentication;
 
 public sealed class FailedLoginRecorder
 {
-    private readonly AppDbContext _db;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public FailedLoginRecorder(AppDbContext db) => _db = db;
+    // Use IServiceScopeFactory so each RecordAsync call gets a fresh, isolated
+    // DbContext scope. When PasswordSignInAsync races under concurrency, Identity's
+    // EF UserStore catches a DbUpdateConcurrencyException internally and returns
+    // IdentityResult.Failed — but the shared request-scoped DbContext is left with
+    // the stale AspNetUsers entity still tracked. A subsequent SaveChangesAsync on
+    // that same context would re-attempt the failed update and throw again, silently
+    // swallowing the FailedLoginAttempt insert. Creating a private scope here avoids
+    // the contaminated context entirely.
+    public FailedLoginRecorder(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
 
     public async Task RecordAsync(
         string? emailAttempted,
@@ -17,6 +26,9 @@ public sealed class FailedLoginRecorder
         string userAgent,
         CancellationToken ct = default)
     {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
         var entry = new FailedLoginAttempt
         {
             Id = Guid.NewGuid(),
@@ -27,8 +39,8 @@ public sealed class FailedLoginRecorder
             Reason = reason,
             OccurredAt = DateTime.UtcNow,
         };
-        _db.FailedLoginAttempts.Add(entry);
-        await _db.SaveChangesAsync(ct);
+        db.FailedLoginAttempts.Add(entry);
+        await db.SaveChangesAsync(ct);
     }
 
     private static string? TruncateAndNormalize(string? input, int max)
