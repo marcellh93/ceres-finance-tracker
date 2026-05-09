@@ -22,20 +22,17 @@ public sealed class UserBlockedIpMiddleware
             && Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
         {
             var ip = context.Connection.RemoteIpAddress?.ToString() ?? "";
-            if (!string.IsNullOrEmpty(ip))
+            var blocked = await db.UserBlockedIps
+                .AnyAsync(b => b.UserId == userId && b.IpAddress == ip);
+            if (blocked)
             {
-                var blocked = await db.UserBlockedIps
-                    .AnyAsync(b => b.UserId == userId && b.IpAddress == ip);
-                if (blocked)
-                {
-                    var now = DateTime.UtcNow;
-                    await db.UserSessions
-                        .Where(s => s.UserId == userId && s.IpCreatedAt == ip && s.RevokedAt == null)
-                        .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now));
+                var now = DateTime.UtcNow;
+                await db.UserSessions
+                    .Where(s => s.UserId == userId && s.IpCreatedAt == ip && s.RevokedAt == null)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now));
 
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    return;
-                }
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return;
             }
         }
 
