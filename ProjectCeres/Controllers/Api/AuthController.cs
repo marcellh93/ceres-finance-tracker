@@ -71,7 +71,7 @@ public sealed class AuthController : ControllerBase
         {
             // Constant-time enumeration prevention: still pay the Argon2id cost.
             _argon.RunDummyHash();
-            return Unauthorized();
+            return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
         var sessionId = Guid.NewGuid();
@@ -106,13 +106,13 @@ public sealed class AuthController : ControllerBase
         if (signIn.IsLockedOut)
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
-            return Unauthorized(new { error = "locked_out" });
+            return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
         }
 
         if (!signIn.Succeeded)
         {
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
-            return Unauthorized();
+            return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
         await IssueSessionAndCookiesAsync(user, sessionId, request.RememberMe);
@@ -131,7 +131,7 @@ public sealed class AuthController : ControllerBase
         // Identity reads Identity.TwoFactorUserId from request cookies
         // and resolves the half-authenticated user.
         var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
-        if (user is null) return Unauthorized();
+        if (user is null) return UnauthorizedEnvelope("UNAUTHENTICATED", "Authentication required.");
 
         var rememberMe = ReadRememberMeCookie();
         var sessionId = Guid.NewGuid();
@@ -141,14 +141,14 @@ public sealed class AuthController : ControllerBase
         {
             var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(
                 request.Code, isPersistent: false, rememberClient: false);
-            if (result.IsLockedOut) return Unauthorized(new { error = "locked_out" });
-            if (!result.Succeeded) return Unauthorized();
+            if (result.IsLockedOut) return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+            if (!result.Succeeded) return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
 
             var accepted = await replayGuard.TryAcceptAsync(user.Id, request.Code, HttpContext.RequestAborted);
             if (!accepted)
             {
                 await _signInManager.SignOutAsync();
-                return Unauthorized(new { error = "replay" });
+                return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
             }
 
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
@@ -161,7 +161,7 @@ public sealed class AuthController : ControllerBase
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
             var ok = await backupCodes.VerifyAndConsumeAsync(user.Id, request.Code, ip, HttpContext.RequestAborted);
-            if (!ok) return Unauthorized();
+            if (!ok) return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
 
             await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
@@ -169,7 +169,7 @@ public sealed class AuthController : ControllerBase
             return NoContent();
         }
 
-        return Unauthorized();
+        return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
     }
 
     private async Task IssueSessionAndCookiesAsync(ApplicationUser user, Guid sessionId, bool rememberMe)
