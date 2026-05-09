@@ -49,4 +49,115 @@ public class FailedLoginRecorderTests : IAsyncLifetime
         rows[0].IpAddress.Should().Be("203.0.113.5");
         rows[0].UserAgent.Should().Be("ua/1.0");
     }
+
+    [Fact]
+    public async Task PasswordIsNeverInRow()
+    {
+        const string secret = "should-never-leak-into-the-failed-login-table";
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            "leaktest@recorder-test.local",
+            userId: null,
+            FailedLoginReason.BadCredentials,
+            "203.0.113.5",
+            "ua/1.0",
+            CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var anyLeak = await db.FailedLoginAttempts.AnyAsync(e =>
+            (e.EmailAttempted != null && e.EmailAttempted.Contains(secret))
+            || e.IpAddress.Contains(secret)
+            || e.UserAgent.Contains(secret));
+        anyLeak.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EmailAttempted_TruncatedTo256Chars()
+    {
+        var longEmail = new string('a', 1000) + "@recorder-test.local";
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(longEmail, null, FailedLoginReason.UnknownUser,
+            "1.2.3.4", "ua", CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstAsync();
+        row.EmailAttempted!.Length.Should().Be(256);
+    }
+
+    [Fact]
+    public async Task EmailAttempted_LowercasedAndTrimmed()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            "  Foo@Recorder-Test.LOCAL  ",
+            null, FailedLoginReason.UnknownUser,
+            "1.2.3.4", "ua", CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "foo@recorder-test.local")
+            .SingleOrDefaultAsync();
+        row.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task UserAgent_Missing_RowStillWrites()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            "ua-missing@recorder-test.local", null, FailedLoginReason.BadCredentials,
+            "1.2.3.4", "", CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "ua-missing@recorder-test.local")
+            .SingleOrDefaultAsync();
+        row.Should().NotBeNull();
+        row!.UserAgent.Should().Be("");
+    }
+
+    [Fact]
+    public async Task UserAgent_TruncatedTo512Chars()
+    {
+        var longUa = new string('x', 1000);
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            "ua-trunc@recorder-test.local", null, FailedLoginReason.BadCredentials,
+            "1.2.3.4", longUa, CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "ua-trunc@recorder-test.local")
+            .SingleOrDefaultAsync();
+        row!.UserAgent.Length.Should().Be(512);
+    }
+
+    [Fact]
+    public async Task Ip_NullSafe_RecordsAsUnknown()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            "ip-null@recorder-test.local", null, FailedLoginReason.BadCredentials,
+            "", "ua", CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "ip-null@recorder-test.local")
+            .SingleOrDefaultAsync();
+        row!.IpAddress.Should().Be("unknown");
+    }
 }
