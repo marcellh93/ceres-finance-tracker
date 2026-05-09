@@ -27,8 +27,8 @@ Wire ASP.NET Core Identity's built-in TOTP support for opt-in MFA. Add backup co
 | TOTP storage | ASP.NET Identity built-in (`UserManager.GenerateNewAuthenticatorKey`, `VerifyTwoFactorTokenAsync`, `AspNetUserTokens` row keyed under `[AspNetUserStore].AuthenticatorKey`). |
 | TOTP encryption at rest | ASP.NET Data Protection (Identity uses it transparently). Local dev: filesystem default at `~/.aspnet/DataProtection-Keys`. Production hardening (KMS / encrypted external volume) is deferred to **Stage 16 (Hosting + ops)** and is a Phase 3 launch gate. |
 | Mid-enrollment seed | Identity's built-in candidate-seed flow. The seed is written to `AspNetUserTokens` on `GenerateNewAuthenticatorKey` and only confirmed (`SetTwoFactorEnabledAsync(true)`) after the first verifying code passes. |
-| Login flow shape | Two endpoints: `POST /api/auth/login` (credentials → 200+ticket if MFA enabled, else 204+session); `POST /api/auth/login/totp` (ticket+code → 204+session). |
-| Login ticket | `IDataProtector`-wrapped `{ userId, issuedAt }` payload, 5-min TTL, base64url-encoded. No DB row. Distinct purpose-string from Identity's other tokens. |
+| Login flow shape | Two endpoints, framework-aligned: `POST /api/auth/login` (credentials; if MFA enabled, returns `200 { requiresTotp: true }` and the framework auto-sets the scoped `Identity.TwoFactorUserId` cookie; if not enabled, returns `204` with `__Host-Session`). `POST /api/auth/login/totp` (request: `{ code }`; the scoped cookie carries the userId; on success the framework swaps it for a real session). |
+| Two-step state carrier | The framework's built-in `Identity.TwoFactorUserId` scoped auth cookie. Set automatically by `SignInManager.PasswordSignInAsync` when the result is `RequiresTwoFactor`; consumed by `TwoFactorAuthenticatorSignInAsync` / `TwoFactorRecoveryCodeSignInAsync`. We do NOT roll our own ticket service — the framework solves this with a short-lived, encrypted, scoped cookie that already has the right security properties. |
 | Backup-code shape | One row per code: `UserMfaBackupCode { Id, UserId, CodeHash, CreatedAt, UsedAt nullable, UsedFromIp nullable }`. |
 | Backup-code hash | Argon2id via the existing `Argon2idPasswordHasher` (m=19456 t=2 p=1). Same hasher already used for passwords + persistent-cookie tokens. |
 | Backup-code format | 16 chars Crockford base-32 (no I/L/O/U), formatted `XXXX-XXXX-XXXX-XXXX`. ~80 bits entropy. Hyphens stripped server-side before hashing. |
@@ -41,13 +41,27 @@ Wire ASP.NET Core Identity's built-in TOTP support for opt-in MFA. Add backup co
 | `ApplicationUser.CreatedAt` | Added in this stage for audit / analytics. **No behavioural role** in 6b.1's login flow (no grace cliff). |
 | UI | None. Stage 9 ships React enrollment + login-TOTP + backup-codes display + recovery flow. 6b.1 verifies via xUnit. |
 
-### Sub-decision worth recording: `TotpReplayEntry.CodeHash` uses Argon2id, not SHA-256
+### Sub-decisions worth recording
+
+Three places where the first draft of this spec was wrong and got corrected via research. Recorded here so the rationale survives future re-reads of the spec — and so they don't quietly drift back during implementation.
+
+#### Sub-decision 1 — `TotpReplayEntry.CodeHash` uses Argon2id, not SHA-256
 
 The first draft of this design proposed SHA-256 for the replay-entry hash to avoid a "perceptible" 50ms cost on TOTP verify. This was researched and rejected:
 
 - **Nielsen's 100ms perception threshold** (and Normoyle et al. 2014's mean ~65ms) put 50ms below the threshold where users can detect latency. OWASP's *target* for password-verify is 200–500ms by design — the security-vs-UX trade-off is already calibrated for a slow hash.
 - **SHA-256 has a hidden weakness in this context.** TOTP codes have only 1,000,000 possible values. SHA-256 unsalted (which is the natural shape if we hash the bare code) makes a database dump rainbow-tableable in seconds against the 1M space — leaking which codes were accepted recently. Argon2id with a per-row salt closes that gap entirely.
 - **Decision: Argon2id**, reusing the existing `Argon2idPasswordHasher` (no new code, no new tuning surface). The marginal ~50ms on every TOTP-verify is invisible.
+
+#### Sub-decision 2 — Use the framework's `Identity.TwoFactorUserId` cookie, not a homegrown ticket
+
+The first draft proposed an `MfaTicketService` that wrapped `IDataProtector` to issue a 5-min `{ userId, issuedAt }` ticket carried in the JSON response body. Research revealed that ASP.NET Core Identity already does exactly this — see § 4 (no custom ticket service) for the full reasoning. The framework's `SignInManager.PasswordSignInAsync` returns `SignInResult.RequiresTwoFactor` and sets a scoped `Identity.TwoFactorUserId` cookie automatically; the homegrown ticket would have been ~80 lines duplicating that.
+
+#### Sub-decision 3 — Keep `UserMfaBackupCode` + `MfaBackupCodeService` (don't use Identity's recovery codes)
+
+Identity has built-in recovery codes via `UserManager.GenerateNewTwoFactorRecoveryCodesAsync` + `SignInManager.TwoFactorRecoveryCodeSignInAsync`. Tempting to use them, but Identity stores recovery codes **as plaintext** in `AspNetUserTokens` ([dotnet/aspnetcore#5815](https://github.com/dotnet/aspnetcore/issues/5815), open since 2018). Our `security-model.md` § TOTP Backup Codes explicitly requires Argon2id-hashed storage. So we keep our own backup-code table + service, and substitute our path on the backup-code branch of `/login/totp` while still using the framework for the TOTP branch.
+
+**Process note:** Sub-decisions 2 and 3 are exactly the failure mode the [`verify-against-codebase`](.../skills/verify-against-codebase/SKILL.md) skill exists to catch. The skill is now wired as a `PreToolUse` hook on `Write` for any file under `docs/superpowers/specs/`, blocking new spec writes until the skill has been invoked. See `.claude/hooks/require-verify-against-codebase-before-spec.js`.
 
 ---
 
@@ -142,71 +156,103 @@ public sealed class TotpReplayGuard
 - If no match → inserts a new `TotpReplayEntry { Id=NewGuid, UserId, CodeHash, AcceptedAt=now }`, runs an opportunistic purge `DELETE WHERE AcceptedAt < now - 2min` on every accept call (single SQL statement, idempotent), returns true.
 - The opportunistic purge replaces a scheduled job — at single-user-beta scale it's strictly cheaper than running a background sweep.
 
-#### `MfaTicketService`
+#### No custom ticket service — the framework already solves it
 
-```csharp
-public sealed class MfaTicketService
-{
-    string Issue(Guid userId);
-    Result<Guid> Verify(string ticket);
-}
-```
+The first draft of this design proposed an `MfaTicketService` that wrapped `IDataProtector` to issue a 5-min `{ userId, issuedAt }` ticket carried in the JSON response body. This was researched and rejected:
 
-Wraps an `IDataProtector` purpose-keyed `Project Ceres / MFA Login Ticket / v1`. Issues a base64url-encoded payload `{ userId, issuedAt }` via `Protect`. Verifies via `Unprotect` + checks `now - issuedAt <= 5min`. The 5-min window is short enough to limit attack surface but long enough for a typing-impaired user to find their authenticator app. The data-protector ensures forgery requires the server's key material (the same key material that protects auth cookies — already a Phase 3 launch concern via the Data Protection key-storage hardening deferred to Stage 16).
+- ASP.NET Core Identity's `SignInManager.PasswordSignInAsync` already handles the half-authenticated state. When the user has `TwoFactorEnabled = true`, it returns a `SignInResult` with `Succeeded = false` and `RequiresTwoFactor = true`, **does not** issue a session cookie, and **does** set a separate scoped cookie called `Identity.TwoFactorUserId` carrying the userId of the half-authenticated user.
+- The framework's `TwoFactorAuthenticatorSignInAsync` / `TwoFactorRecoveryCodeSignInAsync` methods read that scoped cookie, verify the second-factor code, and on success swap it for a real session cookie. The scoped cookie is automatically cleared.
+- The scoped cookie has the security properties we wanted from the custom ticket: encrypted by Data Protection, short-lived (default 5 min, configurable), scoped to a separate auth scheme so other endpoints reject it. Reusing it means we don't reinvent it.
+- **Decision:** delete `MfaTicketService` from this design. The login response carries a simple `{ requiresTotp: bool }` flag, not a ticket. The browser's automatic cookie handling carries the half-authenticated state to `/login/totp`.
 
 ### 5. Login flow changes
 
-`POST /api/auth/login` is modified from Stage 6a:
+The login flow uses the canonical ASP.NET Core Identity two-step pattern: `PasswordSignInAsync` + `TwoFactorAuthenticatorSignInAsync` / `TwoFactorRecoveryCodeSignInAsync`. The framework handles the "credentials valid but second factor still required" state via the scoped `Identity.TwoFactorUserId` cookie — no homegrown ticket needed.
+
+#### `POST /api/auth/login` (modified from Stage 6a)
 
 ```
 POST /api/auth/login  { email, password, rememberMe }
-  → SignInManager.PasswordSignInAsync (existing 6a logic)
-    → on failure: return 401  (existing 6a behaviour, dummy-hash on user-not-found)
-    → on success:
-        → if user.TwoFactorEnabled is FALSE:
-              → existing 6a path: insert UserSession, set __Host-Session cookie,
-                                  optional __Host-Persist cookie if rememberMe,
-                                  rotate CSRF cookie, return 204 No Content.
-        → if user.TwoFactorEnabled is TRUE:
-              → undo the SignInAsync that PasswordSignInAsync just did
-                (no session cookie issued — credentials are valid but second
-                 factor still required)
-              → issue an MFA ticket via MfaTicketService.Issue(user.Id)
-              → return 200 OK with body { ticket, ticketExpiresAt }
-              → DO NOT set any session cookie yet.
-              → DO rotate the CSRF cookie (the next call to /login/totp needs it).
+  → SignInManager.PasswordSignInAsync(user, password,
+                                       isPersistent: rememberMe,
+                                       lockoutOnFailure: true)
+  → Inspect the SignInResult:
+      → result.Succeeded = true:
+            → password right, MFA off → user is fully signed in
+              (framework set __Host-Session automatically).
+            → run the existing 6a session-issue work:
+              insert UserSession row, optional __Host-Persist cookie if
+              rememberMe, rotate CSRF cookie.
+            → return 204 No Content.
+      → result.RequiresTwoFactor = true:
+            → password right, MFA on → NO session cookie issued.
+              Framework set Identity.TwoFactorUserId scoped cookie automatically.
+            → DO NOT insert a UserSession row yet — wait for the second step.
+            → DO rotate the CSRF cookie (the next call to /login/totp needs a fresh one).
+            → return 200 OK { requiresTotp: true }.
+              No ticket field; the scoped cookie carries the half-auth state.
+      → result.IsLockedOut = true → return 401 with { error: "locked_out" }.
+            (Lockout-email + self-service-unlock land in 6b.2.)
+      → result.IsNotAllowed = true (e.g. EmailConfirmed = false) → return 401.
+      → otherwise (Succeeded = false, no special flag):
+            → return 401. Same constant-time enumeration prevention as 6a:
+              if the email was not found, run Argon2idPasswordHasher.RunDummyHash
+              before returning so wall-clock timing doesn't leak existence.
 ```
 
-**Implementation note:** `SignInManager.PasswordSignInAsync` always signs in on success — it's not parameterizable. The clean way to "validate without signing in" is to use `UserManager.CheckPasswordAsync(user, password)` plus manual lockout-counter handling. Stage 6a's `PasswordSignInAsync` includes lockout integration; Stage 6b.2 adds the lockout enforcement. For 6b.1: we keep `PasswordSignInAsync` for the credential check, and if MFA is enabled, immediately call `SignInManager.SignOutAsync()` to undo the cookie issue before the response is written. Net result is identical and simpler than rewriting the credential path. This is documented as a known-and-acceptable "issue then undo" pattern in the implementation.
+#### `POST /api/auth/login/totp` (new)
 
 ```
-POST /api/auth/login/totp  { ticket, code }
-  → MfaTicketService.Verify(ticket)
-    → on failure (invalid / expired): return 401
-    → on success: extract userId
+POST /api/auth/login/totp  { code }
+  (The browser automatically sends the Identity.TwoFactorUserId cookie.
+   The body has only the code; no ticket.)
   → Detect code shape:
-      → 6 digits → TOTP path:
-            → UserManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, code)
-              (Identity's own replay-window logic operates within a 30-second window;
-               our TotpReplayGuard adds the cross-window "this exact code has been
-               accepted recently" check)
-            → on failure: return 401
-            → TotpReplayGuard.TryAcceptAsync — if false (replay): return 401
-            → on success: full Stage 6a session-issue path (insert UserSession,
-              set cookies, rotate CSRF, return 204).
-      → after the TOTP path failed to match (length != 6 or contains non-digit),
-        check backup-code shape: strip `-` separators, then test
-        `^[0-9A-HJKMNP-TV-Z]{16}$` (case-insensitive Crockford base-32 — excludes I/L/O/U, 16 chars).
-        Match → backup-code path:
-            → MfaBackupCodeService.VerifyAndConsumeAsync
-            → on failure: return 401
-            → on success: full Stage 6a session-issue path (insert UserSession,
-              set cookies, rotate CSRF, return 204).
-              The single-use marking happened inside VerifyAndConsumeAsync.
+      → ^\d{6}$ → TOTP path:
+            → SignInManager.TwoFactorAuthenticatorSignInAsync(
+                  code, isPersistent: false, rememberClient: false)
+              (The framework reads Identity.TwoFactorUserId, looks up the user,
+               verifies the code against the user's authenticator seed,
+               increments the failed-attempt counter on miss for lockout
+               integration.)
+            → on result.Succeeded = false: return 401.
+            → on result.IsLockedOut: return 401 { error: "locked_out" }.
+            → on result.Succeeded = true:
+                  → TotpReplayGuard.TryAcceptAsync(userId, code)
+                    — if false (replay across the 30s window): return 401.
+                    The framework's verify is correct within the current 30s
+                    window; our guard rejects re-use across the next ±30s slot
+                    where the code is still cryptographically valid.
+                  → run the existing 6a session-issue work:
+                    insert UserSession row, rotate CSRF, return 204 No Content.
+      → after stripping `-` separators and uppercasing, ^[0-9A-HJKMNP-TV-Z]{16}$
+        → backup-code path:
+            → MfaBackupCodeService.VerifyAndConsumeAsync(userId, code, clientIp)
+              — userId is read from the Identity.TwoFactorUserId cookie via
+              SignInManager's GetTwoFactorAuthenticationUserAsync helper.
+            → on false: return 401.
+            → on true:
+                  → SignInManager.SignInAsync(user, isPersistent: false)
+                    — manually sign the user in since we used our own backup-code
+                    pipeline (not the framework's TwoFactorRecoveryCodeSignInAsync,
+                    which would expect the framework's plaintext recovery codes).
+                  → run the existing 6a session-issue work:
+                    insert UserSession row, rotate CSRF, return 204 No Content.
       → otherwise: return 401.
 ```
 
-`POST /api/auth/login/totp` is `[AllowAnonymous]` + `[ValidateAntiForgeryToken]` — the user is not yet authenticated when calling it (the ticket is the auth proof, not a session cookie).
+#### Why we keep our own backup-code pipeline (not Identity's recovery codes)
+
+Identity has built-in recovery codes via `UserManager.GenerateNewTwoFactorRecoveryCodesAsync` + `SignInManager.TwoFactorRecoveryCodeSignInAsync`. Researched and rejected:
+
+- Identity stores recovery codes **as plaintext** in `AspNetUserTokens`. This is documented in `dotnet/aspnetcore` issue [#5815 "Unsafe Two Factor Recovery Codes"](https://github.com/dotnet/aspnetcore/issues/5815), open since 2018.
+- Our `security-model.md` § TOTP Backup Codes explicitly requires Argon2id-hashed storage: *"hash each backup code with Argon2id before storage. Never store them in plaintext."*
+- Plaintext recovery codes in a DB dump permanently bypass MFA for every user with backup codes generated. That's the worst-case outcome of the dump-attacker threat in our threat model.
+- **Decision:** keep `UserMfaBackupCode` + `MfaBackupCodeService`. Use the framework for TOTP (`TwoFactorAuthenticatorSignInAsync`) where it does the right thing, and substitute our own backup-code path on the secondary branch.
+
+#### Endpoint attributes
+
+- `POST /api/auth/login` is `[AllowAnonymous]` + `[ValidateAntiForgeryToken]` (unchanged from 6a).
+- `POST /api/auth/login/totp` is `[AllowAnonymous]` + `[ValidateAntiForgeryToken]`. The `Identity.TwoFactorUserId` cookie is the auth proof for this endpoint, not a session cookie. CSRF still applies because this is a state-changing POST.
 
 ### 6. MFA enrollment endpoints
 
@@ -274,10 +320,9 @@ If any of these need tuning later, a single named-options class can be introduce
 - Create `Migrations/<ts>_AddMfaBackupCodesAndReplayPrevention.cs` (auto-generated).
 - Create `Common/Authentication/MfaBackupCodeService.cs`.
 - Create `Common/Authentication/TotpReplayGuard.cs`.
-- Create `Common/Authentication/MfaTicketService.cs`.
 - Create `Controllers/Api/MfaController.cs` — three enrollment endpoints.
-- Modify `Controllers/Api/AuthController.cs` — branch login on `TwoFactorEnabled`; add `/login/totp` action.
-- Modify `Program.cs` — register `MfaBackupCodeService`, `TotpReplayGuard`, `MfaTicketService`. Configure `IDataProtector` purpose-key for `MfaTicketService` (named `Project Ceres / MFA Login Ticket / v1`).
+- Modify `Controllers/Api/AuthController.cs` — inspect `SignInResult.RequiresTwoFactor` after `PasswordSignInAsync`; add `/login/totp` action.
+- Modify `Program.cs` — register `MfaBackupCodeService` and `TotpReplayGuard`. (No `MfaTicketService` — see § 4 implementation note.)
 
 ### Test code (`ProjectCeres.Tests/Integration/Authentication/Mfa/`)
 
@@ -289,7 +334,8 @@ New sub-folder under existing `Authentication/`:
 - `LoginWithoutMfaTests` — login with `TwoFactorEnabled=false` returns 204 + session cookie (confirms ADR-0069 opt-in: no grace cliff); login works regardless of `CreatedAt` age.
 - `TotpReplayGuardTests` — same code accepted once then rejected on second accept; rows older than 2min are purged on the next accept call; entries for one user don't block another user's same-numeric-code (per-user scoping).
 - `MfaCacheControlTests` — `/enroll`, `/enroll/verify`, and `/backup-codes/regenerate` responses all carry `Cache-Control: no-store, no-cache` and `Pragma: no-cache`.
-- `MfaTicketServiceTests` — Issue/Verify round-trips for the same user; expired ticket (synthesise via mocked clock) rejected; ticket-payload tampering rejected (corrupt the base64 → Verify fails); ticket cannot be cross-applied to a different user (the userId is in the protected payload).
+- (No `MfaTicketServiceTests` — service deleted; the `Identity.TwoFactorUserId` cookie's lifecycle is covered by the framework's own tests.)
+- `LoginScopedCookieTests` — confirm `PasswordSignInAsync` returns `RequiresTwoFactor` for a user with `TwoFactorEnabled=true` and that `Identity.TwoFactorUserId` cookie is set on the response; confirm anonymous request to other authenticated endpoints (`/api/accounts`, `/api/transactions`, etc.) still returns 401 even when this scoped cookie is present (the scoped cookie is NOT a real session).
 
 ### Test fixture additions
 
