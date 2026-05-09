@@ -20,7 +20,14 @@ public class FailedLoginRecorderTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();
+        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@recorder-test.local")).ToList())
+        {
+            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
+            await um.DeleteAsync(u);
+        }
         await db.FailedLoginAttempts
             .Where(e => e.EmailAttempted!.EndsWith("@recorder-test.local"))
             .ExecuteDeleteAsync();
@@ -226,5 +233,47 @@ public class FailedLoginRecorderTests : IAsyncLifetime
         row.Should().NotBeNull();
         row!.UserId.Should().BeNull();
         row.Reason.Should().Be(FailedLoginReason.UnknownUser);
+    }
+
+    [Fact]
+    public async Task LoginTotp_BadTotp_WritesRowWithReasonBadTotp()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "bad-totp@recorder-test.local");
+        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+        var client = _factory.CreateClient();
+
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login/totp",
+            new { code = "000000" });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.UserId == user.Id && e.Reason == FailedLoginReason.BadTotp)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+        row.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task LoginTotp_BadBackupCode_WritesRowWithReasonBadBackupCode()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "bad-bc@recorder-test.local");
+        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+        var client = _factory.CreateClient();
+
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login/totp",
+            new { code = "AAAA-AAAA-AAAA-AAAA" });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.UserId == user.Id && e.Reason == FailedLoginReason.BadBackupCode)
+            .OrderByDescending(e => e.OccurredAt)
+            .FirstOrDefaultAsync();
+        row.Should().NotBeNull();
     }
 }

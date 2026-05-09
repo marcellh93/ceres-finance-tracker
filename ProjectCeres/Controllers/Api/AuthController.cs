@@ -161,6 +161,8 @@ public sealed class AuthController : ControllerBase
                 user, TokenOptions.DefaultAuthenticatorProvider, request.Code);
             if (!ok)
             {
+                var (ip, ua) = RequestContext();
+                await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.BadTotp, ip, ua, HttpContext.RequestAborted);
                 return UnauthorizedEnvelope("INVALID_MFA_CODE",
                     "The verification code is invalid or expired.");
             }
@@ -168,6 +170,8 @@ public sealed class AuthController : ControllerBase
             var accepted = await replayGuard.TryAcceptAsync(user.Id, request.Code, HttpContext.RequestAborted);
             if (!accepted)
             {
+                var (ip, ua) = RequestContext();
+                await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.BadTotp, ip, ua, HttpContext.RequestAborted);
                 await _signInManager.SignOutAsync();
                 return UnauthorizedEnvelope("INVALID_MFA_CODE",
                     "The verification code is invalid or expired.");
@@ -189,11 +193,14 @@ public sealed class AuthController : ControllerBase
         var stripped = request.Code.Replace("-", "").Replace(" ", "").ToUpperInvariant();
         if (MfaConstants.BackupCodeShape.IsMatch(stripped))
         {
-            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+            var (ip, ua) = RequestContext();
             var ok = await backupCodes.VerifyAndConsumeAsync(user.Id, request.Code, ip, HttpContext.RequestAborted);
             if (!ok)
+            {
+                await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.BadBackupCode, ip, ua, HttpContext.RequestAborted);
                 return UnauthorizedEnvelope("INVALID_MFA_CODE",
                     "The verification code is invalid or expired.");
+            }
 
             // Backup-code success during lockout clears the lock — same policy as TOTP.
             if (user.LockoutEnd.HasValue)
