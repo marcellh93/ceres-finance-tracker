@@ -1096,6 +1096,7 @@ See [`planning-phase3-spa-migration.md` → Final cleanup plan](planning-phase3-
 | 11.4 | Every per-area 302 redirect deleted (Dashboard, Movements, Transactions, Transfers, Categories, Accounts, Recurring, Reports, Review, Import, Settings, Budgets, CsvImportProfiles) |
 | 11.5 | MVC infrastructure stripped from `Program.cs` (controllers-only API surface) |
 | 11.6 | Razor host views deleted (`Views/App/`, `Views/Home/`, `Views/Shared/_Layout.cshtml`, `Error.cshtml`, `_ViewStart.cshtml`, `_ViewImports.cshtml`, `_ValidationScriptsPartial.cshtml`) |
+| 11.7 | Stage 6a architecture tests widened back to full scope (`No_api_controller_class_has_AllowAnonymous` → `No_controller_class_has_AllowAnonymous`; `Api_HttpGet_actions_must_not_have_write_verb_names` → `HttpGet_actions_must_not_have_write_verb_names`). Both rules are dropped to API-only in 6a because of legacy Razor controllers; Stage 11 deletes those, restoring the full-scope contract. |
 
 ### Verification checklist
 
@@ -1128,6 +1129,12 @@ Razor controller stubs:
 - [ ] Every Razor controller (`MovementsController`, `TransactionsController`, `TransfersController`, `CategoriesController`, `AccountsController`, `RecurringTransactionsController`, `ReportsController`, `ImportController`, `CsvImportProfilesController`, `BudgetsController`, `SettingsController`, `DashboardController`, `ReviewController`/`TransfersReviewController`) deleted
 - [ ] Verify by grep: no `: Controller` in `ProjectCeres/Controllers/` outside `ProjectCeres/Controllers/Api/`
 - [ ] All API controllers under `Controllers/Api/` retained and functional
+
+Architecture tests (widening from Stage 6a's API-only narrowing):
+
+- [ ] `ArchitectureTests.No_api_controller_class_has_AllowAnonymous` renamed to `No_controller_class_has_AllowAnonymous`; the `.Namespace?.Contains(".Api") == true` filter is removed
+- [ ] `ArchitectureTests.Api_HttpGet_actions_must_not_have_write_verb_names` renamed to `HttpGet_actions_must_not_have_write_verb_names`; the `.Namespace?.Contains(".Api") == true` filter is removed
+- [ ] Both tests pass after the rename + filter removal — confirms no remaining controllers carry class-level `[AllowAnonymous]` or have `[HttpGet]` actions whose names start with write verbs
 
 Smoke tests:
 

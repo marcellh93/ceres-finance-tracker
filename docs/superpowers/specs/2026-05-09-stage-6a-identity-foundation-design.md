@@ -32,7 +32,7 @@ The following were resolved during brainstorming on 2026-05-09 and are not re-li
 | Session ID storage | Custom claim in the auth cookie + `IUserClaimsPrincipalFactory`; `OnValidatePrincipal` looks up `UserSession` row by `SessionId`. |
 | Remember-me cookie model | Two cookies: `__Host-Session` (short, sliding) and `__Host-Persist` (long-lived, rotated on each use). |
 | Sentinel-fallback during transition | **None.** `HttpContextCurrentUserAccessor` is the only registered `ICurrentUserAccessor` once 6a merges. |
-| Auth endpoints in 6a | Bare-minimum JSON only: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`. No UI. |
+| Auth endpoints in 6a | Bare-minimum JSON only: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, plus a `GET /api/auth/csrf` helper that refreshes the `__Host-XSRF` cookie for the SPA + integration tests after authentication context changes (added during implementation; see § 8 below). No UI. |
 | E2E test infrastructure | **Deferred to Stage 9** (first stage with real auth UI). 6a verifies via xUnit `WebApplicationFactory`. |
 | `IgnoreAntiforgeryToken` carve-outs | **None.** CSRF only validates state-changing methods (`POST/PUT/PATCH/DELETE`); GETs are exempt by definition (RFC 9110 safe methods). No endpoint requires the bypass attribute. |
 
@@ -159,11 +159,18 @@ Indexes: `UserSession (UserId, RevokedAt)`, `UserSession (LastUsedAt)` for purge
 `__Host-Session` (Identity cookie via `AddIdentity` defaults override):
 
 ```csharp
+// SecurePolicy: Always in Production (browser enforces __Host- prefix Secure attribute);
+// SameAsRequest outside Production so WebApplicationFactory tests over HTTP can exercise
+// the antiforgery + cookie pipeline. Browsers don't enter the picture in tests.
+var cookieSecurePolicy = builder.Environment.IsProduction()
+    ? CookieSecurePolicy.Always
+    : CookieSecurePolicy.SameAsRequest;
+
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "__Host-Session";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.Path = "/";
     // No Domain — required by __Host- prefix
@@ -177,16 +184,27 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 ```
 
-`__Host-Persist` is a separate authentication scheme registered in `Program.cs`:
+> **Implementation note:** The original spec used `CookieSecurePolicy.Always` unconditionally. During implementation, `WebApplicationFactory` integration tests (which run over plain HTTP) tripped antiforgery's internal `CheckSSLConfig`, throwing 500 before the request reached the controller. Switching the non-production case to `SameAsRequest` keeps Production behaviour identical (the `__Host-` prefix browser-side enforces `Secure` regardless) while letting WAF tests exercise the full pipeline. This applies to `__Host-Session`, `__Host-Persist`, and `__Host-XSRF`.
+
+`__Host-Persist` rotation is handled by **`PersistentCookieRotationMiddleware`** registered in `Program.cs` *before* `UseAuthentication`:
 
 ```csharp
-builder.Services.AddAuthentication()
-    .AddScheme<PersistentCookieOptions, PersistentCookieHandler>("PersistentCookie", _ => { });
+app.UseRouting();
+app.UseMiddleware<PersistentCookieRotationMiddleware>();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<UserBlockedIpMiddleware>();
 ```
 
-The handler's `HandleAuthenticateAsync` reads the `__Host-Persist` cookie value, hashes it with the same Argon2id hasher, and looks up `UserSession` rows where `PersistentTokenHash` matches and `RevokedAt IS NULL`. Comparison uses PHC `VerifyHashedPassword` semantics (constant-time). On match: rotate the token (issue new 256-bit token, hash it, replace `PersistentTokenHash`, set new `__Host-Persist` cookie), insert a fresh `UserSession` row for the rotated session, sign the user in via the regular Identity scheme (which sets `__Host-Session`).
+> **Implementation note:** The original spec used a custom `AuthenticationHandler<PersistentCookieOptions>` (`PersistentCookieHandler`) registered via `AddScheme`. The handler approach hit ASP.NET's per-request scheme-forwarding semantics: routing sign-in calls to the persistent scheme during login (when `__Host-Session` was absent) failed because that scheme does not support `SignInAsync`. Switching to a dedicated middleware that runs before `UseAuthentication` is simpler, avoids the forwarding indirection, and produces the same observable behaviour. The `PersistentCookieOptions` and `PersistentCookieHandler` files do not exist in the implementation.
 
-Persistent cookie attributes: `__Host-Persist`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, 30-day rolling expiry.
+The middleware runs only when `__Host-Persist` is present and `__Host-Session` is absent. When triggered, it:
+
+1. Looks up `UserSession` rows where `IsPersistent && RevokedAt IS NULL && PersistentTokenHash != null` and verifies the cookie value against each stored hash via Argon2id PHC verify (constant-time).
+2. On match: rotates the token (issue new 256-bit token, hash it, mark the old session's `RevokedAt`, insert a new `UserSession` row, set a fresh `__Host-Persist` cookie on the response), calls `SignInManager.SignInAsync` so the Identity scheme writes a new `__Host-Session` cookie for the next request, and stamps `HttpContext.User` directly so the current request hop is authenticated.
+3. On no match: passes the request through to authentication unchanged.
+
+Persistent cookie attributes: `__Host-Persist`, `HttpOnly`, `Secure` (per `Request.IsHttps` at write time), `SameSite=Lax`, `Path=/`, 30-day rolling expiry.
 
 #### SessionRevocationValidator
 
@@ -247,7 +265,7 @@ builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = "__Host-XSRF";
     options.Cookie.HttpOnly = false;          // SPA must read this
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;  // see § 4 cookie configuration note
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.Path = "/";
     options.HeaderName = "X-XSRF-TOKEN";
@@ -321,30 +339,35 @@ builder.Services.AddAuthorization(options =>
 
 | Endpoint | Method | Why anonymous |
 |---|---|---|
-| `/health` | GET | Liveness probe — must work pre-auth. |
+| `/api/health` | GET, POST | Liveness + structured-validation probes — must work pre-auth. (`[AllowAnonymous]` declared at the method level, not the class.) |
 | `/api/auth/register` | POST | User cannot register if registration requires login. |
 | `/api/auth/login` | POST | Same logic. |
-| SPA static catch-all (`/`, `/assets/*`, `/index.html`) | GET | Static assets served before login UI loads. Auth is enforced at the API layer, not the SPA shell. |
+| `/api/auth/csrf` | GET | CSRF cookie refresh; safe (RFC-9110-safe method) and useful pre-auth so the SPA can issue its first state-changing POST. |
+| Legacy Razor SPA-shell controllers (`AppController`, `HomeController`) | GET | Static SPA shell + error pages. Class-level `[AllowAnonymous]` is permitted on these because they're slated for Batch 4 deletion. |
+| Legacy Razor 302-redirect controllers (`AccountsController`, `BudgetsController`, `CategoriesController`, `MovementsController`, etc.) | GET / POST | All legacy redirect endpoints. Carry class-level `[Authorize]` rather than `[AllowAnonymous]` (they require auth to access the underlying SPA targets). Slated for Batch 4 deletion. |
 
 Logout (`/api/auth/logout`) is **not** in the whitelist — it requires an authenticated session by definition.
 
-`[AllowAnonymous]` is forbidden at the controller-class level by convention; only method-level. Architecture test:
+`[AllowAnonymous]` is forbidden at the **API** controller-class level by convention; method-level only. Legacy Razor SPA-shell controllers (App, Home) carry class-level `[AllowAnonymous]` because they have no API surface and are slated for Batch 4 deletion. The architecture test scopes accordingly:
 
 ```csharp
 [Fact]
-public void Controllers_must_not_have_class_level_AllowAnonymous()
+public void No_api_controller_class_has_AllowAnonymous()
 {
     var violations = typeof(Program).Assembly.GetTypes()
-        .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
+        .Where(t => typeof(ControllerBase).IsAssignableFrom(t) && !t.IsAbstract)
+        .Where(t => t.Namespace?.Contains(".Api") == true)
         .Where(t => t.GetCustomAttribute<AllowAnonymousAttribute>() is not null)
-        .Select(t => t.Name)
+        .Select(t => t.FullName!)
         .ToList();
 
     violations.Should().BeEmpty();
 }
 ```
 
-A second architecture test ensures every controller class (or every action method) has either `[Authorize]` or `[AllowAnonymous]` declared explicitly — catches the "I forgot to think about auth on this one" case:
+> **Implementation note (scope narrowing).** The original spec rule was *"no controller has class-level `[AllowAnonymous]`"*. During implementation the rule was narrowed to API controllers only because legacy Razor SPA-shell controllers (`AppController`, `HomeController`) need class-level `[AllowAnonymous]` to serve the SPA bundle and error pages pre-login. **Batch 4 (Razor + URL cleanup) deletes all legacy Razor controllers**, at which point this narrowing becomes moot — only API controllers will remain. See `planning-phase3-spa-migration.md` § *Final cleanup plan* for the Batch 4 follow-up to widen the architecture test back to "no controller anywhere has class-level `[AllowAnonymous]`" once the legacy controllers are gone.
+
+A second architecture test ensures every controller action (legacy and API alike) has either `[Authorize]` or `[AllowAnonymous]` declared explicitly — catches the "I forgot to think about auth on this one" case:
 
 ```csharp
 [Fact]
@@ -356,13 +379,16 @@ public void Every_controller_action_must_declare_authorization_intent()
         .Where(m => m.GetCustomAttributes().OfType<HttpMethodAttribute>().Any())
         .Where(m => m.GetCustomAttribute<AuthorizeAttribute>() is null
                  && m.GetCustomAttribute<AllowAnonymousAttribute>() is null
-                 && m.DeclaringType!.GetCustomAttribute<AuthorizeAttribute>() is null)
+                 && m.DeclaringType!.GetCustomAttribute<AuthorizeAttribute>() is null
+                 && m.DeclaringType!.GetCustomAttribute<AllowAnonymousAttribute>() is null)
         .Select(m => $"{m.DeclaringType!.Name}.{m.Name}")
         .ToList();
 
     violations.Should().BeEmpty(because: "explicit auth attribute required on every action");
 }
 ```
+
+A third architecture test (API-scoped) forbids GET actions whose names start with write verbs (`Create`, `Update`, `Delete`, `Archive`, `Confirm`, `Dispute`, …) — `Api_HttpGet_actions_must_not_have_write_verb_names`. The test scope is API-only because legacy Razor 302-redirect controllers have action names like `Edit` and `Confirm` that mirror legacy URL paths but execute pure redirects — Batch 4 deletion makes that hygiene gap disappear and lets the test be widened back to all controllers.
 
 ### 7. ICurrentUserAccessor swap
 
@@ -400,7 +426,12 @@ builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>
 
 ### 8. Auth endpoints (bare-minimum, JSON only)
 
-Three new endpoints in a new `AuthController`:
+Four endpoints in a new `AuthController`:
+
+- `POST /api/auth/register` — anonymous, creates user, no auto-sign-in.
+- `POST /api/auth/login` — anonymous, validates credentials, issues session.
+- `POST /api/auth/logout` — authenticated, revokes session.
+- `GET /api/auth/csrf` — anonymous, refreshes the `__Host-XSRF` cookie. Side-effect-free; added during implementation (the original spec listed only the three POSTs).
 
 #### `POST /api/auth/register`
 
@@ -468,13 +499,21 @@ Project Ceres takes the secure path: confirm-first, then sign-in. The local-dev 
   6. Call `IAntiforgery.GetAndStoreTokens(HttpContext)` to rotate the CSRF cookie.
 - Returns `204 No Content` on success.
 
+#### `GET /api/auth/csrf`
+
+- `[AllowAnonymous]`, no antiforgery validation (GET is RFC-9110-safe; antiforgery validates only state-changing methods).
+- Calls `IAntiforgery.GetAndStoreTokens(HttpContext)` which writes a fresh `__Host-XSRF` cookie bound to the current authentication context.
+- Returns `204 No Content`.
+
+**Why this endpoint exists** (not in the original spec, added during implementation): `IAntiforgery` binds the CSRF token to the current `HttpContext.User`. An anonymous-minted token does not validate against a request from an authenticated user (and vice versa). The SPA needs a way to refresh the CSRF cookie after login (transitioning anonymous → authenticated) and after logout (authenticated → anonymous) without needing to mutate state. A GET endpoint is the idiomatic shape; integration tests use the same endpoint to mint user-bound CSRF tokens for authenticated state-changing requests like logout.
+
 #### `POST /api/auth/logout`
 
 - Default fallback policy applies — requires auth.
 - `[ValidateAntiForgeryToken]` enforced via global filter.
 - Read `"sid"` claim, set `UserSession.RevokedAt = DateTime.UtcNow`.
 - If `__Host-Persist` cookie present, parse it, find the matching `UserSession` by `PersistentTokenHash`, set `RevokedAt` on that row too. Clear `__Host-Persist`.
-- Call `SignOutAsync()` to clear `__Host-Session`.
+- Call `SignInManager.SignOutAsync()` to clear `__Host-Session`. (The original spec used `HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme)`; that scheme name is `"Cookies"` while ASP.NET Identity registers under `IdentityConstants.ApplicationScheme` (`"Identity.Application"`), so the literal call from the spec threw 500. `SignInManager.SignOutAsync()` resolves the right scheme automatically.)
 - Call `IAntiforgery.GetAndStoreTokens(HttpContext)` to rotate the CSRF cookie.
 - Returns `204 No Content`.
 
@@ -532,9 +571,16 @@ Argon2id values are read into a strongly-typed options class (`Argon2idOptions`)
 
 ## Testing strategy
 
-All tests are xUnit + `WebApplicationFactory<Program>` integration tests in a new `ProjectCeres.Tests/Authentication/` folder. **No Playwright in 6a** — that lands in Stage 9.
+All tests are xUnit + `WebApplicationFactory<Program>` integration tests in a new `ProjectCeres.Tests/Integration/Authentication/` folder. **No Playwright in 6a** — that lands in Stage 9.
 
-Test database: PostgreSQL via Testcontainers (existing pattern in the repo). Each test class gets a fresh database; per-test data is created via the test fixture's `RegisterUserAsync(email, password)` helper.
+Test database: shared local PostgreSQL `project_ceres_test` (existing project pattern; tests in the `IntegrationTests` xUnit collection run sequentially on one thread to avoid races). Per-test data is created via the test fixture's `RegisterUserAsync(email, password)` helper.
+
+**Two test factories** (added during implementation; the original spec assumed a single factory):
+
+- `TestWebApplicationFactory` (default, used by 478 pre-Stage-6a CRUD integration tests): installs a `TestAuthenticationHandler` that auto-authenticates every request as the sentinel user, rebinds `ICurrentUserAccessor` to `SingleUserAccessor`, and removes the global `AutoValidateAntiforgeryTokenAttribute` filter. Pre-existing tests work unchanged.
+- `AuthTestWebApplicationFactory : TestWebApplicationFactory` (used by every test class in `Integration/Authentication/`): overrides `UseTestAuthHandler => false` so the real Identity + cookie + CSRF + global fallback policy pipeline runs end-to-end. Auth tests exercise the production behaviour.
+
+The factory split is the cleanest way to keep ~478 pre-Stage-6a integration tests green without forcing every existing test to perform a login dance, while still giving Stage 6a auth tests an unmocked pipeline. The `IntegrationCollection` xUnit collection registers both factories, so any test class can resolve either via constructor injection.
 
 ### Required passing tests before 6a is considered complete
 

@@ -220,5 +220,9 @@ Once no Razor views remain (the last feature is ported), a single dedicated clea
 2. **Add one-shot 301 redirects** from `/app/*` to `/*` to catch external bookmarks and any cached deep links. These are 301 (permanent) because the move is genuinely permanent.
 3. **Delete every per-area 302 redirect** (`/Dashboard`, `/Movements`, etc.) added during migration — they served their purpose and now point to URLs that no longer exist.
 4. **Strip MVC infrastructure from `Program.cs`** as already noted in step 5 of the migration sequence above.
+5. **Widen the Stage 6a architecture tests** that were narrowed to the API namespace because of legacy Razor controllers:
+   - `No_api_controller_class_has_AllowAnonymous` → `No_controller_class_has_AllowAnonymous` (drop the `.Namespace?.Contains(".Api") == true` filter). Once `AppController` and `HomeController` are gone, no controller should have class-level `[AllowAnonymous]` anywhere.
+   - `Api_HttpGet_actions_must_not_have_write_verb_names` → `HttpGet_actions_must_not_have_write_verb_names` (drop the same filter). With legacy 302-redirect controllers gone, no `[HttpGet]` action should start with write verbs (`Create`, `Update`, `Delete`, `Archive`, `Confirm`, `Dispute`, …) anywhere.
+   - Both renames + filter removals are a single small commit. The Stage 6a spec at `docs/superpowers/specs/2026-05-09-stage-6a-identity-foundation-design.md` § 6 records the original full-scope intent.
 
-Net result: a clean URL space (`/`, `/transactions`, etc.) with one one-shot `/app/*` → `/*` 301 catching legacy URLs. Both the migration 302s and the `/app/` prefix vanish.
+Net result: a clean URL space (`/`, `/transactions`, etc.) with one one-shot `/app/*` → `/*` 301 catching legacy URLs. Both the migration 302s and the `/app/` prefix vanish, and the architecture tests return to their full-scope form.
