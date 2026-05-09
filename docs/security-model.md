@@ -239,17 +239,31 @@ IDOR prevention applies equally to list endpoints (GET /api/v1/transactions, GET
 
 **Integration test requirement:** for every list endpoint, there must be a test that: (1) creates records belonging to User A and User B, (2) authenticates as User A, (3) calls the list endpoint, and (4) asserts the response contains only User A's records.
 
-### PostgreSQL Row-Level Security (Defense in Depth)
+### PostgreSQL Row-Level Security (Defense in Depth — Phase 3, Stage 7.5)
 
-Configure RLS policies on all user-data tables as a defense-in-depth layer that catches the case where application-layer filters are missing or bypassed:
+RLS ships in Phase 3, immediately after the Stage 7 multi-tenancy cutover. It catches the one failure mode the EF global-query-filter stack does not: raw SQL (e.g. `FromSqlRaw`) against user-owned tables without an explicit `WHERE UserId = @currentUser` clause. RLS was originally deferred to Phase 4 by ADR-0065 — that deferral was overturned by [ADR-0068](decisions/ADR-0068-postgres-rls-as-phase-3-defence-in-depth.md) on 2026-05-09.
+
+Enable RLS on every user-owned table with both `USING` and `WITH CHECK` policies. The `WITH CHECK` clause catches inserts/updates that try to write a `UserId` other than the current one, not just reads:
 
 ```sql
 ALTER TABLE "Transactions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Transactions" FORCE ROW LEVEL SECURITY;  -- applies even to table owners
 CREATE POLICY user_isolation ON "Transactions"
-  USING ("UserRef" = current_setting('app.current_user_ref'));
+  USING ("UserId" = current_setting('app.current_user_ref')::uuid)
+  WITH CHECK ("UserId" = current_setting('app.current_user_ref')::uuid);
 ```
 
-The application sets `app.current_user_ref` at session start via `SET LOCAL`. This is a secondary control — application-layer IDOR prevention remains primary. RLS is not a substitute for correct `WHERE UserId = ?` clauses.
+The application sets `app.current_user_ref` per command via an `IDbCommandInterceptor` issuing `SET LOCAL` against the same connection inside the same transaction. `SET LOCAL` is transaction-scoped — safe with Npgsql connection pooling because it does not leak across transactions.
+
+Three Postgres roles back this:
+
+- `ceres_app` — application runtime; RLS policies apply.
+- `ceres_admin` — Admin services + `IUserJobRunner` cross-tenant background jobs (ADR-0067); has `BYPASSRLS`. Selected via a separate connection string + DI scope; the `Admin/` architecture test enforces that no non-admin code path reaches this connection.
+- `ceres_migrator` — DDL + `BYPASSRLS`; only `dotnet ef database update` uses it.
+
+RLS remains a secondary control — application-layer IDOR prevention via EF global query filters + explicit `.Where(t => t.UserId == _currentUser.UserId)` redundancy + the IDOR integration test suite is still primary. RLS is not a substitute for correct `WHERE UserId = ?` clauses; it is the last layer that catches the cases primary controls miss.
+
+See `roadmap-phase-three.md` § Stage 7.5 for the full sub-stage breakdown and verification checklist.
 
 ---
 

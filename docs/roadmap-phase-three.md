@@ -685,6 +685,74 @@ IDOR integration test suite (per `multi-tenancy-strategy.md` § Required Integra
 
 ---
 
+## Stage 7.5 — PostgreSQL Row-Level Security (Batch 3c continued)
+
+**Status: ❌ Pending.** Closes the named gap left by Stage 7 (raw SQL bypasses EF query filters). Ships immediately after Stage 7 so the schema already contains real `AspNetUsers.Id` values when policies turn on. See [ADR-0068](decisions/ADR-0068-postgres-rls-as-phase-3-defence-in-depth.md) for the full rationale (this stage was originally deferred to Phase 4 by ADR-0065 and superseded on 2026-05-09).
+
+> **Goal:** PostgreSQL Row-Level Security is enabled on every user-owned table with both `USING` and `WITH CHECK` policies tied to `current_setting('app.current_user_ref')`; an EF `IDbCommandInterceptor` sets that GUC per command from `ICurrentUserAccessor`; a separate Postgres role with `BYPASSRLS` backs Admin services and `IUserJobRunner` cross-tenant jobs; integration tests prove RLS catches `FromSqlRaw` bypass attempts and `IgnoreQueryFilters()` mistakes.
+
+### Sub-stages
+
+| # | Sub-stage | Spec / Reference |
+|---|---|---|
+| 7.5.1 | Postgres roles: `ceres_app`, `ceres_admin` (BYPASSRLS), `ceres_migrator` (BYPASSRLS + DDL) | ADR-0068 § Decision (1) + `security-model.md` § Database Credentials |
+| 7.5.2 | `RowLevelSecurityInterceptor : IDbCommandInterceptor` issues `SET LOCAL "app.current_user_ref"` per command | ADR-0068 § Decision (2) |
+| 7.5.3 | DI: two `DbContext` configurations (app vs admin connection) selected by HTTP context vs `IUserScope.EnterAs` | ADR-0067 + ADR-0068 § Decision (1) |
+| 7.5.4 | Migration `AddRowLevelSecurityPolicies` enables RLS + FORCE RLS + adds `user_isolation` policy on every user-owned table | ADR-0068 § Decision (3) |
+| 7.5.5 | Per-table integration tests: `FromSqlRaw` bypass, `WITH CHECK` insert blocked, admin role sees all rows, `IUserScope.EnterAs` honours scope | ADR-0068 § Decision (5) |
+| 7.5.6 | Architecture test: every user-owned entity has both an EF `HasQueryFilter` registration AND a corresponding RLS policy in the latest migration | New — enforces parity between layers |
+
+### Verification checklist
+
+Postgres roles + connection strings:
+
+- [ ] Three roles exist in production-equivalent local Postgres: `ceres_app`, `ceres_admin`, `ceres_migrator`
+- [ ] `ceres_app` has DML rights, no DDL, **no** `BYPASSRLS`
+- [ ] `ceres_admin` has DML rights, no DDL, **has** `BYPASSRLS`
+- [ ] `ceres_migrator` has DDL rights, has `BYPASSRLS`, used only by `dotnet ef database update`
+- [ ] Three connection strings configured: `Postgres__ApplicationConnection`, `Postgres__AdminConnection`, `Postgres__MigrationConnection`
+- [ ] DI container resolves the correct `DbContext` based on whether the request is in `Admin/` namespace or under an `IUserScope` admin-context override
+
+`RowLevelSecurityInterceptor`:
+
+- [ ] Implements `IDbCommandInterceptor` (`ScalarExecuting`, `ReaderExecuting`, `NonQueryExecuting`)
+- [ ] Reads current `UserId` from `ICurrentUserAccessor`
+- [ ] Issues `SET LOCAL "app.current_user_ref" = '<uuid>'` against the same connection inside the same transaction, immediately before the EF command runs
+- [ ] Throws if `ICurrentUserAccessor` cannot resolve a user (matches existing accessor contract)
+- [ ] Skipped (does not run `SET LOCAL`) when the active `DbContext` is the admin-connection variant — admin role uses `BYPASSRLS` instead
+- [ ] Integration test: `SET LOCAL` does not leak across transactions when Npgsql pooling reuses the underlying connection
+
+RLS policies on every user-owned table:
+
+- [ ] `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile`, `ImportStagedTransaction`, `ImportStagedTransfer`, `ImportTransferExclusion` all have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`
+- [ ] Each user-owned table has a `user_isolation` policy with both `USING ("UserId" = current_setting('app.current_user_ref')::uuid)` and `WITH CHECK (...)` clauses
+- [ ] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) have **no** RLS — verified by SQL query against `pg_policies`
+- [ ] Admin tables that are intentionally cross-tenant (e.g. failed-login log if scoped this way) are documented and intentionally excluded
+
+Per-table integration tests (one suite per user-owned entity):
+
+- [ ] `FromSqlRaw("SELECT * FROM \"Transactions\"")` under User B's context returns **only** User B's rows (proves RLS catches EF-bypass)
+- [ ] `INSERT` of a row with a foreign `UserId` raises Postgres `42501` permission denied
+- [ ] `UPDATE` that would change `UserId` to a foreign value raises `42501`
+- [ ] `DELETE` against a foreign-`UserId` row affects 0 rows
+- [ ] Admin services using `ceres_admin` connection + `IgnoreQueryFilters()` return all rows (proves `BYPASSRLS` works)
+- [ ] Background job entered via `IUserScope.EnterAs(targetUserId)` sees **only** that user's rows on `ceres_app` (proves interceptor honours background scope)
+- [ ] User A cannot read User B's row even via `FromSqlRaw` with an explicit `WHERE "Id" = @bs_id` clause (final IDOR catch)
+
+Architecture tests:
+
+- [ ] Every user-owned entity registered in `ApplicationDbContext.OnModelCreating` with `HasQueryFilter` has a corresponding RLS policy in the latest migration (parity test — fails the build if a new entity ships without RLS)
+- [ ] Outside the Admin namespace and `IUserScope` infrastructure, no code references `Postgres__AdminConnection` directly
+
+Operational:
+
+- [ ] Local-dev seed script creates all three roles
+- [ ] Production deployment guide updated to require all three roles + their connection strings
+- [ ] `dotnet ef database update` runs as `ceres_migrator` in production runbook
+- [ ] Application startup fails fast if it can connect as `ceres_migrator` (privilege-leak detection)
+
+---
+
 ## Stage 8 — Email service + email security (Batch 3d)
 
 **Status: ❌ Pending.** Lands before Stage 9 (auth UI) because auth flows depend on a working email service.
@@ -1534,7 +1602,7 @@ Pre-launch dry run:
 
 ---
 
-> **When the master checklist is fully green, Phase 3 is shippable. Phase 4 begins with: per-tenant payload encryption, social login (one provider — likely Google), JWT issuance for mobile, PostgreSQL Row-Level Security as defense in depth, and the deferred items from `docs/planning-future.md`.**
+> **When the master checklist is fully green, Phase 3 is shippable. Phase 4 begins with: per-tenant payload encryption, social login (one provider — likely Google), JWT issuance for mobile, and the deferred items from `docs/planning-future.md`.** (PostgreSQL Row-Level Security was originally on this list but moved into Phase 3 as Stage 7.5 by ADR-0068.)
 
 
 
