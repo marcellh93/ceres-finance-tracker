@@ -336,7 +336,7 @@ Tier 5 — discretionary: ✅ T5.20/T5.21 shipped 2026-05-09; T5.19 deferred
 
 ### "Feels well done" gut-check — verification checklist
 
-From the same audit doc (§ 15). With Tier 1 + Tier 2 + Stage 5.4 done, most boxes are now ticked. Remaining `[ ]` items map onto Tier 3.
+From the same audit doc (§ 15). With all five tiers shipped (T1–T5 done as of 2026-05-09), most boxes are now ticked. Remaining `[ ]` and `[~]` items are deliberately deferred — they tie to features that have no consumer today (Button primitive scale-on-press, opt-in `<Link viewTransition>` for cross-fade page transitions). Reopen if a consumer emerges.
 
 - [x] No element appears or disappears instantly except in response to typing — skeleton/data cross-fade ships across the SPA via DataTransition
 - [x] No content jumps when data loads — skeleton heights match reality
@@ -393,6 +393,17 @@ A second wave of fixes surfaced during the Tier 3 verification browser-pass on i
 | TabsTrigger transition was Tailwind's default 150 ms (not migrated by T3.11); bound to `--motion-duration-base` for consistency with the rest of the app | `014f7e3` |
 | TabsList stretched full-width on desktop after the mobile fix; `md:w-fit` restores the chip-style strip at md+ | `5e84207` |
 | Razor SPA shells (`Views/App/Index.cshtml`, `Views/Shared/_Layout.cshtml`) had no favicon link, causing browser fallback to `/favicon.ico` 404; copied SVG to `wwwroot/` and wired explicit `<link rel="icon">` tags | `54a8451` |
+
+#### Tier 5 follow-up fixes (2026-05-09, post Stage-5 close-out)
+
+A handful of report-page polish surfaced after Stage 5 was marked done. Shipped same day.
+
+| Fix | Commit |
+|---|---|
+| Reports sticky-chrome's `-mt-6` overshoot the mobile gutter (`p-4` after the responsive change), leaving a transparent strip above the chrome on phones; matched negative margin to breakpoint (`-mt-4 md:-mt-6`) | `1a58892` |
+| Six reports (BudgetVsActual, IncomeExpense, MonthlyCashFlow, ExpenseBreakdown, LargestExpenses, NetWorthOverTime) wrapped KPI tile grid + ReportTableCard in a React fragment inside `<DataTransition>` — fragment's siblings don't get the outer `space-y-6`, so cards touched the table; replaced with `<div className="space-y-6">` | `4e2244a` |
+| Sticky chrome's `-mt-*` extension wasn't paired with a matching `pt-*`, so the chrome's bg only painted around the tabs/title/filters; added `pt-4 md:pt-6` so the bg fills the full sticky region | `dea45a9` |
+| `top: 0` sticky pinned the chrome at `<main>`'s content-box top, leaving 24px of `<main>`'s padding region uncovered; scrolled rows leaked through that strip between the topbar and the report tabs. Switched to `top: -1rem` mobile / `-1.5rem` desktop so the chrome anchors at `<main>`'s outer edge | `2c59535` |
 
 ---
 

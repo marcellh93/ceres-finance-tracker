@@ -62,9 +62,9 @@ Ceres is in better shape than most production apps. The hard parts — motion to
 - 3.1 [E] ⚠️ Hover transitions exist but use Tailwind literals (`duration-200`). Migration to motion tokens already on your roadmap (Known Limitation in `design-system.md` line 1154).
 - 3.2 [E] ❓ Button active/press state. Verify `components/ui/button.tsx` includes `active:scale-[0.98]` or equivalent.
 - 3.3 [E] ✅ Focus-visible rings consistent. Global `* { outline-ring/50 }` rule in `index.css` line 170.
-- 3.4 [E] ⚠️ `transition-colors` used correctly mostly. Status block (`MovementForm.tsx` lines 460/469/483/491) uses literal `duration-200` — same migration as 3.1.
+- 3.4 [E] ✅ `transition-colors` used correctly. Status block in `MovementForm.tsx` migrated to `[transition-duration:var(--motion-duration-base)]` under T3.11 (commit `c372b89`); enforced everywhere outside shadcn-vendored `sheet.tsx`.
 - 3.5 [E] ✅ Dialog/Sheet/Dropdown shadcn defaults preserved. Sonner toast tinting is icon-only — preserves AA contrast on body text.
-- 3.6 [P] ❌ List stagger animations. Add `@formkit/auto-animate`.
+- 3.6 [P] ⏸ List stagger animations. `@formkit/auto-animate` evaluated under T5.19 and **deferred 2026-05-09: no candidate consumer.** No drag-to-reorder UI exists; lists refetch-on-filter-change rather than reorder. Reopens when a real reordering surface emerges.
 - 3.7 [E] ✅ Lucide icon sizing consistent. `h-3/4/5 w-3/4/5` used appropriately, `aria-hidden="true"` set with adjacent text.
 - 3.8 [E] ✅ No `animate-bounce`/`animate-spin` on idle UI.
 - 3.9 [P] — `ease-out` for entrances vs `ease-in` for exits. shadcn defaults are fine.
