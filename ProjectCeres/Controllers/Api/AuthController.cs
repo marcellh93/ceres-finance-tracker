@@ -150,6 +150,20 @@ public sealed class AuthController : ControllerBase
         var sessionId = Guid.NewGuid();
         HttpContext.Items[SessionConstants.PendingSessionItemKey] = sessionId;
 
+        // Stage 6b.2 (Task 19 — REVERSED IN TASK 22.5):
+        // Pre-check lockout state for TOTP-shape requests so we can clear cookies
+        // and short-circuit. Backup-code shape submissions still pass through —
+        // their branch decides for itself.
+        // NOTE: Task 22.5 reverses this direction so successful TOTP can also bypass.
+        if (MfaConstants.TotpCodeShape.IsMatch(request.Code) && await _userManager.IsLockedOutAsync(user))
+        {
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
+            await _signInManager.SignOutAsync();
+            ClearRememberMeCookie();
+            return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+        }
+
         if (MfaConstants.TotpCodeShape.IsMatch(request.Code))
         {
             // Stage 6b.2: replaced TwoFactorAuthenticatorSignInAsync (which silently
