@@ -132,11 +132,8 @@ builder.Services.ConfigureApplicationCookie(options =>
         return Task.CompletedTask;
     };
     options.Events.OnValidatePrincipal = SessionRevocationValidator.ValidateAsync;
-});
 
-builder.Services.AddAuthentication()
-    .AddScheme<PersistentCookieOptions, PersistentCookieHandler>(
-        SessionConstants.PersistentScheme, _ => { });
+});
 
 builder.Services.AddAntiforgery(options =>
 {
@@ -210,6 +207,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseMiddleware<PersistentCookieRotationMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserBlockedIpMiddleware>();
