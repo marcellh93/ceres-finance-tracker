@@ -222,6 +222,14 @@ public sealed class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Returns 401 with the standard api-contract.md error envelope:
+    /// { error: { code, message } }. Use this for every Unauthorized return
+    /// from auth-flow methods so the SPA gets a consistent shape.
+    /// </summary>
+    private IActionResult UnauthorizedEnvelope(string code, string message)
+        => Unauthorized(new { error = new { code, message } });
+
+    /// <summary>
     /// GET endpoint that refreshes the __Host-XSRF cookie. State-changing endpoints
     /// require a CSRF cookie + matching X-XSRF-TOKEN header; this endpoint is the
     /// idiomatic way for the SPA (and integration tests) to ensure both are present
