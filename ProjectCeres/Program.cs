@@ -1,8 +1,15 @@
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Filters;
 using ProjectCeres.ModelBinders;
+using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Services.Reports;
 using Vite.AspNetCore;
@@ -41,9 +48,11 @@ builder.Services.AddControllers()
         };
     });
 
-// Phase 3 pre-auth: every user-owned row is stamped with a sentinel UserId. Swap this
-// registration for an HttpContext-backed accessor when authentication lands.
-builder.Services.AddScoped<ICurrentUserAccessor, SingleUserAccessor>();
+// Phase 3 Stage 6a: HttpContext-backed accessor replaces SingleUserAccessor.
+// SingleUserAccessor stays in the codebase because Stage 7's data remap references
+// the sentinel constant; only the DI registration changes here.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
 builder.Services.AddScoped<UserOwnershipInterceptor>();
 
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
@@ -51,6 +60,100 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
     options.AddInterceptors(sp.GetRequiredService<UserOwnershipInterceptor>());
 });
+
+// === Stage 6a: ASP.NET Identity + Argon2id + custom session model ===
+
+builder.Services.Configure<Argon2idOptions>(
+    builder.Configuration.GetSection("Authentication:Argon2id"));
+
+builder.Services
+    .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.SignIn.RequireConfirmedEmail = true;
+
+        options.Lockout.MaxFailedAccessAttempts = 10;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
+
+        // Length minimum is enforced dynamically by MfaAwareLengthValidator
+        // (15 pre-MFA, 8 post-MFA). The 8 here is the Identity floor.
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequiredUniqueChars = 1;
+    })
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders()
+    .AddPasswordValidator<MfaAwareLengthValidator>()
+    .AddPasswordValidator<BreachedPasswordValidator>()
+    .AddClaimsPrincipalFactory<ApplicationUserClaimsPrincipalFactory>();
+
+builder.Services.Configure<SecurityStampValidatorOptions>(o =>
+{
+    o.ValidationInterval = TimeSpan.FromMinutes(5);
+});
+
+// Replace Identity's PBKDF2 hasher with Argon2id (pinned m=19456 t=2 p=1).
+builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, Argon2idPasswordHasher>();
+builder.Services.AddScoped<Argon2idPasswordHasher>();
+builder.Services.AddScoped<PersistentTokenService>();
+
+builder.Services.AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = SessionConstants.SessionCookieName;
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Path = "/";
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+    options.SlidingExpiration = true;
+    options.LoginPath = PathString.Empty;
+    options.AccessDeniedPath = PathString.Empty;
+    options.Events.OnRedirectToLogin = ctx =>
+    {
+        ctx.Response.StatusCode = 401;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = ctx =>
+    {
+        ctx.Response.StatusCode = 403;
+        return Task.CompletedTask;
+    };
+    options.Events.OnValidatePrincipal = SessionRevocationValidator.ValidateAsync;
+});
+
+builder.Services.AddAuthentication()
+    .AddScheme<PersistentCookieOptions, PersistentCookieHandler>(
+        SessionConstants.PersistentScheme, _ => { });
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = SessionConstants.CsrfCookieName;
+    options.Cookie.HttpOnly = false;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Path = "/";
+    options.HeaderName = SessionConstants.CsrfHeaderName;
+});
+
+builder.Services.Configure<MvcOptions>(options =>
+{
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+// === End Stage 6a wiring ===
 
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
@@ -100,7 +203,9 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<UserBlockedIpMiddleware>();
 
 if (app.Environment.IsDevelopment())
     app.UseViteDevelopmentServer(useMiddleware: true);
@@ -114,12 +219,9 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// Guarantee the Settings row exists before handling any requests.
-using (var scope = app.Services.CreateScope())
-{
-    var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
-    await settingsService.EnsureExistsAsync();
-}
+// Stage 6a: removed startup EnsureExistsAsync hook. With HttpContextCurrentUserAccessor,
+// no HttpContext exists at startup so the call would throw. Stage 7's data remap
+// creates the per-user Settings row on first registration.
 
 app.Run();
 
