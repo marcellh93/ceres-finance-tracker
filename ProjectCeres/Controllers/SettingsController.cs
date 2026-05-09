@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ProjectCeres.Controllers;
@@ -8,6 +9,7 @@ namespace ProjectCeres.Controllers;
 /// browsers don't aggressively cache during the SPA migration window.
 /// The redirect is removed entirely in the final SPA-cutover cleanup batch.
 /// </summary>
+[Authorize]
 public class SettingsController : Controller
 {
     public IActionResult Edit() => Redirect("/app/settings");

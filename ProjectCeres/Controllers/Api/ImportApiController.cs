@@ -1,4 +1,5 @@
 // ProjectCeres/Controllers/Api/ImportApiController.cs
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -7,6 +8,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/import")]
+[Authorize]
 public class ImportApiController(IImportService importService) : ControllerBase
 {
     [HttpPost]

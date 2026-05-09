@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
@@ -9,6 +10,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/categories")]
+[Authorize]
 public class CategoriesApiController(
     AppDbContext db,
     ICategoryService categoryService,
@@ -119,6 +121,7 @@ public class CategoriesApiController(
 
 [ApiController]
 [Route("api/category-types")]
+[Authorize]
 public class CategoryTypesApiController(AppDbContext db) : ControllerBase
 {
     [HttpGet]

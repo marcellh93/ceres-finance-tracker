@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
@@ -8,6 +9,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/budgets")]
+[Authorize]
 public class BudgetsApiController(AppDbContext db, ICurrentUserAccessor user) : ControllerBase
 {
     [HttpGet("{id:guid}")]

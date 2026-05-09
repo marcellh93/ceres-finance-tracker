@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 
@@ -5,6 +6,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/attachments")]
+[Authorize]
 public class AttachmentsApiController(IFileAttachmentService attachmentService) : ControllerBase
 {
     /// <summary>

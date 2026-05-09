@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Helpers;
 using ProjectCeres.Services;
@@ -9,6 +10,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/reports")]
+[Authorize]
 public class ReportsApiController(
     IReportService reportService,
     ISettingsService settingsService,

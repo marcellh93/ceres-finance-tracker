@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ProjectCeres.Controllers;
@@ -9,6 +10,7 @@ namespace ProjectCeres.Controllers;
 /// window. The redirect is removed entirely in the final SPA-cutover
 /// cleanup batch.
 /// </summary>
+[Authorize]
 public class CategoriesController : Controller
 {
     public IActionResult Index() => Redirect("/app/categories");

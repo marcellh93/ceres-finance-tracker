@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
@@ -9,6 +10,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/movements")]
+[Authorize]
 public class MovementsApiController(
     IMovementService movementService,
     ITransactionService transactionService,

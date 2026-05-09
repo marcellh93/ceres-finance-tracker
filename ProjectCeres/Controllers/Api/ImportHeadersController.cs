@@ -1,4 +1,5 @@
 // ProjectCeres/Controllers/Api/ImportHeadersController.cs
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 
@@ -6,6 +7,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/import/headers")]
+[Authorize]
 public class ImportHeadersController(IHeaderDetectionService headerDetectionService) : ControllerBase
 {
     [HttpPost]

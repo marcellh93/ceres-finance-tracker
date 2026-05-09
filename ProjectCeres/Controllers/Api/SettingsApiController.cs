@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Common;
 using ProjectCeres.Services;
@@ -7,6 +8,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/settings")]
+[Authorize]
 public class SettingsApiController(ISettingsService settingsService) : ControllerBase
 {
     [HttpGet]

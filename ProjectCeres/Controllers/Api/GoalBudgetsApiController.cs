@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -6,6 +7,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/goal-budgets")]
+[Authorize]
 public class GoalBudgetsApiController(IBudgetService budgetService) : ControllerBase
 {
     [HttpGet]

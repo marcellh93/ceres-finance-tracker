@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ProjectCeres.Controllers;
 
+[Authorize]
 public class BudgetsController : Controller
 {
     [HttpGet] public IActionResult Index()                  => Redirect("/app/budgets?type=category");

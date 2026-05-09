@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -6,6 +7,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/category-budgets")]
+[Authorize]
 public class CategoryBudgetsApiController(
     ICategoryBudgetService categoryBudgetService,
     ISettingsService settingsService) : ControllerBase

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
@@ -9,6 +10,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/accounts")]
+[Authorize]
 public class AccountsApiController(
     AppDbContext db,
     IAccountService accountService,
@@ -143,6 +145,7 @@ public class AccountsApiController(
 
 [ApiController]
 [Route("api/account-types")]
+[Authorize]
 public class AccountTypesApiController(AppDbContext db) : ControllerBase
 {
     [HttpGet]

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Data;
@@ -6,6 +7,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/currencies")]
+[Authorize]
 public class CurrenciesApiController(AppDbContext db) : ControllerBase
 {
     [HttpGet]

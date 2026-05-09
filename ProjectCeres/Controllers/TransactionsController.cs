@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Services;
 
 namespace ProjectCeres.Controllers;
 
+[Authorize]
 public class TransactionsController(ITransactionService transactionService) : Controller
 {
     [HttpGet]

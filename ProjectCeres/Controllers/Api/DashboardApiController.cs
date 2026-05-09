@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
@@ -9,6 +10,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/dashboard")]
+[Authorize]
 public class DashboardApiController(
     IDashboardService dashboardService,
     ICategoryBudgetService categoryBudgetService,

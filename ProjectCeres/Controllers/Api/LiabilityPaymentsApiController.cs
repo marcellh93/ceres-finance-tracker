@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
@@ -10,6 +11,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/liability-payments")]
+[Authorize]
 public class LiabilityPaymentsApiController(
     ILiabilityPaymentService liabilityPaymentService,
     AppDbContext db,

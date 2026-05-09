@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Common;
 using ProjectCeres.Models;
@@ -8,6 +9,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/import-profiles")]
+[Authorize]
 public class ImportProfilesApiController(IImportProfileService profileService) : ControllerBase
 {
     [HttpGet]
