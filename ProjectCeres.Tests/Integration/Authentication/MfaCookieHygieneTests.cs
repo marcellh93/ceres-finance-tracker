@@ -54,17 +54,20 @@ public class MfaCookieHygieneTests : IAsyncLifetime
     [Fact]
     public async Task TwoFactorUserIdCookie_ExpiresIn5Minutes()
     {
-        var user = await AuthTestFixture.RegisterUserAsync(_factory, "ttl@cookies-test.local");
-        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
-        var client = _factory.CreateClient();
-
-        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
-
-        resp.Headers.TryGetValues("Set-Cookie", out var cookies);
-        var twoFactor = cookies!.First(c => c.StartsWith("Identity.TwoFactorUserId="));
-        // Either max-age=300 or an Expires within 4-6 minutes from now.
-        twoFactor.Should().MatchRegex(@"max-age=300|expires=.+");
+        // The 5-min TTL is enforced server-side via ExpireTimeSpan, not via the
+        // browser cookie's Expires header. Browser-visible expiry only fires when
+        // IsPersistent=true, which we deliberately do NOT set on the MFA-pending
+        // cookie (a persistent MFA-pending cookie would survive browser close,
+        // defeating the strict TTL). The server enforces rejection after 5 min
+        // regardless of what the browser-side cookie says.
+        using var scope = _factory.Services.CreateScope();
+        var optionsMonitor = scope.ServiceProvider
+            .GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<
+                Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>>();
+        var opts = optionsMonitor.Get(IdentityConstants.TwoFactorUserIdScheme);
+        opts.ExpireTimeSpan.Should().Be(TimeSpan.FromMinutes(5));
+        opts.SlidingExpiration.Should().BeFalse();
+        await Task.CompletedTask;
     }
 
     [Fact]
