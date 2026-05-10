@@ -242,6 +242,7 @@ public sealed class PasswordResetService
             }
 
             // MFA gate: if user has TwoFactorEnabled, a totpCode is required.
+            var mfaVerified = false;
             if (user.TwoFactorEnabled)
             {
                 if (string.IsNullOrWhiteSpace(totpCode))
@@ -269,7 +270,7 @@ public sealed class PasswordResetService
                     return new PasswordResetConfirmOutcome.InvalidTotp();
                 }
 
-                current.MfaVerifiedAt = DateTime.UtcNow;
+                mfaVerified = true;
             }
 
             // Password write: remove + add (re-runs all Identity password validators).
@@ -292,10 +293,21 @@ public sealed class PasswordResetService
                 await _userManager.UpdateAsync(user);
             }
 
-            // Mark token consumed.
-            await _db.PasswordResetTokens
-                .Where(t => t.Id == match.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+            // Mark token consumed; include MfaVerifiedAt when MFA was satisfied.
+            if (mfaVerified)
+            {
+                await _db.PasswordResetTokens
+                    .Where(t => t.Id == match.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(t => t.ConsumedAt, DateTime.UtcNow)
+                        .SetProperty(t => t.MfaVerifiedAt, DateTime.UtcNow), ct);
+            }
+            else
+            {
+                await _db.PasswordResetTokens
+                    .Where(t => t.Id == match.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+            }
 
             // Bulk-revoke all sessions for this user.
             await _db.UserSessions

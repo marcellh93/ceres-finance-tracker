@@ -103,11 +103,7 @@ public class PasswordResetConfirmMfaTests : IClassFixture<AuthTestWebApplication
                 .Where(t => t.UserId == userId)
                 .SingleAsync(Timeout30s());
             row.ConsumedAt.Should().NotBeNull();
-            // NOTE: MfaVerifiedAt is intentionally NOT asserted here — production code loads
-            // the token row with AsNoTracking() and then sets MfaVerifiedAt on the detached
-            // entity, which is never saved (ExecuteUpdateAsync only writes ConsumedAt).
-            // This is a known gap in production code; the two-step flow is validated by the
-            // 200→204 status codes and the ConsumedAt timestamp above.
+            row.MfaVerifiedAt.Should().NotBeNull("MfaVerifiedAt must be persisted via ExecuteUpdateAsync on the MFA path");
         }
     }
 
@@ -195,19 +191,16 @@ public class PasswordResetConfirmMfaTests : IClassFixture<AuthTestWebApplication
             backupCode = codes[0];
         }
 
-        // Submit the backup code as totpCode. Must be rejected.
-        // Backup codes are 16 chars; PasswordResetConfirmRequest.TotpCode has [StringLength(8)],
-        // so model validation fires first (before the service-side TotpCodeShape guard) and
-        // returns 400 Bad Request from ValidationProblem. Either 400 or 401 satisfies the
-        // "backup codes are not accepted" contract.
+        // Submit the backup code as totpCode. Must be rejected with 401 INVALID_MFA_CODE.
+        // The DTO now allows up to 32 chars so the backup code reaches the service-side
+        // MfaConstants.TotpCodeShape check, which rejects non-six-digit inputs.
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(
             factory, client, "/api/auth/password-reset/confirm",
             new { token, newPassword = "fresh horse battery staple", totpCode = backupCode });
 
-        // Backup codes are 16 chars; TotpCode has [StringLength(8)] → 400 from ValidationProblem.
-        // Either 400 or 401 satisfies "backup code rejected before reset succeeds".
-        resp.StatusCode.Should().NotBe(HttpStatusCode.NoContent,
-            "backup code must never complete a password reset");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "backup code must be rejected with 401 per ADR-0069");
+        (await resp.Content.ReadAsStringAsync()).Should().Contain("INVALID_MFA_CODE");
 
         // Backup code MUST still be unused — we never consumed it on this path.
         using (var scope = factory.Services.CreateScope())
