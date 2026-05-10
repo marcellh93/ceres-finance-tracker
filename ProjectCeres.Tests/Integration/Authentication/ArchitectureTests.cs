@@ -343,6 +343,62 @@ public class ArchitectureTests
             "the new password must not appear in any log line");
     }
 
+    // -----------------------------------------------------------------------
+    // #27 — RequireRecentAuth attribute is only on action methods, not classes
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void RequireRecentAuth_attribute_is_only_on_action_methods_not_classes()
+    {
+        var asm = typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute).Assembly;
+        var controllerTypes = asm.GetTypes()
+            .Where(t => typeof(ControllerBase).IsAssignableFrom(t));
+
+        foreach (var t in controllerTypes)
+        {
+            t.GetCustomAttributes(typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute), inherit: false)
+                .Should().BeEmpty($"{t.Name} carries [RequireRecentAuth] at the class level — must be action-level only");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // #28 — RequireRecentAuth attribute is never combined with AllowAnonymous
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void RequireRecentAuth_attribute_is_never_combined_with_AllowAnonymous()
+    {
+        var asm = typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute).Assembly;
+        var actionMethods = asm.GetTypes()
+            .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
+
+        foreach (var m in actionMethods)
+        {
+            var hasRecentAuth = m.GetCustomAttributes(typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute), inherit: false).Any();
+            if (!hasRecentAuth) continue;
+            var hasAllowAnon = m.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false).Any();
+            hasAllowAnon.Should().BeFalse($"{m.DeclaringType!.Name}.{m.Name} carries both [RequireRecentAuth] and [AllowAnonymous] — these are mutually exclusive");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // #29 — Three existing MFA endpoints carry RequireRecentAuth attribute
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Three_existing_MFA_endpoints_carry_RequireRecentAuth_attribute()
+    {
+        var t = typeof(ProjectCeres.Controllers.Api.MfaController);
+        foreach (var name in new[] { "Enroll", "EnrollVerify", "RegenerateBackupCodes" })
+        {
+            var m = t.GetMethod(name);
+            m.Should().NotBeNull($"MfaController must expose {name}");
+            m!.GetCustomAttributes(typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute), inherit: false)
+                .Should().NotBeEmpty($"MfaController.{name} must carry [RequireRecentAuth] (Stage 6c.2)");
+        }
+    }
+
     /// <summary>
     /// Resolves a controller source path by walking up from the test bin/ output to
     /// the repository root, then descending into the production project. xUnit runs
