@@ -81,13 +81,10 @@ public class MfaRegenerateRateLimitTests : IAsyncLifetime
     }
 
     private async Task<HttpResponseMessage> PostRegenAsync(
-        HttpClient client, string sessionCookie, Guid userId, object body)
+        HttpClient client, string sessionCookie, Guid userId)
     {
         var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, userId);
-        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/backup-codes/regenerate")
-        {
-            Content = JsonContent.Create(body),
-        };
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/backup-codes/regenerate");
         req.Headers.Add("Cookie",
             $"{SessionConstants.SessionCookieName}={sessionCookie}; {SessionConstants.CsrfCookieName}={csrfCookie}");
         req.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader);
@@ -101,27 +98,20 @@ public class MfaRegenerateRateLimitTests : IAsyncLifetime
         // Gap 4 implementation did not add it. This test confirms the fix: 11 calls in
         // quick succession must eventually return 429.
 
-        var (client, sessionCookie, seed, user) = await SetupAuthenticatedMfaUserAsync("rl-regen@mfa-rl-test.local");
+        var (client, sessionCookie, _, user) = await SetupAuthenticatedMfaUserAsync("rl-regen@mfa-rl-test.local");
 
-        // Wait so regen codes are in a different TOTP window than the login code.
-        await Task.Delay(TimeSpan.FromSeconds(31));
-
+        // No body or TOTP required after Task 11; [RequireRecentAuth] gates via LastReauthAt
+        // stamped at login. Send 11 rapid no-body POSTs; the rate limiter must fire before
+        // all 11 complete.
         HttpResponseMessage? last429 = null;
         for (int i = 0; i < 11; i++)
         {
-            var code = AuthTestFixture.ComputeCurrentTotpCode(seed);
-            var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = code });
+            var resp = await PostRegenAsync(client, sessionCookie, user.Id);
             if (resp.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 last429 = resp;
                 break;
             }
-            // After the first successful regen the old codes are replaced; the seed stays
-            // the same (authenticator key is unchanged), so we can keep computing codes.
-            // Each call within the same TOTP window will replay the same code and get 401
-            // (either replay-guard or TOTP reject) — wait for the next window to get a
-            // fresh code. This is acceptable: we want to see if the rate limiter fires at
-            // all, not just on perfectly valid codes.
         }
 
         last429.Should().NotBeNull(

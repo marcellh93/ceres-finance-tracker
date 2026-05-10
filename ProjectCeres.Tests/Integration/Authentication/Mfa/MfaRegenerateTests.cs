@@ -85,18 +85,16 @@ public class MfaRegenerateTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// POSTs to an authenticated MFA endpoint using a user-bound CSRF token and the
-    /// established session cookie. Mirrors the pattern used by MfaEnrollmentTests and
-    /// MfaCacheControlTests for post-login requests.
+    /// POSTs to the regenerate endpoint using a user-bound CSRF token and the
+    /// established session cookie. The endpoint takes no body after Task 11;
+    /// the gate is [RequireRecentAuth] which checks LastReauthAt baked into the
+    /// session cookie at login time.
     /// </summary>
     private async Task<HttpResponseMessage> PostRegenAsync(
-        HttpClient client, string sessionCookie, Guid userId, object body)
+        HttpClient client, string sessionCookie, Guid userId)
     {
         var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, userId);
-        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/backup-codes/regenerate")
-        {
-            Content = JsonContent.Create(body),
-        };
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/backup-codes/regenerate");
         req.Headers.Add("Cookie",
             $"{SessionConstants.SessionCookieName}={sessionCookie}; {SessionConstants.CsrfCookieName}={csrfCookie}");
         req.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader);
@@ -104,54 +102,24 @@ public class MfaRegenerateTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Regenerate_WithoutTotpCode_Returns422()
+    public async Task Regenerate_WithoutBody_Succeeds_AfterFreshLogin()
     {
+        // After Task 11 the endpoint takes no body; [RequireRecentAuth] is the gate.
+        // Login stamps LastReauthAt so the gate passes immediately.
         var (client, sessionCookie, _, user) = await SetupAuthenticatedMfaUserAsync("no-code@regen-test.local");
 
-        var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { });
+        var resp = await PostRegenAsync(client, sessionCookie, user.Id);
 
-        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task Regenerate_WithInvalidTotp_Returns401_DoesNotWipeCodes()
+    public async Task Regenerate_ReplacesCodes()
     {
-        var (client, sessionCookie, _, user) = await SetupAuthenticatedMfaUserAsync("bad-code@regen-test.local");
+        var (client, sessionCookie, _, user) = await SetupAuthenticatedMfaUserAsync("valid@regen-test.local");
 
-        // Capture the original code count.
-        int originalCount;
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            originalCount = await db.UserMfaBackupCodes.Where(c => c.UserId == user.Id).CountAsync();
-        }
-        originalCount.Should().Be(10, "setup generated 10 backup codes");
-
-        var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = "000000" });
-
-        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetProperty("code").GetString().Should().Be("INVALID_MFA_CODE");
-
-        // Codes are still intact.
-        using var verifyScope = _factory.Services.CreateScope();
-        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var afterCount = await verifyDb.UserMfaBackupCodes.Where(c => c.UserId == user.Id).CountAsync();
-        afterCount.Should().Be(10);
-    }
-
-    [Fact]
-    public async Task Regenerate_WithValidTotp_ReplacesCodes()
-    {
-        var (client, sessionCookie, seed, user) = await SetupAuthenticatedMfaUserAsync("valid@regen-test.local");
-
-        // Wait so the regen TOTP code is a different time-step than the login code (replay guard).
-        // TOTP rotates every 30s; sleep 31s to guarantee a fresh window.
-        await Task.Delay(TimeSpan.FromSeconds(31));
-
-        var regenCode = AuthTestFixture.ComputeCurrentTotpCode(seed);
-        var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = regenCode });
+        // No body, no TOTP — the gate is RequireRecentAuth (LastReauthAt claim from login).
+        var resp = await PostRegenAsync(client, sessionCookie, user.Id);
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();

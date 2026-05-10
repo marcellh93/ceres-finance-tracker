@@ -53,10 +53,10 @@ public class MfaCacheControlTests : IAsyncLifetime
             new { code });
         verify.Headers.CacheControl!.NoStore.Should().BeTrue();
 
-        // /backup-codes/regenerate — new contract requires a current TOTP code (Gap 4 fix)
-        var regenCode = AuthTestFixture.ComputeCurrentTotpCode(seed);
+        // /backup-codes/regenerate — no body required after Task 11; gate is [RequireRecentAuth]
+        // (LastReauthAt is stamped at login, so the request passes immediately).
         var regen = await PostMfaAsync(client, sessionCookie!, user.Id, "/api/auth/mfa/backup-codes/regenerate",
-            new { totpCode = regenCode });
+            body: null);
         regen.Headers.CacheControl!.NoStore.Should().BeTrue();
     }
 
