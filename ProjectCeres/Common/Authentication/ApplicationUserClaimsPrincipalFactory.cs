@@ -36,6 +36,12 @@ public sealed class ApplicationUserClaimsPrincipalFactory
         {
             identity.AddClaim(new Claim(SessionConstants.SessionIdClaim, sid.ToString()));
         }
+
+        if (_http.HttpContext?.Items[SessionConstants.LastReauthAtItemKey] is string ts && ts.Length > 0)
+        {
+            identity.AddClaim(new Claim(SessionConstants.LastReauthAtClaim, ts));
+        }
+
         return identity;
     }
 }
