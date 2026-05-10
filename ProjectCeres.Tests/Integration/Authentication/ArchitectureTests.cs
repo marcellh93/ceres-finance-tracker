@@ -3,7 +3,11 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using ProjectCeres.Common.Email;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -195,6 +199,148 @@ public class ArchitectureTests
         // Also guard against Unauthorized with flat strings (belt-and-suspenders)
         source.Should().NotContain("Unauthorized(new { error = \"",
             "MfaController must use envelope shape for Unauthorized returns too");
+    }
+
+    // -----------------------------------------------------------------------
+    // #40 — PasswordResetController action attributes
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PasswordResetController_methods_have_correct_attributes()
+    {
+        // The action method is named RequestReset (not Request) to avoid collision with
+        // ControllerBase.Request property. Confirm and RequestReset must both carry
+        // [AllowAnonymous] and [EnableRateLimiting].
+        var type = typeof(ProjectCeres.Controllers.Api.PasswordResetController);
+        foreach (var methodName in new[] { "RequestReset", "Confirm" })
+        {
+            var mi = type.GetMethod(methodName);
+            mi.Should().NotBeNull($"PasswordResetController must define {methodName}");
+            mi!.GetCustomAttributes(true)
+                .Any(a => a is AllowAnonymousAttribute)
+                .Should().BeTrue($"{methodName} must be [AllowAnonymous]");
+            mi.GetCustomAttributes(true)
+                .Any(a => a is EnableRateLimitingAttribute)
+                .Should().BeTrue($"{methodName} must be [EnableRateLimiting]");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // #41 — PasswordResetController does not hold a PasswordHasher field
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PasswordResetController_does_not_call_PasswordHasher_directly()
+    {
+        // The controller should depend only on PasswordResetService, never on
+        // Argon2idPasswordHasher directly — hashing is the service's responsibility.
+        var type = typeof(ProjectCeres.Controllers.Api.PasswordResetController);
+        var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
+        fields.Select(f => f.FieldType)
+            .Should().NotContain(typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+                "the controller must delegate password hashing to PasswordResetService");
+    }
+
+    // -----------------------------------------------------------------------
+    // #42 — Only known IEmailService implementations exist in the production assembly
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void IEmailService_dev_impl_is_LogOnly()
+    {
+        // LogOnlyEmailService is the sole dev/production implementation.
+        // NoopEmailService ships in the production assembly (test-helper role)
+        // but must never be registered in production DI.
+        // This test guards against accidental addition of a third implementation
+        // (e.g. a real SMTP sender) before Stage 8 intentionally wires one.
+        var asm = typeof(IEmailService).Assembly;
+        var impls = asm.GetTypes()
+            .Where(t => typeof(IEmailService).IsAssignableFrom(t)
+                     && !t.IsAbstract
+                     && !t.IsInterface)
+            .ToList();
+
+        var knownImpls = new[]
+        {
+            typeof(LogOnlyEmailService),
+            typeof(NoopEmailService),
+        };
+
+        impls.Should().OnlyContain(t => knownImpls.Contains(t),
+            "only LogOnlyEmailService and NoopEmailService may exist in the production assembly — " +
+            "any new implementation (real SMTP, etc.) must be gated by Stage 8");
+
+        impls.Should().Contain(typeof(LogOnlyEmailService),
+            "LogOnlyEmailService must be present as the dev IEmailService implementation");
+    }
+
+    // -----------------------------------------------------------------------
+    // #43 — PasswordResetService public methods accept CancellationToken
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void PasswordResetService_methods_take_CancellationToken()
+    {
+        var type = typeof(ProjectCeres.Common.Authentication.PasswordResetService);
+        var publicMethods = type
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(m => m.Name is "RequestAsync" or "ConfirmAsync")
+            .ToList();
+
+        publicMethods.Should().NotBeEmpty("PasswordResetService must expose RequestAsync and ConfirmAsync");
+
+        foreach (var m in publicMethods)
+        {
+            var lastParam = m.GetParameters().LastOrDefault();
+            lastParam.Should().NotBeNull($"{m.Name} must have at least one parameter");
+            lastParam!.ParameterType.Should().Be(typeof(CancellationToken),
+                $"{m.Name} must end with CancellationToken so callers can propagate cancellation");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // #44 — PasswordResetController actions do not log PII (email / password)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task PasswordResetController_actions_dont_log_request_body()
+    {
+        // Full integration assertion: replay a request and a confirm, then verify
+        // captured logs contain neither the literal email nor the literal new password.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        var capturedLogs = new List<string>();
+
+        // WithCapturedLogger returns WebApplicationFactory<Program>; chain the email
+        // replacement via a second WithWebHostBuilder to keep the base AuthTestWebApplicationFactory
+        // pipeline (real Identity, real CSRF, real rate-limit).
+        await using var factory = new AuthTestWebApplicationFactory()
+            .WithCapturedLogger(capturedLogs)
+            .WithWebHostBuilder(builder =>
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<IEmailService>();
+                    services.AddSingleton<IEmailService>(new NoopEmailService());
+                }));
+
+        var client = factory.CreateClient();
+
+        var email = $"arch-pii-{Guid.NewGuid():N}@example.com";
+        await AuthTestFixture.RegisterUserAsync(factory, email);
+        var sentinelPassword = $"sentinel-{Guid.NewGuid():N}-passw0rd";
+
+        await AuthTestFixture.PostJsonWithCsrfAsync(
+            factory, client, "/api/auth/password-reset/request", new { email });
+
+        // The confirm token will be invalid, but we only care about log content — not the outcome.
+        await AuthTestFixture.PostJsonWithCsrfAsync(
+            factory, client, "/api/auth/password-reset/confirm",
+            new { token = "irrelevant-token", newPassword = sentinelPassword });
+
+        capturedLogs.Should().NotContain(s => s.Contains(email),
+            "the request body email must not appear in any log line");
+        capturedLogs.Should().NotContain(s => s.Contains(sentinelPassword),
+            "the new password must not appear in any log line");
     }
 
     /// <summary>
