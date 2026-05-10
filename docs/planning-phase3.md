@@ -429,6 +429,22 @@ The following items were captured during Stage 6b.2 design and implementation, t
 
 6. **Backup-code-during-lockout policy** — formalized in `security-model.md` § Login → Account lockout (Stage 6b.2 amendment, 2026-05-09). No further action needed.
 
-7. **TOTP replay guard: replace in-process semaphore with deterministic-window unique index** (Stage 16, before multi-host) — Stage 6b.2 closed the SELECT-then-INSERT TOCTOU using a per-user `SemaphoreSlim` in `TotpReplayGuard` (band-aid for single-host beta). The structural fix is to store the deterministic TOTP counter window (Unix-seconds / 30) and add a unique index on `(UserId, CodeWindow)`. Then INSERT first, catch `UniqueConstraintViolation` → reject as replay. The current semaphore silently fails under multi-host and must be replaced before any horizontal scale-out. See commit `6a5133b`.
+7. **TOTP replay guard and backup-code consume: replace in-process semaphores with DB-level uniqueness** (Stage 16, before multi-host) — Stage 6b.2 closed the TOTP SELECT-then-INSERT TOCTOU using a per-user `SemaphoreSlim` in `TotpReplayGuard`; Stage 6b.3 added a second per-user `SemaphoreSlim` in `MfaBackupCodeService.VerifyAndConsumeAsync` for the same reason. Both are single-host band-aids that silently fail under multi-host. Structural fix for TOTP: add a unique index on `(UserId, CodeWindow)` and INSERT-first/catch-UniqueConstraint. Structural fix for backup codes: unique index on `(UserMfaBackupCodeId)` with a conditional UPDATE-where-not-consumed approach. Must replace before any horizontal scale-out. See commits `6a5133b` (6b.2) and the 6b.3 implementation.
 
 8. **Login lockout: replace per-user semaphore with atomic single-statement UPDATE** (Stage 16, before multi-host) — Stage 6b.2 closed the AccessFailedCount race using a per-user `SemaphoreSlim` in `AuthController.Login` (band-aid for single-host beta). The structural fix is a single atomic SQL: `UPDATE "AspNetUsers" SET "AccessFailedCount" = "AccessFailedCount" + 1, "LockoutEnd" = CASE WHEN "AccessFailedCount" + 1 >= @threshold THEN @end ELSE "LockoutEnd" END WHERE "Id" = @id`, issued via `ExecuteSqlInterpolatedAsync`, completely bypassing Identity's `AccessFailedAsync`. Works on a multi-host fleet without in-process state. The current semaphore silently fails under multi-host and must be replaced before any horizontal scale-out. See commit `6a5133b`.
+
+9. **MFA in-process semaphores in `MfaBackupCodeService` and `PersistentCookieRotationMiddleware`** (Stage 16, before multi-host) — Stage 6b.3 added per-user `SemaphoreSlim` in `MfaBackupCodeService.VerifyAndConsumeAsync` (backup-code consume race) and a per-token `SemaphoreSlim` in `PersistentCookieRotationMiddleware` (rotation race). Both are single-host band-aids. The `MfaBackupCodeService` fix is tracked together with item 7 above. The `PersistentCookieRotationMiddleware` fix requires a CAS-style conditional update or a DB-level unique constraint on the rotation sequence.
+
+---
+
+## Stage 6b.3 deferred decisions (2026-05-10)
+
+The following items were captured during Stage 6b.3 design and implementation, then deferred to later stages:
+
+1. **Step-up middleware (`LastPasswordVerifiedAt` claim)** (Stage 6c) — Stage 6b.3 used an in-body TOTP code on backup-code regeneration as a targeted stopgap (Gap 4). The full reauth middleware that stamps a `LastPasswordVerifiedAt` claim and gates sensitive operations uniformly ships in Stage 6c alongside password-reset and email-change.
+
+2. **MFA disable endpoint** (Stage 6c) — Stage 6b.3 returns `409 MFA_ALREADY_ENROLLED` on `POST /api/auth/mfa/enroll` when MFA is already active (Gap 5), blocking silent re-enrollment. There is no UI path to disable MFA until Stage 6c ships the disable endpoint.
+
+3. **Email notification on duplicate-email registration** (Stage 6c) — Stage 6b.3 changed `POST /api/auth/register` to return `204` on duplicate email (Gap 6, enumeration prevention). The "someone tried to register with your address" notification email to the existing account holder is deferred to Stage 6c because it depends on the email-send infrastructure (SMTP + template engine) shipping then.
+
+4. **Audit log entity + writer** (Stage 6c) — security events (login, logout, MFA change, backup-code regen, session revocation) need a durable `AuditLog` table. Stage 6b.3 logs to the application logger only. The `AuditLog` entity, writer service, and GDPR-retention rules are scoped to Stage 6c.

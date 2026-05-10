@@ -386,6 +386,21 @@ Returned by `POST /api/category-budgets` and `PATCH /api/category-budgets/{id}/r
 }
 ```
 
+### Canonical error codes
+
+The table below lists every `error.code` value the API can return, grouped by domain. Auth codes were added in Stage 6b.1–6b.3.
+
+| Code | Status | Returned by | When |
+|------|--------|-------------|------|
+| `VALIDATION_ERROR` | 422 | All endpoints | Model-state or business-rule validation failure. `details[]` is populated for field errors; empty for semantic/business errors. |
+| `RATE_LIMITED` | 429 | Rate-limited auth endpoints | Request exceeds the endpoint's rate-limit policy. Includes `Retry-After` header. |
+| `UNAUTHENTICATED` | 401 | All authenticated endpoints | No valid session cookie. |
+| `DUPLICATE_BUDGET` | 409 | `POST /api/category-budgets`, `PATCH /api/category-budgets/{id}/reactivate` | Activating would violate the unique `(CategoryId, CurrencyId)` active-budget constraint. |
+| `MFA_ALREADY_ENROLLED` | 409 | `POST /api/auth/mfa/enroll` | `user.TwoFactorEnabled = true` — MFA is already active. Disable MFA (Stage 6c) before re-enrolling. Stage 6b.3. |
+| `MFA_NOT_ENABLED` | 409 | `POST /api/auth/mfa/backup-codes/regenerate` | MFA is not enabled for this user; there are no backup codes to regenerate. Stage 6b.3. |
+| `INVALID_MFA_CODE` | 401 | `POST /api/auth/mfa/backup-codes/regenerate`; MFA verification endpoints | The supplied TOTP or backup code is rejected (wrong, expired, replayed, or already used). Stage 6b.3. |
+| `NO_ENROLLMENT_IN_PROGRESS` | 400 | `POST /api/auth/mfa/enroll/verify` | No authenticator key is staged for this user — `/enroll` must be called first. Stage 6b.3. |
+
 ### Phase 3 — Full Web API (`/api/v1/`)
 
 | Resource | Endpoints | Notes |
@@ -434,14 +449,14 @@ Stage 6a (shipped 2026-05-09) introduced register/login/logout. Stage 6b.1 (ship
 
 | Endpoint | Method | Auth | Body | Response |
 |---|---|---|---|---|
-| `/api/auth/register` | POST | Anonymous, CSRF-validated | `{ email, password }` | `204 No Content` on success. `400` with `{ errors: [...] }` envelope on validation failure (HIBP breach screening, length policy, duplicate email). Does not auto-sign-in — production flow is register → email-confirm (Stage 6c) → login. |
+| `/api/auth/register` | POST | Anonymous, CSRF-validated | `{ email, password }` | `204 No Content` on success. `204 No Content` on duplicate email — same shape, no enumeration (Stage 6b.3). `422` with `{ error: { code: "VALIDATION_ERROR", ... } }` on validation failure (HIBP breach screening, length policy). Does not auto-sign-in — production flow is register → email-confirm (Stage 6c) → login. |
 | `/api/auth/login` | POST | Anonymous, CSRF-validated | `{ email, password, rememberMe }` | `204` + `__Host-Session` cookie if MFA off. `200 { requiresTotp: true }` + scoped `Identity.TwoFactorUserId` cookie if MFA on (no session cookie issued — second-step required). `401` on bad credentials, locked-out, unconfirmed-email. Always runs Argon2id (dummy hash on user-not-found) for constant-time enumeration prevention. |
 | `/api/auth/login/totp` | POST | Anonymous (relies on `Identity.TwoFactorUserId` scoped cookie set by `/login`), CSRF-validated | `{ code }` — 6-digit TOTP **or** 16-char Crockford backup code (with or without `-` separators) | `204` + `__Host-Session` cookie on success. Replayed code → `401 { error: "replay" }`. Wrong code → `401`. Missing/expired scoped cookie → `401`. |
 | `/api/auth/logout` | POST | Authenticated, CSRF-validated | (empty) | `204`. Stamps `UserSession.RevokedAt`, revokes paired `__Host-Persist` row if present, signs out via Identity, rotates CSRF cookie. |
 | `/api/auth/csrf` | GET | Anonymous (safe method, no antiforgery validation needed) | — | `204` + fresh `__Host-XSRF` cookie. SPA + integration-test helper for binding the CSRF token to the current authentication context (anonymous before login; authenticated after). |
-| `/api/auth/mfa/enroll` | POST | Authenticated, CSRF-validated | (empty) | `200 { otpAuthUri, manualEntryKey }`. `Cache-Control: no-store, no-cache`. Generates a fresh authenticator key (overwriting any prior unverified candidate). |
-| `/api/auth/mfa/enroll/verify` | POST | Authenticated, CSRF-validated | `{ code }` — 6-digit TOTP | `200 { backupCodes: [...10 strings] }` on success — flips `TwoFactorEnabled = true` and returns the freshly-generated batch of 10 backup codes once. `400 { error: "code_did_not_verify" }` on wrong code. `Cache-Control: no-store, no-cache`. |
-| `/api/auth/mfa/backup-codes/regenerate` | POST | Authenticated (reauth gate added in 6c), CSRF-validated | (empty) | `200 { backupCodes: [...10 strings] }` — invalidates all existing codes and returns a new batch once. `400 { error: "mfa_not_enabled" }` if user hasn't enrolled. `Cache-Control: no-store, no-cache`. |
+| `/api/auth/mfa/enroll` | POST | Authenticated, CSRF-validated | (empty) | `200 { otpAuthUri, manualEntryKey }`. `Cache-Control: no-store, no-cache`. Generates a fresh authenticator key (overwriting any prior unverified candidate). **`409 MFA_ALREADY_ENROLLED`** if `user.TwoFactorEnabled = true` — no silent re-enrollment (Stage 6b.3). |
+| `/api/auth/mfa/enroll/verify` | POST | Authenticated, CSRF-validated | `{ code }` — 6-digit TOTP | `200 { backupCodes: [...10 strings] }` on success — flips `TwoFactorEnabled = true` and returns the freshly-generated batch of 10 backup codes once. `400 { error: { code: "NO_ENROLLMENT_IN_PROGRESS", message: "..." } }` when no key is staged. `401 { error: { code: "INVALID_MFA_CODE", message: "..." } }` on wrong code. `Cache-Control: no-store, no-cache`. |
+| `/api/auth/mfa/backup-codes/regenerate` | POST | Authenticated (full step-up middleware deferred to 6c), CSRF-validated | `{ totpCode }` — current 6-digit TOTP code required (Stage 6b.3) | `200 { backupCodes: [...10 strings] }` — invalidates all existing codes and returns a new batch once. `422` if `totpCode` is missing. `401 MFA_INVALID_CODE` if code is rejected. `409 MFA_NOT_ENABLED` if user has no MFA. `Cache-Control: no-store, no-cache`. |
 
 **Cookies in play:**
 - `__Host-Session` — short-lived Identity session cookie (sliding 30-min). HttpOnly, Secure (Production; SameAsRequest in dev/test), SameSite=Lax, Path=/.

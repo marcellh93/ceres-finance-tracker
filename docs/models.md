@@ -988,11 +988,11 @@ Tracks active authenticated sessions server-side. Enables multi-device support, 
 |--------|------|-------------|-------|
 | Id | uuid | PK | The "sid" claim value embedded in the auth ticket. UUID prevents sequential ID enumeration. |
 | UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7 (sentinel-to-real-user remap, ADR-0066). |
-| PersistentTokenHash | varchar(512) | nullable | Argon2id-hashed `__Host-Persist` token (256-bit base64url-encoded raw value). Null for non-persistent sessions. Rotated on each use of the persistent cookie. |
+| PersistentTokenHash | varchar(512) | nullable | Argon2id hash of the SECRET portion of the persistent cookie value. The cookie value itself is `{base64url(UserSession.Id)}.{secret}` so server-side lookup is O(1) by indexed Id (no N×Argon2id linear scan on the pre-auth hot path). Null for non-persistent sessions. Rotated on each use of the persistent cookie. Stage 6b.3. |
 | IpCreatedAt | varchar(45) | NOT NULL | IP at session creation. Used for IP enforcement (per-session, not per-user) and for matching against `UserBlockedIp` entries. IPv6-sized. |
 | UserAgent | varchar(512) | NOT NULL | UA header at session creation. Displayed in active-sessions UI. 90-day retention cap per `security-model.md` § Sensitive Fields at Rest — purge job is a Stage 7 deliverable via `IUserJobRunner`. |
 | CreatedAt | timestamp | NOT NULL | When the session was created. |
-| LastUsedAt | timestamp | NOT NULL | Updated on each authenticated request via `SessionRevocationValidator.OnValidatePrincipal`. Future-work flag tracked in `planning-future.md` § *Session-validation per-request DB write*. |
+| LastUsedAt | timestamp | NOT NULL | Updated on authenticated requests via `SessionRevocationValidator.OnValidatePrincipal`, debounced to at most one write per 60 seconds (Stage 6b.3). The SELECT still runs on every request (revocation guarantee). Future-work options tracked in `planning-future.md` § *Session-validation per-request DB write*. |
 | RevokedAt | timestamp | nullable | Stamped when the session is terminated. Non-null = session no longer accepted (the next request with this cookie returns 401). |
 | IsPersistent | bool | NOT NULL | True = "remember me" session paired with a `__Host-Persist` cookie + `PersistentTokenHash` row. |
 
@@ -1000,7 +1000,7 @@ Tracks active authenticated sessions server-side. Enables multi-device support, 
 
 **IP enforcement is per session:** when the user has IP enforcement enabled (the toggle UI ships in 6c), each incoming request is validated against the `IpCreatedAt` of its own session row — not against a single account-wide IP. Multiple devices with different IPs are fully compatible with enforcement on, because each device has its own session anchored to its own creation IP.
 
-**Persistent token rotation:** on each request that arrives with a `__Host-Persist` cookie but no valid `__Host-Session` cookie, `PersistentCookieRotationMiddleware` (runs before `UseAuthentication`) verifies the raw token against `PersistentTokenHash`, rotates the token (issue new + replace the hash), inserts a fresh `UserSession` row, and signs the user back in via the regular Identity scheme. Old `__Host-Persist` cookie value replayed after rotation returns 401.
+**Persistent token rotation (Stage 6b.3):** on each request that arrives with a `__Host-Persist` cookie but no valid `__Host-Session` cookie, `PersistentCookieRotationMiddleware` (runs before `UseAuthentication`) extracts `UserSession.Id` from the cookie prefix (`{base64url(Id)}.{secret}`), looks up the row by PK (O(1)), verifies `Argon2id(secret) == PersistentTokenHash`, rotates the token (issue new + replace the hash), and writes fresh `__Host-Session` + `__Host-Persist` cookies — but does NOT authenticate the current request. The current request returns 401; the next request (with the new `__Host-Session` cookie) succeeds. This closes the SecurityStamp window on the rotation hop. Old `__Host-Persist` cookie value replayed after rotation returns 401. A per-token `SemaphoreSlim` prevents concurrent duplicate-rotation races (single-host band-aid; Stage 16 structural fix required).
 
 ---
 

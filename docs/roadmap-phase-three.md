@@ -438,6 +438,8 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 > **Stage 6b.2 (2026-05-10):** Lockout enforcement + sliding-window rate limits + failed-login logging + backup-code-during-lockout shipped (54 ship-gate tests in `ProjectCeres.Tests/Integration/Authentication/`). 6b.1 latent bug fixed: `TwoFactorAuthenticatorSignInAsync` replaced with `VerifyTwoFactorTokenAsync`, so wrong TOTP codes no longer increment the password lockout counter. All `Unauthorized(...)` returns aligned to api-contract envelope shape. Items below marked `[x]` for 6b.2; remaining lockout-email + password-reset rate limit + self-service unlock items are scoped to 6c.
 
+> **Stage 6b.3 (2026-05-10):** Security hardening — 13 production fixes (1 Critical, 4 High, 4 Medium, 2 Low + 2 surfaced by edge-case tests) closing post-6b.2 audit gaps. Per-user semaphores on backup-code consume + persistent-cookie rotation; persistent cookie sessionId-prefix eliminates pre-auth DoS; backup-code regen requires current TOTP; MFA re-enroll returns 409; register no longer enumerates accounts; CSRF gets own rate-limit bucket; logout rate-limited; SessionRevocationValidator debounced; MfaAwareLengthValidator wired to TwoFactorEnabled; persistent-cookie rotation closes SecurityStamp window. 22 net-new edge-case tests added. Stage 6c continues with password-reset, email-change, reauth middleware, audit log.
+
 ASP.NET Identity hardening:
 
 - [x] `options.Lockout.MaxFailedAccessAttempts = 10`
