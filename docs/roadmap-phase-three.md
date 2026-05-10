@@ -565,6 +565,10 @@ Tests required before Stage 7 begins:
 - [ ] CSRF test: state-changing request without XSRF-TOKEN header returns 400/403
 - [x] Reauthentication test: a gated endpoint without a fresh `LastReauthAt` claim returns 401 `REAUTH_REQUIRED` even with a valid session — Stage 6c.2 (`Gated_endpoint_with_stale_claim_returns_401_REAUTH_REQUIRED`, `Gated_endpoint_with_no_claim_returns_401_REAUTH_REQUIRED`, `MfaRegenerateBackupCodes_now_requires_recent_auth_not_in_body_totp`). Change-password specifically lands with 6.12.
 
+Stage 6 close-out documentation:
+
+- [ ] **Document the entire authentication flow as visual diagrams in `security-model.md`.** Fires at Stage 6 close-out — AFTER all remaining sub-stages have shipped (6.12 email change, 6.14 audit log, lockout self-service unlock, plus the `AuthMfaByUser` rate-limit-partition follow-up tracked in `planning-phase3.md` § Stage 6c.2 deferred decisions). Build a single end-of-stage set of flowcharts covering: the request pipeline (CSRF → rate-limit → blocked-IP → authentication → authorization → controller); registration; login (no-MFA, MFA, backup-code branches); password reset request + confirm; reauth step-up; the `[RequireRecentAuth]` gate firing; email-address change request + verify (post-6.12); lockout self-service unlock (post-lockout-unlock); audit-log writes overlay (post-6.14); plus a cross-flow authentication state machine. Each diagram pairs with explicit audit prompts so a security review can walk top-to-bottom and surface gaps. Single end-of-stage pass — explicitly NOT incremental updates per sub-stage. Goal: visually verify every security control is in place before Stage 7's multi-tenancy cutover lands. Mermaid format so the diagrams render inline on GitHub and stay editable in `security-model.md`.
+
 ---
 
 ## Stage 7 — Multi-tenancy cutover (Batch 3c)
