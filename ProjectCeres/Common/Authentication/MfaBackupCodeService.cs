@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
@@ -9,6 +10,15 @@ namespace ProjectCeres.Common.Authentication;
 
 public sealed class MfaBackupCodeService
 {
+    // Per-user semaphore: serializes concurrent VerifyAndConsumeAsync calls for the same user
+    // within this app process. Without serialization, two simultaneous requests with the same
+    // valid backup code would both read "unused row exists" and both succeed, defeating the
+    // single-use guarantee. Mirrors TotpReplayGuard._userLocks (Stage 6b.3 Gap 1).
+    //
+    // In-process locking is single-host only. Multi-host fix (e.g. ConcurrencyStamp on
+    // UserMfaBackupCode) is captured in planning-phase3.md § Stage 6b.2 deferred decisions.
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _userLocks = new();
+
     private readonly AppDbContext _db;
     private readonly Argon2idPasswordHasher _hasher;
 
@@ -39,6 +49,21 @@ public sealed class MfaBackupCodeService
     }
 
     public async Task<bool> VerifyAndConsumeAsync(
+        Guid userId, string submittedCode, string clientIp, CancellationToken ct)
+    {
+        var sem = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync(ct);
+        try
+        {
+            return await VerifyAndConsumeLockedAsync(userId, submittedCode, clientIp, ct);
+        }
+        finally
+        {
+            sem.Release();
+        }
+    }
+
+    private async Task<bool> VerifyAndConsumeLockedAsync(
         Guid userId, string submittedCode, string clientIp, CancellationToken ct)
     {
         var normalized = NormalizeForVerify(submittedCode);
