@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -120,6 +121,8 @@ if (builder.Environment.IsDevelopment())
 builder.Services.AddScoped<MfaBackupCodeService>();
 builder.Services.AddScoped<TotpReplayGuard>();
 builder.Services.AddScoped<FailedLoginRecorder>();
+builder.Services.AddSingleton<IAuthorizationHandler, RecentAuthRequirementHandler>();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, RecentAuthMiddlewareResultHandler>();
 
 builder.Services.AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>();
 
@@ -187,6 +190,9 @@ builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+
+    options.AddPolicy(RequireRecentAuthAttribute.PolicyName, p =>
+        p.AddRequirements(new RecentAuthRequirement()));
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -247,6 +253,19 @@ builder.Services.AddRateLimiter(options =>
         // gates the endpoint, but a misconfiguration shouldn't crash the limiter).
         var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                   ?? "anonymous-mfa";
+        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromSeconds(60),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0,
+        });
+    });
+
+    options.AddPolicy(AuthRateLimitPolicies.AuthReauthByUser, httpContext =>
+    {
+        var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                  ?? "anonymous-reauth";
         return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
         {
             PermitLimit = 10,
