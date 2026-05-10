@@ -351,7 +351,7 @@ public sealed class AuthController : ControllerBase
     /// to be GET.
     /// </summary>
     [HttpGet("csrf"), AllowAnonymous]
-    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthCsrfByIp)]
     public IActionResult Csrf()
     {
         _antiforgery.GetAndStoreTokens(HttpContext);

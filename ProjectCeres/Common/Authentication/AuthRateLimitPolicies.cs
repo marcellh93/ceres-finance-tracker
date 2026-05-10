@@ -2,8 +2,13 @@ namespace ProjectCeres.Common.Authentication;
 
 public static class AuthRateLimitPolicies
 {
-    /// <summary>10/min/IP sliding window. Applied to /login, /register, /csrf.</summary>
+    /// <summary>10/min/IP sliding window. Applied to /login, /register.</summary>
     public const string AuthLoginByIp = "auth-login-by-ip";
+
+    /// <summary>60/min/IP sliding window. Applied to /csrf only — separate bucket so token
+    /// refresh churn (SPA tab-flap, multi-tab) doesn't lock the IP out of login.
+    /// Stage 6b.3 Gap 7.</summary>
+    public const string AuthCsrfByIp = "auth-csrf-by-ip";
 
     /// <summary>10/min/user sliding window keyed off Identity.TwoFactorUserId. Applied to /login/totp.</summary>
     public const string AuthTotpByUser = "auth-totp-by-user";

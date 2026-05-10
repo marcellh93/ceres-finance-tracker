@@ -72,7 +72,12 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 var removeFromPolicy     = policyMap.GetType()     .GetMethod("Remove", new[] { typeof(string) })!;
                 var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
 
-                foreach (var name in new[] { AuthRateLimitPolicies.AuthLoginByIp, AuthRateLimitPolicies.AuthTotpByUser })
+                foreach (var name in new[]
+                {
+                    AuthRateLimitPolicies.AuthLoginByIp,
+                    AuthRateLimitPolicies.AuthTotpByUser,
+                    AuthRateLimitPolicies.AuthCsrfByIp,
+                })
                 {
                     removeFromPolicy.Invoke(policyMap,         new object[] { name });
                     removeFromUnactivated.Invoke(unactivatedMap, new object[] { name });

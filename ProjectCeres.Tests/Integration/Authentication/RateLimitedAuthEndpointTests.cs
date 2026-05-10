@@ -75,21 +75,56 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Csrf_SharesAuthLoginByIpPolicy()
+    public async Task Csrf_HasItsOwnPolicy_DoesNotConsumeLoginBucket()
     {
+        // Burn substantially MORE than the login bucket would allow on /csrf.
+        // If they shared the bucket, /login would be locked out after 10 calls.
+        // With separate buckets, /login still has its full quota.
+        //
+        // Wait for the login bucket to clear — earlier tests in this class saturate
+        // the auth-login-by-ip partition. The sliding window is 60s; 70s covers the
+        // worst segment boundary.
+        await Task.Delay(TimeSpan.FromSeconds(70));
+
         var client = _factory.CreateClient();
 
-        var rejected = await FireUntilRateLimited(() => client.GetAsync("/api/auth/csrf"));
+        for (int i = 0; i < 25; i++)
+        {
+            var resp = await client.GetAsync("/api/auth/csrf");
+            // Don't care whether 60-bucket trips here; we just need to consume MANY /csrf
+            // calls and confirm /login's bucket is untouched.
+        }
 
-        rejected.Should().NotBeNull("expected /api/auth/csrf to share AuthLoginByIp policy");
+        // /login from the SAME client should still succeed (not 429), because the buckets
+        // are independent.
+        await AuthTestFixture.RegisterUserAsync(_factory, "csrfsep@rl-test.local");
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = "csrfsep@rl-test.local", password = AuthTestFixture.ValidPassword, rememberMe = false });
+
+        loginResp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
+            "burning /csrf bucket must NOT consume /login bucket — they are separate policies (Gap 7)");
+    }
+
+    [Fact]
+    public async Task Csrf_OwnPolicyStillRateLimitedAtHigherThreshold()
+    {
+        // 60/min cap. Burn more than 60 to confirm the new policy still rate-limits, just at
+        // a more permissive threshold. Use FireUntilRateLimited helper to find the rejection
+        // without hardcoding the count.
+        var client = _factory.CreateClient();
+        var rejected = await FireUntilRateLimited(() => client.GetAsync("/api/auth/csrf"), maxAttempts: 70);
+        rejected.Should().NotBeNull("the auth-csrf-by-ip policy must still rate-limit, just at a higher threshold");
     }
 
     [Fact]
     public async Task RateLimitOnRejected_ContentTypeIsApplicationJson()
     {
+        await AuthTestFixture.RegisterUserAsync(_factory, "contenttype@rl-test.local");
         var client = _factory.CreateClient();
 
-        var rejected = await FireUntilRateLimited(() => client.GetAsync("/api/auth/csrf"));
+        var rejected = await FireUntilRateLimited(() =>
+            AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+                new { email = "contenttype@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
 
         rejected.Should().NotBeNull("expected rate limit to fire within 25 attempts");
         rejected!.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
@@ -212,10 +247,11 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     {
         // Both clients hit Kestrel from 127.0.0.1 in a TestServer scenario, so this
         // test is structurally limited. Document it and exercise the partition factory
-        // by hitting Csrf from one client to confirm same-IP shares bucket.
+        // by hitting Csrf from one client to confirm same-IP shares the CSRF bucket (60/min).
+        // maxAttempts is set above 60 so we can actually reach the limit.
         var client = _factory.CreateClient();
-        var rejected = await FireUntilRateLimited(() => client.GetAsync("/api/auth/csrf"));
-        rejected.Should().NotBeNull("same client IP must share the bucket");
+        var rejected = await FireUntilRateLimited(() => client.GetAsync("/api/auth/csrf"), maxAttempts: 70);
+        rejected.Should().NotBeNull("same client IP must share the auth-csrf-by-ip bucket");
     }
 
     [Fact]
@@ -223,17 +259,23 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     {
         // Sliding window with 4 segments × 15s. Fire some requests, wait less than
         // window-length, fire more. The combined burst within the rolling window
-        // must still trip the limiter.
+        // must still trip the login limiter (10/min bucket).
+        await AuthTestFixture.RegisterUserAsync(_factory, "slidingwindow@rl-test.local");
         var client = _factory.CreateClient();
 
         // Make sure we start with a clean window — wait out any residue from prior tests.
         await Task.Delay(TimeSpan.FromSeconds(70));
 
-        for (int i = 0; i < 5; i++) await client.GetAsync("/api/auth/csrf");
+        for (int i = 0; i < 5; i++)
+            await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+                new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         await Task.Delay(TimeSpan.FromSeconds(25));
-        for (int i = 0; i < 5; i++) await client.GetAsync("/api/auth/csrf");
-        var eleventh = await client.GetAsync("/api/auth/csrf");
+        for (int i = 0; i < 5; i++)
+            await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+                new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
+        var eleventh = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         eleventh.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
-            "10 requests within the 60s sliding window should saturate the bucket; the 11th must be rejected");
+            "10 requests within the 60s sliding window should saturate the login bucket; the 11th must be rejected");
     }
 }

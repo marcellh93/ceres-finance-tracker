@@ -42,7 +42,12 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                 var removeFromPolicy      = policyMap.GetType()     .GetMethod("Remove", new[] { typeof(string) })!;
                 var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
 
-                foreach (var name in new[] { AuthRateLimitPolicies.AuthLoginByIp, AuthRateLimitPolicies.AuthTotpByUser })
+                foreach (var name in new[]
+                {
+                    AuthRateLimitPolicies.AuthLoginByIp,
+                    AuthRateLimitPolicies.AuthTotpByUser,
+                    AuthRateLimitPolicies.AuthCsrfByIp,
+                })
                 {
                     removeFromPolicy.Invoke(policyMap, new object[] { name });
                     removeFromUnactivated.Invoke(unactivatedMap, new object[] { name });
@@ -73,6 +78,18 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
+                        Window = TimeSpan.FromSeconds(60),
+                        SegmentsPerWindow = 4,
+                        QueueLimit = 0,
+                    });
+                });
+
+                opts.AddPolicy(AuthRateLimitPolicies.AuthCsrfByIp, httpContext =>
+                {
+                    var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 60,
                         Window = TimeSpan.FromSeconds(60),
                         SegmentsPerWindow = 4,
                         QueueLimit = 0,
