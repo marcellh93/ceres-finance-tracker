@@ -81,6 +81,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     AuthRateLimitPolicies.AuthTotpByUser,
                     AuthRateLimitPolicies.AuthCsrfByIp,
                     AuthRateLimitPolicies.AuthMfaByUser,
+                    AuthRateLimitPolicies.AuthReauthByUser,
                 })
                 {
                     removeFromPolicy.Invoke(policyMap,         new object[] { name });
