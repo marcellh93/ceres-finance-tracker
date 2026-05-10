@@ -71,15 +71,21 @@ public sealed class MfaController : ControllerBase
 
     [HttpPost("backup-codes/regenerate")]
     public async Task<IActionResult> RegenerateBackupCodes(
+        [FromBody] RegenerateBackupCodesRequest request,
         [FromServices] MfaBackupCodeService backupCodes)
     {
+        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
         var user = await GetCurrentUserAsync();
         if (user is null) return Unauthorized();
 
         if (!user.TwoFactorEnabled)
-        {
-            return BadRequest(new { error = "mfa_not_enabled" });
-        }
+            return Conflict(new { error = new { code = "MFA_NOT_ENABLED", message = "MFA must be enabled to regenerate backup codes." } });
+
+        var ok = await _userManager.VerifyTwoFactorTokenAsync(
+            user, TokenOptions.DefaultAuthenticatorProvider, request.TotpCode);
+        if (!ok)
+            return Unauthorized(new { error = new { code = "INVALID_MFA_CODE", message = "The verification code is invalid or expired." } });
 
         var codes = await backupCodes.RegenerateAsync(user.Id, HttpContext.RequestAborted);
 
