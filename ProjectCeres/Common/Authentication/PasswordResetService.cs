@@ -189,4 +189,164 @@ public sealed class PasswordResetService
             """;
         return new EmailMessage(to, subject, bodyHtml, bodyText);
     }
+
+    public async Task<PasswordResetConfirmOutcome> ConfirmAsync(
+        string rawToken, string newPassword, string? totpCode, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(rawToken))
+        {
+            // Constant-time: still pay one Argon2 verify against a dummy hash.
+            _argon.RunDummyHash();
+            return new PasswordResetConfirmOutcome.InvalidToken();
+        }
+
+        var now = DateTime.UtcNow;
+        var candidates = await _db.PasswordResetTokens
+            .Where(t => t.ConsumedAt == null && t.ExpiresAt > now)
+            .ToListAsync(ct);
+
+        PasswordResetToken? match = null;
+        foreach (var candidate in candidates)
+        {
+            if (_tokens.Verify(rawToken, candidate.TokenHash))
+            {
+                match = candidate;
+                break;
+            }
+        }
+
+        if (match is null)
+        {
+            // Even with zero candidates, run one verify so timing doesn't reveal "no candidates".
+            if (candidates.Count == 0) _argon.RunDummyHash();
+            return new PasswordResetConfirmOutcome.InvalidToken();
+        }
+
+        var sem = _userLocks.GetOrAdd(match.UserId, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync(ct);
+        try
+        {
+            // Re-read the token row inside the lock; another concurrent caller may have consumed it.
+            var current = await _db.PasswordResetTokens
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
+            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
+            {
+                return new PasswordResetConfirmOutcome.InvalidToken();
+            }
+
+            var user = await _userManager.FindByIdAsync(match.UserId.ToString());
+            if (user is null)
+            {
+                return new PasswordResetConfirmOutcome.InvalidToken();
+            }
+
+            // MFA gate: if user has TwoFactorEnabled, a totpCode is required.
+            if (user.TwoFactorEnabled)
+            {
+                if (string.IsNullOrWhiteSpace(totpCode))
+                {
+                    return new PasswordResetConfirmOutcome.RequiresTotp();
+                }
+
+                // Backup codes are NOT accepted at reset time per ADR-0069.
+                // The reset endpoint accepts only six-digit authenticator-app codes.
+                if (!MfaConstants.TotpCodeShape.IsMatch(totpCode))
+                {
+                    return new PasswordResetConfirmOutcome.InvalidTotp();
+                }
+
+                var ok = await _userManager.VerifyTwoFactorTokenAsync(
+                    user, Microsoft.AspNetCore.Identity.TokenOptions.DefaultAuthenticatorProvider, totpCode);
+                if (!ok)
+                {
+                    return new PasswordResetConfirmOutcome.InvalidTotp();
+                }
+
+                var accepted = await _replayGuard.TryAcceptAsync(user.Id, totpCode, ct);
+                if (!accepted)
+                {
+                    return new PasswordResetConfirmOutcome.InvalidTotp();
+                }
+
+                current.MfaVerifiedAt = DateTime.UtcNow;
+            }
+
+            // Password write: remove + add (re-runs all Identity password validators).
+            var remove = await _userManager.RemovePasswordAsync(user);
+            if (!remove.Succeeded)
+            {
+                return new PasswordResetConfirmOutcome.PasswordPolicyViolation(remove.Errors.ToList());
+            }
+            var add = await _userManager.AddPasswordAsync(user, newPassword);
+            if (!add.Succeeded)
+            {
+                // Token NOT consumed; user can retry with a different password.
+                return new PasswordResetConfirmOutcome.PasswordPolicyViolation(add.Errors.ToList());
+            }
+
+            // Promote EmailConfirmed (the email itself is proof of address ownership).
+            if (!user.EmailConfirmed)
+            {
+                user.EmailConfirmed = true;
+                await _userManager.UpdateAsync(user);
+            }
+
+            // Mark token consumed.
+            await _db.PasswordResetTokens
+                .Where(t => t.Id == match.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+
+            // Bulk-revoke all sessions for this user.
+            await _db.UserSessions
+                .Where(s => s.UserId == user.Id && s.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, DateTime.UtcNow), ct);
+
+            // SecurityStamp regen — invalidates any in-flight Identity cookies via SecurityStampValidator.
+            await _userManager.UpdateSecurityStampAsync(user);
+
+            // Clear lockout if any.
+            await _userManager.ResetAccessFailedCountAsync(user);
+            await _userManager.SetLockoutEndDateAsync(user, null);
+
+            // Clear any half-authenticated MFA-pending cookie on the caller's browser.
+            await _signInManager.SignOutAsync();
+
+            // Notification email — never blocks the return.
+            try
+            {
+                await _email.SendAsync(BuildChangedEmail(user.Email!), ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send password-changed notification email.");
+            }
+
+            return new PasswordResetConfirmOutcome.Success();
+        }
+        finally
+        {
+            sem.Release();
+        }
+    }
+
+    private static EmailMessage BuildChangedEmail(string to)
+    {
+        const string subject = "Your Project Ceres password was changed";
+        const string bodyText = """
+            Your Project Ceres password was just changed.
+
+            If this was you, no further action is needed. All other active sessions
+            have been signed out as a precaution.
+
+            If you did not change your password, contact support immediately.
+            """;
+        var bodyHtml = """
+            <p>Your Project Ceres password was just changed.</p>
+            <p>If this was you, no further action is needed. All other active
+            sessions have been signed out as a precaution.</p>
+            <p>If you did not change your password, contact support immediately.</p>
+            """;
+        return new EmailMessage(to, subject, bodyHtml, bodyText);
+    }
 }

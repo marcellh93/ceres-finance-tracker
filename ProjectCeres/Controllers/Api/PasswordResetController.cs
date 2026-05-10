@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.ViewModels.Auth;
+using System.Linq;
 
 namespace ProjectCeres.Controllers.Api;
 
@@ -38,5 +39,38 @@ public sealed class PasswordResetController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    [HttpPost("confirm"), AllowAnonymous]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
+    public async Task<IActionResult> Confirm([FromBody] PasswordResetConfirmRequest request)
+    {
+        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+        var outcome = await _service.ConfirmAsync(
+            request.Token, request.NewPassword, request.TotpCode, HttpContext.RequestAborted);
+
+        return outcome switch
+        {
+            PasswordResetConfirmOutcome.Success => NoContent(),
+            PasswordResetConfirmOutcome.RequiresTotp => Ok(new { requiresTotp = true }),
+            PasswordResetConfirmOutcome.InvalidToken =>
+                Unauthorized(new { error = new { code = "INVALID_RESET_TOKEN", message = "The reset link is invalid or has expired." } }),
+            PasswordResetConfirmOutcome.InvalidTotp =>
+                Unauthorized(new { error = new { code = "INVALID_MFA_CODE", message = "The verification code is invalid or expired." } }),
+            PasswordResetConfirmOutcome.PasswordPolicyViolation policyOutcome =>
+                UnprocessableEntity(new
+                {
+                    error = new
+                    {
+                        code = "VALIDATION_ERROR",
+                        message = "The new password does not meet the policy.",
+                        details = policyOutcome.Errors
+                            .Select(e => new { field = "newPassword", message = e.Description })
+                            .ToArray(),
+                    }
+                }),
+            _ => throw new InvalidOperationException($"unhandled outcome: {outcome.GetType().Name}"),
+        };
     }
 }
