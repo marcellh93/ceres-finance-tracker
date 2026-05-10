@@ -40,6 +40,9 @@
     - [UserBlockedIp](#userblockedip-phase-3)
     - [CustomerArchive](#customerarchive-phase-3)
     - [AdminAuditLog](#adminauditlog-phase-3)
+    - [UserMfaBackupCode](#usermfabackupcode-phase-3-stage-6b1)
+    - [TotpReplayEntry](#totpreplayentry-phase-3-stage-6b1)
+    - [FailedLoginAttempt](#failedloginattempt-phase-3-stage-6b2)
 
 ---
 
@@ -1056,6 +1059,39 @@ One row per TOTP code accepted within the 2-minute replay window. Per `security-
 **Indexes:** `(UserId)` for the per-user replay scan; `(AcceptedAt)` for the purge query.
 
 **Lifecycle:** `TotpReplayGuard.TryAcceptAsync` (a) verifies the new code does not match any existing row in the 2-min window for this user, (b) inserts the new row + executes a single `DELETE FROM "TotpReplayEntries" WHERE "AcceptedAt" < now - 2min` against the table-wide rows (cheap, idempotent, runs on every accept call). This pattern replaces a scheduled background job.
+
+### FailedLoginAttempt (Phase 3, Stage 6b.2)
+
+Records every rejected authentication attempt for credential-stuffing forensics and per-IP/per-account anomaly detection. Intentionally **cross-tenant** — captures attempts against accounts that may not exist (`UserId` is nullable). Per ADR-0065, this entity does NOT receive a global query filter when Stage 7 wires multi-tenancy: it is read by background purge jobs as a cross-tenant operation per ADR-0067 § Decision-6.
+
+**Schema:**
+
+| Field | Type | Constraint | Purpose |
+|-------|------|------------|---------|
+| Id | uuid | PK | |
+| EmailAttempted | varchar(256) | nullable | Lowercased + trimmed copy of the submitted email. NULL on absurd-input cases. Truncated to AspNetUsers.NormalizedEmail length. Anonymized to NULL on GDPR erasure (Stage 6c flow). |
+| UserId | uuid? | nullable | NULL when the email did not resolve to any AspNetUser (UnknownUser case). Set when the user exists. No FK — the entity intentionally has no cascading relationship with AspNetUsers (an AspNetUsers delete must NOT cascade-delete forensic history). |
+| IpAddress | varchar(45) | NOT NULL, default `"unknown"` | Client IP at attempt time. IPv6-sized. `"unknown"` when `Connection.RemoteIpAddress` is null (test contexts, unix sockets). |
+| UserAgent | varchar(512) | NOT NULL | Truncated User-Agent header. Empty string when missing. |
+| Reason | text (enum-as-string) | NOT NULL | One of: `BadCredentials`, `BadTotp`, `BadBackupCode`, `LockedOut`, `UnknownUser`. Stored as string via `HasConversion<string>()` per project enum convention. |
+| OccurredAt | timestamp with time zone | NOT NULL | Wall-clock UTC at attempt time. |
+
+**Indexes:**
+
+- `(IpAddress, OccurredAt)` — supports "this IP is attacking many accounts" queries.
+- `(EmailAttempted, OccurredAt)` — supports "this account is being targeted by many IPs" queries.
+- `(OccurredAt)` — supports the retention purge sweep (1-year flat DELETE; first cross-tenant background job in Stage 7).
+
+**Writer:** `FailedLoginRecorder` (`ProjectCeres/Common/Authentication/FailedLoginRecorder.cs`), Scoped DI lifetime, takes `IServiceScopeFactory` so each `RecordAsync` call gets a private DbContext (insulates the recorder from a contaminated request DbContext after Identity raises a concurrency exception).
+
+**Failure contract:** `RecordAsync` is a synchronous DB write on the request hot path. If the write throws, the exception bubbles — login returns 500 and no session cookie is issued. Loud-failure is intentional: a recorder failure must NOT silently let an attacker through. Verified by `FailedLoginRecorderTests.SaveChangesFailure_BubblesAs500_DoesNotIssueSession`.
+
+**Multi-tenancy exemption:** intentionally NO global query filter. See ADR-0065 § Decision-1 for the enumeration of cross-tenant exempt entities.
+
+**GDPR / retention:**
+
+- Erasure (Stage 6c): on right-to-erasure, the 6c flow nullifies `EmailAttempted` for matching rows (column is nullable, no schema change required).
+- Retention purge (Stage 7+): 1-year flat cross-tenant `DELETE WHERE OccurredAt < now() - interval '1 year'`. Different cadence from `AuditLog` (6 months, per-user fan-out via `IUserJobRunner`).
 
 ### CustomerArchive (Phase 3)
 
