@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
@@ -191,6 +192,22 @@ public static class AuthTestFixture
                    | ((hash[offset + 2] & 0xFF) << 8)
                    | (hash[offset + 3] & 0xFF);
         return (binary % 1_000_000).ToString("D6");
+    }
+
+    /// <summary>
+    /// Extracts the raw reset token from an <see cref="EmailMessage"/> body. The body
+    /// is expected to contain a segment of the form <c>token=&lt;value&gt;</c> where
+    /// the value ends at the next whitespace or end-of-string. Throws if no marker is
+    /// found, so tests fail fast if the email format changes.
+    /// </summary>
+    public static string ExtractResetTokenFromMessage(EmailMessage message)
+    {
+        var marker = "token=";
+        var idx = message.BodyText.IndexOf(marker, StringComparison.Ordinal);
+        if (idx < 0) throw new InvalidOperationException($"no token marker in body: {message.BodyText}");
+        var start = idx + marker.Length;
+        var end = message.BodyText.IndexOfAny(new[] { '\r', '\n', ' ' }, start);
+        return end < 0 ? message.BodyText[start..] : message.BodyText[start..end];
     }
 
     private static byte[] DecodeBase32(string input)
