@@ -45,19 +45,28 @@ public sealed class PersistentCookieRotationMiddleware
             await _next(context);
             return;
         }
-        if (!context.Request.Cookies.TryGetValue(SessionConstants.PersistentCookieName, out var rawToken)
-            || string.IsNullOrWhiteSpace(rawToken))
+        if (!context.Request.Cookies.TryGetValue(SessionConstants.PersistentCookieName, out var rawCookie)
+            || string.IsNullOrWhiteSpace(rawCookie))
         {
             await _next(context);
             return;
         }
 
-        var candidates = await db.UserSessions
-            .Where(s => s.IsPersistent && s.RevokedAt == null && s.PersistentTokenHash != null)
-            .ToListAsync();
+        var parsed = tokens.TryParseCookie(rawCookie);
+        if (parsed is null)
+        {
+            // Malformed cookie (e.g., legacy raw-secret-only format from pre-6b.3).
+            // Short-circuit before any Argon2id work.
+            await _next(context);
+            return;
+        }
 
-        var match = candidates.FirstOrDefault(c => tokens.Verify(rawToken, c.PersistentTokenHash!));
-        if (match is null)
+        var (sessionId, secret) = parsed.Value;
+        var match = await db.UserSessions
+            .Where(s => s.Id == sessionId && s.IsPersistent && s.RevokedAt == null && s.PersistentTokenHash != null)
+            .FirstOrDefaultAsync();
+
+        if (match is null || !tokens.Verify(secret, match.PersistentTokenHash!))
         {
             await _next(context);
             return;
@@ -79,16 +88,17 @@ public sealed class PersistentCookieRotationMiddleware
                 return;
             }
 
-            // Rotate.
+            // Rotate. Issue new cookie in {base64url(sessionIdBytes)}.{secret} format (Gap 3).
+            // Hash only the secret; the session ID is stored plaintext in the cookie and indexed in DB.
             match.RevokedAt = DateTime.UtcNow;
 
             var newSessionId = Guid.NewGuid();
-            var newToken = tokens.Generate();
+            var newSecret = tokens.Generate();
             var newSession = new UserSession
             {
                 Id = newSessionId,
                 UserId = match.UserId,
-                PersistentTokenHash = tokens.Hash(newToken),
+                PersistentTokenHash = tokens.Hash(newSecret),
                 IpCreatedAt = context.Connection.RemoteIpAddress?.ToString() ?? "",
                 UserAgent = context.Request.Headers.UserAgent.ToString(),
                 CreatedAt = DateTime.UtcNow,
@@ -98,9 +108,10 @@ public sealed class PersistentCookieRotationMiddleware
             db.UserSessions.Add(newSession);
             await db.SaveChangesAsync();
 
+            var newCookieValue = tokens.FormatCookie(newSessionId, newSecret);
             context.Response.Cookies.Append(
                 SessionConstants.PersistentCookieName,
-                newToken,
+                newCookieValue,
                 new CookieOptions
                 {
                     HttpOnly = true,

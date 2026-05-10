@@ -287,11 +287,14 @@ public sealed class AuthController : ControllerBase
 
         if (rememberMe)
         {
-            var rawToken = _tokens.Generate();
-            session.PersistentTokenHash = _tokens.Hash(rawToken);
+            // Issue cookie in {base64url(sessionIdBytes)}.{secret} format (Gap 3).
+            // Only the secret is hashed; session ID is indexed in DB for O(1) lookup.
+            var secret = _tokens.Generate();
+            session.PersistentTokenHash = _tokens.Hash(secret);
+            var cookieValue = _tokens.FormatCookie(sessionId, secret);
             Response.Cookies.Append(
                 SessionConstants.PersistentCookieName,
-                rawToken,
+                cookieValue,
                 new CookieOptions
                 {
                     HttpOnly = true,
@@ -358,17 +361,23 @@ public sealed class AuthController : ControllerBase
             }
         }
 
-        if (Request.Cookies.TryGetValue(SessionConstants.PersistentCookieName, out var rawToken)
-            && !string.IsNullOrWhiteSpace(rawToken))
+        if (Request.Cookies.TryGetValue(SessionConstants.PersistentCookieName, out var rawCookie)
+            && !string.IsNullOrWhiteSpace(rawCookie))
         {
-            var candidates = await _db.UserSessions
-                .Where(s => s.IsPersistent && s.RevokedAt == null && s.PersistentTokenHash != null)
-                .ToListAsync();
-            var match = candidates.FirstOrDefault(c => _tokens.Verify(rawToken, c.PersistentTokenHash!));
-            if (match is not null)
+            // Parse cookie to get session ID for O(1) indexed lookup (Gap 3).
+            // Legacy raw-secret cookies (pre-6b.3) won't parse and are skipped.
+            var parsed = _tokens.TryParseCookie(rawCookie);
+            if (parsed is { } p)
             {
-                match.RevokedAt = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
+                var match = await _db.UserSessions
+                    .Where(s => s.Id == p.sessionId && s.IsPersistent && s.RevokedAt == null && s.PersistentTokenHash != null)
+                    .FirstOrDefaultAsync();
+
+                if (match is not null && _tokens.Verify(p.secret, match.PersistentTokenHash!))
+                {
+                    match.RevokedAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                }
             }
             Response.Cookies.Delete(SessionConstants.PersistentCookieName);
         }
