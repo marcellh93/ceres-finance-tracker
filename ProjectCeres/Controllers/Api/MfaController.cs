@@ -26,6 +26,9 @@ public sealed class MfaController : ControllerBase
         var user = await GetCurrentUserAsync();
         if (user is null) return Unauthorized();
 
+        if (user.TwoFactorEnabled)
+            return Conflict(new { error = new { code = "MFA_ALREADY_ENROLLED", message = "MFA is already enabled. Disable MFA first to re-enroll." } });
+
         await _userManager.ResetAuthenticatorKeyAsync(user);
         var key = await _userManager.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(key)) return StatusCode(500);

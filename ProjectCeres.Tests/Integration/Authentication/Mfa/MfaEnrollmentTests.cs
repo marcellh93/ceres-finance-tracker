@@ -143,6 +143,62 @@ public class MfaEnrollmentTests : IAsyncLifetime
         refreshed!.TwoFactorEnabled.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Enroll_WhenAlreadyEnrolled_Returns409_AndAuthenticatorKeyUnchanged()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "already@mfa-enroll-test.local");
+        var originalSeed = await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+
+        // Full two-step login for an MFA-enabled user (HandleCookies = false — matches existing pattern).
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        // Step 1 — credentials → get Identity.TwoFactorUserId cookie
+        var (csrf1, header1) = AuthTestFixture.MintCsrf(_factory);
+        var loginReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false }),
+        };
+        loginReq.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={csrf1}");
+        loginReq.Headers.Add(SessionConstants.CsrfHeaderName, header1);
+        var loginResp = await client.SendAsync(loginReq);
+        var twoFactorCookie = ExtractSetCookie(loginResp, "Identity.TwoFactorUserId");
+        twoFactorCookie.Should().NotBeNullOrEmpty("credentials login must return Identity.TwoFactorUserId");
+
+        // Step 2 — TOTP login → get session cookie
+        var loginCode = AuthTestFixture.ComputeCurrentTotpCode(originalSeed);
+        var (csrf2, header2) = AuthTestFixture.MintCsrf(_factory);
+        var totpReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/totp")
+        {
+            Content = JsonContent.Create(new { code = loginCode }),
+        };
+        totpReq.Headers.Add("Cookie", $"Identity.TwoFactorUserId={twoFactorCookie}; {SessionConstants.CsrfCookieName}={csrf2}");
+        totpReq.Headers.Add(SessionConstants.CsrfHeaderName, header2);
+        var totpResp = await client.SendAsync(totpReq);
+        totpResp.StatusCode.Should().Be(HttpStatusCode.NoContent, "TOTP login must succeed");
+        var sessionCookie = ExtractSetCookie(totpResp, SessionConstants.SessionCookieName);
+        sessionCookie.Should().NotBeNullOrEmpty("TOTP login must issue a session cookie");
+
+        // Attempt to re-enroll — must return 409, not rotate the key.
+        var (enrollCsrfCookie, enrollCsrfHeader) = AuthTestFixture.MintCsrf(_factory, user.Id);
+        var enrollReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/enroll");
+        enrollReq.Headers.Add("Cookie",
+            $"{SessionConstants.SessionCookieName}={sessionCookie}; {SessionConstants.CsrfCookieName}={enrollCsrfCookie}");
+        enrollReq.Headers.Add(SessionConstants.CsrfHeaderName, enrollCsrfHeader);
+        var resp = await client.SendAsync(enrollReq);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString().Should().Be("MFA_ALREADY_ENROLLED");
+
+        // The seed must NOT have been rotated.
+        using var scope = _factory.Services.CreateScope();
+        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var fresh = await um.FindByIdAsync(user.Id.ToString());
+        var currentSeed = await um.GetAuthenticatorKeyAsync(fresh!);
+        currentSeed.Should().Be(originalSeed, "re-enroll must NOT rotate AuthenticatorKey when MFA is already enabled");
+    }
+
     private async Task<string?> LoginAndGetSessionCookieAsync(HttpClient client, string email)
     {
         var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory);
