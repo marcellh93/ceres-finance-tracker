@@ -75,6 +75,63 @@ public class LogoutEndpointTests : IAsyncLifetime
         session.RevokedAt.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task Logout_DeletesPersistentCookieWithCorrectOptions()
+    {
+        // Set up an authenticated user with rememberMe so __Host-Persist is issued.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "delopts@logout-test.local");
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        // Step 1: login with rememberMe=true so the persistent cookie is issued.
+        var (loginCsrfCookie, loginCsrfHeader) = AuthTestFixture.MintCsrf(_factory);
+        var loginReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new
+            {
+                email = user.Email,
+                password = AuthTestFixture.ValidPassword,
+                rememberMe = true,
+            }),
+        };
+        loginReq.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={loginCsrfCookie}");
+        loginReq.Headers.Add(SessionConstants.CsrfHeaderName, loginCsrfHeader);
+        var loginResp = await client.SendAsync(loginReq);
+        loginResp.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        // Collect the session cookie and persistent cookie from the login response.
+        var sessionCookie = ExtractSetCookie(loginResp, SessionConstants.SessionCookieName);
+        sessionCookie.Should().NotBeNullOrEmpty("login must issue a session cookie");
+        var persistCookieValue = ExtractSetCookie(loginResp, SessionConstants.PersistentCookieName);
+        persistCookieValue.Should().NotBeNullOrEmpty("login with rememberMe must issue a persistent cookie");
+
+        // Step 2: logout. Use a user-bound CSRF token so the antiforgery middleware accepts it.
+        var (logoutCsrfCookie, logoutCsrfHeader) = AuthTestFixture.MintCsrf(_factory, user.Id);
+        var logoutReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout")
+        {
+            Content = JsonContent.Create(new { }),
+        };
+        logoutReq.Headers.Add("Cookie",
+            $"{SessionConstants.SessionCookieName}={sessionCookie}; " +
+            $"{SessionConstants.PersistentCookieName}={persistCookieValue}; " +
+            $"{SessionConstants.CsrfCookieName}={logoutCsrfCookie}");
+        logoutReq.Headers.Add(SessionConstants.CsrfHeaderName, logoutCsrfHeader);
+        var logoutResp = await client.SendAsync(logoutReq);
+        logoutResp.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        // Inspect Set-Cookie for the __Host-Persist deletion directive.
+        var setCookies = logoutResp.Headers.GetValues("Set-Cookie").ToList();
+        var persistDelete = setCookies.FirstOrDefault(c =>
+            c.StartsWith($"{SessionConstants.PersistentCookieName}=") &&
+            c.Contains("expires=Thu, 01 Jan 1970"));
+        persistDelete.Should().NotBeNull("logout must emit a deletion directive for the __Host-Persist cookie");
+
+        // __Host- cookies require Path=/ and Secure to be valid (and to match for deletion).
+        persistDelete!.Should().Contain("path=/", "deletion directive must include path=/ to match the __Host- cookie");
+        // Secure is environment-dependent in tests (CookieSecurePolicy.SameAsRequest outside Production)
+        // — assert the directive is well-formed but skip the secure assertion to keep test
+        // environment-agnostic. The path=/ assertion is the load-bearing one for the bug fix.
+    }
+
     private static string? ExtractSetCookie(HttpResponseMessage response, string cookieName)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return null;

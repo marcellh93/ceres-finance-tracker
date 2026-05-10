@@ -359,6 +359,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("logout"), Authorize]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Logout()
     {
         if (Guid.TryParse(User.FindFirstValue(SessionConstants.SessionIdClaim), out var sid))
@@ -389,7 +390,12 @@ public sealed class AuthController : ControllerBase
                     await _db.SaveChangesAsync();
                 }
             }
-            Response.Cookies.Delete(SessionConstants.PersistentCookieName);
+            Response.Cookies.Delete(SessionConstants.PersistentCookieName, new CookieOptions
+            {
+                Path = "/",
+                Secure = Request.IsHttps,
+                SameSite = SameSiteMode.Lax,
+            });
         }
 
         await _signInManager.SignOutAsync();
