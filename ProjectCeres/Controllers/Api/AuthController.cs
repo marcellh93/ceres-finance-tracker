@@ -66,6 +66,16 @@ public sealed class AuthController : ControllerBase
         var result = await _userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
         {
+            // Stage 6b.3 Gap 6: don't leak account existence. If the failure is purely the
+            // duplicate-username case, return 204 same as a fresh registration. All other
+            // failure classes (short password, breached, malformed) still return 422.
+            // Stage 6c follow-up: send "someone tried to register with your email" notice
+            // on the duplicate path once email-send ships.
+            var isDuplicateOnly = result.Errors.All(e =>
+                e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
+            if (isDuplicateOnly && result.Errors.Any())
+                return NoContent();
+
             foreach (var error in result.Errors)
             {
                 ModelState.AddModelError(error.Code, error.Description);

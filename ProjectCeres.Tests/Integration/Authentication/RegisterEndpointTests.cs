@@ -24,7 +24,9 @@ public class RegisterEndpointTests : IAsyncLifetime
     {
         using var scope = _factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        foreach (var u in userManager.Users.Where(u => u.Email!.EndsWith("@register-test.local")).ToList())
+        foreach (var u in userManager.Users.Where(u =>
+            u.Email!.EndsWith("@register-test.local") ||
+            u.Email!.EndsWith("@register-noenum-test.local")).ToList())
         {
             await userManager.DeleteAsync(u);
         }
@@ -73,18 +75,31 @@ public class RegisterEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Register_rejects_duplicate_email()
+    public async Task Register_DuplicateEmail_ReturnsSameShapeAsNewEmail()
     {
-        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _client, "/api/auth/register", new
-        {
-            email = "dup@register-test.local",
-            password = "correct horse battery staple"
-        });
-        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _client, "/api/auth/register", new
-        {
-            email = "dup@register-test.local",
-            password = "correct horse battery staple"
-        });
-        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Register a fresh email — must succeed with 204.
+        var firstResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _factory.CreateClient(),
+            "/api/auth/register",
+            new { email = "first@register-noenum-test.local", password = "correct horse battery staple" });
+        firstResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var firstBody = await firstResp.Content.ReadAsStringAsync();
+
+        // Re-register the SAME email — must return the SAME shape (204 + identical body) so the
+        // attacker can't distinguish "exists" from "doesn't exist".
+        var dupResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _factory.CreateClient(),
+            "/api/auth/register",
+            new { email = "first@register-noenum-test.local", password = "correct horse battery staple" });
+        dupResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var dupBody = await dupResp.Content.ReadAsStringAsync();
+
+        dupBody.Should().Be(firstBody, "duplicate-email registration must return identical body shape to a fresh-email registration (no user enumeration)");
+
+        // Sanity: a different fresh email also succeeds with the same shape.
+        var thirdResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _factory.CreateClient(),
+            "/api/auth/register",
+            new { email = "second@register-noenum-test.local", password = "correct horse battery staple" });
+        thirdResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var thirdBody = await thirdResp.Content.ReadAsStringAsync();
+        thirdBody.Should().Be(firstBody);
     }
 }
