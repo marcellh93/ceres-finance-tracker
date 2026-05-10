@@ -138,7 +138,13 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
 
                 opts.AddPolicy(AuthRateLimitPolicies.AuthReauthByUser, httpContext =>
                 {
-                    var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    // Rate limiter runs BEFORE UseAuthentication, so httpContext.User is empty here.
+                    // Explicitly authenticate against the application cookie scheme to resolve the
+                    // current user id for per-user partitioning. Mirrors the pattern in
+                    // TotpByUserPartitioner (which authenticates against TwoFactorUserIdScheme).
+                    var task = httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+                    task.Wait();
+                    var userId = task.Result.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                               ?? "anonymous-reauth";
                     return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
                     {
