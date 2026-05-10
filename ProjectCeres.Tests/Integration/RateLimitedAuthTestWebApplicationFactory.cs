@@ -4,9 +4,12 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectCeres.Common.Authentication;
 
 namespace ProjectCeres.Tests.Integration;
@@ -23,6 +26,28 @@ namespace ProjectCeres.Tests.Integration;
 /// </summary>
 public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplicationFactory
 {
+    /// <summary>
+    /// Returns a derived factory with a fresh, empty <see cref="IMemoryCache"/> singleton.
+    /// Use this for per-email rate-limit tests so each test starts with a clean bucket
+    /// regardless of prior test state.
+    /// </summary>
+    public WebApplicationFactory<Program> WithFreshMemoryCache() =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IMemoryCache>();
+                services.AddSingleton<IMemoryCache>(new MemoryCache(new MemoryCacheOptions()));
+            }));
+
+    /// <summary>
+    /// Evicts all entries from the shared <see cref="IMemoryCache"/>, simulating an elapsed
+    /// time window without waiting. Calls <c>Compact(1.0)</c> which flushes 100% of entries.
+    /// Call on a derived factory returned from <see cref="WithFreshMemoryCache"/> to reset
+    /// the per-email bucket mid-test.
+    /// </summary>
+    public static void ResetMemoryCache(WebApplicationFactory<Program> factory) =>
+        ((MemoryCache)factory.Services.GetRequiredService<IMemoryCache>()).Compact(1.0);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
