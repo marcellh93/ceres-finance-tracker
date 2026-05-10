@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
@@ -33,6 +34,69 @@ public static class AuthTestFixture
         var confirmed = await userManager.ConfirmEmailAsync(user, token);
         confirmed.Succeeded.Should().BeTrue();
         return user;
+    }
+
+    /// <summary>
+    /// Overload of <see cref="RegisterUserAsync(AuthTestWebApplicationFactory,string,string)"/>
+    /// that accepts a base <see cref="WebApplicationFactory{Program}"/> — used when the caller
+    /// has a derived factory from <c>WithReplacedService</c> or <c>WithCapturedLogger</c>.
+    /// </summary>
+    public static async Task<ApplicationUser> RegisterUserAsync(
+        WebApplicationFactory<Program> factory, string email, string password = ValidPassword)
+    {
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = new ApplicationUser { UserName = email, Email = email };
+        var result = await userManager.CreateAsync(user, password);
+        result.Succeeded.Should().BeTrue("expected user to be created: {0}",
+            string.Join(", ", result.Errors.Select(e => e.Description)));
+
+        var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
+        var confirmed = await userManager.ConfirmEmailAsync(user, token);
+        confirmed.Succeeded.Should().BeTrue();
+        return user;
+    }
+
+    /// <summary>
+    /// Overload of <see cref="PostJsonWithCsrfAsync{T}(AuthTestWebApplicationFactory,HttpClient,string,T)"/>
+    /// that accepts a base <see cref="WebApplicationFactory{Program}"/> for minting the CSRF token.
+    /// </summary>
+    public static Task<HttpResponseMessage> PostJsonWithCsrfAsync<T>(
+        WebApplicationFactory<Program> factory, HttpClient client, string url, T body)
+    {
+        var (cookie, header) = MintCsrf(factory);
+        var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body),
+        };
+        req.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={cookie}");
+        req.Headers.Add(SessionConstants.CsrfHeaderName, header);
+        return client.SendAsync(req);
+    }
+
+    /// <summary>
+    /// Overload of <see cref="MintCsrf(AuthTestWebApplicationFactory,Guid?)"/> that accepts
+    /// a base <see cref="WebApplicationFactory{Program}"/>.
+    /// </summary>
+    public static (string CookieValue, string HeaderValue) MintCsrf(
+        WebApplicationFactory<Program> factory, Guid? userId = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var antiforgery = scope.ServiceProvider.GetRequiredService<IAntiforgery>();
+        var ctx = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        if (userId is { } id)
+        {
+            var identity = new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, id.ToString()),
+                    new Claim(ClaimTypes.Name, id.ToString()),
+                },
+                authenticationType: "Test");
+            ctx.User = new ClaimsPrincipal(identity);
+        }
+        var tokens = antiforgery.GetAndStoreTokens(ctx);
+        return (tokens.CookieToken!, tokens.RequestToken!);
     }
 
     /// <summary>

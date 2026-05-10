@@ -3,7 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Tests.Integration.Authentication;
@@ -126,6 +129,28 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 public class AuthTestWebApplicationFactory : TestWebApplicationFactory
 {
     protected override bool UseTestAuthHandler => false;
+
+    /// <summary>
+    /// Returns a derived factory in which <typeparamref name="T"/> is replaced with
+    /// <paramref name="replacement"/>. The returned factory is disposable; tests should
+    /// <c>await using</c> it so the inner WebHost is torn down after the test.
+    /// </summary>
+    public WebApplicationFactory<Program> WithReplacedService<T>(T replacement) where T : class =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<T>();
+                services.AddSingleton(replacement);
+            }));
+
+    /// <summary>
+    /// Returns a derived factory that appends every log message to <paramref name="sink"/>.
+    /// Chain with <see cref="WithReplacedService{T}"/> to combine effects.
+    /// </summary>
+    public WebApplicationFactory<Program> WithCapturedLogger(List<string> sink) =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<ILoggerProvider>(new InMemoryLoggerProvider(sink))));
 }
 
 /// <summary>
