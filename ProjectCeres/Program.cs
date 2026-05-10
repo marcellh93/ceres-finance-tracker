@@ -227,6 +227,22 @@ builder.Services.AddRateLimiter(options =>
     });
 
     options.AddPolicy<string, TotpByUserPartitioner>(AuthRateLimitPolicies.AuthTotpByUser);
+
+    options.AddPolicy(AuthRateLimitPolicies.AuthMfaByUser, httpContext =>
+    {
+        // Authenticated endpoint — partition by the user's NameIdentifier claim.
+        // Defensive fallback: anonymous bucket (should never hit since [Authorize]
+        // gates the endpoint, but a misconfiguration shouldn't crash the limiter).
+        var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                  ?? "anonymous-mfa";
+        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromSeconds(60),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0,
+        });
+    });
 });
 
 // === End Stage 6a wiring ===

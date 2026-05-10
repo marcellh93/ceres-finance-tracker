@@ -16,4 +16,9 @@ public static class AuthRateLimitPolicies
     /// <summary>Fallback partition key for /login/totp requests with no MFA-pending cookie.
     /// Routes them into a single shared bucket so an attacker can't dodge the limit by stripping the cookie.</summary>
     public const string AnonymousTotpPartition = "anonymous-totp";
+
+    /// <summary>10/min/user sliding window keyed off authenticated NameIdentifier claim.
+    /// Applied to all MfaController endpoints (Enroll, EnrollVerify, RegenerateBackupCodes).
+    /// Stage 6b.3 follow-up to Gap 4.</summary>
+    public const string AuthMfaByUser = "auth-mfa-by-user";
 }

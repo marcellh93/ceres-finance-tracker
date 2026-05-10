@@ -47,6 +47,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     AuthRateLimitPolicies.AuthLoginByIp,
                     AuthRateLimitPolicies.AuthTotpByUser,
                     AuthRateLimitPolicies.AuthCsrfByIp,
+                    AuthRateLimitPolicies.AuthMfaByUser,
                 })
                 {
                     removeFromPolicy.Invoke(policyMap, new object[] { name });
@@ -95,6 +96,19 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                         QueueLimit = 0,
                     });
                 });
+
+                opts.AddPolicy(AuthRateLimitPolicies.AuthMfaByUser, httpContext =>
+                {
+                    var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                              ?? "anonymous-mfa";
+                    return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromSeconds(60),
+                        SegmentsPerWindow = 4,
+                        QueueLimit = 0,
+                    });
+                });
             });
         });
     }
@@ -102,5 +116,16 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
 
 [CollectionDefinition("RateLimitTests", DisableParallelization = true)]
 public class RateLimitTestsCollection
+    : ICollectionFixture<RateLimitedAuthTestWebApplicationFactory>
+{ }
+
+/// <summary>
+/// Separate collection for MFA-specific rate-limit tests. Uses its own
+/// RateLimitedAuthTestWebApplicationFactory instance so the in-process login/TOTP
+/// partition state from RateLimitedAuthEndpointTests does not bleed into
+/// MfaRegenerateRateLimitTests.
+/// </summary>
+[CollectionDefinition("MfaRateLimitTests", DisableParallelization = true)]
+public class MfaRateLimitTestsCollection
     : ICollectionFixture<RateLimitedAuthTestWebApplicationFactory>
 { }

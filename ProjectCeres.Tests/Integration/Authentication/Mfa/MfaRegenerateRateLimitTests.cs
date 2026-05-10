@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -12,18 +11,24 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
-[Collection("IntegrationTests")]
-public class MfaRegenerateTests : IAsyncLifetime
+/// <summary>
+/// Rate-limit tests for MfaController endpoints. Uses RateLimitedAuthTestWebApplicationFactory
+/// so the real in-process auth-mfa-by-user sliding-window policy is active.
+/// Must live in the "RateLimitTests" collection so partition state does not leak
+/// into the IntegrationTests collection's no-op factory.
+/// </summary>
+[Collection("MfaRateLimitTests")]
+public class MfaRegenerateRateLimitTests : IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
-    public MfaRegenerateTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    private readonly RateLimitedAuthTestWebApplicationFactory _factory;
+    public MfaRegenerateRateLimitTests(RateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();
         var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@regen-test.local")).ToList())
+        foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@mfa-rl-test.local")).ToList())
         {
             await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
@@ -32,21 +37,12 @@ public class MfaRegenerateTests : IAsyncLifetime
         }
     }
 
-    /// <summary>
-    /// Registers a user, enrolls MFA, generates initial backup codes, then performs
-    /// the full two-step login (credentials + TOTP). Returns the client (cookie-jar
-    /// disabled), the session cookie, the seed, and the user object so callers can
-    /// make user-bound CSRF requests against authenticated endpoints.
-    /// </summary>
     private async Task<(HttpClient client, string sessionCookie, string seed, ApplicationUser user)>
         SetupAuthenticatedMfaUserAsync(string email)
     {
         var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
         var seed = await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
 
-        // Generate the initial set of 10 backup codes. EnrollUserMfaAsync enables
-        // TwoFactor but does not call GenerateAndPersistAsync — the enroll/verify
-        // endpoint does that in production. We do it here so counts can be verified.
         using (var scope = _factory.Services.CreateScope())
         {
             var bc = scope.ServiceProvider.GetRequiredService<MfaBackupCodeService>();
@@ -67,7 +63,7 @@ public class MfaRegenerateTests : IAsyncLifetime
         var twoFactorCookie = ExtractSetCookie(loginResp, "Identity.TwoFactorUserId");
         twoFactorCookie.Should().NotBeNullOrEmpty("credentials login must return Identity.TwoFactorUserId");
 
-        // Step 2 — TOTP login → get session cookie (anonymous CSRF — user is not yet signed-in)
+        // Step 2 — TOTP login → get session cookie
         var loginCode = AuthTestFixture.ComputeCurrentTotpCode(seed);
         var (csrf2, header2) = AuthTestFixture.MintCsrf(_factory);
         var totpReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/totp")
@@ -84,11 +80,6 @@ public class MfaRegenerateTests : IAsyncLifetime
         return (client, sessionCookie, seed, user);
     }
 
-    /// <summary>
-    /// POSTs to an authenticated MFA endpoint using a user-bound CSRF token and the
-    /// established session cookie. Mirrors the pattern used by MfaEnrollmentTests and
-    /// MfaCacheControlTests for post-login requests.
-    /// </summary>
     private async Task<HttpResponseMessage> PostRegenAsync(
         HttpClient client, string sessionCookie, Guid userId, object body)
     {
@@ -104,65 +95,38 @@ public class MfaRegenerateTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Regenerate_WithoutTotpCode_Returns422()
+    public async Task Regenerate_RateLimitedPerUser()
     {
-        var (client, sessionCookie, _, user) = await SetupAuthenticatedMfaUserAsync("no-code@regen-test.local");
+        // The spec called for an auth-mfa-by-user rate-limit policy on the regen endpoint.
+        // Gap 4 implementation did not add it. This test confirms the fix: 11 calls in
+        // quick succession must eventually return 429.
 
-        var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { });
+        var (client, sessionCookie, seed, user) = await SetupAuthenticatedMfaUserAsync("rl-regen@mfa-rl-test.local");
 
-        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-    }
-
-    [Fact]
-    public async Task Regenerate_WithInvalidTotp_Returns401_DoesNotWipeCodes()
-    {
-        var (client, sessionCookie, _, user) = await SetupAuthenticatedMfaUserAsync("bad-code@regen-test.local");
-
-        // Capture the original code count.
-        int originalCount;
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            originalCount = await db.UserMfaBackupCodes.Where(c => c.UserId == user.Id).CountAsync();
-        }
-        originalCount.Should().Be(10, "setup generated 10 backup codes");
-
-        var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = "000000" });
-
-        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetProperty("code").GetString().Should().Be("INVALID_MFA_CODE");
-
-        // Codes are still intact.
-        using var verifyScope = _factory.Services.CreateScope();
-        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var afterCount = await verifyDb.UserMfaBackupCodes.Where(c => c.UserId == user.Id).CountAsync();
-        afterCount.Should().Be(10);
-    }
-
-    [Fact]
-    public async Task Regenerate_WithValidTotp_ReplacesCodes()
-    {
-        var (client, sessionCookie, seed, user) = await SetupAuthenticatedMfaUserAsync("valid@regen-test.local");
-
-        // Wait so the regen TOTP code is a different time-step than the login code (replay guard).
-        // TOTP rotates every 30s; sleep 31s to guarantee a fresh window.
+        // Wait so regen codes are in a different TOTP window than the login code.
         await Task.Delay(TimeSpan.FromSeconds(31));
 
-        var regenCode = AuthTestFixture.ComputeCurrentTotpCode(seed);
-        var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = regenCode });
+        HttpResponseMessage? last429 = null;
+        for (int i = 0; i < 11; i++)
+        {
+            var code = AuthTestFixture.ComputeCurrentTotpCode(seed);
+            var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = code });
+            if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                last429 = resp;
+                break;
+            }
+            // After the first successful regen the old codes are replaced; the seed stays
+            // the same (authenticator key is unchanged), so we can keep computing codes.
+            // Each call within the same TOTP window will replay the same code and get 401
+            // (either replay-guard or TOTP reject) — wait for the next window to get a
+            // fresh code. This is acceptable: we want to see if the rate limiter fires at
+            // all, not just on perfectly valid codes.
+        }
 
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        var newCodes = body.GetProperty("backupCodes");
-        newCodes.GetArrayLength().Should().Be(10);
-
-        // Old codes wiped, exactly 10 new active codes in DB.
-        using var verifyScope = _factory.Services.CreateScope();
-        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var unused = await verifyDb.UserMfaBackupCodes.Where(c => c.UserId == user.Id && c.UsedAt == null).CountAsync();
-        unused.Should().Be(10);
+        last429.Should().NotBeNull(
+            "regenerate must be rate-limited (auth-mfa-by-user policy); 11 rapid calls must eventually return 429. " +
+            "If this fails, the Gap B implementation missed the rate-limit — see spec § Gap B");
     }
 
     private static string? ExtractSetCookie(HttpResponseMessage response, string cookieName)

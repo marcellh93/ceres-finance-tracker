@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels.Auth;
@@ -21,6 +22,7 @@ public sealed class MfaController : ControllerBase
     }
 
     [HttpPost("enroll")]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthMfaByUser)]
     public async Task<IActionResult> Enroll()
     {
         var user = await GetCurrentUserAsync();
@@ -43,6 +45,7 @@ public sealed class MfaController : ControllerBase
     }
 
     [HttpPost("enroll/verify")]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthMfaByUser)]
     public async Task<IActionResult> EnrollVerify(
         [FromBody] EnrollVerifyRequest request,
         [FromServices] MfaBackupCodeService backupCodes)
@@ -55,14 +58,14 @@ public sealed class MfaController : ControllerBase
         var hasKey = await _userManager.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(hasKey))
         {
-            return BadRequest(new { error = "no_enrollment_in_progress" });
+            return BadRequest(new { error = new { code = "NO_ENROLLMENT_IN_PROGRESS", message = "Call POST /api/auth/mfa/enroll first to start enrollment." } });
         }
 
         var verified = await _userManager.VerifyTwoFactorTokenAsync(
             user, TokenOptions.DefaultAuthenticatorProvider, request.Code);
         if (!verified)
         {
-            return BadRequest(new { error = "code_did_not_verify" });
+            return BadRequest(new { error = new { code = "INVALID_MFA_CODE", message = "The verification code is invalid or expired." } });
         }
 
         await _userManager.SetTwoFactorEnabledAsync(user, true);
@@ -73,6 +76,7 @@ public sealed class MfaController : ControllerBase
     }
 
     [HttpPost("backup-codes/regenerate")]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthMfaByUser)]
     public async Task<IActionResult> RegenerateBackupCodes(
         [FromBody] RegenerateBackupCodesRequest request,
         [FromServices] MfaBackupCodeService backupCodes)
