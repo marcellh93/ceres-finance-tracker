@@ -11,8 +11,7 @@ namespace ProjectCeres.Common.Authentication;
 /// <summary>
 /// Cookie auth event handler. On every authenticated request: read sid claim,
 /// load matching UserSession, reject if missing/revoked, otherwise stamp
-/// LastUsedAt = now. One DB read + one write per authenticated request —
-/// future-work tracked in docs/planning-future.md § Session-validation perf.
+/// LastUsedAt = now (debounced to one write per 60 s per session row).
 /// </summary>
 public static class SessionRevocationValidator
 {
@@ -36,8 +35,15 @@ public static class SessionRevocationValidator
             return;
         }
 
-        session.LastUsedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
+        // Stage 6b.3 Gap 9: debounce LastUsedAt writes to avoid hot-row contention under
+        // authenticated load. 60-second resolution is sufficient for "last used" telemetry;
+        // without the gate, every authenticated request issued an UPDATE, causing PostgreSQL
+        // row-lock contention and authenticated write amplification.
+        if (session.LastUsedAt < DateTime.UtcNow - TimeSpan.FromSeconds(60))
+        {
+            session.LastUsedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
     }
 
     private static async Task RejectAsync(CookieValidatePrincipalContext ctx)
