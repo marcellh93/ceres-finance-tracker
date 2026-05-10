@@ -23,7 +23,7 @@ PostgreSQL Row-Level Security is treated as a Phase 4 defense-in-depth layer (pe
 Adopt **Option B: global query filters + explicit redundancy + admin-only bypass.**
 
 1. **Global query filters** are applied to every user-owned entity in `ApplicationDbContext.OnModelCreating`:
-   `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `Settings`, `SupportTicket`, `AuditLog`, and any future user-owned entities. System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) receive no filter.
+   `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `Settings`, `SupportTicket`, `AuditLog`, and any future user-owned entities. System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) receive no filter. **Intentionally cross-tenant entities** that record events spanning unknown or non-existent users — `FailedLoginAttempt` (added Stage 6b.2) and any future security-event log — also receive no filter; they are read by background purge jobs per ADR-0067 § Decision-6.
 
 2. **Service code continues to write `.Where(t => t.UserId == _currentUser.UserId)` explicitly** even though the global filter would also catch it. The redundancy documents intent at the call site and provides a second layer that is grep-able during code review.
 
