@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
@@ -33,7 +32,6 @@ public sealed class PasswordResetService
     private readonly IEmailService _email;
     private readonly IMemoryCache _cache;
     private readonly ILogger<PasswordResetService> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
 
     public PasswordResetService(
         UserManager<ApplicationUser> userManager,
@@ -45,8 +43,7 @@ public sealed class PasswordResetService
         FailedLoginRecorder failedLogins,
         IEmailService email,
         IMemoryCache cache,
-        ILogger<PasswordResetService> logger,
-        IServiceScopeFactory scopeFactory)
+        ILogger<PasswordResetService> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager; // Reserved for ConfirmAsync (Task 13)
@@ -58,7 +55,6 @@ public sealed class PasswordResetService
         _email = email;
         _cache = cache;
         _logger = logger;
-        _scopeFactory = scopeFactory;
     }
 
     public sealed class RateLimitedException : Exception
@@ -67,15 +63,6 @@ public sealed class PasswordResetService
         public RateLimitedException(int retryAfterSeconds)
             : base("Password reset rate limit exceeded.")
             => RetryAfterSeconds = retryAfterSeconds;
-    }
-
-    /// <summary>
-    /// Thrown when the requesting IP is on the user's blocked-IP list.
-    /// Controller maps this to 403.
-    /// </summary>
-    public sealed class BlockedIpException : Exception
-    {
-        public BlockedIpException() : base("Request IP is blocked for this user.") { }
     }
 
     public async Task RequestAsync(
@@ -94,111 +81,58 @@ public sealed class PasswordResetService
 
         var user = await _userManager.FindByEmailAsync(normalized);
 
-        // IP-block check: if the user exists and the requesting IP is on their blocked list,
-        // reject with BlockedIpException (controller maps to 403). This mirrors what
-        // UserBlockedIpMiddleware does for authenticated requests — applying it here
-        // extends the protection to the anonymous /request endpoint.
-        if (user is not null)
-        {
-            var isBlocked = await _db.UserBlockedIps
-                .AnyAsync(b => b.UserId == user.Id && b.IpAddress == ip, ct);
-            if (isBlocked)
-            {
-                throw new BlockedIpException();
-            }
-        }
-
-        // Constant-time design: start the I/O work on a fresh scope in parallel with the
-        // Argon2id hash so both known and unknown branches have approximately equal wall-clock
-        // time (the hash dominates). The I/O task uses its own scope to avoid DbContext
-        // concurrency issues; the request scope is not touched after launching the task.
-        Task ioTask;
-        if (user is null)
-        {
-            // Unknown email: fire FailedLogin recording in parallel with hash.
-            var capturedNorm = normalized;
-            var capturedIp = ip;
-            var capturedUa = userAgent;
-            ioTask = Task.Run(async () =>
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
-                try
-                {
-                    await recorder.RecordAsync(
-                        capturedNorm, null, FailedLoginReason.PasswordResetUnknownEmail,
-                        capturedIp, capturedUa, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to record failed-login attempt for password-reset unknown-email path.");
-                }
-            });
-        }
-        else
-        {
-            // Known email: fire token creation + email send in parallel with hash.
-            var capturedUser = user;
-            var capturedBase = resetUrlBase;
-            ioTask = Task.Run(async () =>
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var tokens = scope.ServiceProvider.GetRequiredService<PasswordResetTokenGenerator>();
-                var emailSvc = scope.ServiceProvider.GetRequiredService<IEmailService>();
-
-                var sem = _userLocks.GetOrAdd(capturedUser.Id, _ => new SemaphoreSlim(1, 1));
-                await sem.WaitAsync(CancellationToken.None);
-                string rawToken;
-                try
-                {
-                    // Supersede prior unused tokens.
-                    await db.PasswordResetTokens
-                        .Where(t => t.UserId == capturedUser.Id && t.ConsumedAt == null)
-                        .ExecuteUpdateAsync(
-                            s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow),
-                            CancellationToken.None);
-
-                    rawToken = tokens.Generate();
-                    var hash = tokens.Hash(rawToken);
-
-                    var now = DateTime.UtcNow;
-                    db.PasswordResetTokens.Add(new PasswordResetToken
-                    {
-                        Id = Guid.NewGuid(),
-                        UserId = capturedUser.Id,
-                        TokenHash = hash,
-                        CreatedAt = now,
-                        ExpiresAt = now + TokenLifetime,
-                        ConsumedAt = null,
-                        MfaVerifiedAt = null,
-                    });
-                    await db.SaveChangesAsync(CancellationToken.None);
-                }
-                finally
-                {
-                    sem.Release();
-                }
-
-                var resetUrl = $"{capturedBase.TrimEnd('/')}/app/password-reset#token={rawToken}";
-                try
-                {
-                    await emailSvc.SendAsync(BuildRequestEmail(capturedUser.Email!, resetUrl), CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to send password-reset email; token row already committed.");
-                }
-            });
-        }
-
         // Always pay the Argon2id cost — equalise wall-clock time across known/unknown branches.
-        // Running it after launching the ioTask means both branches overlap I/O with CPU work.
         _argon.RunDummyHash();
 
-        // Await the I/O task so the service call doesn't return before the work completes
-        // (ensures test assertions on the DB state are always valid).
-        await ioTask;
+        if (user is null)
+        {
+            await _failedLogins.RecordAsync(
+                normalized, null, FailedLoginReason.PasswordResetUnknownEmail, ip, userAgent, ct);
+            return;
+        }
+
+        var sem = _userLocks.GetOrAdd(user.Id, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync(ct);
+        string rawToken;
+        try
+        {
+            // Supersede prior unused tokens.
+            await _db.PasswordResetTokens
+                .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+
+            rawToken = _tokens.Generate();
+            var hash = _tokens.Hash(rawToken);
+
+            var now = DateTime.UtcNow;
+            _db.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                TokenHash = hash,
+                CreatedAt = now,
+                ExpiresAt = now + TokenLifetime,
+                ConsumedAt = null,
+                MfaVerifiedAt = null,
+            });
+            await _db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            sem.Release();
+        }
+
+        var resetUrl = $"{resetUrlBase.TrimEnd('/')}/app/password-reset#token={rawToken}";
+
+        try
+        {
+            await _email.SendAsync(BuildRequestEmail(user.Email!, resetUrl), ct);
+        }
+        catch (Exception ex)
+        {
+            // Per spec: failed sends are logged but never block the user-facing request.
+            _logger.LogError(ex, "Failed to send password-reset email; token row already committed.");
+        }
     }
 
     private void EnforceEmailRateLimit(string normalizedEmail)

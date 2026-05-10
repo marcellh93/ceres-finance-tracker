@@ -36,13 +36,6 @@ public sealed class PasswordResetController : ControllerBase
                 error = new { code = "RATE_LIMITED", message = "Too many requests. Please retry shortly." }
             });
         }
-        catch (PasswordResetService.BlockedIpException)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new
-            {
-                error = new { code = "IP_BLOCKED", message = "Access denied." }
-            });
-        }
 
         return NoContent();
     }
