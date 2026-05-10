@@ -18,4 +18,5 @@ public enum FailedLoginReason
     BadBackupCode,
     LockedOut,
     UnknownUser,
+    PasswordResetUnknownEmail,
 }
