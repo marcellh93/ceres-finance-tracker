@@ -410,3 +410,25 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
 - ~~Settings migration~~ — Migrates with the rest of the sentinel data per ADR-0066; onboarding Preferences step handles per-user overrides for subsequent registrations.
 - ~~WCAG 2.1 AA compliance~~ — Full spec in §8 above.
 - ~~MVC → Web API decoupling~~ — Approach locked 2026-04-28. See `planning-phase3-spa-migration.md`.
+
+---
+
+## Stage 6b.2 deferred decisions (2026-05-09)
+
+The following items were captured during Stage 6b.2 design and implementation, then deferred to later stages:
+
+1. **Reverse-proxy header configuration** (Stage 16) — `Program.cs` does not call `UseForwardedHeaders`. Behind any reverse proxy (Cloudflare, nginx, Caddy, Render, Fly), `Connection.RemoteIpAddress` becomes the proxy's IP and the rate limiter collapses every request into one partition. Stage 16 must add `app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto })` plus `KnownProxies`/`KnownNetworks` once the proxy is chosen. Cross-ref: `docs/superpowers/specs/2026-05-09-stage-6b-2-lockout-rate-limit-failed-login-design.md` § Deferred decisions.
+
+2. **In-memory rate limiter is single-host only** (Stage 16) — limiter state is in-process. If Stage 16 introduces a second app instance, swap to a Redis-backed limiter or pin auth endpoints to a single host.
+
+3. **`FailedLoginAttempt` GDPR data-export inclusion** (Stage 6c) — open question. Recommendation: include in Article 15 (access) export, omit from Article 20 (portability) since not user-provided.
+
+4. **`FailedLoginAttempt` GDPR erasure cascade** (Stage 6c) — on right-to-erasure, the 6c flow must `UPDATE FailedLoginAttempt SET EmailAttempted = NULL WHERE EmailAttempted = @normalizedEmail`. Schema enables it (column is nullable).
+
+5. **`FailedLoginAttempt` retention purge** (Stage 7+) — 1-year flat cross-tenant `DELETE WHERE OccurredAt < now() - interval '1 year'`. Different from `AuditLog` (6 months, per-user fan-out). Implementation lands when the background-job runner ships in Stage 7. First cross-tenant job for the runner.
+
+6. **Backup-code-during-lockout policy** — formalized in `security-model.md` § Login → Account lockout (Stage 6b.2 amendment, 2026-05-09). No further action needed.
+
+7. **TOTP replay guard: replace in-process semaphore with deterministic-window unique index** (Stage 16, before multi-host) — Stage 6b.2 closed the SELECT-then-INSERT TOCTOU using a per-user `SemaphoreSlim` in `TotpReplayGuard` (band-aid for single-host beta). The structural fix is to store the deterministic TOTP counter window (Unix-seconds / 30) and add a unique index on `(UserId, CodeWindow)`. Then INSERT first, catch `UniqueConstraintViolation` → reject as replay. The current semaphore silently fails under multi-host and must be replaced before any horizontal scale-out. See commit `6a5133b`.
+
+8. **Login lockout: replace per-user semaphore with atomic single-statement UPDATE** (Stage 16, before multi-host) — Stage 6b.2 closed the AccessFailedCount race using a per-user `SemaphoreSlim` in `AuthController.Login` (band-aid for single-host beta). The structural fix is a single atomic SQL: `UPDATE "AspNetUsers" SET "AccessFailedCount" = "AccessFailedCount" + 1, "LockoutEnd" = CASE WHEN "AccessFailedCount" + 1 >= @threshold THEN @end ELSE "LockoutEnd" END WHERE "Id" = @id`, issued via `ExecuteSqlInterpolatedAsync`, completely bypassing Identity's `AccessFailedAsync`. Works on a multi-host fleet without in-process state. The current semaphore silently fails under multi-host and must be replaced before any horizontal scale-out. See commit `6a5133b`.
