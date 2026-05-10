@@ -2,6 +2,8 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using FluentAssertions;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -208,6 +210,93 @@ public static class AuthTestFixture
         var start = idx + marker.Length;
         var end = message.BodyText.IndexOfAny(new[] { '\r', '\n', ' ' }, start);
         return end < 0 ? message.BodyText[start..] : message.BodyText[start..end];
+    }
+
+    /// <summary>
+    /// POSTs /api/auth/login with the given credentials and returns the value of the
+    /// __Host-Session cookie. The user must already exist (call RegisterUserAsync first).
+    /// Stamps LastReauthAt on the cookie via the production login flow.
+    /// </summary>
+    public static async Task<string> LoginViaHttpAsync(
+        AuthTestWebApplicationFactory factory, HttpClient client, string email,
+        string password = ValidPassword, bool rememberMe = false)
+    {
+        var (cookie, header) = MintCsrf(factory);
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new { email, password, rememberMe }),
+        };
+        req.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={cookie}");
+        req.Headers.Add(SessionConstants.CsrfHeaderName, header);
+
+        var resp = await client.SendAsync(req);
+        resp.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var setCookies = resp.Headers.GetValues("Set-Cookie");
+        var sessionCookie = setCookies.First(c => c.StartsWith($"{SessionConstants.SessionCookieName}="));
+        var value = sessionCookie.Split(';')[0].Substring(SessionConstants.SessionCookieName.Length + 1);
+        return value;
+    }
+
+    /// <summary>
+    /// Builds an authentication cookie value containing a ClaimsPrincipal for the given
+    /// user with a chosen LastReauthAt claim value (Unix seconds, or null to omit).
+    /// Used by gate tests that need a stale/future/missing/malformed claim without
+    /// waiting real wall-clock time.
+    ///
+    /// Mechanism: build a ClaimsPrincipal via the registered ApplicationUserClaimsPrincipalFactory,
+    /// then encrypt a TicketDataFormat-compatible payload using the same IDataProtector purpose
+    /// strings the cookie middleware uses. Returns the cookie value to be sent in
+    /// the Cookie header on subsequent requests.
+    /// </summary>
+    public static async Task<string> MintAuthCookieWithLastReauthAt(
+        AuthTestWebApplicationFactory factory, ApplicationUser user, long? lastReauthAtUnix)
+    {
+        using var scope = factory.Services.CreateScope();
+        var sp = scope.ServiceProvider;
+
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext { RequestServices = sp };
+        if (lastReauthAtUnix is { } v)
+        {
+            http.Items[SessionConstants.LastReauthAtItemKey] = v.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+        var sid = Guid.NewGuid();
+        http.Items[SessionConstants.PendingSessionItemKey] = sid;
+
+        var pcf = sp.GetRequiredService<
+            Microsoft.AspNetCore.Identity.IUserClaimsPrincipalFactory<ApplicationUser>>();
+        var accessor = sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        if (accessor is not null) accessor.HttpContext = http;
+        var principal = await pcf.CreateAsync(user);
+
+        // Insert a UserSession row so SessionRevocationValidator doesn't reject the cookie
+        // on first use (the validator looks up the row by sid claim).
+        var db = sp.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+        db.UserSessions.Add(new ProjectCeres.Models.UserSession
+        {
+            Id = sid,
+            UserId = user.Id,
+            IpCreatedAt = "127.0.0.1",
+            UserAgent = "test",
+            CreatedAt = DateTime.UtcNow,
+            LastUsedAt = DateTime.UtcNow,
+            IsPersistent = false,
+        });
+        await db.SaveChangesAsync();
+
+        var ticket = new Microsoft.AspNetCore.Authentication.AuthenticationTicket(
+            principal,
+            new Microsoft.AspNetCore.Authentication.AuthenticationProperties { IsPersistent = false },
+            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme);
+
+        var dpProvider = sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+        var protector = dpProvider.CreateProtector(
+            "Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationMiddleware",
+            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme,
+            "v2");
+        var format = new Microsoft.AspNetCore.Authentication.TicketDataFormat(protector);
+        return format.Protect(ticket);
     }
 
     private static byte[] DecodeBase32(string input)
