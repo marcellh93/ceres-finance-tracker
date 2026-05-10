@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using Microsoft.AspNetCore.Identity;
@@ -14,9 +12,12 @@ namespace ProjectCeres.Common.Authentication;
 /// no __Host-Session cookie, look up matching UserSession by hashed token, rotate
 /// (issue new + replace hash + clear old cookie), insert a new UserSession row,
 /// sign the user into the Identity scheme so the response carries a fresh
-/// __Host-Session cookie. Subsequent authentication picks up the rotated cookie
-/// via SignInManager.SignInAsync's response-side write — and for THIS request,
-/// HttpContext.User is set directly so authorization succeeds without a round-trip.
+/// __Host-Session cookie. The current request is NOT authenticated by the middleware
+/// — it returns 401 and the browser retries with the freshly-issued cookie. This
+/// keeps SecurityStampValidator and SessionRevocationValidator honest for every
+/// authenticated hop (Stage 6b.3 Gap 11). Cost: one extra round-trip on
+/// rememberMe-bootstrap; benefit: no one-request principal stamp that bypasses
+/// the cookie auth pipeline.
 /// </summary>
 public sealed class PersistentCookieRotationMiddleware
 {
@@ -129,19 +130,14 @@ public sealed class PersistentCookieRotationMiddleware
             }
 
             // Sign into Identity (writes __Host-Session response cookie for next request).
+            // SignInAsync also sets context.User as a framework side-effect; immediately
+            // clear it so THIS request remains unauthenticated. SecurityStampValidator
+            // and SessionRevocationValidator must run on every authenticated hop — the
+            // browser will retry with the freshly-issued cookie on the next request
+            // (Stage 6b.3 Gap 11).
             context.Items[SessionConstants.PendingSessionItemKey] = newSessionId;
             await signInManager.SignInAsync(user, isPersistent: false);
-
-            // Stamp the current request's principal so authorization succeeds for this hop.
-            // (Gap 11 will revisit whether to drop this stamp; for now keep it.)
-            var identity = new ClaimsIdentity(
-                new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, match.UserId.ToString()),
-                    new Claim(SessionConstants.SessionIdClaim, newSessionId.ToString())
-                },
-                authenticationType: SessionConstants.PersistentScheme);
-            context.User = new ClaimsPrincipal(identity);
+            context.User = new System.Security.Claims.ClaimsPrincipal();
         }
         finally
         {

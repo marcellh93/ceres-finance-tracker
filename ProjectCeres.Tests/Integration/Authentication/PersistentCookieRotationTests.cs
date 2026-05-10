@@ -25,7 +25,9 @@ public class PersistentCookieRotationTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        foreach (var u in userManager.Users.Where(u => u.Email!.EndsWith("@persist-test.local")).ToList())
+        foreach (var u in userManager.Users
+            .Where(u => u.Email!.EndsWith("@persist-test.local") || u.Email!.EndsWith("@persist-stamp-test.local"))
+            .ToList())
         {
             await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await userManager.DeleteAsync(u);
@@ -111,6 +113,42 @@ public class PersistentCookieRotationTests : IAsyncLifetime
             .Where(s => s.UserId == user.Id && s.IsPersistent && s.RevokedAt == null)
             .CountAsync();
         activePersistent.Should().Be(1, "concurrent rotation must produce exactly one new active persistent session");
+    }
+
+    [Fact]
+    public async Task RotationDoesNotAuthenticateCurrentRequest_ReturnsFreshCookieFor401()
+    {
+        // Set up a rememberMe session.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "stamp@persist-stamp-test.local");
+        var loginClient = _factory.CreateClient();
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, loginClient, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = true });
+        loginResp.EnsureSuccessStatusCode();
+
+        var setCookies = loginResp.Headers.GetValues("Set-Cookie").ToList();
+        var persistCookieLine = setCookies.First(c => c.StartsWith($"{SessionConstants.PersistentCookieName}="));
+        var persistValue = persistCookieLine.Split(';')[0].Substring(SessionConstants.PersistentCookieName.Length + 1);
+
+        // Now hit an authenticated endpoint with ONLY the persist cookie (no __Host-Session).
+        // The middleware rotates the persistent cookie and signs into Identity (issuing a
+        // fresh __Host-Session for the next request) — but per Gap 11, this current request
+        // should NOT be authenticated. The fallback policy returns 401.
+        var noSessionClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });
+        var firstReq = new HttpRequestMessage(HttpMethod.Get, "/api/categories");
+        firstReq.Headers.Add("Cookie", $"{SessionConstants.PersistentCookieName}={persistValue}");
+
+        var firstResp = await noSessionClient.SendAsync(firstReq);
+        firstResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "rotation must NOT authenticate this exact request — the freshly-set cookie carries the next request");
+
+        // The response MUST carry a fresh __Host-Session cookie.
+        var firstSetCookies = firstResp.Headers.TryGetValues("Set-Cookie", out var c1) ? c1.ToList() : new List<string>();
+        firstSetCookies.Should().Contain(c => c.StartsWith($"{SessionConstants.SessionCookieName}="),
+            "rotation must issue a fresh __Host-Session cookie even though this request was rejected");
+
+        // The response MUST also carry the rotated __Host-Persist.
+        firstSetCookies.Should().Contain(c => c.StartsWith($"{SessionConstants.PersistentCookieName}="),
+            "rotation must issue the new __Host-Persist cookie");
     }
 
     private static string? ExtractCookie(IEnumerable<string> setCookies, string name)
