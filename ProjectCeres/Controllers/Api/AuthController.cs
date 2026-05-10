@@ -107,6 +107,8 @@ public sealed class AuthController : ControllerBase
 
         var sessionId = Guid.NewGuid();
         HttpContext.Items[SessionConstants.PendingSessionItemKey] = sessionId;
+        HttpContext.Items[SessionConstants.LastReauthAtItemKey] =
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         // Serialize concurrent login attempts for the same user with an in-process
         // per-user semaphore. Without serialization, concurrent bad-password requests
@@ -239,6 +241,8 @@ public sealed class AuthController : ControllerBase
                 await _userManager.SetLockoutEndDateAsync(user, null);
             }
 
+            HttpContext.Items[SessionConstants.LastReauthAtItemKey] =
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
             await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
@@ -270,6 +274,8 @@ public sealed class AuthController : ControllerBase
                 await _userManager.SetLockoutEndDateAsync(user, null);
             }
 
+            HttpContext.Items[SessionConstants.LastReauthAtItemKey] =
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
             await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
