@@ -11,7 +11,7 @@ namespace ProjectCeres.Common.Authentication;
 
 /// <summary>
 /// Orchestrates the password-reset flow per docs/superpowers/specs/2026-05-10-password-reset-design.md.
-/// Per-user semaphore mirrors AuthController._loginLocks. Per-email rate gate is service-side
+/// Per-user semaphore serialises the token supersede+insert. Per-email rate gate is service-side
 /// (MemoryCache); per-IP gate is the existing AuthLoginByIp policy applied at the controller.
 /// </summary>
 public sealed class PasswordResetService
@@ -21,7 +21,6 @@ public sealed class PasswordResetService
     public const int EmailRateLimit = 5;
 
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _userLocks = new();
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _emailLocks = new();
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -47,11 +46,11 @@ public sealed class PasswordResetService
         ILogger<PasswordResetService> logger)
     {
         _userManager = userManager;
-        _signInManager = signInManager;
+        _signInManager = signInManager; // Reserved for ConfirmAsync (Task 13)
         _db = db;
         _argon = argon;
         _tokens = tokens;
-        _replayGuard = replayGuard;
+        _replayGuard = replayGuard;    // Reserved for ConfirmAsync (Task 13)
         _failedLogins = failedLogins;
         _email = email;
         _cache = cache;
@@ -61,8 +60,9 @@ public sealed class PasswordResetService
     public sealed class RateLimitedException : Exception
     {
         public int RetryAfterSeconds { get; }
-        public RateLimitedException(int retryAfterSeconds) =>
-            RetryAfterSeconds = retryAfterSeconds;
+        public RateLimitedException(int retryAfterSeconds)
+            : base("Password reset rate limit exceeded.")
+            => RetryAfterSeconds = retryAfterSeconds;
     }
 
     public async Task RequestAsync(
@@ -139,33 +139,28 @@ public sealed class PasswordResetService
     {
         // Sliding-window-ish: if the cached counter for this email reaches the limit,
         // reject. Cache TTL = the window length, so the bucket auto-resets.
-        var sem = _emailLocks.GetOrAdd(normalizedEmail, _ => new SemaphoreSlim(1, 1));
-        sem.Wait();
-        try
+        // No per-email semaphore: MemoryCache is thread-safe, and a tiny race on Count
+        // is intentional — accuracy here is best-effort; the per-IP limiter is the hard
+        // defence against abuse. Keying by arbitrary email is safe because we never hold
+        // a lock on the string (no unbounded ConcurrentDictionary growth).
+        var key = $"pwreset:rate:{normalizedEmail}";
+        var entry = _cache.Get<RateBucket>(key);
+        if (entry is null || entry.WindowStart + EmailRateWindow <= DateTime.UtcNow)
         {
-            var key = $"pwreset:rate:{normalizedEmail}";
-            var entry = _cache.Get<RateBucket>(key);
-            if (entry is null || entry.WindowStart + EmailRateWindow <= DateTime.UtcNow)
-            {
-                entry = new RateBucket { WindowStart = DateTime.UtcNow, Count = 1 };
-                _cache.Set(key, entry, EmailRateWindow);
-                return;
-            }
-
-            if (entry.Count >= EmailRateLimit)
-            {
-                var elapsed = DateTime.UtcNow - entry.WindowStart;
-                var remaining = (int)Math.Ceiling((EmailRateWindow - elapsed).TotalSeconds);
-                throw new RateLimitedException(Math.Max(remaining, 1));
-            }
-
-            entry.Count += 1;
-            _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - DateTime.UtcNow);
+            entry = new RateBucket { WindowStart = DateTime.UtcNow, Count = 1 };
+            _cache.Set(key, entry, EmailRateWindow);
+            return;
         }
-        finally
+
+        if (entry.Count >= EmailRateLimit)
         {
-            sem.Release();
+            var elapsed = DateTime.UtcNow - entry.WindowStart;
+            var remaining = (int)Math.Ceiling((EmailRateWindow - elapsed).TotalSeconds);
+            throw new RateLimitedException(Math.Max(remaining, 1));
         }
+
+        entry.Count += 1;
+        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - DateTime.UtcNow);
     }
 
     private sealed class RateBucket
@@ -183,13 +178,13 @@ public sealed class PasswordResetService
             Click or paste this link into your browser to set a new password:
             {resetUrl}
 
-            This link expires in 15 minutes and can only be used once.
+            This link expires in {(int)TokenLifetime.TotalMinutes} minutes and can only be used once.
             If you did not request a reset, you can ignore this email.
             """;
         var bodyHtml = $"""
             <p>We received a request to reset your Project Ceres password.</p>
             <p><a href="{resetUrl}">Reset your password</a></p>
-            <p>This link expires in 15 minutes and can only be used once.</p>
+            <p>This link expires in {(int)TokenLifetime.TotalMinutes} minutes and can only be used once.</p>
             <p>If you did not request a reset, you can ignore this email.</p>
             """;
         return new EmailMessage(to, subject, bodyHtml, bodyText);
