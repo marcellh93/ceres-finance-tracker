@@ -68,6 +68,57 @@ public class CookieAttributesTests : IAsyncLifetime
         AssertHostCookieContract(setCookies, SessionConstants.CsrfCookieName, expectedHttpOnly: false);
     }
 
+    // ── Edge-case batch A (Stage 6b.3) ──────────────────────────────────────
+
+    [Fact]
+    public async Task TotpSuccess_SetsSessionCookieWithExpectedAttributes()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "totp-ck@cookie-test.local");
+        var seed = await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        // Step 1: credential login — returns 200 + Identity.TwoFactorUserId cookie.
+        var (csrfCookie1, csrfHeader1) = AuthTestFixture.MintCsrf(_factory);
+        var loginReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new
+            {
+                email = "totp-ck@cookie-test.local",
+                password = AuthTestFixture.ValidPassword,
+                rememberMe = false
+            }),
+        };
+        loginReq.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={csrfCookie1}");
+        loginReq.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader1);
+        var loginResp = await client.SendAsync(loginReq);
+        loginResp.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+
+        // Extract the Identity.TwoFactorUserId cookie value.
+        var twoFactorCookieValue = loginResp.Headers
+            .GetValues("Set-Cookie")
+            .Select(c => c.Split(';')[0])
+            .FirstOrDefault(c => c.StartsWith("Identity.TwoFactorUserId="))
+            ?.Split('=', 2)[1];
+        twoFactorCookieValue.Should().NotBeNullOrEmpty();
+
+        // Step 2: TOTP submit — should issue the session cookie.
+        var (csrfCookie2, csrfHeader2) = AuthTestFixture.MintCsrf(_factory);
+        var code = AuthTestFixture.ComputeCurrentTotpCode(seed);
+        var totpReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/totp")
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(new { code }),
+        };
+        totpReq.Headers.Add("Cookie",
+            $"Identity.TwoFactorUserId={twoFactorCookieValue}; {SessionConstants.CsrfCookieName}={csrfCookie2}");
+        totpReq.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader2);
+        var totpResp = await client.SendAsync(totpReq);
+
+        totpResp.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+
+        var setCookies = totpResp.Headers.GetValues("Set-Cookie").ToList();
+        AssertHostCookieContract(setCookies, SessionConstants.SessionCookieName, expectedHttpOnly: true);
+    }
+
     private static void AssertHostCookieContract(IEnumerable<string> setCookies, string name, bool expectedHttpOnly)
     {
         var match = setCookies.FirstOrDefault(c => c.StartsWith(name + "="));

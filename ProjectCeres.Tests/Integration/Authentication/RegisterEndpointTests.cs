@@ -74,6 +74,27 @@ public class RegisterEndpointTests : IAsyncLifetime
         resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    // ── Edge-case batch A (Stage 6b.3) ──────────────────────────────────────
+
+    [Fact]
+    public async Task Register_NoBody_Returns400()
+    {
+        // POST with no body at all (Content-Length: 0, no Content-Type).
+        // The JSON binder cannot construct the model — expect 400 or 422.
+        var (cookie, header) = AuthTestFixture.MintCsrf(_factory);
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/register");
+        req.Headers.Add("Cookie", $"{ProjectCeres.Common.Authentication.SessionConstants.CsrfCookieName}={cookie}");
+        req.Headers.Add(ProjectCeres.Common.Authentication.SessionConstants.CsrfHeaderName, header);
+
+        var resp = await _client.SendAsync(req);
+
+        // Framework returns 415 when no Content-Type is set (no JSON binder match),
+        // 400/422 when body is present but invalid. All are acceptable — the key
+        // contract is that the server does NOT return 500.
+        ((int)resp.StatusCode).Should().BeOneOf(new[] { 400, 415, 422 },
+            "missing body must be rejected gracefully — not a 500");
+    }
+
     [Fact]
     public async Task Register_DuplicateEmail_ReturnsSameShapeAsNewEmail()
     {

@@ -92,6 +92,39 @@ public class MfaBackupCodeServiceTests : IAsyncLifetime
         ok.Should().BeTrue();
     }
 
+    // ── Edge-case batch A (Stage 6b.3) ──────────────────────────────────────
+
+    [Fact]
+    public async Task VerifyAndConsumeAsync_RejectsInvalidCrockfordChars()
+    {
+        // Crockford base-32 excludes I, L, O, U (visually ambiguous).
+        // NormalizeForVerify strips hyphens, uppercases, then tests BackupCodeShape.
+        // Codes made entirely of excluded chars must return false (shape mismatch → null → false).
+        var userId = new Guid("dddddddd-0000-0000-0000-000000000006");
+        using var scope = _factory.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<MfaBackupCodeService>();
+
+        // Seed valid backup codes so the user has rows (otherwise false would be trivially
+        // correct for a missing-user reason, not the shape-rejection reason we're testing).
+        await svc.GenerateAndPersistAsync(userId, CancellationToken.None);
+
+        // I — excluded Crockford character
+        var resultI = await svc.VerifyAndConsumeAsync(userId, "IIII-IIII-IIII-IIII", "10.0.0.1", CancellationToken.None);
+        resultI.Should().BeFalse("'I' is not in the Crockford alphabet — shape must be rejected");
+
+        // L — excluded Crockford character
+        var resultL = await svc.VerifyAndConsumeAsync(userId, "LLLL-LLLL-LLLL-LLLL", "10.0.0.1", CancellationToken.None);
+        resultL.Should().BeFalse("'L' is not in the Crockford alphabet — shape must be rejected");
+
+        // O — excluded Crockford character
+        var resultO = await svc.VerifyAndConsumeAsync(userId, "OOOO-OOOO-OOOO-OOOO", "10.0.0.1", CancellationToken.None);
+        resultO.Should().BeFalse("'O' is not in the Crockford alphabet — shape must be rejected");
+
+        // U — excluded Crockford character
+        var resultU = await svc.VerifyAndConsumeAsync(userId, "UUUU-UUUU-UUUU-UUUU", "10.0.0.1", CancellationToken.None);
+        resultU.Should().BeFalse("'U' is not in the Crockford alphabet — shape must be rejected");
+    }
+
     [Fact]
     public async Task RegenerateAsync_invalidates_all_previous_codes_and_yields_10_new()
     {

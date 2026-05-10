@@ -278,6 +278,88 @@ public class FailedLoginRecorderTests : IAsyncLifetime
         row.Should().NotBeNull();
     }
 
+    // ── Edge-case batch A (Stage 6b.3) ──────────────────────────────────────
+
+    [Fact]
+    public async Task SuccessfulLogin_DoesNotWriteRow()
+    {
+        await AuthTestFixture.RegisterUserAsync(_factory, "success@recorder-test.local");
+        var client = _factory.CreateClient();
+
+        using var scopeBefore = _factory.Services.CreateScope();
+        var dbBefore = scopeBefore.ServiceProvider.GetRequiredService<AppDbContext>();
+        var countBefore = await dbBefore.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "success@recorder-test.local")
+            .CountAsync();
+
+        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = "success@recorder-test.local", password = AuthTestFixture.ValidPassword, rememberMe = false });
+
+        using var scopeAfter = _factory.Services.CreateScope();
+        var dbAfter = scopeAfter.ServiceProvider.GetRequiredService<AppDbContext>();
+        var countAfter = await dbAfter.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "success@recorder-test.local")
+            .CountAsync();
+
+        countAfter.Should().Be(countBefore,
+            "recorder must not write a row on a successful login");
+    }
+
+    [Fact]
+    public async Task OccurredAt_IsUtc()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            "utccheck@recorder-test.local",
+            userId: Guid.NewGuid(),
+            FailedLoginReason.BadCredentials,
+            "1.2.3.4",
+            "ua/utc-test",
+            CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == "utccheck@recorder-test.local")
+            .SingleOrDefaultAsync();
+        row.Should().NotBeNull();
+
+        // EF may return Unspecified Kind even for UTC values (Npgsql strips Kind).
+        // Assert the value is within 5 seconds of UtcNow as a reliable UTC check.
+        row!.OccurredAt.Should().BeCloseTo(DateTime.UtcNow, precision: TimeSpan.FromSeconds(5),
+            because: "OccurredAt must represent a UTC time written at record time");
+    }
+
+    [Fact]
+    public async Task SqlInjectionFlavoredInput_StoredAsLiteralString()
+    {
+        const string injectionInput = "' OR '1'='1' --@recorder-test.local";
+        using var scope = _factory.Services.CreateScope();
+        var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
+
+        await recorder.RecordAsync(
+            injectionInput,
+            userId: null,
+            FailedLoginReason.UnknownUser,
+            "1.2.3.4",
+            "ua",
+            CancellationToken.None);
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // The recorder lowercases + truncates to 256 chars; the input is short so it survives intact (lowercased).
+        var expected = injectionInput.ToLowerInvariant().Trim();
+        if (expected.Length > 256) expected = expected[..256];
+
+        var row = await db.FailedLoginAttempts
+            .Where(e => e.EmailAttempted == expected)
+            .SingleOrDefaultAsync();
+        row.Should().NotBeNull(
+            "EF parameterization must store injection-flavored input as a literal string, not execute it");
+        row!.EmailAttempted.Should().Be(expected,
+            "stored value must equal the lowercased literal — no SQL injection occurred");
+    }
+
     [Fact]
     public async Task SaveChangesFailure_BubblesAs500_DoesNotIssueSession()
     {
