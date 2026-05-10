@@ -73,6 +73,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     AuthRateLimitPolicies.AuthTotpByUser,
                     AuthRateLimitPolicies.AuthCsrfByIp,
                     AuthRateLimitPolicies.AuthMfaByUser,
+                    AuthRateLimitPolicies.AuthReauthByUser,
                 })
                 {
                     removeFromPolicy.Invoke(policyMap, new object[] { name });
@@ -126,6 +127,19 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                 {
                     var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                               ?? "anonymous-mfa";
+                    return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromSeconds(60),
+                        SegmentsPerWindow = 4,
+                        QueueLimit = 0,
+                    });
+                });
+
+                opts.AddPolicy(AuthRateLimitPolicies.AuthReauthByUser, httpContext =>
+                {
+                    var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                              ?? "anonymous-reauth";
                     return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
