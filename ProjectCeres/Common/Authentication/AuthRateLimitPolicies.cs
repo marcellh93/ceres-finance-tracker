@@ -31,4 +31,8 @@ public static class AuthRateLimitPolicies
     /// Routes them into a single shared bucket so an attacker can't dodge the limit by
     /// sending junk. Stage 6c.1.</summary>
     public const string AnonymousPasswordResetPartition = "anonymous-password-reset";
+
+    /// <summary>10/min/user sliding window keyed off authenticated NameIdentifier claim.
+    /// Applied to POST /api/auth/reauth. Stage 6c.2.</summary>
+    public const string AuthReauthByUser = "auth-reauth-by-user";
 }
