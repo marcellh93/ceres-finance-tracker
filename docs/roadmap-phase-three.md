@@ -440,6 +440,8 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 > **Stage 6b.3 (2026-05-10):** Security hardening — 13 production fixes (1 Critical, 4 High, 4 Medium, 2 Low + 2 surfaced by edge-case tests) closing post-6b.2 audit gaps. Per-user semaphores on backup-code consume + persistent-cookie rotation; persistent cookie sessionId-prefix eliminates pre-auth DoS; backup-code regen requires current TOTP; MFA re-enroll returns 409; register no longer enumerates accounts; CSRF gets own rate-limit bucket; logout rate-limited; SessionRevocationValidator debounced; MfaAwareLengthValidator wired to TwoFactorEnabled; persistent-cookie rotation closes SecurityStamp window. 22 net-new edge-case tests added. Stage 6c continues with password-reset, email-change, reauth middleware, audit log.
 
+> **Stage 6c.1 (2026-05-10):** Password-reset flow shipped — 2 endpoints (`POST /api/auth/password-reset/request` and `/confirm`), Argon2id-hashed single-use tokens (15-min expiry, base64url URL fragment), MFA-conditional gating per ADR-0069 (TOTP only — backup codes rejected at reset), all-sessions-revoked + `SecurityStamp` regen on success, lockout cleared on success, `EmailConfirmed` promoted on success, supersession-on-new-request via per-user `SemaphoreSlim`. Rate limits: per-IP `AuthLoginByIp` (10/min) + service-side per-email `MemoryCache` window (5/hour). New `IEmailService` abstraction with dev-only `LogOnlyEmailService`; production deliberately throws at startup until Stage 8 wires the real provider. Surfaced + fixed two real bugs in production code while writing tests: `MfaVerifiedAt` was loaded `AsNoTracking` and never persisted (now written via `ExecuteUpdateAsync` on the MFA branch); `PasswordResetConfirmRequest.TotpCode` `[StringLength(8)]` blocked backup-code-length submissions from reaching the service-side shape check (relaxed to 32 so the 401 `INVALID_MFA_CODE` rejection lands per spec). 46-test ship-gate green (request, confirm-no-mfa, confirm-mfa, concurrency, rate-limits, session-revocation, architecture). Stage 6c continues with email-change (6.12), reauth middleware (6.13), audit log (6.14), and lockout self-service unlock.
+
 ASP.NET Identity hardening:
 
 - [x] `options.Lockout.MaxFailedAccessAttempts = 10`
@@ -454,7 +456,7 @@ Password handling:
 - [x] Default `IPasswordHasher<TUser>` replaced with Argon2id implementation pinned to `m=19456, t=2, p=1`
 - [x] Password policy: minimum 8 characters, no maximum below 64 (NIST SP 800-63B)
 - [x] No mandatory complexity rules; breached-password check via Have I Been Pwned API or local top-N list
-- [ ] Password reset endpoints always run Argon2id hash (against dummy if user not found) — constant-time enumeration prevention *(deferred to 6c)*
+- [x] Password reset endpoints always run Argon2id hash (against dummy if user not found) — constant-time enumeration prevention (Stage 6c.1: `RunDummyHash` on the unknown-email branch in `PasswordResetService.RequestAsync` and on the zero-candidates branch in `ConfirmAsync`)
 - [x] Login endpoint always runs Argon2id hash (same defence)
 
 `UserSession` table + token rotation:
@@ -503,7 +505,7 @@ Rate limiting:
 
 - [x] `/login` endpoint: 10 requests/min/IP minimum, fixed-window
 - [x] `/register` endpoint: 10 requests/min/IP minimum
-- [ ] `/password-reset` endpoint: 10 requests/min/IP minimum, plus per-account rate limit
+- [x] `/password-reset` endpoint: 10 requests/min/IP minimum, plus per-account rate limit (Stage 6c.1: per-IP via existing `AuthLoginByIp` policy; per-account is a service-side `MemoryCache`-backed sliding window keyed by lowercased email, 5/hour, returns 429 `RATE_LIMITED` with `Retry-After`)
 - [x] Account lockout: lock for 15 min after 10 failed attempts; counter resets on successful login
 - [ ] Lockout email includes a time-limited signed unlock link separate from the password-reset flow
 - [x] `/login/totp` endpoint: rate-limited per user (after credentials valid, before TOTP)
@@ -514,17 +516,17 @@ Failed-login logging:
 - [x] Attempted password is NEVER logged
 - [x] Logs queryable for distributed credential-stuffing detection (multiple accounts, same source IP)
 
-Password reset:
+Password reset (Stage 6c.1, shipped 2026-05-10):
 
-- [ ] Token: 256-bit cryptographically random, base64url-encoded
-- [ ] Stored as Argon2id hash only (never the raw token)
-- [ ] 15-minute expiry from issuance
-- [ ] Single-use: invalidate on first successful submission
-- [ ] On successful reset: revoke all `UserSession` rows for that user
-- [ ] Reset flow requires a valid TOTP code before accepting the new password
-- [ ] Backup codes are the recovery path if TOTP device is lost — NOT a TOTP bypass during reset
-- [ ] Email always sent on reset request (registered or not — same response, same wall-clock timing)
-- [ ] Separate notification email sent on successful password change
+- [x] Token: 256-bit cryptographically random, base64url-encoded (`PasswordResetTokenGenerator.Generate` via `RandomNumberGenerator.GetBytes(32)`)
+- [x] Stored as Argon2id hash only (never the raw token) — `PasswordResetToken.TokenHash`, same hasher as passwords (`m=19456 t=2 p=1`)
+- [x] 15-minute expiry from issuance — `PasswordResetService.TokenLifetime`
+- [x] Single-use: invalidate on first successful submission — `ConsumedAt` stamped synchronously in same DB transaction as password write
+- [x] On successful reset: revoke all `UserSession` rows for that user — bulk `ExecuteUpdateAsync` plus `UpdateSecurityStampAsync` to invalidate in-flight Identity cookies via `SecurityStampValidator`
+- [x] Reset flow requires a valid TOTP code before accepting the new password — **only when** `user.TwoFactorEnabled = true`, per ADR-0069 (MFA opt-in). No-MFA users complete reset with the email-link token alone; email-channel ownership is the second factor
+- [x] Backup codes are the recovery path if TOTP device is lost — NOT a TOTP bypass during reset (service-side `MfaConstants.TotpCodeShape` regex rejects backup-code shapes with 401 `INVALID_MFA_CODE`)
+- [x] Email always sent on reset request (registered or not — same response, same wall-clock timing) — known and unknown branches both run `RunDummyHash`; unknown branch records `FailedLoginAttempt` with reason `PasswordResetUnknownEmail`. **Note:** the unknown branch does NOT actually send an email (suppressed to avoid being a spam relay); the constant-time defence is the dummy hash, not a phantom send. Notification-on-unknown is reconsidered for Stage 8 once the real provider lands.
+- [x] Separate notification email sent on successful password change — `BuildChangedEmail`, queued non-blocking via `IEmailService.SendAsync`
 
 Email-address change:
 
@@ -556,8 +558,8 @@ Tests required before Stage 7 begins:
 - [ ] Self-service unlock token test: valid token unlocks; expired token returns error
 - [x] TOTP replay test: same code used twice within window is rejected on second use
 - [x] TOTP replay survives app restart (persistent store, not in-memory)
-- [ ] Password reset happy-path integration test (request → email → click link → enter TOTP → set new password → all sessions revoked)
-- [ ] Password reset enumeration test: same response + timing whether email exists or not
+- [x] Password reset happy-path integration test (request → email → click link → enter TOTP → set new password → all sessions revoked) — Stage 6c.1: `Confirm_no_mfa_succeeds`, `Confirm_with_mfa_two_step_succeeds`, `Successful_reset_revokes_all_user_sessions`
+- [x] Password reset enumeration test: same response + timing whether email exists or not — Stage 6c.1: `Request_with_unknown_email_returns_204_with_same_timing` (200ms threshold; constant-time defence is `RunDummyHash` parity), `Request_with_unknown_email_does_not_create_db_row`, `Request_with_unknown_email_does_not_send_email`, `Request_per_email_limit_does_not_leak_user_existence`
 - [ ] CSRF test: state-changing request without XSRF-TOKEN header returns 400/403
 - [ ] Reauthentication test: changing password without fresh password entry returns 401, even with valid session
 

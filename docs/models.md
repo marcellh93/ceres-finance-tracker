@@ -43,6 +43,7 @@
     - [UserMfaBackupCode](#usermfabackupcode-phase-3-stage-6b1)
     - [TotpReplayEntry](#totpreplayentry-phase-3-stage-6b1)
     - [FailedLoginAttempt](#failedloginattempt-phase-3-stage-6b2)
+    - [PasswordResetToken](#passwordresettoken-phase-3-stage-6c1)
 
 ---
 
@@ -1073,7 +1074,7 @@ Records every rejected authentication attempt for credential-stuffing forensics 
 | UserId | uuid? | nullable | NULL when the email did not resolve to any AspNetUser (UnknownUser case). Set when the user exists. No FK — the entity intentionally has no cascading relationship with AspNetUsers (an AspNetUsers delete must NOT cascade-delete forensic history). |
 | IpAddress | varchar(45) | NOT NULL, default `"unknown"` | Client IP at attempt time. IPv6-sized. `"unknown"` when `Connection.RemoteIpAddress` is null (test contexts, unix sockets). |
 | UserAgent | varchar(512) | NOT NULL | Truncated User-Agent header. Empty string when missing. |
-| Reason | text (enum-as-string) | NOT NULL | One of: `BadCredentials`, `BadTotp`, `BadBackupCode`, `LockedOut`, `UnknownUser`. Stored as string via `HasConversion<string>()` per project enum convention. |
+| Reason | text (enum-as-string) | NOT NULL | One of: `BadCredentials`, `BadTotp`, `BadBackupCode`, `LockedOut`, `UnknownUser`, `PasswordResetUnknownEmail` (Stage 6c.1 — recorded when the password-reset request endpoint is hit with an email that does not resolve to any user; provides observability for distributed enumeration without leaking back to the caller). Stored as string via `HasConversion<string>()` per project enum convention. |
 | OccurredAt | timestamp with time zone | NOT NULL | Wall-clock UTC at attempt time. |
 
 **Indexes:**
@@ -1092,6 +1093,32 @@ Records every rejected authentication attempt for credential-stuffing forensics 
 
 - Erasure (Stage 6c): on right-to-erasure, the 6c flow nullifies `EmailAttempted` for matching rows (column is nullable, no schema change required).
 - Retention purge (Stage 7+): 1-year flat cross-tenant `DELETE WHERE OccurredAt < now() - interval '1 year'`. Different cadence from `AuditLog` (6 months, per-user fan-out via `IUserJobRunner`).
+
+### PasswordResetToken (Phase 3, Stage 6c.1)
+
+One row per active or recently-consumed password-reset token. The raw token is a 256-bit RNG value, base64url-encoded, transmitted once in the reset email URL fragment. Only the Argon2id hash is persisted. Single-use: `ConsumedAt` is stamped synchronously inside the same DB transaction as the password write. `MfaVerifiedAt` is stamped on the MFA path after the TOTP step succeeds. Supersession: a new `/request` for a user with prior unconsumed tokens stamps `ConsumedAt` on those rows.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7. |
+| TokenHash | varchar(512) | NOT NULL | Argon2id PHC string of the raw 256-bit base64url token. Same hasher pinned to `m=19456 t=2 p=1` as passwords + persistent-cookie tokens + backup codes. |
+| CreatedAt | timestamp with time zone | NOT NULL | When the token was issued. |
+| ExpiresAt | timestamp with time zone | NOT NULL | `CreatedAt + 15min`. Confirm rejects tokens past this with `INVALID_RESET_TOKEN`. |
+| ConsumedAt | timestamp with time zone | nullable | Set on success or supersession. Single-use. |
+| MfaVerifiedAt | timestamp with time zone | nullable | Set on the MFA path after the TOTP step succeeds. Informational; the password write happens in the same transaction. |
+
+**Indexes:** `(UserId, ConsumedAt)` for the supersede-prior-unused query and per-user lookups; `(ExpiresAt)` for future cleanup sweeps.
+
+**Token format:** raw token is 32 bytes from `RandomNumberGenerator.GetBytes(32)`, encoded as base64url (≈43 chars). Carried in the reset URL fragment (`/app/password-reset#token=<base64url>`) so it never appears in server logs or `Referer` headers per `security-model.md` § Logging and PII Redaction.
+
+**Lifecycle:**
+- `RequestAsync` issues a new token: bulk-supersedes any prior unconsumed tokens for the user via `ExecuteUpdateAsync`, generates + hashes the new value, inserts the row, sends the email. Wrapped in a per-user `SemaphoreSlim`.
+- `ConfirmAsync` resolves the token by Argon2-verifying it against active candidates (`WHERE ConsumedAt IS NULL AND ExpiresAt > now()`), re-reads the matched row inside the per-user lock to handle concurrent confirms, validates MFA if `user.TwoFactorEnabled = true`, performs the password write, then stamps `ConsumedAt` (and `MfaVerifiedAt` on the MFA branch) via `ExecuteUpdateAsync`.
+
+**Constant-time discipline:** `ConfirmAsync` runs at least one Argon2 verify even when zero candidates match, so timing doesn't reveal "no rows."
+
+**Multi-tenancy:** scoped per user. Stage 7 will add a global query filter alongside the FK; until then, all queries explicitly filter by `UserId`.
 
 ### CustomerArchive (Phase 3)
 

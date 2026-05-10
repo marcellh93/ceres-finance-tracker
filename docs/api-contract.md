@@ -400,6 +400,7 @@ The table below lists every `error.code` value the API can return, grouped by do
 | `MFA_NOT_ENABLED` | 409 | `POST /api/auth/mfa/backup-codes/regenerate` | MFA is not enabled for this user; there are no backup codes to regenerate. Stage 6b.3. |
 | `INVALID_MFA_CODE` | 401 | `POST /api/auth/mfa/backup-codes/regenerate`; MFA verification endpoints | The supplied TOTP or backup code is rejected (wrong, expired, replayed, or already used). Stage 6b.3. |
 | `NO_ENROLLMENT_IN_PROGRESS` | 400 | `POST /api/auth/mfa/enroll/verify` | No authenticator key is staged for this user — `/enroll` must be called first. Stage 6b.3. |
+| `INVALID_RESET_TOKEN` | 401 | `POST /api/auth/password-reset/confirm` | Reset token is unknown, malformed, expired, or already consumed. Stage 6c.1. |
 
 ### Phase 3 — Full Web API (`/api/v1/`)
 
@@ -445,7 +446,7 @@ The table below lists every `error.code` value the API can return, grouped by do
 
 #### Auth endpoints
 
-Stage 6a (shipped 2026-05-09) introduced register/login/logout. Stage 6b.1 (shipped 2026-05-09) added the TOTP MFA flow. Endpoints below are mounted at the route base shown — Stage 6a uses `/api/auth` directly; the `/api/v1/` prefix kicks in alongside Stage 11's URL cleanup.
+Stage 6a (shipped 2026-05-09) introduced register/login/logout. Stage 6b.1 (shipped 2026-05-09) added the TOTP MFA flow. Stage 6c.1 (shipped 2026-05-10) added the password-reset flow. Endpoints below are mounted at the route base shown — Stage 6a uses `/api/auth` directly; the `/api/v1/` prefix kicks in alongside Stage 11's URL cleanup.
 
 | Endpoint | Method | Auth | Body | Response |
 |---|---|---|---|---|
@@ -457,6 +458,8 @@ Stage 6a (shipped 2026-05-09) introduced register/login/logout. Stage 6b.1 (ship
 | `/api/auth/mfa/enroll` | POST | Authenticated, CSRF-validated | (empty) | `200 { otpAuthUri, manualEntryKey }`. `Cache-Control: no-store, no-cache`. Generates a fresh authenticator key (overwriting any prior unverified candidate). **`409 MFA_ALREADY_ENROLLED`** if `user.TwoFactorEnabled = true` — no silent re-enrollment (Stage 6b.3). |
 | `/api/auth/mfa/enroll/verify` | POST | Authenticated, CSRF-validated | `{ code }` — 6-digit TOTP | `200 { backupCodes: [...10 strings] }` on success — flips `TwoFactorEnabled = true` and returns the freshly-generated batch of 10 backup codes once. `400 { error: { code: "NO_ENROLLMENT_IN_PROGRESS", message: "..." } }` when no key is staged. `401 { error: { code: "INVALID_MFA_CODE", message: "..." } }` on wrong code. `Cache-Control: no-store, no-cache`. |
 | `/api/auth/mfa/backup-codes/regenerate` | POST | Authenticated (full step-up middleware deferred to 6c), CSRF-validated | `{ totpCode }` — current 6-digit TOTP code required (Stage 6b.3) | `200 { backupCodes: [...10 strings] }` — invalidates all existing codes and returns a new batch once. `422` if `totpCode` is missing. `401 MFA_INVALID_CODE` if code is rejected. `409 MFA_NOT_ENABLED` if user has no MFA. `Cache-Control: no-store, no-cache`. |
+| `/api/auth/password-reset/request` | POST | Anonymous, CSRF-validated | `{ email }` | `204 No Content` always (constant-time, no enumeration leak — known and unknown emails return identical response and wall-clock time). Issues a 256-bit base64url token, Argon2id-hashed in `PasswordResetTokens`, 15-min expiry, single-use; supersedes any prior unconsumed tokens for the user. Email sent via `IEmailService` to a known address only (unknown branch is silent). Rate limits: per-IP `auth-login-by-ip` (10/min/IP) AND service-side per-email window (5/hour/email) → 429 `RATE_LIMITED` with `Retry-After` if exceeded. Stage 6c.1. |
+| `/api/auth/password-reset/confirm` | POST | Anonymous, CSRF-validated | `{ token, newPassword, totpCode? }` | `204 No Content` on success. `200 { requiresTotp: true }` if user has MFA enabled and `totpCode` is omitted (token NOT consumed). `401 INVALID_RESET_TOKEN` if token unknown/malformed/expired/consumed. `401 INVALID_MFA_CODE` if MFA-enabled user submits a wrong/replayed/non-TOTP-shape code (backup codes are NOT accepted at reset per ADR-0069). `422 VALIDATION_ERROR` with `details: [{ field: "newPassword", ... }]` on policy violation (HIBP breach, length, etc.) — token NOT consumed, user can retry. On success: password written, all `UserSession` rows revoked, `SecurityStamp` regenerated, lockout cleared, `EmailConfirmed` promoted, MFA-pending cookie cleared, password-changed notification email queued. Per-IP rate limit `auth-login-by-ip`. Stage 6c.1. |
 
 **Cookies in play:**
 - `__Host-Session` — short-lived Identity session cookie (sliding 30-min). HttpOnly, Secure (Production; SameAsRequest in dev/test), SameSite=Lax, Path=/.
