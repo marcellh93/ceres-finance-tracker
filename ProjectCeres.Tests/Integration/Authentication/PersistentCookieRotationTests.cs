@@ -75,6 +75,44 @@ public class PersistentCookieRotationTests : IAsyncLifetime
         replay.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task ConcurrentRequestsWithSameCookie_RotateExactlyOnce()
+    {
+        // Set up a rememberMe session via the password-step login path.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "race@persist-test.local");
+        var loginClient = _factory.CreateClient();
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, loginClient, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = true });
+        loginResp.EnsureSuccessStatusCode();
+
+        // Extract the __Host-Persist cookie value the server just issued.
+        var setCookies = loginResp.Headers.GetValues("Set-Cookie").ToList();
+        var persistCookieLine = setCookies.First(c => c.StartsWith($"{SessionConstants.PersistentCookieName}="));
+        var persistValue = persistCookieLine.Split(';')[0].Substring(SessionConstants.PersistentCookieName.Length + 1);
+
+        // Two parallel requests, each with ONLY the persist cookie (no session cookie),
+        // hitting an authenticated endpoint that triggers the rotation middleware.
+        async Task<HttpResponseMessage> SendAsync()
+        {
+            var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+            var req = new HttpRequestMessage(HttpMethod.Get, "/api/categories");
+            req.Headers.Add("Cookie", $"{SessionConstants.PersistentCookieName}={persistValue}");
+            return await client.SendAsync(req);
+        }
+
+        var t1 = SendAsync();
+        var t2 = SendAsync();
+        await Task.WhenAll(t1, t2);
+
+        // Assert exactly one new persistent session row was created (the original was revoked).
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var activePersistent = await db.UserSessions
+            .Where(s => s.UserId == user.Id && s.IsPersistent && s.RevokedAt == null)
+            .CountAsync();
+        activePersistent.Should().Be(1, "concurrent rotation must produce exactly one new active persistent session");
+    }
+
     private static string? ExtractCookie(IEnumerable<string> setCookies, string name)
     {
         foreach (var c in setCookies)
