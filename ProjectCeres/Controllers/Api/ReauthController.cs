@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -81,6 +82,17 @@ public sealed class ReauthController : ControllerBase
         }
 
         await _userManager.ResetAccessFailedCountAsync(user);
+
+        // Preserve the existing sid claim across the cookie refresh. Without this, the
+        // claims factory finds no PendingSessionItemKey and the refreshed cookie omits
+        // the sid claim — which then causes SessionRevocationValidator to reject the
+        // session on the next request.
+        var existingSidRaw = User.FindFirstValue(SessionConstants.SessionIdClaim);
+        if (Guid.TryParse(existingSidRaw, out var existingSid))
+        {
+            HttpContext.Items[SessionConstants.PendingSessionItemKey] = existingSid;
+        }
+
         HttpContext.Items[SessionConstants.LastReauthAtItemKey] =
             DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
         await _signInManager.RefreshSignInAsync(user);
