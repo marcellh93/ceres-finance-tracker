@@ -12,4 +12,10 @@ public static class SessionConstants
     public const string PersistentScheme = "PersistentCookie";
 
     public const string PendingSessionItemKey = "PendingUserSession";
+
+    public const string LastReauthAtClaim = "last_reauth_at";
+
+    /// <summary>HttpContext.Items key used by the login + reauth flows to pass the
+    /// freshness Unix-seconds string into ApplicationUserClaimsPrincipalFactory.</summary>
+    public const string LastReauthAtItemKey = "LastReauthAt";
 }
