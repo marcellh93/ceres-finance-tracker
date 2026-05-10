@@ -36,6 +36,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<UserMfaBackupCode> UserMfaBackupCodes => Set<UserMfaBackupCode>();
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureUserOwnership(modelBuilder);
         ConfigureSessionEntities(modelBuilder);
         ConfigureMfaEntities(modelBuilder);
+        ConfigurePasswordResetEntities(modelBuilder);
         SeedData(modelBuilder);
     }
 
@@ -100,6 +102,17 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.Property(e => e.IpAddress).HasMaxLength(45);
             b.Property(e => e.UserAgent).HasMaxLength(512);
             b.Property(e => e.Reason).HasConversion<string>();
+        });
+    }
+
+    private static void ConfigurePasswordResetEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PasswordResetToken>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.UserId, e.ConsumedAt });
+            b.HasIndex(e => e.ExpiresAt);
+            b.Property(e => e.TokenHash).HasMaxLength(512);
         });
     }
 
