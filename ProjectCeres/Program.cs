@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Filters;
 using ProjectCeres.ModelBinders;
@@ -105,6 +106,17 @@ builder.Services.Configure<SecurityStampValidatorOptions>(o =>
 builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, Argon2idPasswordHasher>();
 builder.Services.AddScoped<Argon2idPasswordHasher>();
 builder.Services.AddScoped<PersistentTokenService>();
+builder.Services.AddScoped<PasswordResetTokenGenerator>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddMemoryCache();
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<IEmailService, LogOnlyEmailService>();
+}
+// Production deliberately has no IEmailService implementation registered.
+// DI will throw at startup until Stage 8 wires the real provider.
+
 builder.Services.AddScoped<MfaBackupCodeService>();
 builder.Services.AddScoped<TotpReplayGuard>();
 builder.Services.AddScoped<FailedLoginRecorder>();
