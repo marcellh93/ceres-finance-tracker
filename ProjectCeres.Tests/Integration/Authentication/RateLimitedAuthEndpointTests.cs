@@ -255,6 +255,120 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task LoginTotp_RejectionUsesEnvelopeShape()
+    {
+        // Register, enroll MFA, do the password step, then burn the per-user TOTP bucket.
+        // Capture the 429 body and assert it matches { error: { code, message } }.
+
+        // Wait for any residual IP-login bucket to clear (login step shares auth-login-by-ip).
+        await Task.Delay(TimeSpan.FromSeconds(70));
+
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "totp-envelope@rl-test.local");
+        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+
+        var options = new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            HandleCookies = false,
+        };
+        var client = _factory.CreateClient(options);
+
+        // Password step — get the Identity.TwoFactorUserId cookie
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+        var mfaCookie = ExtractSetCookie(loginResp, "Identity.TwoFactorUserId");
+        mfaCookie.Should().NotBeNullOrEmpty("password login must return Identity.TwoFactorUserId");
+
+        // Burn the TOTP bucket until 429
+        var rejected = await FireUntilRateLimited(
+            () => PostTotpWithCookieAsync(client, mfaCookie!, "000000"));
+
+        rejected.Should().NotBeNull("TOTP per-user rate limiter must fire within 25 attempts");
+
+        var body = await rejected!.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("RATE_LIMITED", "429 body must use envelope shape { error: { code, message } }");
+        body.GetProperty("error").GetProperty("message").GetString()
+            .Should().NotBeNullOrEmpty("envelope message must not be empty");
+    }
+
+    [Fact]
+    public async Task SpoofedXForwardedForHeader_DoesNotInfluencePartition()
+    {
+        // The limiter reads Connection.RemoteIpAddress (real source), NOT X-Forwarded-For.
+        // If it read XFF, each of 11 requests with a different XFF value would land in a
+        // different partition and never 429. With the real source IP (all TestServer calls
+        // share the same loopback address), all 11 land in the same partition and the 11th
+        // returns 429, proving the limiter ignores the spoofed header.
+
+        await Task.Delay(TimeSpan.FromSeconds(70)); // wait for a fresh login bucket
+
+        await AuthTestFixture.RegisterUserAsync(_factory, "xff-spoof@rl-test.local");
+        var client = _factory.CreateClient();
+
+        HttpResponseMessage? last429 = null;
+        for (int i = 1; i <= 11; i++)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+            {
+                Content = System.Net.Http.Json.JsonContent.Create(new
+                {
+                    email = "xff-spoof@rl-test.local",
+                    password = "x-long-enough-x",
+                    rememberMe = false
+                }),
+            };
+            // Each request spoofs a different "remote" IP in the XFF header
+            req.Headers.Add("X-Forwarded-For", $"10.0.0.{i}");
+
+            var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory);
+            req.Headers.Add("Cookie", $"{ProjectCeres.Common.Authentication.SessionConstants.CsrfCookieName}={csrfCookie}");
+            req.Headers.Add(ProjectCeres.Common.Authentication.SessionConstants.CsrfHeaderName, csrfHeader);
+
+            var resp = await client.SendAsync(req);
+            if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                last429 = resp;
+                break;
+            }
+        }
+
+        last429.Should().NotBeNull(
+            "all 11 requests must share the same real-IP partition and saturate the bucket — " +
+            "spoofed X-Forwarded-For headers must NOT create separate partitions");
+    }
+
+    [Fact]
+    public async Task Register_AlsoRateLimited()
+    {
+        // Register and login share the auth-login-by-ip partition (10/min).
+        // Fire 11 register attempts with unique emails; the 11th must return 429.
+
+        await Task.Delay(TimeSpan.FromSeconds(70)); // fresh bucket
+
+        var client = _factory.CreateClient();
+        HttpResponseMessage? last429 = null;
+
+        for (int i = 1; i <= 11; i++)
+        {
+            // Each email is unique so duplicate-prevention does not kick in.
+            var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/register",
+                new
+                {
+                    email = $"reg-rl-{i}@rl-test.local",
+                    password = AuthTestFixture.ValidPassword,
+                });
+            if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                last429 = resp;
+                break;
+            }
+        }
+
+        last429.Should().NotBeNull(
+            "register shares the auth-login-by-ip bucket; 11th request within the window must return 429");
+    }
+
+    [Fact]
     public async Task SlidingWindow_BoundaryAttack_StillBlocked()
     {
         // Sliding window with 4 segments × 15s. Fire some requests, wait less than

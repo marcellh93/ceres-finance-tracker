@@ -165,6 +165,42 @@ public class MfaRegenerateTests : IAsyncLifetime
         unused.Should().Be(10);
     }
 
+    [Fact]
+    public async Task Regenerate_RateLimitedPerUser()
+    {
+        // The spec called for an auth-mfa-by-user rate-limit policy on the regen endpoint.
+        // Gap 4 implementation did not add it. This test confirms the gap: 11 calls in
+        // quick succession must eventually return 429. If the test FAILS (i.e. none of
+        // the 11 calls returns 429), that confirms the missing policy — stop and report.
+
+        var (client, sessionCookie, seed, user) = await SetupAuthenticatedMfaUserAsync("rl-regen@regen-test.local");
+
+        // Wait so regen codes are in a different TOTP window than the login code.
+        await Task.Delay(TimeSpan.FromSeconds(31));
+
+        HttpResponseMessage? last429 = null;
+        for (int i = 0; i < 11; i++)
+        {
+            var code = AuthTestFixture.ComputeCurrentTotpCode(seed);
+            var resp = await PostRegenAsync(client, sessionCookie, user.Id, new { totpCode = code });
+            if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                last429 = resp;
+                break;
+            }
+            // After the first successful regen the old codes are replaced; the seed stays
+            // the same (authenticator key is unchanged), so we can keep computing codes.
+            // Each call within the same TOTP window will replay the same code and get 401
+            // (either replay-guard or TOTP reject) — wait for the next window to get a
+            // fresh code. This is acceptable: we want to see if the rate limiter fires at
+            // all, not just on perfectly valid codes.
+        }
+
+        last429.Should().NotBeNull(
+            "regenerate must be rate-limited (auth-mfa-by-user policy); 11 rapid calls must eventually return 429. " +
+            "If this fails, the Gap-4 implementation skipped the rate-limit — see spec § Gap 4");
+    }
+
     private static string? ExtractSetCookie(HttpResponseMessage response, string cookieName)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return null;

@@ -142,6 +142,61 @@ public class ArchitectureTests
         source.Should().NotContain("error = \"replay\"");
     }
 
+    [Fact]
+    public void LoginTotp_OnlyAcceptsPost()
+    {
+        // AuthController.LoginTotp must have [HttpPost("login/totp")] and no [HttpGet].
+        // A GET on a login endpoint would allow CSRF via link navigation — the method
+        // must be POST-only so the antiforgery token requirement actually has teeth.
+
+        var authControllerType = App.GetTypes()
+            .Single(t => t.Name == "AuthController" && typeof(ControllerBase).IsAssignableFrom(t));
+
+        // Confirm no method on AuthController has [HttpGet] with route ending in "login/totp"
+        var httpGetOnLoginTotp = authControllerType
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(m => m.GetCustomAttribute<HttpGetAttribute>() is { } attr
+                        && (attr.Template?.EndsWith("login/totp", StringComparison.OrdinalIgnoreCase) == true
+                            || m.Name.Equals("LoginTotp", StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        httpGetOnLoginTotp.Should().BeEmpty(
+            "LoginTotp must not have [HttpGet] — GET requests bypass antiforgery and are replay-prone");
+
+        // Confirm the LoginTotp method exists with [HttpPost("login/totp")]
+        var loginTotpMethod = authControllerType
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .SingleOrDefault(m => m.Name == "LoginTotp");
+
+        loginTotpMethod.Should().NotBeNull("AuthController must have a LoginTotp method");
+
+        var httpPost = loginTotpMethod!.GetCustomAttribute<HttpPostAttribute>();
+        httpPost.Should().NotBeNull("LoginTotp must be decorated with [HttpPost]");
+        httpPost!.Template.Should().Be("login/totp",
+            "LoginTotp route must match login/totp");
+    }
+
+    [Fact]
+    public void MfaController_AllErrorReturnsUseEnvelopeShape()
+    {
+        // MfaController must use the { error: { code, message } } envelope shape for
+        // all error returns — no flat-string patterns like BadRequest(new { error = "..." }).
+        // Gap 4 + Gap 5 fixed the new branches; this test catches regressions and also
+        // validates that the OLD branches (EnrollVerify lines 58 + 65) still use flat strings.
+        // If those old branches are found, STOP and report — they need migration.
+        var path = ResolveControllerSourcePath("MfaController.cs");
+        var source = System.IO.File.ReadAllText(path);
+
+        // Flat-string patterns: BadRequest(new { error = "<string>" })
+        source.Should().NotContain("BadRequest(new { error = \"",
+            "MfaController must use envelope shape { error: { code, message } } — " +
+            "found flat-string BadRequest return (EnrollVerify has stale branches that need migration)");
+
+        // Also guard against Unauthorized with flat strings (belt-and-suspenders)
+        source.Should().NotContain("Unauthorized(new { error = \"",
+            "MfaController must use envelope shape for Unauthorized returns too");
+    }
+
     /// <summary>
     /// Resolves a controller source path by walking up from the test bin/ output to
     /// the repository root, then descending into the production project. xUnit runs

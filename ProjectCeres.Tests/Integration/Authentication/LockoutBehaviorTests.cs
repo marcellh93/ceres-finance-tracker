@@ -168,4 +168,37 @@ public class LockoutBehaviorTests : IAsyncLifetime
         var after = await um2.FindByIdAsync(user.Id.ToString());
         (await um2.IsLockedOutAsync(after!)).Should().BeTrue();
     }
+
+    [Fact]
+    public async Task LockoutAutoLifts_AfterDefaultLockoutTimeSpan_Elapses()
+    {
+        // Set a future lockout via UserManager (same as production lock path).
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "autolift@lockout-test.local");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var fresh = await um.FindByIdAsync(user.Id.ToString());
+            await um.SetLockoutEndDateAsync(fresh!, DateTimeOffset.UtcNow.AddMinutes(15));
+        }
+
+        // Backdate the LockoutEnd to 1ms in the past so the lockout window appears elapsed.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Users
+                .Where(u => u.Id == user.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(
+                    u => u.LockoutEnd,
+                    DateTimeOffset.UtcNow.AddMilliseconds(-1)));
+        }
+
+        // Login with the correct password — lockout window is now in the past.
+        var client = _factory.CreateClient();
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+
+        // 204 = success (no MFA enrolled). The lockout window has elapsed so login should succeed.
+        resp.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent,
+            "login must succeed once the lockout window has elapsed (Identity auto-lifts expired lockouts)");
+    }
 }
