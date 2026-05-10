@@ -442,6 +442,8 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 > **Stage 6c.1 (2026-05-10):** Password-reset flow shipped — 2 endpoints (`POST /api/auth/password-reset/request` and `/confirm`), Argon2id-hashed single-use tokens (15-min expiry, base64url URL fragment), MFA-conditional gating per ADR-0069 (TOTP only — backup codes rejected at reset), all-sessions-revoked + `SecurityStamp` regen on success, lockout cleared on success, `EmailConfirmed` promoted on success, supersession-on-new-request via per-user `SemaphoreSlim`. Rate limits: per-IP `AuthLoginByIp` (10/min) + service-side per-email `MemoryCache` window (5/hour). New `IEmailService` abstraction with dev-only `LogOnlyEmailService`; production deliberately throws at startup until Stage 8 wires the real provider. Surfaced + fixed two real bugs in production code while writing tests: `MfaVerifiedAt` was loaded `AsNoTracking` and never persisted (now written via `ExecuteUpdateAsync` on the MFA branch); `PasswordResetConfirmRequest.TotpCode` `[StringLength(8)]` blocked backup-code-length submissions from reaching the service-side shape check (relaxed to 32 so the 401 `INVALID_MFA_CODE` rejection lands per spec). 46-test ship-gate green (request, confirm-no-mfa, confirm-mfa, concurrency, rate-limits, session-revocation, architecture). Stage 6c continues with email-change (6.12), reauth middleware (6.13), audit log (6.14), and lockout self-service unlock.
 
+> **Stage 6c.2 (2026-05-10):** Reauth middleware shipped. New `LastReauthAt` claim stamped at login (no-MFA + MFA + backup-code paths), refreshed via `RefreshSignInAsync` after step-up. New `POST /api/auth/reauth` endpoint accepts `{password?}` or `{totpCode?}` based on `user.TwoFactorEnabled`. New `[RequireRecentAuth]` attribute backed by `RecentAuthRequirement` policy + custom `IAuthorizationMiddlewareResultHandler` emitting `401 REAUTH_REQUIRED`. 5-minute freshness window. Three existing MFA endpoints (`/enroll`, `/enroll/verify`, `/backup-codes/regenerate`) retroactively gated; in-body TOTP from `/backup-codes/regenerate` removed and `RegenerateBackupCodesRequest` DTO deleted. Surfaced + fixed two real bugs in production code while writing tests: (1) `ReauthController.RefreshSignInAsync` lost the `sid` claim because the claims factory had no `PendingSessionItemKey` to copy — fixed by reading the existing `sid` from the inbound principal and staging it back into `HttpContext.Items`; (2) `AuthReauthByUser` rate-limit policy didn't actually partition per user because the rate-limit middleware runs before `UseAuthentication` — fixed by explicitly calling `httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme).Wait()` (mirroring `TotpByUserPartitioner`). 32-test ship-gate green (endpoint happy/failure/defensive, gate behaviour, retroactive gating, rate limit, cross-feature, architecture). **Follow-up flagged:** `AuthMfaByUser` (Stage 6b.3) has the same rate-limit-partition bug, but its existing test asserts only "any 429 fires" so it doesn't catch it. Same `AuthenticateAsync(TwoFactorUserIdScheme)` fix applies; tracked separately. Stage 6c continues with email-change (6.12), audit log (6.14), and lockout self-service unlock.
+
 ASP.NET Identity hardening:
 
 - [x] `options.Lockout.MaxFailedAccessAttempts = 10`
@@ -536,11 +538,11 @@ Email-address change:
 - [ ] Old address remains the address-of-record until new address verified
 - [ ] Notification email sent to old address on successful change
 
-Reauthentication for sensitive operations:
+Reauthentication for sensitive operations (Stage 6c.2, shipped 2026-05-10):
 
-- [ ] Fresh password entry required before: change password, change email, re-enrol TOTP, view active sessions, GDPR erasure
-- [ ] Persistent sessions ("remember me") do NOT bypass reauthentication
-- [ ] Reauthentication grant is short-lived (e.g., 5 minutes) and scoped to a single sensitive action
+- [x] Fresh password (or TOTP) entry required before: re-enrol TOTP (`/api/auth/mfa/enroll`, `/mfa/enroll/verify`), regenerate backup codes (`/mfa/backup-codes/regenerate`). Change-password and email-change land in 6.12; sessions list lands in Stage 12; GDPR erasure lands in Stage 13 — all will declare `[RequireRecentAuth]` when shipped. Architecture test #29 pins the three currently-gated endpoints.
+- [x] Persistent sessions ("remember me") do NOT bypass reauthentication — the gate reads the `LastReauthAt` claim on the application cookie, which is independent of the `__Host-Persist` rotation. Test #31 (`RefreshSignInAsync_after_reauth_does_not_disrupt_persistent_cookie`) pins this.
+- [x] Reauthentication grant is short-lived (5 minutes) and scoped to a single sensitive action — `RecentAuthRequirement.Window = 5 min`. Test #18 (stale at 301s) and #19 (boundary at 300s) pin the window.
 
 Audit logging:
 
@@ -561,7 +563,7 @@ Tests required before Stage 7 begins:
 - [x] Password reset happy-path integration test (request → email → click link → enter TOTP → set new password → all sessions revoked) — Stage 6c.1: `Confirm_no_mfa_succeeds`, `Confirm_with_mfa_two_step_succeeds`, `Successful_reset_revokes_all_user_sessions`
 - [x] Password reset enumeration test: same response + timing whether email exists or not — Stage 6c.1: `Request_with_unknown_email_returns_204_with_same_timing` (200ms threshold; constant-time defence is `RunDummyHash` parity), `Request_with_unknown_email_does_not_create_db_row`, `Request_with_unknown_email_does_not_send_email`, `Request_per_email_limit_does_not_leak_user_existence`
 - [ ] CSRF test: state-changing request without XSRF-TOKEN header returns 400/403
-- [ ] Reauthentication test: changing password without fresh password entry returns 401, even with valid session
+- [x] Reauthentication test: a gated endpoint without a fresh `LastReauthAt` claim returns 401 `REAUTH_REQUIRED` even with a valid session — Stage 6c.2 (`Gated_endpoint_with_stale_claim_returns_401_REAUTH_REQUIRED`, `Gated_endpoint_with_no_claim_returns_401_REAUTH_REQUIRED`, `MfaRegenerateBackupCodes_now_requires_recent_auth_not_in_body_totp`). Change-password specifically lands with 6.12.
 
 ---
 

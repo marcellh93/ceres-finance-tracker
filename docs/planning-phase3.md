@@ -441,10 +441,18 @@ The following items were captured during Stage 6b.2 design and implementation, t
 
 The following items were captured during Stage 6b.3 design and implementation, then deferred to later stages:
 
-1. **Step-up middleware (`LastPasswordVerifiedAt` claim)** (Stage 6c) — Stage 6b.3 used an in-body TOTP code on backup-code regeneration as a targeted stopgap (Gap 4). The full reauth middleware that stamps a `LastPasswordVerifiedAt` claim and gates sensitive operations uniformly ships in Stage 6c alongside password-reset and email-change.
+1. ~~**Step-up middleware (`LastPasswordVerifiedAt` claim)** (Stage 6c)~~ — **Resolved in Stage 6c.2 (2026-05-10).** Shipped as `LastReauthAt` claim + `[RequireRecentAuth]` attribute + `POST /api/auth/reauth` endpoint with 5-min freshness window. Three MFA endpoints (`/enroll`, `/enroll/verify`, `/backup-codes/regenerate`) retroactively gated; in-body TOTP from `/backup-codes/regenerate` removed. See `planning-resolved.md` and `docs/superpowers/specs/2026-05-10-reauth-middleware-design.md`.
 
 2. **MFA disable endpoint** (Stage 6c) — Stage 6b.3 returns `409 MFA_ALREADY_ENROLLED` on `POST /api/auth/mfa/enroll` when MFA is already active (Gap 5), blocking silent re-enrollment. There is no UI path to disable MFA until Stage 6c ships the disable endpoint.
 
 3. **Email notification on duplicate-email registration** (Stage 6c) — Stage 6b.3 changed `POST /api/auth/register` to return `204` on duplicate email (Gap 6, enumeration prevention). The "someone tried to register with your address" notification email to the existing account holder is deferred to Stage 6c because it depends on the email-send infrastructure (SMTP + template engine) shipping then.
 
 4. **Audit log entity + writer** (Stage 6c) — security events (login, logout, MFA change, backup-code regen, session revocation) need a durable `AuditLog` table. Stage 6b.3 logs to the application logger only. The `AuditLog` entity, writer service, and GDPR-retention rules are scoped to Stage 6c.
+
+---
+
+## Stage 6c.2 deferred decisions (2026-05-10)
+
+The following items were captured during Stage 6c.2 implementation, then deferred to a follow-up stage:
+
+1. **`AuthMfaByUser` rate-limit policy partition bug** (follow-up) — same root cause as the `AuthReauthByUser` bug fixed in 6c.2: the rate-limit middleware runs before `UseAuthentication`, so the lambda's `httpContext.User?.FindFirst(NameIdentifier)` returns null and all authenticated MFA requests collapse into the `"anonymous-mfa"` shared bucket. The existing `MfaRegenerateRateLimitTests.Regenerate_RateLimitedPerUser` only asserts "any 429 fires" within 11 calls so it never caught the regression. The fix is identical to 6c.2: explicit `httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme).Wait()` to resolve the user. The TOTP partitioner already uses this pattern correctly via `TotpByUserPartitioner` (different scheme — `IdentityConstants.TwoFactorUserIdScheme`). Tracked here so the next Stage 6c work can pick it up. Risk profile: low — the per-process bucket still rate-limits the absolute call volume; the failure mode is "hostile user A's calls eat hostile user B's budget" rather than a security gap.
