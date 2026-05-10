@@ -436,6 +436,8 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 > **Stage 6a (2026-05-09):** Identity wiring + Argon2id + sessions + cookies + CSRF + global authorization fallback are shipped (24 integration tests in `ProjectCeres.Tests/Integration/Authentication/`). Items below are marked `[x]` for 6a; remaining items are scoped to 6b (TOTP, lockout, rate-limit, failed-login logging) and 6c (password reset, email change, reauth, audit log).
 
+> **Stage 6b.2 (2026-05-10):** Lockout enforcement + sliding-window rate limits + failed-login logging + backup-code-during-lockout shipped (54 ship-gate tests in `ProjectCeres.Tests/Integration/Authentication/`). 6b.1 latent bug fixed: `TwoFactorAuthenticatorSignInAsync` replaced with `VerifyTwoFactorTokenAsync`, so wrong TOTP codes no longer increment the password lockout counter. All `Unauthorized(...)` returns aligned to api-contract envelope shape. Items below marked `[x]` for 6b.2; remaining lockout-email + password-reset rate limit + self-service unlock items are scoped to 6c.
+
 ASP.NET Identity hardening:
 
 - [x] `options.Lockout.MaxFailedAccessAttempts = 10`
@@ -470,7 +472,7 @@ TOTP:
 - [x] Replay records auto-purged after 2 minutes
 - [x] Backup codes hashed with Argon2id (not plaintext) — single-use, regeneration invalidates all previous codes
 - [x] TOTP enrollment is **opt-in** per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md). Users enable from Settings → Security; once enabled, MFA is enforced on every subsequent login. Login does not block on enrollment, no grace period, no enforcement deadline. Onboarding presents MFA as recommended-but-skippable.
-- [ ] Backup-code use during lockout is honoured (lockout protects against password guessing, not TOTP abuse) — depends on lockout, ships in 6b.2
+- [x] Backup-code use during lockout is honoured (lockout protects against password guessing, not TOTP abuse) — depends on lockout, ships in 6b.2
 - [x] No SMS option exposed (SIM-swap vulnerability)
 
 CSRF:
@@ -497,18 +499,18 @@ Cookie configuration:
 
 Rate limiting:
 
-- [ ] `/login` endpoint: 10 requests/min/IP minimum, fixed-window
-- [ ] `/register` endpoint: 10 requests/min/IP minimum
+- [x] `/login` endpoint: 10 requests/min/IP minimum, fixed-window
+- [x] `/register` endpoint: 10 requests/min/IP minimum
 - [ ] `/password-reset` endpoint: 10 requests/min/IP minimum, plus per-account rate limit
-- [ ] Account lockout: lock for 15 min after 10 failed attempts; counter resets on successful login
+- [x] Account lockout: lock for 15 min after 10 failed attempts; counter resets on successful login
 - [ ] Lockout email includes a time-limited signed unlock link separate from the password-reset flow
-- [ ] `/login/totp` endpoint: rate-limited per user (after credentials valid, before TOTP)
+- [x] `/login/totp` endpoint: rate-limited per user (after credentials valid, before TOTP)
 
 Failed-login logging:
 
-- [ ] Every failed login logs: timestamp, IP, user-agent, whether the failure was credential-based or TOTP-based
-- [ ] Attempted password is NEVER logged
-- [ ] Logs queryable for distributed credential-stuffing detection (multiple accounts, same source IP)
+- [x] Every failed login logs: timestamp, IP, user-agent, whether the failure was credential-based or TOTP-based
+- [x] Attempted password is NEVER logged
+- [x] Logs queryable for distributed credential-stuffing detection (multiple accounts, same source IP)
 
 Password reset:
 
@@ -548,10 +550,10 @@ Tests required before Stage 7 begins:
 - [ ] Login happy-path integration test (credentials → TOTP → cookie issued)
 - [ ] Login wrong-password test returns identical error message + timing as login with non-existent user
 - [ ] Login wrong-TOTP test returns generic error
-- [ ] Account lockout test: 10 failed attempts locks; 11th returns lockout error
+- [x] Account lockout test: 10 failed attempts locks; 11th returns lockout error
 - [ ] Self-service unlock token test: valid token unlocks; expired token returns error
-- [ ] TOTP replay test: same code used twice within window is rejected on second use
-- [ ] TOTP replay survives app restart (persistent store, not in-memory)
+- [x] TOTP replay test: same code used twice within window is rejected on second use
+- [x] TOTP replay survives app restart (persistent store, not in-memory)
 - [ ] Password reset happy-path integration test (request → email → click link → enter TOTP → set new password → all sessions revoked)
 - [ ] Password reset enumeration test: same response + timing whether email exists or not
 - [ ] CSRF test: state-changing request without XSRF-TOKEN header returns 400/403
