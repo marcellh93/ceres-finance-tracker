@@ -936,7 +936,7 @@ Define explicit numeric retention periods for every data category. Indefinite re
 |--------------|-----------|-----------------|
 | Transactions, accounts | Duration of active account + 5 years (statute of limitations) | Soft-delete on user erasure; hard-delete 5 years after account closure |
 | File attachments | Duration of parent transaction | Hard-delete from filesystem; row deleted |
-| Audit log (security events) | 1 year | Auto-purge via scheduled job |
+| Audit log (security events) | 6 months | Auto-purge via `IUserJobRunner` per-user fan-out — aligned with `planning-phase3.md` § Audit log entity + writer (Stage 6c sequencing) |
 | Application logs | 30 days | Log sink rotation |
 | UserSession rows (revoked) | 90 days | Auto-purge via scheduled job |
 | IP addresses | Retained within session/audit rows per the above schedule | Follows parent row deletion |
@@ -1037,7 +1037,7 @@ Document all rotation procedures before Phase 3 launch:
 ### Audit Log Security
 
 - Audit log rows are insert-only. The runtime database user must have `INSERT` but not `UPDATE` or `DELETE` on the audit log table. This enforces tamper-evidence at the database level.
-- **Scope extension:** the existing audit log covers login/logout, account creation, data export, and erasure requests. Extend to include: `TransactionCreated`, `TransactionDeleted`, `TransferCreated`, `TransferDeleted` (entity ID, timestamp, IP address — no financial amounts). This is required for dispute resolution.
+- **Scope extension — deferred to Stage 7 (multi-tenancy cutover):** the Stage 6.14 audit log covers authentication events (login no-MFA / MFA / backup-code, logout, registration, password reset request + confirm, email change request + confirm + revoke, MFA enrolment, backup-code regeneration). Financial-entity events — `TransactionCreated`, `TransactionDeleted`, `TransferCreated`, `TransferDeleted` (entity ID, timestamp, IP address — no financial amounts) — are required for dispute resolution before public launch and are wired alongside Stage 7's multi-tenancy cutover, when every financial-service method is already being touched to add the `UserId` scope.
 - **New session alert email:** default to **enabled** (opt-out, not opt-in). For a financial application, a new sign-in from an unknown IP is always a security-relevant event. A user who never visits settings should still receive compromise notifications. Users may opt out from notification preferences with disclosure of the security implication.
 
 ---

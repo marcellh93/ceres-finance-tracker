@@ -43,6 +43,7 @@
     - [UserMfaBackupCode](#usermfabackupcode-phase-3-stage-6b1)
     - [TotpReplayEntry](#totpreplayentry-phase-3-stage-6b1)
     - [FailedLoginAttempt](#failedloginattempt-phase-3-stage-6b2)
+    - [AuditLog](#auditlog-phase-3-stage-614)
     - [PasswordResetToken](#passwordresettoken-phase-3-stage-6c1)
 
 ---
@@ -1093,6 +1094,42 @@ Records every rejected authentication attempt for credential-stuffing forensics 
 
 - Erasure (Stage 6c): on right-to-erasure, the 6c flow nullifies `EmailAttempted` for matching rows (column is nullable, no schema change required).
 - Retention purge (Stage 7+): 1-year flat cross-tenant `DELETE WHERE OccurredAt < now() - interval '1 year'`. Different cadence from `AuditLog` (6 months, per-user fan-out via `IUserJobRunner`).
+
+### AuditLog (Phase 3, Stage 6.14)
+
+Append-only record of security-relevant authentication events for the user's own account: successful logins (no-MFA / MFA / backup-code branches), logout, registration, password reset (request known-email branch and confirm), email-address change (request, confirm, revoke), MFA enrolment, backup-code regeneration. The user can later see "what has happened to my account" via the Stage 12 read endpoint. Distinct from `FailedLoginAttempt` (rejected attempts, cross-tenant) — `AuditLog` records successful state changes, scoped per user.
+
+**Schema:**
+
+| Field | Type | Constraint | Purpose |
+|-------|------|------------|---------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | The user the event happened to. No FK in 6.14 — Stage 7 adds the FK to `AspNetUsers.Id` alongside the global query filter. |
+| Action | text (enum-as-string) | NOT NULL | `AuditLogAction` value. EF `HasConversion<string>()`. The .NET enum is the source of truth; an architecture test pins values against `docs/superpowers/specs/2026-05-11-stage-6-14-audit-log-design.md` § 3.1. |
+| EntityType | varchar(64) | nullable | Set together with `EntityId`. Null on identity-self events (login, logout, register, MFA enrol, password-reset, email-change). |
+| EntityId | uuid | nullable | Set together with `EntityType`. |
+| OccurredAt | timestamp with time zone | NOT NULL | UTC wall-clock at write time. |
+| IpAddress | varchar(45) | NOT NULL, default `"unknown"` | IPv6-sized. `"unknown"` when `Connection.RemoteIpAddress` is null (background contexts, test paths). |
+
+**DB-level CHECK constraint:** `CK_AuditLog_EntityPair` — `(EntityType IS NULL AND EntityId IS NULL) OR (EntityType IS NOT NULL AND EntityId IS NOT NULL)`. Belt-and-braces with the application-level invariant guard in `AuditLogWriter.RecordAsync`.
+
+**Indexes:**
+
+- `(UserId, OccurredAt DESC)` — supports the Stage 12 GET endpoint pagination AND the Stage 7+ per-user 6-month purge.
+- `(OccurredAt)` — defensive ops query support.
+
+**Writer:** `AuditLogWriter` (`ProjectCeres/Common/Authentication/AuditLogWriter.cs`), Scoped DI lifetime, fresh `DbContext` via `IServiceScopeFactory` per `RecordAsync` call. Same rationale as `FailedLoginRecorder`: insulates the writer from a request `DbContext` left holding a stale entity after an Identity-internal concurrency race.
+
+**Failure contract:** `RecordAsync` is a synchronous DB write on the request hot path. If the write throws, the exception bubbles — the calling auth flow returns 500 and no state-change side effect (cookie, session, password) survives in a user-visible way. Loud-failure is intentional. Verified end-to-end by `AuditLogIntegrationTests.Failed_audit_insert_during_login_returns_500_AND_does_NOT_issue_session_cookie`.
+
+**Multi-tenancy:** scoped per user. Stage 7's cutover adds the EF global query filter on `UserId`. Until then, all queries explicitly filter by `UserId`.
+
+**GDPR / retention:**
+
+- Erasure (Stage 13): `UserId` is **not** nulled — it remains as a pseudonymized identifier (the user-row's PII is erased separately). `IpAddress` is rewritten to `"erased"` in the same erasure transaction.
+- Retention purge (Stage 7+): 6-month per-user fan-out via `IUserJobRunner` — `DELETE WHERE UserId = @u AND OccurredAt < now() - interval '6 months'`. Different cadence from `FailedLoginAttempt` (1-year flat cross-tenant `DELETE`).
+
+**No financial amounts:** `AuditLog` has no `Amount`, `Balance`, `Value`, `Total`, or any `decimal` property. Enforced by architecture test `AuditLog_entity_contains_no_financial_amount_columns`.
 
 ### PasswordResetToken (Phase 3, Stage 6c.1)
 

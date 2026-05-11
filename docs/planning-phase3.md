@@ -448,7 +448,18 @@ The following items were captured during Stage 6b.3 design and implementation, t
 
 3. **Email notification on duplicate-email registration** (Stage 6c) — Stage 6b.3 changed `POST /api/auth/register` to return `204` on duplicate email (Gap 6, enumeration prevention). The "someone tried to register with your address" notification email to the existing account holder is deferred to Stage 6c because it depends on the email-send infrastructure (SMTP + template engine) shipping then.
 
-4. **Audit log entity + writer** (Stage 6c) — security events (login, logout, MFA change, backup-code regen, session revocation) need a durable `AuditLog` table. Stage 6b.3 logs to the application logger only. The `AuditLog` entity, writer service, and GDPR-retention rules are scoped to Stage 6c.
+4. **Audit log entity + writer** (Stage 6.14, shipped 2026-05-11) — `AuditLog` entity + `IAuditLogWriter` writer + 12 call sites across `AuthController`, `MfaController`, `PasswordResetService`, `EmailChangeService`. Loud-failure on the request hot path (mirrors `FailedLoginRecorder`). 24 ship-gate tests. Spec: [`docs/superpowers/specs/2026-05-11-stage-6-14-audit-log-design.md`](superpowers/specs/2026-05-11-stage-6-14-audit-log-design.md).
+
+   **Phase 3 launch follow-up (deferred from 6.14):**
+   - 6-month per-user retention purge via `IUserJobRunner` → Stage 7+ (the runner ships with the multi-tenancy cutover).
+   - EF global query filter on `AuditLog.UserId` → Stage 7 (every user-owned filter lands together at cutover per ADR-0065).
+   - FK from `AuditLog.UserId` → `AspNetUsers.Id` → Stage 7 (same cutover migration).
+   - `GET /api/auth/audit-log` controller + paginated DTO + `/app/audit-log` SPA page → Stage 12 (Sessions + Support SPA pages).
+   - Financial events (`TransactionCreated/Deleted`, `TransferCreated/Deleted`, no amounts) → Stage 7 (wired in the same cutover that touches every financial service for the `UserId` scope).
+   - `MfaDisabled` call site → whenever an MFA-disable endpoint ships (enum value reserved in 6.14).
+   - `LockoutSelfServiceUnlock` call site → Stage 6.10 (enum value reserved in 6.14).
+   - `DataExportRequested` + `GdprErasureRequested` call sites → Stage 13 (enum values reserved in 6.14).
+   - Runtime DB role `GRANT INSERT / REVOKE UPDATE, DELETE` on `AuditLogs` → Stage 16 (Hosting + ops) per security-model.md line 1141.
 
 ---
 

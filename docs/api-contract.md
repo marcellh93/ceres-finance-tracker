@@ -443,7 +443,7 @@ The table below lists every `error.code` value the API can return, grouped by do
 | Settings | GET (read preferences), PATCH (update preferences) | Per-user in Phase 3; includes `PeriodStartDay`, notification preferences |
 | Notifications | GET (list preferences), PATCH (update preferences) | Controls: weekly digest opt-in, new session alert opt-out, Safe to Spend alert |
 | DataExport | POST (request export), GET (download by token) | Async: POST returns `202 Accepted` with a job ID; user notified by email when ready; download link is time-limited (24 h) and authenticated |
-| AuditLog | GET (list, paginated) | User's own audit log entries only — no delete endpoint |
+| AuditLog | GET (list, paginated) | User's own audit log entries only — no delete endpoint. **Writes ship in Stage 6.14; read endpoint ships in Stage 12.** |
 | SupportTickets | POST (submit), GET list, GET by ID | User-facing; admin management surface is separate |
 | Sessions | List active sessions, revoke session | Security settings |
 | BlockedIps | List, add, remove | Security settings |
