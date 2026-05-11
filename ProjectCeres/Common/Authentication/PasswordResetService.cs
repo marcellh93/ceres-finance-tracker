@@ -32,6 +32,7 @@ public sealed class PasswordResetService
     private readonly IEmailService _email;
     private readonly IMemoryCache _cache;
     private readonly ILogger<PasswordResetService> _logger;
+    private readonly IAuditLogWriter _auditLog;
 
     public PasswordResetService(
         UserManager<ApplicationUser> userManager,
@@ -43,7 +44,8 @@ public sealed class PasswordResetService
         FailedLoginRecorder failedLogins,
         IEmailService email,
         IMemoryCache cache,
-        ILogger<PasswordResetService> logger)
+        ILogger<PasswordResetService> logger,
+        IAuditLogWriter auditLog)
     {
         _userManager = userManager;
         _signInManager = signInManager; // Reserved for ConfirmAsync (Task 13)
@@ -55,6 +57,7 @@ public sealed class PasswordResetService
         _email = email;
         _cache = cache;
         _logger = logger;
+        _auditLog = auditLog;
     }
 
     public sealed class RateLimitedException : Exception
@@ -133,6 +136,8 @@ public sealed class PasswordResetService
             // Per spec: failed sends are logged but never block the user-facing request.
             _logger.LogError(ex, "Failed to send password-reset email; token row already committed.");
         }
+
+        await _auditLog.RecordAsync(user.Id, AuditLogAction.PasswordResetRequested, ct: ct);
     }
 
     private void EnforceEmailRateLimit(string normalizedEmail)
@@ -355,6 +360,8 @@ public sealed class PasswordResetService
             {
                 _logger.LogError(ex, "Failed to send password-changed notification email.");
             }
+
+            await _auditLog.RecordAsync(user.Id, AuditLogAction.PasswordResetCompleted, ct: ct);
 
             return new PasswordResetConfirmOutcome.Success();
         }
