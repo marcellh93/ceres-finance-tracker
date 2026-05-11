@@ -457,7 +457,7 @@ The following items were captured during Stage 6b.3 design and implementation, t
    - `GET /api/auth/audit-log` controller + paginated DTO + `/app/audit-log` SPA page → Stage 12 (Sessions + Support SPA pages).
    - Financial events (`TransactionCreated/Deleted`, `TransferCreated/Deleted`, no amounts) → Stage 7 (wired in the same cutover that touches every financial service for the `UserId` scope).
    - `MfaDisabled` call site → whenever an MFA-disable endpoint ships (enum value reserved in 6.14).
-   - `LockoutSelfServiceUnlock` call site → Stage 6.10 (enum value reserved in 6.14).
+   - `LockoutSelfServiceUnlock` call site → shipped 2026-05-11 (Stage 6.10).
    - `DataExportRequested` + `GdprErasureRequested` call sites → Stage 13 (enum values reserved in 6.14).
    - Runtime DB role `GRANT INSERT / REVOKE UPDATE, DELETE` on `AuditLogs` → Stage 16 (Hosting + ops) per security-model.md line 1141.
 

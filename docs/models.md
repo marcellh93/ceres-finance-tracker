@@ -45,6 +45,7 @@
     - [FailedLoginAttempt](#failedloginattempt-phase-3-stage-6b2)
     - [AuditLog](#auditlog-phase-3-stage-614)
     - [PasswordResetToken](#passwordresettoken-phase-3-stage-6c1)
+    - [LockoutUnlockToken](#lockoutunlocktoken-phase-3-stage-610)
 
 ---
 
@@ -1156,6 +1157,38 @@ One row per active or recently-consumed password-reset token. The raw token is a
 **Constant-time discipline:** `ConfirmAsync` runs at least one Argon2 verify even when zero candidates match, so timing doesn't reveal "no rows."
 
 **Multi-tenancy:** scoped per user. Stage 7 will add a global query filter alongside the FK; until then, all queries explicitly filter by `UserId`.
+
+### LockoutUnlockToken (Phase 3, Stage 6.10)
+
+One row per active or recently-consumed lockout-unlock token. Issued by `AuthController.Login` on the lockout transition (the failing `PasswordSignInAsync` that flipped `LockoutEnd` null → not null). The user receives a single email per lockout window; clicking the link POSTs to `/api/auth/lockout-unlock` and clears `AccessFailedCount` + `LockoutEnd` immediately. Defends the legitimate user against an attacker-induced lockout-loop DoS.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7. |
+| TokenHash | varchar(512) | NOT NULL | Argon2id PHC string of the raw 256-bit base64url token. Same hasher pinned to `m=19456 t=2 p=1` as passwords + persistent-cookie tokens + backup codes + password-reset + email-change tokens. |
+| CreatedAt | timestamp with time zone | NOT NULL | When the token was issued — i.e., the moment lockout engaged. |
+| ExpiresAt | timestamp with time zone | NOT NULL | `CreatedAt + 15min`. Matches the lockout duration; once the natural lockout self-expires, an unlock link has no marginal value. |
+| ConsumedAt | timestamp with time zone | nullable | Set on first successful confirm OR on supersession by a new issuance. Single-use. |
+
+**No `MfaVerifiedAt`** (deliberately diverges from `PasswordResetToken`) — confirm has no MFA gate. The unlock is undo-only: it does NOT change the password, does NOT change the email, does NOT log the user in. The unlocked account is still password-protected and (if MFA enabled) still MFA-protected on the next login attempt.
+
+**Indexes:** `(UserId, ConsumedAt)` for the supersede-prior-unused query; `(ExpiresAt)` for the future Stage 7+ cleanup sweep.
+
+**Token format:** raw token is 32 bytes from `RandomNumberGenerator.GetBytes(32)`, encoded as base64url (≈43 chars). Carried in the unlock URL fragment (`/app/lockout-unlock#token=<base64url>`) so it never appears in server logs or `Referer` headers per `security-model.md` § Logging and PII Redaction.
+
+**Lifecycle:**
+- `LockoutUnlockService.IssueAsync` is called by `AuthController.Login` on the transition only — gated by `wasLockedBefore == false && isLockedAfter == true`, captured inside the existing per-user `_loginLocks` semaphore. Already-locked accounts that receive subsequent bad-password attempts do NOT trigger additional issuances. This is the email-DoS defence (otherwise an attacker who knows the victim's email amplifies their bad-password loop into an email flood).
+- `IssueAsync` bulk-supersedes prior unconsumed tokens for the user, generates + hashes the new value, inserts the row, sends the email. Email-send failures are logged but do NOT roll back the token write or break the user-visible `ACCOUNT_LOCKED_OUT` response.
+- `ConfirmAsync` resolves the token by Argon2-verifying against active candidates (`WHERE ConsumedAt IS NULL AND ExpiresAt > now()`), re-reads the matched row inside the per-user lock to handle concurrent confirms, calls `ResetAccessFailedCountAsync` + `SetLockoutEndDateAsync(user, null)`, stamps `ConsumedAt` via `ExecuteUpdateAsync`, and writes an `AuditLog` row with `Action = LockoutSelfServiceUnlock`.
+
+**Constant-time discipline:** `ConfirmAsync` runs at least one Argon2 verify even when zero candidates match, so timing doesn't reveal "no rows".
+
+**Side effects of unlock (by deliberate omission):** does NOT revoke `UserSession` rows, does NOT regenerate `SecurityStamp`, does NOT touch `EmailConfirmed`, does NOT sign anyone in. The unlock is reversing a side-effect of failed-login attempts — it's not a credential change or a recovery flow, so it doesn't escalate security state. Mirrors `EmailChangeService.RevokeAsync`'s "undo-only operations don't move security state" posture.
+
+**Multi-tenancy:** scoped per user. Stage 7 adds the global query filter + FK alongside every other user-owned entity. Until then, all queries explicitly filter by `UserId`.
+
+**Retention:** the `(ExpiresAt)` index supports a future Stage 7+ flat cleanup sweep (`DELETE WHERE ConsumedAt IS NOT NULL OR ExpiresAt < now() - interval '1 day'`); not in 6.10 (no background-runner abstraction until Stage 7).
 
 ### CustomerArchive (Phase 3)
 
