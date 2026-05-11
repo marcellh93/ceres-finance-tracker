@@ -431,6 +431,7 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 | 6.12 | Email-address-change flow (dual-address verification, 7-day revoke link to old address) | `security-model.md` § Email Address Change |
 | 6.13 | Re-authentication middleware for sensitive operations | `security-model.md` § Login → Reauthentication |
 | 6.14 | Audit log table (`AuditLog` entity + writer service) | `planning-phase3.md` § Audit logging |
+| 6.15 | O(1) token verify via HMAC `TokenLookup` column on `PasswordResetToken` + `EmailChangeToken` (closes Argon2id-amplification DoS vector on `/confirm` + `/revoke`). **⚠️ Until shipped, the green test suite is misleading**: tests pass because `AuthTestTokenCleanup.DeleteAllTestTokensAsync` empties the token tables between test classes, but production has no equivalent cleanup and tokens accumulate naturally (up to 7 days for email-change RevokeOld). 6.15's ship-gate explicitly **removes** the test-side cleanup and replaces it with regression tests that insert N=200 dummy rows. See `docs/superpowers/specs/2026-05-11-stage-6-15-token-lookup-design.md` § 1 and § 8.4. | `planning-phase3.md` § Stage 6.15 — Argon2id-O(N) DoS vector on token verify (planned) |
 
 ### Verification checklist
 
