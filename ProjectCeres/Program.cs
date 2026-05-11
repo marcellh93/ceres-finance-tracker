@@ -55,9 +55,12 @@ builder.Services.AddControllers()
         };
     });
 
-// Phase 3 Stage 6a: HttpContext-backed accessor replaces SingleUserAccessor.
-// SingleUserAccessor stays in the codebase because Stage 7's data remap references
-// the sentinel constant; only the DI registration changes here.
+// Phase 3 Stage 7: background-job scope primitive. Singleton — the AsyncLocal inside
+// does the per-flow isolation; the holder is process-wide. IUserJobRunner is scoped
+// because it depends on the scoped AppDbContext.
+builder.Services.AddSingleton<IUserScope, UserScope>();
+builder.Services.AddScoped<IUserJobRunner, UserJobRunner>();
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
 builder.Services.AddScoped<UserOwnershipInterceptor>();
