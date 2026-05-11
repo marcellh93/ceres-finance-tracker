@@ -13,15 +13,9 @@ public static class CategoryPolicies
     public const string SystemImmutableCode = "SYSTEM_CATEGORY_IMMUTABLE";
     public const string CategoryInUseCode   = "CATEGORY_IN_USE";
 
-    /// <summary>Reserved system fallbacks. IsSystem is false on these so they appear in pickers, but they cannot be edited or deactivated.</summary>
-    private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
-    private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
-
-    public static bool IsReserved(Guid id) => id == UncategorizedIncomeId || id == UncategorizedExpenseId;
-
     public static Result CanEdit(Category category)
     {
-        if (category.IsSystem || IsReserved(category.Id))
+        if (category.IsSystem || category.IsReserved)
             return Result.Fail(SystemImmutableCode, "System categories cannot be modified.");
         return Result.Ok();
     }
@@ -35,7 +29,5 @@ public static class CategoryPolicies
         return Result.Ok();
     }
 
-    /// <summary>System-immutability also blocks reactivate; system categories shouldn't
-    /// be in the archived list in the first place, but this is defense in depth.</summary>
     public static Result CanReactivate(Category category) => CanEdit(category);
 }
