@@ -14,13 +14,9 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationTests")]
-public class EmailChangeCrossFeatureTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmailChangeCrossFeatureTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
-
 
     public EmailChangeCrossFeatureTests(AuthTestWebApplicationFactory factory) => _factory = factory;
 

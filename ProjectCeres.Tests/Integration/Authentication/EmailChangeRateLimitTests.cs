@@ -12,14 +12,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("RateLimitTests")]
-public class EmailChangeRateLimitTests : IClassFixture<RateLimitedAuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmailChangeRateLimitTests : IClassFixture<RateLimitedAuthTestWebApplicationFactory>
 {
     private readonly RateLimitedAuthTestWebApplicationFactory _factory;
 
     public EmailChangeRateLimitTests(RateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     private static async Task<HttpResponseMessage> PostConfirmAsync(
         WebApplicationFactory<Program> factory, RateLimitedAuthTestWebApplicationFactory baseFactory, string token)

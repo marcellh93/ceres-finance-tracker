@@ -14,14 +14,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationTests")]
-public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
     public PasswordResetRequestTests(AuthTestWebApplicationFactory factory) => _factory = factory;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -57,6 +54,9 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         token.ExpiresAt.Should().BeBefore(DateTime.UtcNow.AddMinutes(16));
         token.ConsumedAt.Should().BeNull();
         token.MfaVerifiedAt.Should().BeNull();
+        // Stage 6.15 — RequestAsync must populate the HMAC-derived TokenLookup so the
+        // unique index is satisfied AND /confirm can locate the row in O(1).
+        token.TokenLookup.Should().NotBeNull().And.HaveCount(32);
 
         emailMock.Verify(e => e.SendAsync(
             It.Is<EmailMessage>(m => m.To == email && m.Subject.Contains("Reset")),

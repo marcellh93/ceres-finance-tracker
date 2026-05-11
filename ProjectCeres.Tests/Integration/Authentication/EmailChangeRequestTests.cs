@@ -14,15 +14,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationTests")]
-public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
     public EmailChangeRequestTests(AuthTestWebApplicationFactory factory) => _factory = factory;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -95,6 +91,14 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         var revoke = rows.Single(r => r.Purpose == EmailChangeTokenPurpose.RevokeOld);
         revoke.ExpiresAt.Should().BeAfter(DateTime.UtcNow.AddDays(6));
         revoke.ExpiresAt.Should().BeBefore(DateTime.UtcNow.AddDays(8));
+
+        // Stage 6.15 — both rows carry an HMAC-derived TokenLookup so /confirm and
+        // /revoke find them in O(1). The two rows MUST have distinct lookups because
+        // they wrap distinct raw tokens (one VerifyNew + one RevokeOld per /request).
+        verify.TokenLookup.Should().NotBeNull().And.HaveCount(32);
+        revoke.TokenLookup.Should().NotBeNull().And.HaveCount(32);
+        verify.TokenLookup.Should().NotEqual(revoke.TokenLookup,
+            "VerifyNew and RevokeOld must have distinct lookups so a raw token cannot match across purposes");
 
         captured.Should().HaveCount(2, "one verify email to new address + one revoke email to old address");
         captured.Should().Contain(m => m.To == newEmail && m.Subject.Contains("Confirm"));

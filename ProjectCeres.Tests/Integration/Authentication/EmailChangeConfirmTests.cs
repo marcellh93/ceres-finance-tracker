@@ -15,14 +15,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationTests")]
-public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
     public EmailChangeConfirmTests(AuthTestWebApplicationFactory factory) => _factory = factory;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -203,6 +200,7 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var generator = scope.ServiceProvider.GetRequiredService<EmailChangeTokenGenerator>();
+            var lookupHasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
             rawToken = generator.Generate();
             db.EmailChangeTokens.Add(new EmailChangeToken
             {
@@ -210,6 +208,7 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
                 UserId = user.Id,
                 Purpose = EmailChangeTokenPurpose.VerifyNew,
                 NewEmail = newEmail,
+                TokenLookup = lookupHasher.ComputeLookup(rawToken),
                 TokenHash = generator.Hash(rawToken),
                 CreatedAt = DateTime.UtcNow.AddMinutes(-31),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(-1),

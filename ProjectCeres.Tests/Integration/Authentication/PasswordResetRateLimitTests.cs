@@ -8,14 +8,11 @@ using ProjectCeres.Common.Email;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("RateLimitTests")]
-public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebApplicationFactory>, IAsyncLifetime
+public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebApplicationFactory>
 {
     private readonly RateLimitedAuthTestWebApplicationFactory _factory;
 
     public PasswordResetRateLimitTests(RateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
-
-    public Task InitializeAsync() => Task.CompletedTask;
-    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     // ── Test #24 ────────────────────────────────────────────────────────────
     /// <summary>

@@ -137,6 +137,11 @@
 
 #### Fixed
 
+**Authentication (Stage 6.15 — Argon2id-amplification DoS on token verify, 2026-05-11)**
+- Argon2id-amplification DoS vector on `/password-reset/confirm`, `/email-change/confirm`, and `/email-change/revoke` closed via indexed `TokenLookup` column. Verify path is now O(1) regardless of token table size; pre-6.15 each call ran one Argon2id verify per unconsumed unexpired row (~20s at N=200 under OWASP-minimum params).
+- New `TokenLookupHasher` singleton computes `HMAC-SHA256(Authentication:TokenLookupSecret, rawToken)`; new column added to `PasswordResetToken` and `EmailChangeToken` with a unique index per table; existing rows backfilled and stamped `ConsumedAt = NOW()` so legacy tokens cannot match real verifies.
+- Test-infrastructure crutch removed: `AuthTestTokenCleanup.DeleteAllTestTokensAsync` + 12 `IAsyncLifetime.DisposeAsync` hooks deleted. The full Authentication integration suite (298 tests) now stays green under accumulated token load, proving the production fix is real rather than masked by between-test cleanup.
+
 **Quick-Add**
 - Quick-add modal: per-tab fields (account, category, source/dest, asset/liability) reset on tab switch so a stale selection from another tab can't leak in (shared fields like date, amount, description still persist)
 - Combobox labels rendered as `<div>` instead of `<label>` since there's no input element to associate (fixes a11y "label without for" warning)
