@@ -32,6 +32,7 @@ public sealed class EmailChangeService
     private readonly IEmailService _email;
     private readonly IMemoryCache _cache;
     private readonly ILogger<EmailChangeService> _logger;
+    private readonly IAuditLogWriter _auditLog;
 
     public EmailChangeService(
         UserManager<ApplicationUser> userManager,
@@ -40,7 +41,8 @@ public sealed class EmailChangeService
         EmailChangeTokenGenerator tokens,
         IEmailService email,
         IMemoryCache cache,
-        ILogger<EmailChangeService> logger)
+        ILogger<EmailChangeService> logger,
+        IAuditLogWriter auditLog)
     {
         _userManager = userManager;
         _db = db;
@@ -48,6 +50,7 @@ public sealed class EmailChangeService
         _tokens = tokens;
         _email = email;
         _cache = cache;
+        _auditLog = auditLog;
         _logger = logger;
     }
 
@@ -158,6 +161,8 @@ public sealed class EmailChangeService
         {
             _logger.LogError(ex, "Failed to send email-change revoke email; token row already committed.");
         }
+
+        await _auditLog.RecordAsync(user.Id, AuditLogAction.EmailChangeRequested, ct: ct);
 
         return new EmailChangeRequestOutcome.Accepted();
     }
@@ -285,6 +290,8 @@ public sealed class EmailChangeService
                 }
             }
 
+            await _auditLog.RecordAsync(match.UserId, AuditLogAction.EmailChangeConfirmed, ct: ct);
+
             return new EmailChangeConfirmOutcome.Success();
         }
         finally
@@ -356,6 +363,8 @@ public sealed class EmailChangeService
                     _logger.LogError(ex, "Failed to send email-change revoke notification.");
                 }
             }
+
+            await _auditLog.RecordAsync(match.UserId, AuditLogAction.EmailChangeRevoked, ct: ct);
 
             return new EmailChangeRevokeOutcome.Success();
         }
