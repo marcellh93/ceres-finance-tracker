@@ -29,5 +29,7 @@ public static class CategoryPolicies
         return Result.Ok();
     }
 
+    /// <summary>System-immutability also blocks reactivate; system categories shouldn't
+    /// be in the archived list in the first place, but this is defense in depth.</summary>
     public static Result CanReactivate(Category category) => CanEdit(category);
 }
