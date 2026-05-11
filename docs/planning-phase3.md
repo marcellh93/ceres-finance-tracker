@@ -484,3 +484,26 @@ The following items were captured during Stage 6c.2 implementation, then deferre
 **Risk profile until shipped.** Medium. Mitigated short-term by per-IP `AuthLoginByIp` (10/min) and per-email service-side rate gates (5/hour for password-reset and email-change) which bound the rate of token creation. An attacker would need to sustain token creation for hours to grow N into thousands. The window emptied above (`PasswordResetTokens` had 852 rows from historical test runs) cannot occur in production because the per-email 5/hour gate caps token creation per recipient. Must ship before Phase 3 public launch — invite-only beta tolerates the current risk.
 
 **Migration strategy.** Backfill a synthetic `TokenLookup` placeholder on existing rows, then immediately mark them all `ConsumedAt = NOW()`. Zero real-user impact because 6.15 ships before Phase 3 public launch (it's part of the Stage 6 verification gate per the master pre-launch checklist), so the affected populations at ship time are dev/test data only. See spec § 3.3.
+
+## Full-codebase + test-suite audit (post-Stage-6 follow-up)
+
+**Status:** ❌ Pending. Sequenced after Stage 6 close-out (flow diagrams) and before the Stage 7 multi-tenancy cutover.
+
+**Scope.** A complete audit ensuring the codebase and its tests describe the same system. Not Stage 6-only — covers every Phase 1, 2, and 3 surface. Fires from the user's 2026-05-11 ask after the Stage 6.15 /verify run revealed two defence-in-depth branches that had production code but no test coverage.
+
+**Audit prompts.** For each service / controller / middleware / generator / migration:
+
+- Does every public method have at least one happy-path test?
+- Does every documented error code in `api-contract.md` have a test that pins the controller actually returns it?
+- Does every entity field in `models.md` either have a test or appear in a unique/foreign-key/non-null constraint that the test suite hits?
+- For services with a candidate-loop, list scan, or `ToListAsync` over a user-owned entity: is there a regression test that fails when N grows? (Stage 6.15 added this for the two token tables; the same audit applies to `UserMfaBackupCode`, `LiabilityPayment`, etc.)
+- For every `Where(... && IsActive)` or `Where(... && DeletedAt == null)` filter: is there a test that pins archived/deleted rows are excluded? Per `feedback_audit_cross_module_queries_on_cutover` the Accounts cutover already missed two dashboard queries.
+- Architecture tests: is every cross-cutting rule from `architecture.md` / `security-model.md` (e.g. "audit log writes are loud-failure", "no `Guid.Empty` fallbacks", "no `IgnoreQueryFilters()` outside `Admin/`") backed by a Roslyn or reflection-based test?
+- For every `[RequireRecentAuth]`, `[Authorize]`, `[AllowAnonymous]` decision documented in `security-model.md`: does an architecture test pin it?
+- Rate-limit partitioners: per the Stage 6c.2 + Stage 6c.2-follow-up pattern, every `httpContext.User?.FindFirst(...)` access in `Program.cs` rate-limit lambdas is suspect. Audit ALL rate-limit policies for the same partition-collapse bug.
+
+**Likely outputs.** A backlog of missing-test items in `planning-phase3.md` § Open Questions (or a new § "Audit findings" section), one architecture test per rule that's documentation-only today, and any deferred work bundled into `planning-future.md`.
+
+**Why this is a planning entry, not a spec.** Per `feedback_persist_deferred_decisions`: deferred-but-decided work must land in a planning doc, not under `docs/superpowers/specs/` which gets stage-scoped and superseded. The audit produces a backlog; the individual fixes get specs of their own when scheduled.
+
+**Not in scope right now.** Don't start the audit until Stage 6 closes (flow diagrams ship). The Stage 6 close-out is the next item, not this.

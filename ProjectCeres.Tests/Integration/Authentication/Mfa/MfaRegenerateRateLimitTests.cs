@@ -156,6 +156,30 @@ public class MfaRegenerateRateLimitTests : IAsyncLifetime
             "before reading the NameIdentifier claim.");
     }
 
+    // Stage 6c.2 follow-up — pin the partitioner's "anonymous-mfa" fallback as
+    // unreachable on the production path. [Authorize] gates the endpoint; an
+    // anonymous request must short-circuit at authentication with 401 BEFORE the
+    // rate limiter ever decrements a permit. If this ever returns 429, the gate
+    // ordering has changed and anonymous attackers can drain the shared bucket
+    // without ever authenticating.
+    [Fact]
+    public async Task MfaRegenerate_anonymous_request_returns_401_not_429()
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory);
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/backup-codes/regenerate");
+        req.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={csrfCookie}");
+        req.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader);
+
+        var resp = await client.SendAsync(req);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "anonymous requests to MFA endpoints must be rejected by [Authorize] before the rate limiter sees them. " +
+            "Returning 429 would mean an unauthenticated attacker can exhaust the anonymous-mfa partition shared with " +
+            "any legitimate request that fails authentication.");
+    }
+
     private static string? ExtractSetCookie(HttpResponseMessage response, string cookieName)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return null;
