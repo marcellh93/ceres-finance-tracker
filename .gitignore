@@ -121,3 +121,5 @@ ProjectCeres/wwwroot/css/site.css
 # Claude Code worktrees and tooling
 .worktrees/
 .superpowers/
+# Per-process state from ScheduleWakeup — never share across machines
+.claude/scheduled_tasks.lock

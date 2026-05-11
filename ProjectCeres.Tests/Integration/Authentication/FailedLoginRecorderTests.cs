@@ -85,15 +85,20 @@ public class FailedLoginRecorderTests : IAsyncLifetime
     [Fact]
     public async Task EmailAttempted_TruncatedTo256Chars()
     {
-        var longEmail = new string('a', 1000) + "@recorder-test.local";
+        // Use a unique marker IP so we read THIS test's row out of the table, not
+        // whatever happens to be the latest after concurrent/prior tests in the
+        // IntegrationTests collection have appended their own FailedLoginAttempt rows.
+        var markerIp = $"203.0.113.{Random.Shared.Next(1, 255)}";
+        var longEmail = new string('a', 1000) + $"-{Guid.NewGuid():N}@recorder-test.local";
         using var scope = _factory.Services.CreateScope();
         var recorder = scope.ServiceProvider.GetRequiredService<FailedLoginRecorder>();
 
         await recorder.RecordAsync(longEmail, null, FailedLoginReason.UnknownUser,
-            "1.2.3.4", "ua", CancellationToken.None);
+            markerIp, "ua", CancellationToken.None);
 
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.FailedLoginAttempts
+            .Where(e => e.IpAddress == markerIp)
             .OrderByDescending(e => e.OccurredAt)
             .FirstAsync();
         row.EmailAttempted!.Length.Should().Be(256);

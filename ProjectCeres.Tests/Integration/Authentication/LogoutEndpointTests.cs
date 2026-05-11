@@ -71,7 +71,11 @@ public class LogoutEndpointTests : IAsyncLifetime
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var session = await db.UserSessions.FirstAsync();
+        // Filter by this test's user so concurrent/prior tests in the IntegrationTests
+        // collection don't pollute the result — under load the table accumulates rows
+        // from other tests and an unfiltered FirstAsync() returns whichever row landed
+        // first in the table, not necessarily this test's session.
+        var session = await db.UserSessions.SingleAsync(s => s.UserId == user.Id);
         session.RevokedAt.Should().NotBeNull();
     }
 

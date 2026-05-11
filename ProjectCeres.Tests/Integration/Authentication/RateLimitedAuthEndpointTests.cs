@@ -81,12 +81,10 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // If they shared the bucket, /login would be locked out after 10 calls.
         // With separate buckets, /login still has its full quota.
         //
-        // Wait for the login bucket to clear — earlier tests in this class saturate
-        // the auth-login-by-ip partition. The sliding window is 60s; 70s covers the
-        // worst segment boundary.
-        await Task.Delay(TimeSpan.FromSeconds(70));
-
-        var client = _factory.CreateClient();
+        // Use WithFreshRateLimiter() so the rate-limiter partition state is empty
+        // regardless of which tests ran before us — no real-wall-clock sleep needed.
+        await using var factory = _factory.WithFreshRateLimiter();
+        var client = factory.CreateClient();
 
         for (int i = 0; i < 25; i++)
         {
@@ -97,8 +95,8 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
 
         // /login from the SAME client should still succeed (not 429), because the buckets
         // are independent.
-        await AuthTestFixture.RegisterUserAsync(_factory, "csrfsep@rl-test.local");
-        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+        await AuthTestFixture.RegisterUserAsync(factory, "csrfsep@rl-test.local");
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
             new { email = "csrfsep@rl-test.local", password = AuthTestFixture.ValidPassword, rememberMe = false });
 
         loginResp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
@@ -133,19 +131,25 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Login_LimiterResetsAfterWindow()
     {
-        var user = await AuthTestFixture.RegisterUserAsync(_factory, "reset-window@rl-test.local");
-        var client = _factory.CreateClient();
+        // Override AuthLoginByIp to use a 1-second window for this test so we can
+        // wait the window out in ~1.1s instead of 70s. This test's whole point is
+        // "saturate, wait, confirm window rolled over" — we just shrink the wall-clock
+        // duration of the rollover instead of using a fresh limiter (which would
+        // defeat the test's purpose).
+        await using var factory = _factory.WithShortLoginWindow();
+        var user = await AuthTestFixture.RegisterUserAsync(factory, "reset-window@rl-test.local");
+        var client = factory.CreateClient();
 
         // Saturate the bucket.
         var rejected = await FireUntilRateLimited(() =>
-            AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
                 new { email = user.Email, password = "x-long-enough-x", rememberMe = false }));
         rejected.Should().NotBeNull();
 
-        // Sliding window: 60s. 70s pause covers the worst boundary case.
-        await Task.Delay(TimeSpan.FromSeconds(70));
+        // Sliding window is 1s for this test (see WithShortLoginWindow).
+        await Task.Delay(RateLimitedAuthTestWebApplicationFactory.ShortLoginWindowClearDelay);
 
-        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
             new { email = user.Email, password = "x-long-enough-x", rememberMe = false });
         resp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
     }
@@ -153,14 +157,12 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task LoginTotp_LimiterPartitionsPerUser()
     {
-        var userA = await AuthTestFixture.RegisterUserAsync(_factory, "totp-a@rl-test.local");
-        var userB = await AuthTestFixture.RegisterUserAsync(_factory, "totp-b@rl-test.local");
+        // Fresh rate-limiter so the IP-keyed login bucket isn't saturated by prior tests.
+        await using var factory = _factory.WithFreshRateLimiter();
+        var userA = await AuthTestFixture.RegisterUserAsync(factory, "totp-a@rl-test.local");
+        var userB = await AuthTestFixture.RegisterUserAsync(factory, "totp-b@rl-test.local");
         await AuthTestFixture.EnrollUserMfaAsync(_factory, userA);
         await AuthTestFixture.EnrollUserMfaAsync(_factory, userB);
-
-        // The IP-keyed login bucket may be saturated by earlier tests in this class.
-        // Wait for the full 60s sliding window to roll over so login calls succeed.
-        await Task.Delay(TimeSpan.FromSeconds(70));
 
         // Use HandleCookies = false so we can manually carry cookies across requests.
         // PostJsonWithCsrfAsync sets Cookie headers directly; the TwoFactorUserId
@@ -170,8 +172,8 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         {
             HandleCookies = false,
         };
-        var clientA = _factory.CreateClient(options);
-        var loginA = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, clientA, "/api/auth/login",
+        var clientA = factory.CreateClient(options);
+        var loginA = await AuthTestFixture.PostJsonWithCsrfAsync(factory, clientA, "/api/auth/login",
             new { email = userA.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
         // DIAGNOSTIC: surface the actual status and Set-Cookie headers
         var loginABody = await loginA.Content.ReadAsStringAsync();
@@ -182,8 +184,8 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
             $"userA login must succeed; status={loginA.StatusCode}, Set-Cookie={loginASetCookies}, body={loginABody}");
         var mfaCookieA = ExtractSetCookie(loginA, "Identity.TwoFactorUserId");
 
-        var clientB = _factory.CreateClient(options);
-        var loginB = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, clientB, "/api/auth/login",
+        var clientB = factory.CreateClient(options);
+        var loginB = await AuthTestFixture.PostJsonWithCsrfAsync(factory, clientB, "/api/auth/login",
             new { email = userB.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
         var mfaCookieB = ExtractSetCookie(loginB, "Identity.TwoFactorUserId");
 
@@ -260,20 +262,19 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // Register, enroll MFA, do the password step, then burn the per-user TOTP bucket.
         // Capture the 429 body and assert it matches { error: { code, message } }.
 
-        // Wait for any residual IP-login bucket to clear (login step shares auth-login-by-ip).
-        await Task.Delay(TimeSpan.FromSeconds(70));
-
-        var user = await AuthTestFixture.RegisterUserAsync(_factory, "totp-envelope@rl-test.local");
+        // Fresh rate-limiter so any residual IP-login bucket from prior tests is gone.
+        await using var factory = _factory.WithFreshRateLimiter();
+        var user = await AuthTestFixture.RegisterUserAsync(factory, "totp-envelope@rl-test.local");
         await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
 
         var options = new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
             HandleCookies = false,
         };
-        var client = _factory.CreateClient(options);
+        var client = factory.CreateClient(options);
 
         // Password step — get the Identity.TwoFactorUserId cookie
-        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
             new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
         var mfaCookie = ExtractSetCookie(loginResp, "Identity.TwoFactorUserId");
         mfaCookie.Should().NotBeNullOrEmpty("password login must return Identity.TwoFactorUserId");
@@ -300,10 +301,10 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // share the same loopback address), all 11 land in the same partition and the 11th
         // returns 429, proving the limiter ignores the spoofed header.
 
-        await Task.Delay(TimeSpan.FromSeconds(70)); // wait for a fresh login bucket
-
-        await AuthTestFixture.RegisterUserAsync(_factory, "xff-spoof@rl-test.local");
-        var client = _factory.CreateClient();
+        // Fresh rate-limiter so prior tests don't leave the login bucket saturated.
+        await using var factory = _factory.WithFreshRateLimiter();
+        await AuthTestFixture.RegisterUserAsync(factory, "xff-spoof@rl-test.local");
+        var client = factory.CreateClient();
 
         HttpResponseMessage? last429 = null;
         for (int i = 1; i <= 11; i++)
@@ -320,7 +321,7 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
             // Each request spoofs a different "remote" IP in the XFF header
             req.Headers.Add("X-Forwarded-For", $"10.0.0.{i}");
 
-            var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory);
+            var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(factory);
             req.Headers.Add("Cookie", $"{ProjectCeres.Common.Authentication.SessionConstants.CsrfCookieName}={csrfCookie}");
             req.Headers.Add(ProjectCeres.Common.Authentication.SessionConstants.CsrfHeaderName, csrfHeader);
 
@@ -343,15 +344,15 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // Register and login share the auth-login-by-ip partition (10/min).
         // Fire 11 register attempts with unique emails; the 11th must return 429.
 
-        await Task.Delay(TimeSpan.FromSeconds(70)); // fresh bucket
-
-        var client = _factory.CreateClient();
+        // Fresh rate-limiter so prior tests don't leave the bucket saturated.
+        await using var factory = _factory.WithFreshRateLimiter();
+        var client = factory.CreateClient();
         HttpResponseMessage? last429 = null;
 
         for (int i = 1; i <= 11; i++)
         {
             // Each email is unique so duplicate-prevention does not kick in.
-            var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/register",
+            var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/register",
                 new
                 {
                     email = $"reg-rl-{i}@rl-test.local",
@@ -371,25 +372,29 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task SlidingWindow_BoundaryAttack_StillBlocked()
     {
-        // Sliding window with 4 segments × 15s. Fire some requests, wait less than
-        // window-length, fire more. The combined burst within the rolling window
-        // must still trip the login limiter (10/min bucket).
-        await AuthTestFixture.RegisterUserAsync(_factory, "slidingwindow@rl-test.local");
-        var client = _factory.CreateClient();
-
-        // Make sure we start with a clean window — wait out any residue from prior tests.
-        await Task.Delay(TimeSpan.FromSeconds(70));
+        // Sliding window: 4 segments × 1.25s = 5s window (see WithMediumLoginWindow).
+        // Fire some requests, wait less than window-length, fire more. The combined
+        // burst within the rolling window must still trip the login limiter (10/window).
+        //
+        // 5s is the smallest window that comfortably accommodates an 11-request burst
+        // (~1-3s of HTTP + Argon2id overhead on the dummy-hash path) without the
+        // early requests aging out before the 11th lands.
+        await using var factory = _factory.WithMediumLoginWindow();
+        await AuthTestFixture.RegisterUserAsync(factory, "slidingwindow@rl-test.local");
+        var client = factory.CreateClient();
 
         for (int i = 0; i < 5; i++)
-            await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
                 new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
-        await Task.Delay(TimeSpan.FromSeconds(25));
+        // 20% of 5s test window — straddles a segment boundary without falling out of
+        // the rolling window even with ~2s of HTTP overhead for the 11 requests.
+        await Task.Delay(TimeSpan.FromMilliseconds(1000));
         for (int i = 0; i < 5; i++)
-            await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
                 new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
-        var eleventh = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+        var eleventh = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
             new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         eleventh.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
-            "10 requests within the 60s sliding window should saturate the login bucket; the 11th must be rejected");
+            "10 requests within the 5s test sliding window should saturate the login bucket; the 11th must be rejected");
     }
 }

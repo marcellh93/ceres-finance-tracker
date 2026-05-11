@@ -26,6 +26,98 @@ namespace ProjectCeres.Tests.Integration;
 /// </summary>
 public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplicationFactory
 {
+    // No test-window compression: each test that needs a fresh limiter state
+    // builds a derived inner host via WithFreshRateLimiter() below, which gives
+    // an empty middleware partition without sleeping. The window stays at production
+    // 60s; the fresh-host pattern is the community-recommended alternative when
+    // System.Threading.RateLimiting cannot accept TimeProvider
+    // (https://github.com/dotnet/runtime/issues/52079).
+    // See project memory project_test_suite_performance.md.
+
+    /// <summary>
+    /// Returns a derived factory with a brand-new inner WebHost — and therefore a
+    /// brand-new <see cref="Microsoft.AspNetCore.RateLimiting.RateLimitingMiddleware"/>
+    /// holding fresh, empty rate-limit partition state. Use this at the start of any
+    /// test in the RateLimitTests collection that depends on the limiter starting
+    /// fresh. Replaces the prior pattern of `Task.Delay(70s)` waiting for the
+    /// production-scale window to expire.
+    /// </summary>
+    public WebApplicationFactory<Program> WithFreshRateLimiter() =>
+        this.WithWebHostBuilder(_ => { });
+
+    /// <summary>
+    /// Returns a derived factory with a brand-new inner WebHost AND the
+    /// AuthLoginByIp rate-limit policy reconfigured to use a 1-second sliding
+    /// window. Use this ONLY for tests whose semantics require the window to
+    /// actually expire (e.g. <c>Login_LimiterResetsAfterWindow</c>), so they can
+    /// wait ~1.1s instead of 70s. Other policies stay at production 60s.
+    /// </summary>
+    public WebApplicationFactory<Program> WithShortLoginWindow() =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(opts =>
+                {
+                    var type = opts.GetType();
+                    var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+                    var policyMap = type.GetProperty("PolicyMap", flags)!.GetValue(opts)!;
+                    var removeFromPolicy = policyMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
+                    removeFromPolicy.Invoke(policyMap, new object[] { AuthRateLimitPolicies.AuthLoginByIp });
+
+                    opts.AddPolicy(AuthRateLimitPolicies.AuthLoginByIp, httpContext =>
+                    {
+                        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                        return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
+                        {
+                            PermitLimit = 10,
+                            Window = TimeSpan.FromSeconds(1),
+                            SegmentsPerWindow = 2,
+                            QueueLimit = 0,
+                        });
+                    });
+                });
+            }));
+
+    /// <summary>
+    /// 1.1s delay matching the short login window in <see cref="WithShortLoginWindow"/>.
+    /// </summary>
+    public static readonly TimeSpan ShortLoginWindowClearDelay = TimeSpan.FromMilliseconds(1100);
+
+    /// <summary>
+    /// Returns a derived factory whose AuthLoginByIp policy uses a 5-second window
+    /// (instead of production 60s OR the 1s in <see cref="WithShortLoginWindow"/>).
+    /// 5s is the smallest window that comfortably accommodates an 11-request test
+    /// burst (~1-3s of HTTP + Argon2id overhead) while still being 12× faster than
+    /// production. Use ONLY for tests that need the window LARGER than test
+    /// execution but SHORTER than production — e.g. the sliding-window-boundary
+    /// attack scenario.
+    /// </summary>
+    public WebApplicationFactory<Program> WithMediumLoginWindow() =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(opts =>
+                {
+                    var type = opts.GetType();
+                    var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+                    var policyMap = type.GetProperty("PolicyMap", flags)!.GetValue(opts)!;
+                    var removeFromPolicy = policyMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
+                    removeFromPolicy.Invoke(policyMap, new object[] { AuthRateLimitPolicies.AuthLoginByIp });
+
+                    opts.AddPolicy(AuthRateLimitPolicies.AuthLoginByIp, httpContext =>
+                    {
+                        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                        return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
+                        {
+                            PermitLimit = 10,
+                            Window = TimeSpan.FromSeconds(5),
+                            SegmentsPerWindow = 4,
+                            QueueLimit = 0,
+                        });
+                    });
+                });
+            }));
+
     /// <summary>
     /// Returns a derived factory with a fresh, empty <see cref="IMemoryCache"/> singleton.
     /// Use this for per-email rate-limit tests so each test starts with a clean bucket
