@@ -109,6 +109,8 @@ builder.Services.AddScoped<Argon2idPasswordHasher>();
 builder.Services.AddScoped<PersistentTokenService>();
 builder.Services.AddScoped<PasswordResetTokenGenerator>();
 builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<EmailChangeTokenGenerator>();
+builder.Services.AddScoped<EmailChangeService>();
 builder.Services.AddMemoryCache();
 
 if (builder.Environment.IsDevelopment())

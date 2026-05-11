@@ -6,6 +6,16 @@
 
 #### Added
 
+**Authentication (Stage 6.12 — Email-address-change flow, 2026-05-10)**
+- `POST /api/auth/email-change/request` (authenticated, `[RequireRecentAuth]`) — issues a 30-min VerifyNew token to the new address and a 7-day RevokeOld token to the old address; supersedes any prior pending pair
+- `POST /api/auth/email-change/confirm` (anonymous, token-gated) — rewrites `Email` + `NormalizedEmail` + `UserName` + `NormalizedUserName`, sets `EmailConfirmed = true`, consumes both sibling rows atomically, revokes all `UserSession` rows, regenerates `SecurityStamp`, sends notifications to both new and old addresses; does NOT clear lockout (explicit divergence from password-reset)
+- `POST /api/auth/email-change/revoke` (anonymous, token-gated) — consumes both sibling rows, leaves `user.Email` UNCHANGED, notifies old address only; sessions and `SecurityStamp` untouched
+- `EmailChangeToken` entity with `Purpose` discriminator + `AddEmailChangeTokens` migration (single table, index parity with `PasswordResetTokens`)
+- `EmailChangeService` with per-user `SemaphoreSlim` concurrency, per-new-email `MemoryCache` rate gate (5/hour)
+- Cross-feature: a successful `/api/auth/password-reset/confirm` now atomically cancels any pending email-change for the same user and notifies the old address — closes the window where an attacker-initiated change with a still-live verify token could survive a victim's password-reset
+- Canonical error codes: `INVALID_EMAIL_CHANGE_TOKEN` (401), `EMAIL_ALREADY_IN_USE` (422), `EMAIL_UNCHANGED` (422)
+- 37-test integration ship-gate under `ProjectCeres.Tests/Integration/Authentication/EmailChange*`
+
 **Design System**
 - OKLCH color palette (light + dark) covering background, foreground, card, popover, primary (deep teal), secondary, muted, accent (pale teal), destructive (rose), success (emerald), warning (amber), info (sky), border, input, ring; tokens defined in `src/index.css` and aliased via `@theme inline`
 - Inter Variable + IBM Plex Mono fonts self-hosted via `@fontsource-variable/inter` and `@fontsource/ibm-plex-mono`

@@ -314,6 +314,28 @@ public sealed class PasswordResetService
                 .Where(s => s.UserId == user.Id && s.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, DateTime.UtcNow), ct);
 
+            // Cancel any pending email-change for this user. Reasoning: a password reset
+            // is itself a recovery/compromise signal. If an attacker initiated /email-change/request
+            // before being reset out, leaving the verify token live for up to 30 minutes would let
+            // them complete the takeover after the legitimate user resets. Stage 6.12.
+            var hadPendingEmailChange = await _db.EmailChangeTokens
+                .AnyAsync(t => t.UserId == user.Id && t.ConsumedAt == null, ct);
+            if (hadPendingEmailChange)
+            {
+                await _db.EmailChangeTokens
+                    .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+
+                try
+                {
+                    await _email.SendAsync(BuildEmailChangeCancelledByPasswordResetEmail(user.Email!), ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send email-change-cancelled-by-password-reset email.");
+                }
+            }
+
             // SecurityStamp regen — invalidates any in-flight Identity cookies via SecurityStampValidator.
             await _userManager.UpdateSecurityStampAsync(user);
 
@@ -340,6 +362,25 @@ public sealed class PasswordResetService
         {
             sem.Release();
         }
+    }
+
+    private static EmailMessage BuildEmailChangeCancelledByPasswordResetEmail(string to)
+    {
+        const string subject = "Pending email change cancelled";
+        const string bodyText = """
+            Your Project Ceres password was just reset. Any pending change to your
+            account email address has been cancelled as a precaution.
+
+            Your account email address is unchanged.
+
+            If you did not reset your password, contact support immediately.
+            """;
+        const string bodyHtml = """
+            <p>Your Project Ceres password was just reset. Any pending change to your account email address has been cancelled as a precaution.</p>
+            <p>Your account email address is unchanged.</p>
+            <p>If you did not reset your password, contact support immediately.</p>
+            """;
+        return new EmailMessage(to, subject, bodyHtml, bodyText);
     }
 
     private static EmailMessage BuildChangedEmail(string to)

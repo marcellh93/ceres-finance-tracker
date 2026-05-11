@@ -14,11 +14,14 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationTests")]
-public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFactory>
+public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
     public PasswordResetRequestTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -61,14 +64,18 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
     }
 
     // ── Test #7 ─────────────────────────────────────────────────────────────
-    // Constant-time defence: known vs unknown branch mean wall-clock diff < 200ms.
-    // Threshold is 200ms (not 50ms from the original spec) because the test environment
-    // shows per-iteration variance that can exceed 50ms. The actual constant-time
-    // defence is provided by RunDummyHash equalising the dominant Argon2id cost;
-    // the threshold here guards only against gross regressions (e.g. RunDummyHash
-    // being removed entirely from the unknown branch).
+    // Constant-time defence: known vs unknown branch median wall-clock diff < 200ms.
+    // Uses median, not mean: under load, mean is skewed by single-outlier GC pauses
+    // and thread-pool contention with sibling auth tests in the IntegrationTests
+    // collection. Median ignores those outliers, which is what we actually care about
+    // for constant-time — the property is per-call indistinguishability, not
+    // average-case indistinguishability.
+    //
+    // The actual constant-time defence is provided by RunDummyHash equalising the
+    // dominant Argon2id cost; the threshold here guards only against gross
+    // regressions (e.g. RunDummyHash being removed entirely from the unknown branch).
     // Each iteration registers a fresh user so the per-email rate gate (5/hour) is
-    // never tripped across the warm-up + 5 measurement iterations.
+    // never tripped across the warm-up + 7 measurement iterations.
     [Fact]
     public async Task Request_with_unknown_email_returns_204_with_same_timing()
     {
@@ -81,27 +88,40 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         await Hit(factory, client, warmupKnownEmail);
         await Hit(factory, client, $"unknown-warmup-{Guid.NewGuid():N}@example.com");
 
-        var knownTimings = new List<long>();
-        var unknownTimings = new List<long>();
-        for (var i = 0; i < 5; i++)
+        // 7 iterations so a single outlier (e.g. one GC pause) doesn't dominate
+        // the median window; trimming the top 1 sample post-hoc is also tolerated.
+        const int iterations = 7;
+        var knownTimings = new List<long>(iterations);
+        var unknownTimings = new List<long>(iterations);
+        for (var i = 0; i < iterations; i++)
         {
-            // Fresh user per iteration — stays under the 5/hour per-email rate gate.
             var knownEmail = $"req-known-timing-{i}-{Guid.NewGuid():N}@example.com";
             await AuthTestFixture.RegisterUserAsync(factory, knownEmail);
             knownTimings.Add(await Measure(factory, client, knownEmail));
             unknownTimings.Add(await Measure(factory, client, $"unknown-{Guid.NewGuid():N}@example.com"));
         }
 
-        var meanKnown = knownTimings.Average();
-        var meanUnknown = unknownTimings.Average();
-        var diffMs = Math.Abs(meanKnown - meanUnknown);
+        var medianKnown = Median(knownTimings);
+        var medianUnknown = Median(unknownTimings);
+        var diffMs = Math.Abs(medianKnown - medianUnknown);
 
         diffMs.Should().BeLessThan(200,
-            "constant-time defence requires |mean diff| < 200ms; " +
+            "constant-time defence requires |median diff| < 200ms; " +
             "got known={0}ms unknown={1}ms diff={2}ms. " +
-            "Threshold reflects empirical wall-clock variance in test environment; " +
-            "constant-time defence is provided by RunDummyHash equalising the dominant Argon2id cost.",
-            meanKnown, meanUnknown, diffMs);
+            "Threshold reflects empirical wall-clock variance under integration-test " +
+            "load; constant-time defence is provided by RunDummyHash equalising the " +
+            "dominant Argon2id cost.",
+            medianKnown, medianUnknown, diffMs);
+    }
+
+    private static double Median(List<long> values)
+    {
+        var sorted = values.OrderBy(v => v).ToList();
+        var n = sorted.Count;
+        if (n == 0) throw new InvalidOperationException("median of empty list");
+        return n % 2 == 1
+            ? sorted[n / 2]
+            : (sorted[(n / 2) - 1] + sorted[n / 2]) / 2.0;
     }
 
     private async Task<long> Measure(WebApplicationFactory<Program> factory, HttpClient client, string email)

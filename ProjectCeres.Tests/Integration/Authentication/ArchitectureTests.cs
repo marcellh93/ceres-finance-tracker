@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
@@ -412,5 +413,88 @@ public class ArchitectureTests
         if (!System.IO.File.Exists(resolved))
             throw new System.IO.FileNotFoundException($"Could not resolve controller source: {resolved}");
         return resolved;
+    }
+
+    // -----------------------------------------------------------------------
+    // Stage 6.12 — EmailChangeController architecture tests
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void EmailChangeController_has_correct_attribute_matrix()
+    {
+        var type = typeof(ProjectCeres.Controllers.Api.EmailChangeController);
+
+        // /request: [RequireRecentAuth] (which inherits AuthorizeAttribute and
+        // registers the "RecentAuth" policy = RequireAuthenticatedUser + freshness gate).
+        // A separate [Authorize] would be redundant and would trip the
+        // singular-attribute lookup in Every_controller_action_declares_authorization_intent.
+        var request = type.GetMethod("RequestChange");
+        request.Should().NotBeNull();
+        request!.GetCustomAttributes(true)
+            .Any(a => a is RequireRecentAuthAttribute)
+            .Should().BeTrue("RequestChange must carry [RequireRecentAuth]");
+        request.GetCustomAttributes(true)
+            .Any(a => a is AllowAnonymousAttribute)
+            .Should().BeFalse("RequestChange must NOT be [AllowAnonymous]");
+
+        // /confirm and /revoke: [AllowAnonymous] + [EnableRateLimiting(AuthLoginByIp)]
+        foreach (var name in new[] { "ConfirmChange", "RevokeChange" })
+        {
+            var mi = type.GetMethod(name);
+            mi.Should().NotBeNull($"EmailChangeController must define {name}");
+            mi!.GetCustomAttributes(true)
+                .Any(a => a is AllowAnonymousAttribute)
+                .Should().BeTrue($"{name} must be [AllowAnonymous] — token IS the auth");
+            mi.GetCustomAttributes(true)
+                .OfType<EnableRateLimitingAttribute>()
+                .Any(a => a.PolicyName == AuthRateLimitPolicies.AuthLoginByIp)
+                .Should().BeTrue($"{name} must be [EnableRateLimiting(AuthLoginByIp)]");
+        }
+    }
+
+    [Fact]
+    public void EmailChangeController_does_not_call_PasswordHasher_directly()
+    {
+        // The controller depends only on EmailChangeService — never on Argon2idPasswordHasher
+        // directly; hashing is the service's responsibility.
+        var type = typeof(ProjectCeres.Controllers.Api.EmailChangeController);
+        var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
+        fields.Select(f => f.FieldType)
+            .Should().NotContain(typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+                "the controller must delegate token hashing to EmailChangeService");
+        fields.Select(f => f.FieldType)
+            .Should().NotContain(typeof(ProjectCeres.Common.Authentication.EmailChangeTokenGenerator),
+                "the controller must delegate token generation to EmailChangeService");
+    }
+
+    [Fact]
+    public void EmailChangeService_methods_take_CancellationToken()
+    {
+        var type = typeof(ProjectCeres.Common.Authentication.EmailChangeService);
+        var publicMethods = type
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(m => m.Name is "RequestAsync" or "ConfirmAsync" or "RevokeAsync")
+            .ToList();
+
+        publicMethods.Should().HaveCount(3,
+            "EmailChangeService must expose RequestAsync, ConfirmAsync, RevokeAsync");
+
+        foreach (var m in publicMethods)
+        {
+            var lastParam = m.GetParameters().LastOrDefault();
+            lastParam.Should().NotBeNull($"{m.Name} must have at least one parameter");
+            lastParam!.ParameterType.Should().Be(typeof(CancellationToken),
+                $"{m.Name} must end with CancellationToken so callers can propagate cancellation");
+        }
+    }
+
+    [Fact]
+    public void EmailChangeController_does_not_have_class_level_AllowAnonymous()
+    {
+        // Class-level [AllowAnonymous] would defeat the [Authorize] + [RequireRecentAuth]
+        // gate on /request. Pin: every action declares its own auth intent.
+        var type = typeof(ProjectCeres.Controllers.Api.EmailChangeController);
+        type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
+            .Should().BeEmpty("EmailChangeController must NOT carry class-level [AllowAnonymous]");
     }
 }

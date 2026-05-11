@@ -13,11 +13,14 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationTests")]
-public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicationFactory>
+public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
     public PasswordResetConfirmNoMfaTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => AuthTestTokenCleanup.DeleteAllTestTokensAsync(_factory);
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;

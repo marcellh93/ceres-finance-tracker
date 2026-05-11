@@ -37,6 +37,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureSessionEntities(modelBuilder);
         ConfigureMfaEntities(modelBuilder);
         ConfigurePasswordResetEntities(modelBuilder);
+        ConfigureEmailChangeEntities(modelBuilder);
         SeedData(modelBuilder);
     }
 
@@ -113,6 +115,19 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasIndex(e => new { e.UserId, e.ConsumedAt });
             b.HasIndex(e => e.ExpiresAt);
             b.Property(e => e.TokenHash).HasMaxLength(512);
+        });
+    }
+
+    private static void ConfigureEmailChangeEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmailChangeToken>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.UserId, e.ConsumedAt });
+            b.HasIndex(e => e.ExpiresAt);
+            b.Property(e => e.NewEmail).HasMaxLength(256);
+            b.Property(e => e.TokenHash).HasMaxLength(512);
+            b.Property(e => e.Purpose).HasConversion<int>();
         });
     }
 

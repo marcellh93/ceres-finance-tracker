@@ -320,14 +320,21 @@ Password reset is a high-risk flow because it is the most common path attackers 
 
 ### Email Address Change
 
+> **Status: ✅ Shipped (Stage 6.12, 2026-05-10).** Endpoints `POST /api/auth/email-change/request|confirm|revoke`. See `docs/superpowers/specs/2026-05-10-stage-6-12-email-change-design.md`; ship-gate covered by 37 integration tests under `ProjectCeres.Tests/Integration/Authentication/EmailChange*`.
+
 Email change is a high-risk flow because changing the email changes the account recovery address. A compromised session that changes the email locks the legitimate user out permanently.
 
-- **Reauthentication required** before initiating an email change (already covered by the sensitive-operations policy above).
+- **Reauthentication required** before initiating an email change (already covered by the sensitive-operations policy above). Implemented via `[RequireRecentAuth]` on `POST /api/auth/email-change/request`; `/confirm` and `/revoke` are anonymous because the email-link token IS the auth.
 - **Dual-address verification:**
   1. Send a verification link to the **new** address (256-bit token, single-use, 30-minute expiry). The new address becomes the address of record only after this link is clicked.
   2. Send a notification to the **old** address immediately, including a "revoke this change" link (256-bit token, single-use, 7-day expiry). If the legitimate user did not initiate the change, they have 7 days to cancel it.
   3. Until the new address is verified, the old address remains the address of record and receives all security notifications.
 - Notify the old address on successful completion of the change.
+- **Per-user concurrency:** a `SemaphoreSlim` keyed by `userId` serialises supersede + insert in `/request`, the Identity update + sibling consume + session revoke in `/confirm`, and the dual-row consume in `/revoke`. Two concurrent `/confirm` calls with the same raw token resolve to one `204` and one `401 INVALID_EMAIL_CHANGE_TOKEN`.
+- **Rate limiting:** `/confirm` and `/revoke` use the global per-IP `AuthLoginByIp` policy (10/min/IP). `/request` is reauth-gated and additionally caps service-side at 5/hour per **new** email (`MemoryCache` sliding window) — the abuse vector is spamming a known address with verification mail.
+- **Cross-feature with password reset:** a successful `/api/auth/password-reset/confirm` atomically cancels any pending email-change for the same user (sets `ConsumedAt` on every active `EmailChangeToken` row in the same transaction as the password write) and sends a "Pending email change cancelled" notification to the old address. Reasoning: a password reset is itself a recovery/compromise signal; an attacker-initiated change with a still-live verify token must not survive the legitimate user's recovery.
+- **Session revocation policy:** `/confirm` revokes all `UserSession` rows + regenerates `SecurityStamp`; `/revoke` does NEITHER (revoke is a cancel, not a security event for the legitimate user).
+- **Lockout policy:** `/confirm` does NOT clear lockout (`LockoutEnd`, `AccessFailedCount` unchanged) — explicit divergence from password-reset, because email proof is not equivalent to password recovery.
 
 ### Security Event Notifications
 
