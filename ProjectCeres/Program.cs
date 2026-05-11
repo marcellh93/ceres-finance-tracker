@@ -123,6 +123,7 @@ if (builder.Environment.IsDevelopment())
 builder.Services.AddScoped<MfaBackupCodeService>();
 builder.Services.AddScoped<TotpReplayGuard>();
 builder.Services.AddScoped<FailedLoginRecorder>();
+builder.Services.AddScoped<IAuditLogWriter, AuditLogWriter>();
 builder.Services.AddSingleton<IAuthorizationHandler, RecentAuthRequirementHandler>();
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, RecentAuthMiddlewareResultHandler>();
 
