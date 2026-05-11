@@ -227,12 +227,21 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     {
         var email = $"logout-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
-        var client = _factory.CreateClient();
-        await AuthTestFixture.LoginViaHttpAsync(_factory, client, email, AuthTestFixture.ValidPassword);
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var sessionCookie = await AuthTestFixture.LoginViaHttpAsync(_factory, client, email, AuthTestFixture.ValidPassword);
 
         await ClearAuditAsync(_factory, user.Id);
 
-        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/logout", new { });
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, user.Id);
+        var logoutReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout")
+        {
+            Content = JsonContent.Create(new { }),
+        };
+        logoutReq.Headers.Add("Cookie",
+            $"{SessionConstants.SessionCookieName}={sessionCookie}; {SessionConstants.CsrfCookieName}={csrfCookie}");
+        logoutReq.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader);
+        var resp = await client.SendAsync(logoutReq);
         resp.EnsureSuccessStatusCode();
 
         var rows = await ReadAuditAsync(_factory, user.Id);
@@ -242,10 +251,25 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Register_writes_Registered()
     {
+        // Register through the real HTTP endpoint (the test-fixture helper bypasses
+        // the controller, so it would never exercise the audit call site).
         var email = $"register-{Guid.NewGuid():N}{EmailDomain}";
-        var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
+        var client = _factory.CreateClient();
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/register",
+            new { email, password = AuthTestFixture.ValidPassword });
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var rows = await ReadAuditAsync(_factory, user.Id);
+        // Resolve the user id from the just-created AspNetUser row.
+        Guid userId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await um.FindByEmailAsync(email);
+            user.Should().NotBeNull();
+            userId = user!.Id;
+        }
+
+        var rows = await ReadAuditAsync(_factory, userId);
         rows.Should().ContainSingle().Which.Action.Should().Be(AuditLogAction.Registered);
     }
 
@@ -416,12 +440,42 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Mfa_enroll_verify_writes_MfaEnrolled()
     {
+        // Go through the real HTTP endpoint so the controller-level audit call fires.
+        // The fixture helper EnrollUserMfaAsync bypasses the controller.
         var email = $"mfa-enr-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
-        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+
+        // Generate an authenticator key + compute the matching TOTP code, then post
+        // to /api/auth/mfa/enroll/verify with a fresh-reauth cookie.
+        string seed;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var fresh = await um.FindByIdAsync(user.Id.ToString());
+            await um.ResetAuthenticatorKeyAsync(fresh!);
+            seed = (await um.GetAuthenticatorKeyAsync(fresh!))!;
+        }
+
+        await ClearAuditAsync(_factory, user.Id);
+
+        var totp = AuthTestFixture.ComputeCurrentTotpCode(seed);
+        var freshUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var cookie = await AuthTestFixture.MintAuthCookieWithLastReauthAt(_factory, user, freshUnix);
+        var (csrf, header) = AuthTestFixture.MintCsrf(_factory, user.Id);
+
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/enroll/verify")
+        {
+            Content = JsonContent.Create(new { code = totp }),
+        };
+        req.Headers.Add("Cookie",
+            $"{SessionConstants.SessionCookieName}={cookie}; {SessionConstants.CsrfCookieName}={csrf}");
+        req.Headers.Add(SessionConstants.CsrfHeaderName, header);
+        var resp = await client.SendAsync(req);
+        resp.EnsureSuccessStatusCode();
 
         var rows = await ReadAuditAsync(_factory, user.Id);
-        rows.Should().Contain(r => r.Action == AuditLogAction.MfaEnrolled);
+        rows.Should().ContainSingle().Which.Action.Should().Be(AuditLogAction.MfaEnrolled);
     }
 
     [Fact]
