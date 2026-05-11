@@ -1,3 +1,5 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
 public enum EmailChangeTokenPurpose
@@ -16,7 +18,7 @@ public enum EmailChangeTokenPurpose
 /// TokenHash is Argon2id-hashed (per-row salt). ConsumedAt is set synchronously
 /// inside the same DB transaction as the Identity update or revoke.
 /// </summary>
-public sealed class EmailChangeToken
+public sealed class EmailChangeToken : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

@@ -1,3 +1,5 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace ProjectCeres.Models;
 /// CodeHash). Single-use: UsedAt is set on first successful verify.
 /// Regeneration deletes all existing rows for the user.
 /// </summary>
-public sealed class UserMfaBackupCode
+public sealed class UserMfaBackupCode : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

@@ -1,6 +1,8 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
-public sealed class UserBlockedIp
+public sealed class UserBlockedIp : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

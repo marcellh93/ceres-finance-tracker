@@ -1,6 +1,8 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
-public sealed class AuditLog
+public sealed class AuditLog : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

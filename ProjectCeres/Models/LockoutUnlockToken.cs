@@ -1,6 +1,8 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
-public sealed class LockoutUnlockToken
+public sealed class LockoutUnlockToken : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

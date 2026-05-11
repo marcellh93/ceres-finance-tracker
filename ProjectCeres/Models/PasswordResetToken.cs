@@ -1,3 +1,5 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace ProjectCeres.Models;
 /// index so /confirm finds the row in O(1) instead of running Argon2id over
 /// every candidate (Stage 6.15).
 /// </summary>
-public sealed class PasswordResetToken
+public sealed class PasswordResetToken : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

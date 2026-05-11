@@ -1,3 +1,5 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Models;
 
 /// <summary>
@@ -6,7 +8,7 @@ namespace ProjectCeres.Models;
 /// existing row in the window, then (b) insert the new row + opportunistic-purge old
 /// rows. Purge happens inline on every call instead of as a scheduled job.
 /// </summary>
-public sealed class TotpReplayEntry
+public sealed class TotpReplayEntry : IUserOwned
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
