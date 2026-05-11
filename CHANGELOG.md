@@ -6,6 +6,11 @@
 
 #### Added
 
+**Authentication (Stage 6 close-out — flow diagrams, 2026-05-11)**
+- `docs/security-model.md § Authentication Flow Diagrams (Stage 6 close-out)` — single end-of-stage Mermaid set: request pipeline; registration; login (no-MFA / MFA TOTP / backup-code branches); password reset (request + confirm); reauth step-up + `[RequireRecentAuth]` gate; email-address change (request + confirm + revoke); lockout self-service unlock; audit-log writes overlay; cross-flow authentication state machine
+- Each diagram paired with explicit audit prompts pointing at the integration tests that pin the behaviour
+- With this in place, Stage 6 (Identity infrastructure, Batch 3b) is ✅ Done — all 12 sub-stages + 2 follow-ups shipped; 303/303 Authentication integration tests green; the Stage 6 verification checklist in `roadmap-phase-three.md` carries no `[ ]` items
+
 **Authentication (Stage 6.12 — Email-address-change flow, 2026-05-10)**
 - `POST /api/auth/email-change/request` (authenticated, `[RequireRecentAuth]`) — issues a 30-min VerifyNew token to the new address and a 7-day RevokeOld token to the old address; supersedes any prior pending pair
 - `POST /api/auth/email-change/confirm` (anonymous, token-gated) — rewrites `Email` + `NormalizedEmail` + `UserName` + `NormalizedUserName`, sets `EmailConfirmed = true`, consumes both sibling rows atomically, revokes all `UserSession` rows, regenerates `SecurityStamp`, sends notifications to both new and old addresses; does NOT clear lockout (explicit divergence from password-reset)

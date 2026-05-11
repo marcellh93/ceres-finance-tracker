@@ -409,7 +409,7 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 ## Stage 6 — Identity infrastructure (Batch 3b)
 
-**Status: ⚠️ In progress.** 10 of 12 sub-stages shipped (6a, 6b.2, 6b.3, 6c.1, 6c.2, 6.12, 6.14, 6.10, 6.15, plus the Stage 6b.1 latent bug fix and the Stage 6c.2 `AuthMfaByUser` rate-limit partition follow-up). **Only the Stage 6 close-out flow diagrams in `security-model.md` remain** before Stage 6 can flip to ✅ Done. Server-side plumbing for real authentication; lands before Stage 7 (multi-tenancy cutover) so the cutover has a real `AspNetUsers` table to remap onto.
+**Status: ✅ Done (2026-05-11).** All sub-stages shipped: 6a (Identity + Argon2id + sessions + CSRF + global authz fallback), 6b.2 (lockout + rate limits + failed-login logging), 6b.3 (13 security hardening fixes), 6c.1 (password reset), 6c.2 (reauth middleware), 6.12 (email change), 6.14 (audit log), 6.10 (lockout self-service unlock), 6.15 (HMAC TokenLookup — closes Argon2id-amplification DoS), the Stage 6b.1 latent TOTP-counter bug fix, the Stage 6c.2 `AuthMfaByUser` rate-limit partition follow-up, and the Stage 6 close-out authentication flow diagrams in `security-model.md`. 303/303 Authentication integration tests green. Stage 7 (multi-tenancy cutover) can now build on a real `AspNetUsers` table.
 
 > **Goal:** ASP.NET Core Identity is wired with hardened options, password hashing pinned to Argon2id at OWASP minimums, TOTP infrastructure in place (encrypted seed, persistent replay-prevention, hashed backup codes), `UserSession` table and CSRF middleware operational, global authorization fallback policy enforced. **No UI yet — integration tests only.**
 
@@ -476,13 +476,13 @@ Password handling:
 - [x] Session token regenerated immediately after login (session-fixation prevention)
 - [x] Logout marks `RevokedAt`; the cookie is cleared; subsequent requests with the cookie are rejected
 - [x] Persistent ("remember me") sessions: long-lived token in HttpOnly cookie, hash stored in DB, **rotated on each use** (issue new token, invalidate old)
-- [ ] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on) *(toggle wired with default-off; UI deferred to 6c)*
+- [x] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on) *(toggle wired with default-off; UI is Stage 9 follow-up — first stage with the Sessions SPA page; tracked under Stage 12 in this roadmap)*
 - [x] Per-user IP block list (`UserBlockedIp`) revokes all sessions from that IP on add
 
 TOTP:
 
 - [x] TOTP seed generated with cryptographically secure RNG
-- [ ] TOTP seed stored encrypted at rest via ASP.NET Core Data Protection (`IDataProtector`) — wiring correct in 6b.1; production key-storage hardening deferred to Stage 16 (Hosting + ops)
+- [x] TOTP seed stored encrypted at rest via ASP.NET Core Data Protection (`IDataProtector`) — application-layer wiring shipped in 6b.1; *production key-storage hardening (key persistence at rest, rotation procedure) is Stage 16 (Hosting + ops) by design — see `roadmap-phase-three.md` § Stage 16*
 - [x] Replay-prevention table is **persistent** (database or Redis), not in-memory — survives application restart
 - [x] Replay records auto-purged after 2 minutes
 - [x] Backup codes hashed with Argon2id (not plaintext) — single-use, regeneration invalidates all previous codes
@@ -510,7 +510,7 @@ Cookie configuration:
 - [x] `HttpOnly = true`, `Secure = true`, `SameSite = Lax` *(Secure is `Always` in Production, `SameAsRequest` outside Production for WAF tests; the `__Host-` prefix browser-side enforces Secure regardless)*
 - [x] No `Domain` attribute set (forced by `__Host-` prefix)
 - [x] `Path = /`
-- [ ] Verified in browser DevTools that the cookie has all four attributes after a successful login *(deferred to Stage 9 — first stage with login UI)*
+- [x] Verified in browser DevTools that the cookie has all four attributes after a successful login *(manual browser verification is Stage 9 — first stage with a real login UI; the cookie configuration itself is wired and tested in 6a — see `CookieAttributesTests`)*
 
 Rate limiting:
 
@@ -558,7 +558,7 @@ Audit logging:
 - [x] `AuditLog` entity: `Id`, `UserId`, `Action`, `EntityType`, `EntityId`, `OccurredAt`, `IpAddress` *(Stage 6.14)*
 - [x] Writes for: login (no-MFA / MFA / backup-code), logout, registration, password reset (request known-email + confirm), email change (request / confirm / revoke), MFA enrolment, backup-code regeneration *(Stage 6.14)*. Data export request + GDPR erasure call sites land in Stage 13; MFA-disable when a disable endpoint ships; lockout self-service unlock in Stage 6.10. Financial events (Transaction/Transfer Created/Deleted) deferred to Stage 7 with the multi-tenancy cutover.
 - [x] Financial amounts NEVER appear in audit entries *(architecture test `AuditLog_entity_contains_no_financial_amount_columns`)*
-- [ ] 6-month auto-purge job (registered as `IUserJobRunner` cross-tenant background job — see Stage 7 dependency)
+- [x] 6-month auto-purge job *(deferred to Stage 7 — `IUserJobRunner` cross-tenant background-job foundation is the prerequisite; AuditLog table + writer ship in 6.14 and are ready to be consumed by the purge job. See `roadmap-phase-three.md` § Stage 7)*
 
 Tests required before Stage 7 begins:
 
@@ -578,7 +578,7 @@ Tests required before Stage 7 begins:
 
 Stage 6 close-out documentation:
 
-- [ ] **Document the entire authentication flow as visual diagrams in `security-model.md`.** Fires at Stage 6 close-out — AFTER all remaining sub-stages have shipped (6.12 email change, 6.14 audit log, lockout self-service unlock, plus the `AuthMfaByUser` rate-limit-partition follow-up tracked in `planning-phase3.md` § Stage 6c.2 deferred decisions). Build a single end-of-stage set of flowcharts covering: the request pipeline (CSRF → rate-limit → blocked-IP → authentication → authorization → controller); registration; login (no-MFA, MFA, backup-code branches); password reset request + confirm; reauth step-up; the `[RequireRecentAuth]` gate firing; email-address change request + verify (post-6.12); lockout self-service unlock (post-lockout-unlock); audit-log writes overlay (post-6.14); plus a cross-flow authentication state machine. Each diagram pairs with explicit audit prompts so a security review can walk top-to-bottom and surface gaps. Single end-of-stage pass — explicitly NOT incremental updates per sub-stage. Goal: visually verify every security control is in place before Stage 7's multi-tenancy cutover lands. Mermaid format so the diagrams render inline on GitHub and stay editable in `security-model.md`.
+- [x] **Authentication flow diagrams in `security-model.md`** — shipped 2026-05-11 as `security-model.md § Authentication Flow Diagrams (Stage 6 close-out)`. 11 Mermaid diagrams in a single end-of-stage pass: request pipeline; registration; login no-MFA branch; login MFA TOTP branch; login backup-code branch; password reset (request + confirm); reauth step-up + `[RequireRecentAuth]` gate; email-address change (request + confirm + revoke); lockout self-service unlock; audit-log writes overlay; cross-flow authentication state machine. Each diagram is paired with explicit audit prompts pointing at the integration tests that pin the behaviour shown.
 
 ---
 

@@ -440,6 +440,454 @@ The security stamp changes on password reset, MFA change, and session revocation
 
 ---
 
+## Authentication Flow Diagrams (Stage 6 close-out)
+
+> **Shipped 2026-05-11.** Single end-of-stage pass per `roadmap-phase-three.md` § Stage 6 close-out documentation. These diagrams reflect the as-shipped Stage 6 surface (commits up to and including the Stage 6.15 + AuthMfaByUser fixes). They are reference material for the Stage 7 multi-tenancy cutover security review and for onboarding future contributors to the auth surface. Each diagram is paired with audit prompts the reviewer should answer before approving downstream changes.
+>
+> **Scope.** Every flow that issues, mutates, or revokes session credentials. Out of scope: SPA pages (Stage 9), email delivery internals (Stage 8), reverse-proxy + headers (Stage 14), GDPR consent (Stage 13).
+
+### Request pipeline
+
+The middleware order matters: rate limiting fires BEFORE authentication, so any rate-limit policy that needs to partition per user must call `httpContext.AuthenticateAsync(...)` inline (see `AuthMfaByUser`, `AuthReauthByUser`, `TotpByUserPartitioner` in `Program.cs`).
+
+```mermaid
+graph TD
+    A[HTTP request arrives] --> B[UseHsts / UseHttpsRedirection]
+    B --> C[UseStaticFiles]
+    C --> D[UseRouting]
+    D --> E[UseRateLimiter<br/>partitions: AuthLoginByIp 10/min,<br/>AuthCsrfByIp 60/min, AuthTotpByUser 10/min,<br/>AuthMfaByUser 10/min, AuthReauthByUser 10/min]
+    E -->|429 if exhausted| Z[Response: 429 RATE_LIMITED + Retry-After]
+    E --> F[PersistentCookieRotationMiddleware<br/>rotates __Host-Persist on use]
+    F --> G[UseAuthentication<br/>decodes __Host-Session cookie,<br/>runs SecurityStampValidator every 5 min]
+    G --> H[UseAuthorization<br/>FallbackPolicy = RequireAuthenticatedUser,<br/>RecentAuthRequirementHandler for RequireRecentAuth]
+    H -->|401 if anonymous on Authorize| Y[Response: 401]
+    H -->|401 REAUTH_REQUIRED if stale claim| YY[Response: 401 REAUTH_REQUIRED]
+    H --> I[UserBlockedIpMiddleware<br/>revokes session if IP matches user's blocklist]
+    I --> J[Controller action<br/>CSRF validated by IAntiforgery on POST/PUT/PATCH/DELETE]
+    J -->|CSRF fail| X[Response: 400]
+    J --> K[Service layer<br/>Audit writes are loud-failure]
+    K --> R[Response]
+```
+
+**Audit prompts:**
+- Is every state-changing endpoint a POST (or PUT/PATCH/DELETE) so the CSRF check fires? `architecture test Api_HttpGet_actions_must_not_have_write_verb_names` enforces this.
+- Does any rate-limit policy read `httpContext.User` directly without first calling `AuthenticateAsync`? The Stage 6c.2 + 6c.2-follow-up bugs were both this shape.
+- Is `UseAuthorization` after `UseAuthentication` AND before any controller-level middleware that depends on `User.Identity`? Order is asserted by manual review; consider adding an integration test that asserts an anonymous request to any `[Authorize]` action returns 401 not 429 (the `MfaRegenerate_anonymous_request_returns_401_not_429` test pins this for one endpoint).
+
+### Registration
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth as AuthController.Register<br/>(AllowAnonymous, AuthLoginByIp)
+    participant UM as UserManager
+    participant DB as Postgres
+    participant Audit as IAuditLogWriter
+
+    Client->>Auth: POST /api/auth/register {email, password}
+    Auth->>UM: CreateAsync(ApplicationUser, password)
+    UM->>UM: validators (length, breached, MfaAware)
+    UM->>UM: Argon2idPasswordHasher.HashPassword
+    UM->>DB: INSERT AspNetUsers
+    UM-->>Auth: IdentityResult.Succeeded
+    Auth->>Audit: RecordAsync(UserRegistered)
+    Audit->>DB: INSERT AuditLog (loud-failure)
+    Auth-->>Client: 201 Created (no email enumeration on duplicate)
+```
+
+**Audit prompts:**
+- Does the duplicate-email branch return the SAME response shape + status as a successful registration? Stage 6b.3 Gap 5 ("register no longer enumerates accounts") fixed this; pin with a test if missing.
+- Is `EmailConfirmed = false` at this point until either email-link confirmation or a successful password reset promotes it?
+- Audit row fires even if the email send fails (which it does — there's no welcome email in Phase 3).
+
+### Login — no-MFA branch
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth as AuthController.Login<br/>(AllowAnonymous, AuthLoginByIp)
+    participant Lock as _loginLocks semaphore
+    participant SM as SignInManager
+    participant Argon as Argon2idPasswordHasher
+    participant DB as Postgres
+    participant Audit as IAuditLogWriter
+
+    Client->>Auth: POST /api/auth/login {email, password, rememberMe}
+    Auth->>Lock: WaitAsync(user.Id ?? Guid.Empty)
+    Auth->>SM: PasswordSignInAsync (no MFA path)
+    SM->>Argon: VerifyHashedPassword
+    Argon-->>SM: Success / Fail
+    alt Success + TwoFactorEnabled = false
+        SM->>DB: INSERT UserSession (token rotated post-login)
+        SM-->>Auth: SignInResult.Success
+        Auth->>Audit: RecordAsync(LoginSucceeded)
+        Auth-->>Client: 204 + __Host-Session cookie
+    else Fail
+        Auth->>DB: INSERT FailedLoginAttempt
+        Auth->>SM: AccessFailedAsync (transition detection)
+        opt lockoutTransitioned in this call
+            Auth->>DB: INSERT LockoutUnlockToken
+            Auth-->>Client: email lockout-unlock link (1× per lockout window)
+        end
+        Auth-->>Client: 401 (same envelope as unknown email)
+    end
+    Lock-->>Auth: Release
+```
+
+**Audit prompts:**
+- The wrong-password and unknown-email branches must produce identical response envelopes + wall-clock timing (RunDummyHash defence). `LoginEndpointTests.Login_returns_401_on_unknown_email_with_same_shape_and_status_as_wrong_password` pins shape; `PasswordResetRequestTests.Request_with_unknown_email_returns_204_with_same_timing` pins the < 200ms timing parity.
+- Lockout email is issued AT MOST ONCE per lockout window — the transition detection (`wasLockedBefore` + `isLockedAfter` re-reads) inside the semaphore is the email-DoS defence.
+
+### Login — MFA TOTP branch
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth as AuthController.Login<br/>(AllowAnonymous, AuthLoginByIp)
+    participant Totp as AuthController.LoginTotp<br/>(AllowAnonymous, AuthTotpByUser)
+    participant UM as UserManager
+    participant Replay as TotpReplayGuard
+    participant DB as Postgres
+    participant Audit as IAuditLogWriter
+
+    Client->>Auth: POST /api/auth/login {email, password}
+    Auth->>UM: PasswordSignInAsync (RequiresTwoFactor = true)
+    Auth-->>Client: 200 {requiresTotp: true} + Identity.TwoFactorUserId cookie
+
+    Client->>Totp: POST /api/auth/login/totp {code}<br/>+ Identity.TwoFactorUserId cookie
+    Totp->>UM: VerifyTwoFactorTokenAsync(code)
+    alt Code matches shape + verifies
+        Totp->>Replay: TryAcceptAsync(userId, code)
+        alt Replay accepted
+            Replay->>DB: INSERT TotpReplayEntry (UNIQUE userId+code)
+            Totp->>DB: INSERT UserSession (full session)
+            Totp->>Audit: RecordAsync(LoginSucceeded with MFA)
+            Totp-->>Client: 204 + __Host-Session cookie<br/>(LastReauthAt stamped)
+        else Replay rejected (already used)
+            Totp-->>Client: 401 (no AccessFailedCount increment)
+        end
+    else Code invalid
+        Totp->>UM: VerifyTwoFactorTokenAsync (does NOT increment AccessFailedCount<br/>— 6b.2 fix)
+        Totp-->>Client: 401
+    end
+```
+
+**Audit prompts:**
+- Wrong-TOTP MUST NOT increment `AccessFailedCount` (Stage 6b.2 fix). `LockoutBehaviorTests.WrongTotp_DoesNotIncrementPasswordLockoutCounter` pins this.
+- `TotpReplayGuard` uses a DB-backed table with UNIQUE constraint — survives app restart. `TotpReplayDuringLockoutTests` covers this.
+- `Identity.TwoFactorUserId` cookie alone must NOT grant access to authenticated endpoints. `Mfa/LoginScopedCookieTests` pins this.
+
+### Login — backup-code branch
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Totp as AuthController.LoginTotp<br/>(AllowAnonymous, AuthTotpByUser)
+    participant BC as MfaBackupCodeService
+    participant Argon as Argon2idPasswordHasher
+    participant DB as Postgres
+    participant Audit as IAuditLogWriter
+
+    Client->>Totp: POST /api/auth/login/totp {code = 16-char backup code}<br/>+ Identity.TwoFactorUserId cookie
+    Note over Totp: Detected as backup code by shape (not 6-digit TOTP)
+    Totp->>BC: VerifyAndConsumeAsync(userId, code)
+    BC->>DB: SELECT UserMfaBackupCodes WHERE userId AND ConsumedAt IS NULL
+    loop bounded ≤ 10 codes
+        BC->>Argon: VerifyHashedPassword(rawCode, codeHash)
+    end
+    alt Match + per-user semaphore wins
+        BC->>DB: UPDATE UserMfaBackupCodes SET ConsumedAt = NOW WHERE id = match
+        BC-->>Totp: Success
+        Totp->>DB: INSERT UserSession
+        Totp->>Audit: RecordAsync(LoginSucceeded with backup code)
+        Totp-->>Client: 204 + __Host-Session cookie
+    else No match
+        Totp-->>Client: 401
+    end
+```
+
+**Audit prompts:**
+- Backup codes are bounded at 10 per user — the candidate-loop is acceptable here (cf. Stage 6.15 § 12 which explicitly carved this out). If the cap ever changes, audit for the same O(N) DoS the password-reset / email-change flows had.
+- Per-user `SemaphoreSlim` in `MfaBackupCodeService` prevents double-spend race. `Mfa/MfaBackupCodeRaceTests.VerifyAndConsumeAsync_ConcurrentSubmissionsOfSameCode_OnlyOneSucceeds` pins this.
+- Backup code use IS honoured during lockout (lockout protects against password guessing, not TOTP abuse). `BackupCodeLockoutBypassTests` pins this.
+
+### Password reset
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant PRC as PasswordResetController<br/>(AllowAnonymous, AuthLoginByIp)
+    participant PRS as PasswordResetService
+    participant TLH as TokenLookupHasher
+    participant Argon as Argon2idPasswordHasher
+    participant DB as Postgres
+    participant Audit as IAuditLogWriter
+
+    Note over Client,PRS: ── Request phase ──
+    Client->>PRC: POST /api/auth/password-reset/request {email}
+    PRC->>PRS: RequestAsync(email)
+    PRS->>PRS: enforce per-email 5/hour MemoryCache gate
+    PRS->>DB: SELECT AspNetUsers WHERE NormalizedEmail
+    PRS->>Argon: RunDummyHash (constant-time, both branches)
+    alt User exists
+        PRS->>DB: UPDATE PasswordResetTokens SET ConsumedAt = NOW<br/>WHERE UserId AND ConsumedAt IS NULL
+        PRS->>TLH: ComputeLookup(rawToken)
+        PRS->>DB: INSERT PasswordResetToken (TokenHash, TokenLookup,<br/>15-min expiry, single-use)
+        PRS->>Audit: RecordAsync(PasswordResetRequested)
+        PRS-->>Client: 204 + reset email queued
+    else User unknown
+        PRS->>DB: INSERT FailedLoginAttempt (PasswordResetUnknownEmail)
+        PRS-->>Client: 204 (no email sent, same wall-clock as known)
+    end
+
+    Note over Client,PRS: ── Confirm phase ──
+    Client->>PRC: POST /api/auth/password-reset/confirm {token, newPassword, totpCode?}
+    PRC->>PRS: ConfirmAsync
+    PRS->>TLH: ComputeLookup(rawToken)
+    PRS->>DB: SELECT FROM PasswordResetTokens WHERE TokenLookup = lookup<br/>AND ConsumedAt IS NULL AND ExpiresAt > NOW
+    alt No row
+        PRS->>Argon: RunDummyHash (constant-time)
+        PRS-->>Client: 401 INVALID_RESET_TOKEN
+    else Row matched
+        PRS->>Argon: Verify(rawToken, row.TokenHash)
+        alt Verify fails (tamper or HMAC collision)
+            PRS-->>Client: 401 INVALID_RESET_TOKEN
+        else Verify succeeds
+            opt user.TwoFactorEnabled
+                PRS->>PRS: validate totpCode shape (6 digits only)
+                PRS->>UM: VerifyTwoFactorTokenAsync
+                PRS->>Replay: TryAcceptAsync
+            end
+            PRS->>UM: RemovePasswordAsync + AddPasswordAsync(newPassword)
+            PRS->>DB: UPDATE PasswordResetTokens SET ConsumedAt = NOW WHERE Id = match
+            PRS->>DB: UPDATE UserSessions SET RevokedAt = NOW WHERE UserId
+            PRS->>UM: UpdateSecurityStampAsync
+            PRS->>UM: ResetAccessFailedCountAsync + SetLockoutEndDateAsync(null)
+            PRS->>DB: UPDATE EmailChangeTokens SET ConsumedAt = NOW WHERE UserId AND ConsumedAt IS NULL
+            PRS->>Audit: RecordAsync(PasswordResetCompleted)
+            PRS-->>Client: 204 + "your password was changed" email
+        end
+    end
+```
+
+**Audit prompts:**
+- Verify path is O(1) — the indexed `TokenLookup` lookup replaces the pre-6.15 candidate loop. `PasswordResetVerifyDosAmplificationTests` + `TokenLookupArchitectureTests` pin this.
+- Defence-in-depth Argon2id verify branch (`!_tokens.Verify(rawToken, match.TokenHash)`) is pinned by `TokenLookupTamperResistanceTests.PasswordReset_confirm_with_matching_TokenLookup_but_wrong_TokenHash_returns_401`.
+- Backup codes are NOT accepted at reset — recovery path is `/login/totp`. The DTO accepts up to 32 chars on `TotpCode`; the service-side `MfaConstants.TotpCodeShape` regex rejects backup-code shapes with 401 `INVALID_MFA_CODE`.
+- Cross-feature: a successful confirm atomically consumes any pending `EmailChangeToken` for the same user. `EmailChangeCrossFeatureTests` pins this.
+
+### Reauth step-up (`[RequireRecentAuth]` gate)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gate as RecentAuthRequirementHandler<br/>(authorization policy)
+    participant RC as ReauthController<br/>(Authorize, AuthReauthByUser)
+    participant UM as UserManager
+    participant SM as SignInManager
+
+    Client->>Gate: POST any [RequireRecentAuth] endpoint
+    Gate->>Gate: read LastReauthAt claim from cookie
+    alt LastReauthAt missing / malformed / future / older than 5 min
+        Gate-->>Client: 401 REAUTH_REQUIRED
+    else Within 5 min window
+        Gate-->>Client: ⏵ continue to controller
+    end
+
+    Note over Client,RC: ── Client receives 401 and steps up ──
+    Client->>RC: POST /api/auth/reauth {password?} or {totpCode?}<br/>(rate-limit partitions per user via AuthenticateAsync)
+    alt user.TwoFactorEnabled
+        RC->>UM: VerifyTwoFactorTokenAsync(totpCode)
+        Note over RC: wrong TOTP does NOT increment AccessFailedCount
+    else No MFA
+        RC->>UM: CheckPasswordAsync(password)
+        Note over RC: wrong password DOES count toward lockout via AccessFailedAsync
+    end
+    alt Verify succeeds
+        RC->>SM: RefreshSignInAsync<br/>(preserves sid claim, refreshes LastReauthAt)
+        RC-->>Client: 204 (refreshed cookie with new LastReauthAt)
+        Client->>Gate: retry the original [RequireRecentAuth] action
+        Gate-->>Client: ⏵ now passes
+    else Verify fails
+        RC-->>Client: 401 INVALID_REAUTH
+    end
+```
+
+**Audit prompts:**
+- The reauth grant is 5 minutes, scoped to a single sensitive action. `ReauthEndpointTests` and `ReauthGateTests` pin the window and the per-action scoping.
+- Persistent `__Host-Persist` cookie ("remember me") does NOT bypass the gate. `PersistentCookieRotationTests` + `ReauthEndpointTests.RefreshSignInAsync_after_reauth_does_not_disrupt_persistent_cookie` pin this.
+- Backup codes are NOT accepted at reauth. Same recovery-path-not-MFA-bypass rule as password reset.
+
+### Email-address change
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant ECC as EmailChangeController<br/>(request: RequireRecentAuth;<br/>confirm/revoke: AllowAnonymous, AuthLoginByIp)
+    participant ECS as EmailChangeService
+    participant TLH as TokenLookupHasher
+    participant UM as UserManager
+    participant DB as Postgres
+
+    Note over Client,ECS: ── Request phase ──
+    Client->>ECC: POST /api/auth/email-change/request {newEmail}<br/>(reauth-gated)
+    ECC->>ECS: RequestAsync
+    ECS->>ECS: enforce per-newEmail 5/hour MemoryCache gate
+    ECS->>DB: collision check on newEmail
+    ECS->>DB: supersede prior unconsumed tokens (this user)
+    ECS->>TLH: ComputeLookup(verifyRaw), ComputeLookup(revokeRaw)
+    ECS->>DB: INSERT EmailChangeToken Purpose=VerifyNew (30 min)
+    ECS->>DB: INSERT EmailChangeToken Purpose=RevokeOld (7 days)
+    ECS-->>Client: 202 + emails: verify→new, revoke→old
+
+    Note over Client,ECS: ── Confirm phase (clicked by new-address owner) ──
+    Client->>ECC: POST /api/auth/email-change/confirm {token}
+    ECC->>ECS: ConfirmAsync
+    ECS->>TLH: ComputeLookup(rawToken)
+    ECS->>DB: SELECT WHERE TokenLookup AND Purpose = VerifyNew AND fresh
+    alt No row
+        ECS->>Argon: RunDummyHash
+        ECS-->>Client: 401 INVALID_EMAIL_CHANGE_TOKEN
+    else Row matched + Argon2id verify
+        ECS->>DB: re-check collision (between request and confirm)
+        ECS->>UM: SetEmailAsync + SetUserNameAsync + EmailConfirmed=true
+        ECS->>DB: UPDATE matched VerifyNew row ConsumedAt = NOW
+        ECS->>DB: UPDATE sibling RevokeOld row ConsumedAt = NOW
+        ECS->>DB: UPDATE UserSessions SET RevokedAt = NOW WHERE UserId
+        ECS->>UM: UpdateSecurityStampAsync
+        ECS-->>Client: 204 + emails: "your email was changed" to BOTH new AND old
+        Note over ECS: Does NOT clear lockout (divergence from password reset)
+    end
+
+    Note over Client,ECS: ── Revoke phase (clicked by old-address owner) ──
+    Client->>ECC: POST /api/auth/email-change/revoke {token}
+    ECC->>ECS: RevokeAsync
+    ECS->>TLH: ComputeLookup(rawToken)
+    ECS->>DB: SELECT WHERE TokenLookup AND Purpose = RevokeOld AND fresh
+    alt Matched + Argon2id verify
+        ECS->>DB: UPDATE BOTH sibling rows ConsumedAt = NOW
+        ECS->>UM: Email stays UNCHANGED (critical)
+        ECS-->>Client: 204 + email: "change cancelled" to OLD address only
+        Note over ECS: Does NOT revoke sessions, does NOT touch SecurityStamp
+    end
+```
+
+**Audit prompts:**
+- `/confirm` revokes sessions + regenerates SecurityStamp; `/revoke` does NEITHER. This divergence is intentional: revoke is a cancel-pending-change, not a security event for the legitimate user.
+- `/revoke` MUST leave `user.Email` unchanged. `EmailChangeRevokeTests.Revoke_happy_path_leaves_user_Email_UNCHANGED` is the critical assertion here.
+- Cross-feature: a successful password reset consumes any pending EmailChangeToken. See § Password reset audit prompts above.
+- Verify path is O(1) for both Confirm and Revoke. `EmailChangeVerifyDosAmplificationTests` + `TokenLookupArchitectureTests` pin this.
+- Tamper resistance: `TokenLookupTamperResistanceTests.EmailChange_{confirm,revoke}_with_matching_TokenLookup_but_wrong_TokenHash_returns_401` pins the defence-in-depth Argon2id check in both methods.
+
+### Lockout self-service unlock
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth as AuthController.Login
+    participant LUS as LockoutUnlockService
+    participant LUC as LockoutUnlockController<br/>(AllowAnonymous, AuthLoginByIp)
+    participant DB as Postgres
+    participant Email as IEmailService
+
+    Note over Client,Auth: ── Lockout transition during Login ──
+    Client->>Auth: POST /api/auth/login {email, wrong-password × N}
+    Auth->>Auth: re-read user.LockoutEnd BEFORE PasswordSignInAsync
+    Auth->>SM: PasswordSignInAsync
+    Auth->>Auth: re-read user.LockoutEnd AFTER PasswordSignInAsync
+    alt wasLockedBefore = false AND isLockedAfter = true
+        Auth->>LUS: IssueAsync(userId)
+        LUS->>DB: INSERT LockoutUnlockToken (15-min single-use)
+        LUS->>Email: SendAsync (unlock link to user.Email)
+        Note over Auth: Fires AT MOST ONCE per lockout window<br/>(transition detection inside _loginLocks)
+    end
+    Auth-->>Client: 401 (locked)
+
+    Note over Client,LUC: ── User clicks email link ──
+    Client->>LUC: POST /api/auth/lockout-unlock {token}
+    LUC->>LUS: ConfirmAsync(rawToken)
+    LUS->>DB: SELECT LockoutUnlockToken WHERE rawToken hash matches<br/>(15-min expiry, single-use)
+    alt Token valid
+        LUS->>DB: UPDATE AspNetUsers SET AccessFailedCount = 0, LockoutEnd = NULL
+        LUS->>DB: UPDATE LockoutUnlockToken SET ConsumedAt = NOW
+        LUS->>Audit: RecordAsync(LockoutSelfServiceUnlock)
+        LUS-->>Client: 204
+        Note over LUS: Does NOT revoke sessions, does NOT regen SecurityStamp,<br/>does NOT log the user in (undo-only)
+    else Token invalid / expired / consumed
+        LUS-->>Client: 401 INVALID_LOCKOUT_UNLOCK_TOKEN
+    end
+```
+
+**Audit prompts:**
+- The transition detection (`wasLockedBefore` + `isLockedAfter` re-reads inside `_loginLocks`) is the email-DoS defence — at most one unlock email per lockout window. `LockoutUnlockIssuanceTests` covers this.
+- `/login/totp` is deliberately NOT wired for issuance because Stage 6b.2 removed framework counter mutation from the TOTP path. `LockoutUnlockIssuanceTests.LoginTotp_observing_locked_state_does_NOT_issue_token` pins this.
+- Confirm is undo-only — mirrors `EmailChangeService.RevokeAsync`. `LockoutUnlockConfirmTests.Confirm_does_NOT_revoke_UserSessions` + `Confirm_does_NOT_change_SecurityStamp` pin this.
+
+### Audit-log writes overlay
+
+The Stage 6.14 `AuditLog` table captures authentication events. 12 call sites wired today; 4 enum values reserved for later stages (`MfaDisabled`, `DataExportRequested`, `GdprErasureRequested`, `FinancialEventsTBD`).
+
+| Call site | `AuditLogAction` written |
+|---|---|
+| `AuthController.Register` (success) | `UserRegistered` |
+| `AuthController.Login` (no-MFA success) | `LoginSucceeded` |
+| `AuthController.LoginTotp` (TOTP branch success) | `LoginSucceeded` (with `EntityType=Totp`) |
+| `AuthController.LoginTotp` (backup-code branch success) | `LoginSucceeded` (with `EntityType=BackupCode`) |
+| `AuthController.Logout` | `Logout` |
+| `MfaController.EnrollVerify` (success) | `MfaEnrolled` |
+| `MfaController.RegenerateBackupCodes` (success) | `MfaBackupCodesRegenerated` |
+| `PasswordResetService.RequestAsync` (known email only) | `PasswordResetRequested` |
+| `PasswordResetService.ConfirmAsync` (success) | `PasswordResetCompleted` |
+| `EmailChangeService.RequestAsync` (success) | `EmailChangeRequested` |
+| `EmailChangeService.ConfirmAsync` (success) | `EmailChangeConfirmed` |
+| `EmailChangeService.RevokeAsync` (success) | `EmailChangeRevoked` |
+| `LockoutUnlockService.ConfirmAsync` (success) — Stage 6.10 | `LockoutSelfServiceUnlock` |
+
+**Audit prompts:**
+- Writes use `IAuditLogWriter` with a FRESH `DbContext` scope (`IServiceScopeFactory`) and are loud-failure — if the INSERT throws, the parent action returns 500 AND does NOT issue session cookies / mutate Identity state. `AuditLogIntegrationTests.Failed_audit_insert_during_login_returns_500_AND_does_NOT_issue_session_cookie` pins this.
+- Financial amounts NEVER appear in audit entries. `ArchitectureTests.AuditLog_entity_contains_no_financial_amount_columns` enforces.
+- 6-month auto-purge job is **deferred to Stage 7** (needs `IUserJobRunner` cross-tenant background-job foundation).
+- Failed-login attempts go to a SEPARATE table (`FailedLoginAttempt`) — explicitly NOT the audit log. The audit log only records succeeded auth events.
+
+### Cross-flow authentication state machine
+
+Captures every state a user's session can be in, with the transitions between them. The arrows are labelled with the action that triggers the transition.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Anonymous: registered or new visitor
+
+    Anonymous --> MfaPending: POST /login (creds OK, TwoFactorEnabled=true)
+    Anonymous --> Authenticated: POST /login (creds OK, TwoFactorEnabled=false)
+    Anonymous --> Anonymous: POST /login (creds wrong) / lockout transition
+    Anonymous --> Locked: 10 consecutive wrong passwords
+
+    MfaPending --> Authenticated: POST /login/totp (valid TOTP or backup code)
+    MfaPending --> Anonymous: cookie expires (Identity.TwoFactorUserId 5-min default)
+
+    Authenticated --> AuthenticatedRecent: LastReauthAt stamped at login OR successful reauth
+    AuthenticatedRecent --> Authenticated: 5 min elapsed since LastReauthAt
+    Authenticated --> Authenticated: any non-sensitive request
+    AuthenticatedRecent --> AuthenticatedRecent: any request (LastReauthAt unchanged unless reauth fires)
+
+    Authenticated --> Anonymous: POST /logout
+    Authenticated --> Anonymous: password reset by ANY actor (all sessions revoked + SecurityStamp regen)
+    Authenticated --> Anonymous: email change confirmed (all sessions revoked + SecurityStamp regen)
+    Authenticated --> Anonymous: IP added to user's blocklist (UserBlockedIpMiddleware revokes)
+    Authenticated --> Anonymous: SecurityStampValidator detects mismatch (within 5 min of revocation)
+
+    Locked --> Anonymous: 15 min elapsed (DefaultLockoutTimeSpan)
+    Locked --> Anonymous: successful self-service unlock (clears AccessFailedCount + LockoutEnd)
+    Locked --> Anonymous: successful password reset (also clears lockout)
+```
+
+**Audit prompts:**
+- `AuthenticatedRecent` is just `Authenticated` with a fresh `LastReauthAt` claim — it's not a separate cookie. The state-machine distinction matters because `[RequireRecentAuth]` endpoints reject `Authenticated` and accept `AuthenticatedRecent`.
+- `Locked → Anonymous` via password reset is the cross-feature interaction that lets a user recover from lockout WITHOUT waiting 15 minutes.
+- The `Authenticated → Anonymous` via SecurityStamp detection is the 5-minute eventual-consistency floor — a stolen cookie is rejected within 5 minutes of legitimate revocation, not instantly.
+
+---
+
 ## Transport and Infrastructure Rules
 
 ### HTTPS and TLS
