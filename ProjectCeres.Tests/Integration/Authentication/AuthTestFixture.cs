@@ -36,6 +36,8 @@ public static class AuthTestFixture
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var confirmed = await userManager.ConfirmEmailAsync(user, token);
         confirmed.Succeeded.Should().BeTrue();
+        var seed = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.CategorySeedService>();
+        await seed.CopyDefaultsForUserAsync(user.Id);
         return user;
     }
 
@@ -57,6 +59,8 @@ public static class AuthTestFixture
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var confirmed = await userManager.ConfirmEmailAsync(user, token);
         confirmed.Succeeded.Should().BeTrue();
+        var seed = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.CategorySeedService>();
+        await seed.CopyDefaultsForUserAsync(user.Id);
         return user;
     }
 

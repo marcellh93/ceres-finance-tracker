@@ -36,6 +36,7 @@ public sealed class AuthController : ControllerBase
     private readonly IAuditLogWriter _auditLog;
     private readonly LockoutUnlockService _lockoutUnlock;
     private readonly ILogger<AuthController> _logger;
+    private readonly Services.CategorySeedService _categorySeedService;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -47,7 +48,8 @@ public sealed class AuthController : ControllerBase
         FailedLoginRecorder failedLogins,
         IAuditLogWriter auditLog,
         LockoutUnlockService lockoutUnlock,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        Services.CategorySeedService categorySeedService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -59,6 +61,7 @@ public sealed class AuthController : ControllerBase
         _auditLog = auditLog;
         _lockoutUnlock = lockoutUnlock;
         _logger = logger;
+        _categorySeedService = categorySeedService;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -91,6 +94,8 @@ public sealed class AuthController : ControllerBase
             }
             return ValidationProblem(ModelState);
         }
+        // Stage 7: every user owns their own copy of the default categories.
+        await _categorySeedService.CopyDefaultsForUserAsync(user.Id, HttpContext.RequestAborted);
         await _auditLog.RecordAsync(user.Id, AuditLogAction.Registered, ct: HttpContext.RequestAborted);
         return NoContent();
     }

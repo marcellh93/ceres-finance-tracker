@@ -308,6 +308,7 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<CategorySeedService>();
 builder.Services.AddScoped<ILiabilityPaymentService, LiabilityPaymentService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
