@@ -34,6 +34,8 @@ public sealed class AuthController : ControllerBase
     private readonly IAntiforgery _antiforgery;
     private readonly FailedLoginRecorder _failedLogins;
     private readonly IAuditLogWriter _auditLog;
+    private readonly LockoutUnlockService _lockoutUnlock;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -43,7 +45,9 @@ public sealed class AuthController : ControllerBase
         PersistentTokenService tokens,
         IAntiforgery antiforgery,
         FailedLoginRecorder failedLogins,
-        IAuditLogWriter auditLog)
+        IAuditLogWriter auditLog,
+        LockoutUnlockService lockoutUnlock,
+        ILogger<AuthController> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -53,6 +57,8 @@ public sealed class AuthController : ControllerBase
         _antiforgery = antiforgery;
         _failedLogins = failedLogins;
         _auditLog = auditLog;
+        _lockoutUnlock = lockoutUnlock;
+        _logger = logger;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -127,11 +133,17 @@ public sealed class AuthController : ControllerBase
         var loginSem = _loginLocks.GetOrAdd(userStub.Id, _ => new SemaphoreSlim(1, 1));
         await loginSem.WaitAsync(HttpContext.RequestAborted);
         Microsoft.AspNetCore.Identity.SignInResult signIn;
+        bool lockoutTransitioned;
         try
         {
             await _db.Entry(userStub).ReloadAsync();
+            var wasLockedBefore = userStub.LockoutEnd is not null && userStub.LockoutEnd > DateTimeOffset.UtcNow;
             signIn = await _signInManager.PasswordSignInAsync(
                 userStub, request.Password, isPersistent: false, lockoutOnFailure: true);
+            // Re-read post-call to pick up LockoutEnd flipped by AccessFailedAsync.
+            await _db.Entry(userStub).ReloadAsync();
+            var isLockedAfter = userStub.LockoutEnd is not null && userStub.LockoutEnd > DateTimeOffset.UtcNow;
+            lockoutTransitioned = !wasLockedBefore && isLockedAfter;
         }
         finally
         {
@@ -166,6 +178,22 @@ public sealed class AuthController : ControllerBase
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
             var (ip, ua) = RequestContext();
             await _failedLogins.RecordAsync(request.Email, userStub.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
+            if (lockoutTransitioned)
+            {
+                try
+                {
+                    var unlockUrlBase = $"{Request.Scheme}://{Request.Host}";
+                    await _lockoutUnlock.IssueAsync(
+                        userStub.Id, userStub.Email!, ip, ua, unlockUrlBase, HttpContext.RequestAborted);
+                }
+                catch (Exception ex)
+                {
+                    // IssueAsync internally swallows email failures; this catch covers an
+                    // unexpected DB-write failure so it doesn't mask the user-visible lockout
+                    // response.
+                    _logger.LogError(ex, "Failed to issue lockout-unlock token for user {UserId}", userStub.Id);
+                }
+            }
             return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
         }
 
