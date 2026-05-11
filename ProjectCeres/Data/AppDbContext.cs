@@ -38,6 +38,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +49,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureMfaEntities(modelBuilder);
         ConfigurePasswordResetEntities(modelBuilder);
         ConfigureEmailChangeEntities(modelBuilder);
+        ConfigureAuditLogEntities(modelBuilder);
         SeedData(modelBuilder);
     }
 
@@ -128,6 +130,25 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.Property(e => e.NewEmail).HasMaxLength(256);
             b.Property(e => e.TokenHash).HasMaxLength(512);
             b.Property(e => e.Purpose).HasConversion<int>();
+        });
+    }
+
+    private static void ConfigureAuditLogEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuditLog>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.UserId, e.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_AuditLog_UserId_OccurredAt");
+            b.HasIndex(e => e.OccurredAt)
+                .HasDatabaseName("IX_AuditLog_OccurredAt");
+            b.Property(e => e.Action).HasConversion<string>();
+            b.Property(e => e.EntityType).HasMaxLength(64);
+            b.Property(e => e.IpAddress).HasMaxLength(45).HasDefaultValue("unknown");
+            b.ToTable(t => t.HasCheckConstraint(
+                "CK_AuditLog_EntityPair",
+                "(\"EntityType\" IS NULL AND \"EntityId\" IS NULL) OR (\"EntityType\" IS NOT NULL AND \"EntityId\" IS NOT NULL)"));
         });
     }
 
