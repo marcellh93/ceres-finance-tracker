@@ -497,4 +497,50 @@ public class ArchitectureTests
         type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().BeEmpty("EmailChangeController must NOT carry class-level [AllowAnonymous]");
     }
+
+    // ── Stage 6.14: AuditLog architecture invariants ───────────────────────
+
+    [Fact]
+    public void IAuditLogWriter_has_exactly_one_production_implementation()
+    {
+        var impls = App.GetTypes()
+            .Where(t => typeof(ProjectCeres.Common.Authentication.IAuditLogWriter).IsAssignableFrom(t)
+                        && t is { IsClass: true, IsAbstract: false })
+            .ToList();
+        impls.Should().ContainSingle()
+            .Which.Should().Be(typeof(ProjectCeres.Common.Authentication.AuditLogWriter));
+    }
+
+    [Fact]
+    public void AuditLogAction_enum_values_match_documented_set()
+    {
+        // Pins the enum against docs/superpowers/specs/2026-05-11-stage-6-14-audit-log-design.md § 3.1.
+        var expected = new[]
+        {
+            "LoginSucceeded", "LoginSucceededMfa", "LoginSucceededBackupCode",
+            "Logout", "Registered",
+            "PasswordResetRequested", "PasswordResetCompleted",
+            "EmailChangeRequested", "EmailChangeConfirmed", "EmailChangeRevoked",
+            "MfaEnrolled", "BackupCodesRegenerated",
+            "MfaDisabled", "LockoutSelfServiceUnlock",
+            "DataExportRequested", "GdprErasureRequested",
+        };
+        Enum.GetNames<ProjectCeres.Models.AuditLogAction>()
+            .Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public void AuditLog_entity_contains_no_financial_amount_columns()
+    {
+        // security-model.md line 554: "Financial amounts NEVER appear in audit entries."
+        // Belt-and-braces: reflection-scan for forbidden names + decimal-typed properties.
+        var forbidden = new[] { "Amount", "Balance", "Value", "Total" };
+        var props = typeof(ProjectCeres.Models.AuditLog).GetProperties();
+
+        props.Should().NotContain(p => forbidden.Contains(p.Name, StringComparer.OrdinalIgnoreCase),
+            "AuditLog must never carry a financial-amount column.");
+
+        props.Should().NotContain(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?),
+            "AuditLog must never have a decimal property.");
+    }
 }
