@@ -20,7 +20,7 @@ namespace ProjectCeres.Common.Authentication;
 /// the audit row. No MFA gate, no session revocation, no SecurityStamp regen —
 /// the unlock is an undo of a failed-login side effect, not a credential change.
 /// </summary>
-public sealed class LockoutUnlockService
+public class LockoutUnlockService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(15);
 
@@ -52,7 +52,7 @@ public sealed class LockoutUnlockService
         _auditLog = auditLog;
     }
 
-    public async Task IssueAsync(
+    public virtual async Task IssueAsync(
         Guid userId, string userEmail, string ip, string userAgent,
         string unlockUrlBase, CancellationToken ct)
     {

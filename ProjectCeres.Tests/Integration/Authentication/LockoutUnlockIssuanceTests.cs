@@ -223,4 +223,61 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         var tokens = await db.LockoutUnlockTokens.Where(t => t.UserId == user.Id).ToListAsync();
         tokens.Should().ContainSingle("token row must commit even when the email send throws");
     }
+
+    [Fact]
+    public async Task Issue_DB_write_failure_does_not_break_lockout_response()
+    {
+        // Exercises AuthController.Login's outer try/catch around IssueAsync. IssueAsync's
+        // own catch only handles email failures; this one covers a non-email throw (e.g.
+        // DB write failure). The lockout response must still surface ACCOUNT_LOCKED_OUT,
+        // not 500, because the user-visible outcome (account is locked) is independent of
+        // whether the unlock-token side-effect succeeded.
+        await using var factory = new ThrowingLockoutUnlockServiceFactory();
+        var email = $"issue-throws-{Guid.NewGuid():N}{EmailDomain}";
+        await AuthTestFixture.RegisterUserAsync(factory, email);
+        var client = factory.CreateClient();
+
+        await DriveLockoutAsync(factory, _factory, client, email);
+
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email, password = "still-wrong-pwd-long-enough", rememberMe = false });
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "IssueAsync throw must not propagate to a 500 — the outer catch must convert it to the standard ACCOUNT_LOCKED_OUT response");
+    }
+}
+
+/// <summary>
+/// Sibling factory used only by Issue_DB_write_failure_does_not_break_lockout_response.
+/// Overrides LockoutUnlockService with a subclass whose IssueAsync throws a non-email
+/// exception, exercising AuthController.Login's outer try/catch.
+/// </summary>
+public sealed class ThrowingLockoutUnlockServiceFactory : AuthTestWebApplicationFactory
+{
+    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<LockoutUnlockService>();
+            services.AddScoped<LockoutUnlockService, ThrowingLockoutUnlockService>();
+        });
+    }
+}
+
+internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
+{
+    public ThrowingLockoutUnlockService(
+        Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> userManager,
+        AppDbContext db,
+        Argon2idPasswordHasher argon,
+        LockoutUnlockTokenGenerator tokens,
+        IEmailService email,
+        Microsoft.Extensions.Logging.ILogger<LockoutUnlockService> logger,
+        IAuditLogWriter auditLog)
+        : base(userManager, db, argon, tokens, email, logger, auditLog) { }
+
+    public override Task IssueAsync(
+        Guid userId, string userEmail, string ip, string userAgent,
+        string unlockUrlBase, CancellationToken ct)
+        => throw new InvalidOperationException("simulated DB-write failure inside IssueAsync");
 }
