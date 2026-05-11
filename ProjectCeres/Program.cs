@@ -111,6 +111,8 @@ builder.Services.AddScoped<PasswordResetTokenGenerator>();
 builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddScoped<EmailChangeTokenGenerator>();
 builder.Services.AddScoped<EmailChangeService>();
+builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
+builder.Services.AddScoped<LockoutUnlockService>();
 builder.Services.AddMemoryCache();
 
 if (builder.Environment.IsDevelopment())

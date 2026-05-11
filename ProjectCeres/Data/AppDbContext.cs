@@ -38,6 +38,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
+    public DbSet<LockoutUnlockToken> LockoutUnlockTokens => Set<LockoutUnlockToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -49,6 +50,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureMfaEntities(modelBuilder);
         ConfigurePasswordResetEntities(modelBuilder);
         ConfigureEmailChangeEntities(modelBuilder);
+        ConfigureLockoutUnlockEntities(modelBuilder);
         ConfigureAuditLogEntities(modelBuilder);
         SeedData(modelBuilder);
     }
@@ -130,6 +132,17 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.Property(e => e.NewEmail).HasMaxLength(256);
             b.Property(e => e.TokenHash).HasMaxLength(512);
             b.Property(e => e.Purpose).HasConversion<int>();
+        });
+    }
+
+    private static void ConfigureLockoutUnlockEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<LockoutUnlockToken>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.UserId, e.ConsumedAt });
+            b.HasIndex(e => e.ExpiresAt);
+            b.Property(e => e.TokenHash).HasMaxLength(512);
         });
     }
 
