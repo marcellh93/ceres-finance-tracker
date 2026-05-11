@@ -15,10 +15,12 @@ namespace ProjectCeres.Controllers.Api;
 public sealed class MfaController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IAuditLogWriter _auditLog;
 
-    public MfaController(UserManager<ApplicationUser> userManager)
+    public MfaController(UserManager<ApplicationUser> userManager, IAuditLogWriter auditLog)
     {
         _userManager = userManager;
+        _auditLog = auditLog;
     }
 
     [HttpPost("enroll")]
@@ -73,6 +75,8 @@ public sealed class MfaController : ControllerBase
         await _userManager.SetTwoFactorEnabledAsync(user, true);
         var codes = await backupCodes.GenerateAndPersistAsync(user.Id, HttpContext.RequestAborted);
 
+        await _auditLog.RecordAsync(user.Id, AuditLogAction.MfaEnrolled, ct: HttpContext.RequestAborted);
+
         ApplyNoStoreHeaders();
         return Ok(new { backupCodes = codes });
     }
@@ -90,6 +94,8 @@ public sealed class MfaController : ControllerBase
             return Conflict(new { error = new { code = "MFA_NOT_ENABLED", message = "MFA must be enabled to regenerate backup codes." } });
 
         var codes = await backupCodes.RegenerateAsync(user.Id, HttpContext.RequestAborted);
+
+        await _auditLog.RecordAsync(user.Id, AuditLogAction.BackupCodesRegenerated, ct: HttpContext.RequestAborted);
 
         ApplyNoStoreHeaders();
         return Ok(new { backupCodes = codes });
