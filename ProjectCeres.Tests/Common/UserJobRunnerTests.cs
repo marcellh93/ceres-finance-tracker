@@ -72,4 +72,20 @@ public class UserJobRunnerTests : IAsyncLifetime
 
         succeeded.Should().ContainSingle().Which.Should().Be(userB.Id);
     }
+
+    [Fact]
+    public async Task Scope_unwinds_after_per_user_work_throws()
+    {
+        var userA = await AuthTestFixture.RegisterUserAsync(_factory, $"u-{Guid.NewGuid():N}{TestEmailSuffix}");
+        using var diScope = _factory.Services.CreateScope();
+        var db = diScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var userScope = new UserScope();
+        var runner = new UserJobRunner(db, userScope, NullLogger<UserJobRunner>.Instance);
+
+        await runner.ForEachUserAsync(
+            u => u.Id == userA.Id,
+            _ => throw new InvalidOperationException("boom"));
+
+        userScope.Current.Should().BeNull("scope must unwind even when per-user work throws");
+    }
 }

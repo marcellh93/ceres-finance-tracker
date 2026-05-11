@@ -34,6 +34,11 @@ public sealed class UserJobRunner(
                 {
                     await work(userId);
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // Cooperative cancellation — propagate so the loop exits.
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Per-user job failed for {UserId}", userId);
