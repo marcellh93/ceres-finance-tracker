@@ -476,7 +476,7 @@ Password handling:
 - [x] Session token regenerated immediately after login (session-fixation prevention)
 - [x] Logout marks `RevokedAt`; the cookie is cleared; subsequent requests with the cookie are rejected
 - [x] Persistent ("remember me") sessions: long-lived token in HttpOnly cookie, hash stored in DB, **rotated on each use** (issue new token, invalidate old)
-- [x] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on) *(toggle wired with default-off; UI is Stage 9 follow-up — first stage with the Sessions SPA page; tracked under Stage 12 in this roadmap)*
+- [x] Per-session IP enforcement honoured (each session anchored to its creation IP when toggle is on) *(server-side enforcement wired in 6a with default-off; UI to expose the per-session toggle is deferred to Stage 12 — Sessions SPA page. See `roadmap-phase-three.md` § Stage 12 verification)*
 - [x] Per-user IP block list (`UserBlockedIp`) revokes all sessions from that IP on add
 
 TOTP:
@@ -558,7 +558,7 @@ Audit logging:
 - [x] `AuditLog` entity: `Id`, `UserId`, `Action`, `EntityType`, `EntityId`, `OccurredAt`, `IpAddress` *(Stage 6.14)*
 - [x] Writes for: login (no-MFA / MFA / backup-code), logout, registration, password reset (request known-email + confirm), email change (request / confirm / revoke), MFA enrolment, backup-code regeneration *(Stage 6.14)*. Data export request + GDPR erasure call sites land in Stage 13; MFA-disable when a disable endpoint ships; lockout self-service unlock in Stage 6.10. Financial events (Transaction/Transfer Created/Deleted) deferred to Stage 7 with the multi-tenancy cutover.
 - [x] Financial amounts NEVER appear in audit entries *(architecture test `AuditLog_entity_contains_no_financial_amount_columns`)*
-- [x] 6-month auto-purge job *(deferred to Stage 7 — `IUserJobRunner` cross-tenant background-job foundation is the prerequisite; AuditLog table + writer ship in 6.14 and are ready to be consumed by the purge job. See `roadmap-phase-three.md` § Stage 7)*
+- [x] 6-month auto-purge job *(deferred to Stage 13 — `IUserJobRunner` cross-tenant background-job foundation from Stage 7 (ADR-0067) is the prerequisite; AuditLog table + writer ship in 6.14 and are ready to be consumed by the purge job. The cron registration is row 13.6 + the verification line at Stage 13 below)*
 
 Tests required before Stage 7 begins:
 
@@ -1003,6 +1003,10 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] Backup codes download offers a `.txt` that copies cleanly on mobile (long press → save / share sheet)
 - [ ] Language toggle (globe icon) is reachable without scrolling on mobile
 
+Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
+
+- [ ] **Manual browser DevTools verification of the auth cookie after a real login** — open DevTools → Application → Cookies on `/login` success and confirm the `__Host-Session` cookie carries all four attributes: `HttpOnly`, `Secure`, `SameSite=Lax`, no `Domain`, `Path=/`. Deferred from Stage 6 because no login UI existed there. The cookie configuration itself is wired and tested in 6a (see `CookieAttributesTests`); this is a final eyes-on check in production-like browser before opening to invited beta testers. *Anchor: Stage 6 § Cookie configuration carry-forward.*
+
 ---
 
 ## Stage 10 — Onboarding wizard (Batch 3f)
@@ -1221,6 +1225,10 @@ Tests:
 - [ ] Submit ticket, verify admin receives email
 - [ ] User A cannot view User B's ticket (IDOR)
 - [ ] Reauthentication required to access `/settings/sessions`
+
+Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
+
+- [ ] **Per-session IP enforcement UI** — per-row "anchor this session to its creation IP" toggle on `/settings/sessions`. Server-side enforcement is wired in 6a with `default-off` (each `UserSession` has the field; when enabled, requests from a different IP are rejected). This stage exposes the toggle so users can opt in per session. Confirm the entity field name (`IsIpAnchored` or similar) when wiring; pin with an integration test that flips the toggle on, simulates a request from a different IP, and asserts 401. *Anchor: Stage 6 § UserSession table + token rotation carry-forward.*
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory):
 
@@ -1446,6 +1454,7 @@ Cache headers:
 | 16.11 | CD pipeline (trigger, staging, migration step, rollback plan) | `planning.md` § Open Questions: CD strategy |
 | 16.12 | Monitoring + alerting (uptime, error rate, certificate expiry) | (operational) |
 | 16.13 | Container / runtime hardening | `security-model.md` § Container / Runtime Hardening |
+| 16.14 | Data Protection key persistence + rotation | `security-model.md` § TOTP Secrets + § Secrets Rotation Procedures + Stage 6 carry-forward |
 
 ### Verification checklist
 
@@ -1518,6 +1527,12 @@ Pre-launch dry run:
 - [ ] Email delivery tested end-to-end against the production provider config
 - [ ] CSP violations log empty after a full SPA browse-through
 - [ ] Penetration testing scheduled or completed (per `security-model.md` § Responsible Disclosure and Penetration Testing)
+
+Data Protection key storage (Stage 6 carry-forward):
+
+- [ ] **ASP.NET Core Data Protection keys persisted to a durable location**, not the default ephemeral filesystem. Without this, every container restart rotates the keys silently and every encrypted-at-rest payload tied to those keys (`TotpReplayEntry`-style ephemeral payloads, anything signed by the antiforgery system, anything wrapped by `IDataProtector`) becomes unreadable after a deploy. Options on a single-VPS deployment: bind-mounted host directory (`PersistKeysToFileSystem`) with restricted permissions; or PostgreSQL-backed key ring via `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`. Confirm choice in `planning.md` § Open Questions if not yet locked.
+- [ ] **Key ring rotation procedure documented in `security-model.md` § Secrets Rotation Procedures** — Data Protection auto-rotates the active key every 90 days by default; the rotation procedure documents what to verify after a rotation lands (no decryption failures in logs for 24 h; antiforgery still working across all sessions).
+- [ ] **TOTP seed encryption verified end-to-end**: enrol a user, restart the application, log in with the same TOTP — must still verify. Pins the "Data Protection wiring works AND keys persisted across restart" invariant the Stage 6 verification deferred here.
 
 ---
 
