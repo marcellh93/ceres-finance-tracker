@@ -33,6 +33,7 @@ public sealed class AuthController : ControllerBase
     private readonly PersistentTokenService _tokens;
     private readonly IAntiforgery _antiforgery;
     private readonly FailedLoginRecorder _failedLogins;
+    private readonly IAuditLogWriter _auditLog;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -41,7 +42,8 @@ public sealed class AuthController : ControllerBase
         Argon2idPasswordHasher argon,
         PersistentTokenService tokens,
         IAntiforgery antiforgery,
-        FailedLoginRecorder failedLogins)
+        FailedLoginRecorder failedLogins,
+        IAuditLogWriter auditLog)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -50,6 +52,7 @@ public sealed class AuthController : ControllerBase
         _tokens = tokens;
         _antiforgery = antiforgery;
         _failedLogins = failedLogins;
+        _auditLog = auditLog;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -82,6 +85,7 @@ public sealed class AuthController : ControllerBase
             }
             return ValidationProblem(ModelState);
         }
+        await _auditLog.RecordAsync(user.Id, AuditLogAction.Registered, ct: HttpContext.RequestAborted);
         return NoContent();
     }
 
@@ -174,6 +178,7 @@ public sealed class AuthController : ControllerBase
         }
 
         await IssueSessionAndCookiesAsync(userStub, sessionId, request.RememberMe);
+        await _auditLog.RecordAsync(userStub.Id, AuditLogAction.LoginSucceeded, ct: HttpContext.RequestAborted);
         return NoContent();
     }
 
@@ -246,6 +251,7 @@ public sealed class AuthController : ControllerBase
             await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
+            await _auditLog.RecordAsync(user.Id, AuditLogAction.LoginSucceededMfa, ct: HttpContext.RequestAborted);
             return NoContent();
         }
 
@@ -279,6 +285,7 @@ public sealed class AuthController : ControllerBase
             await _signInManager.SignInAsync(user, isPersistent: false);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
+            await _auditLog.RecordAsync(user.Id, AuditLogAction.LoginSucceededBackupCode, ct: HttpContext.RequestAborted);
             return NoContent();
         }
 
@@ -368,6 +375,8 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Logout()
     {
+        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userIdForAudit);
+
         if (Guid.TryParse(User.FindFirstValue(SessionConstants.SessionIdClaim), out var sid))
         {
             var session = await _db.UserSessions.FirstOrDefaultAsync(s => s.Id == sid);
@@ -406,6 +415,8 @@ public sealed class AuthController : ControllerBase
 
         await _signInManager.SignOutAsync();
         _antiforgery.GetAndStoreTokens(HttpContext);
+        if (userIdForAudit != Guid.Empty)
+            await _auditLog.RecordAsync(userIdForAudit, AuditLogAction.Logout, ct: HttpContext.RequestAborted);
         return NoContent();
     }
 }
