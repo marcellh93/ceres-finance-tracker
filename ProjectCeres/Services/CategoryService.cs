@@ -11,7 +11,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
     public async Task<IEnumerable<Category>> GetAllAsync(bool includeInactive = false)
     {
         var query = db.Categories
-            .OwnedOrShared(user)
+            .Owned(user)
             .Include(c => c.CategoryType)
             .AsQueryable();
 
@@ -23,7 +23,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
 
     public async Task<Category?> GetByIdAsync(Guid id) =>
         await db.Categories
-            .OwnedOrShared(user)
+            .Owned(user)
             .Include(c => c.CategoryType)
             .FirstOrDefaultAsync(c => c.Id == id);
 
@@ -61,7 +61,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
     {
         var category = await db.Categories
             .Include(c => c.CategoryType)
-            .OwnedOrShared(user)
+            .Owned(user)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (category is null)
@@ -80,7 +80,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
     public async Task<Result> TryDeactivateAsync(Guid id)
     {
         var category = await db.Categories
-            .OwnedOrShared(user)
+            .Owned(user)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (category is null)
@@ -98,7 +98,7 @@ public class CategoryService(AppDbContext db, ICurrentUserAccessor user) : ICate
     public async Task<Result> TryReactivateAsync(Guid id)
     {
         var category = await db.Categories
-            .OwnedOrShared(user)
+            .Owned(user)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (category is null)

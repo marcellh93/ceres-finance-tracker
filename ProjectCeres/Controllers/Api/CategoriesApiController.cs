@@ -23,7 +23,7 @@ public class CategoriesApiController(
     {
         var query = db.Categories
             .Include(c => c.CategoryType)
-            .OwnedOrShared(user)
+            .Owned(user)
             .AsQueryable();
 
         if (!includeInactive) query = query.Where(c => c.IsActive);
@@ -44,7 +44,7 @@ public class CategoriesApiController(
     public async Task<IReadOnlyList<CategoryOptionDto>> GetActive()
     {
         return await db.Categories
-            .OwnedOrShared(user)
+            .Owned(user)
             .Where(c => c.IsActive && !c.IsSystem)
             .OrderBy(c => c.Name)
             .Select(c => new CategoryOptionDto(c.Id, c.Name, c.CategoryType.Name))
@@ -56,7 +56,7 @@ public class CategoriesApiController(
     {
         var c = await db.Categories
             .Include(x => x.CategoryType)
-            .OwnedOrShared(user)
+            .Owned(user)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (c is null) return NotFound();
         return new CategoryDetailDto(

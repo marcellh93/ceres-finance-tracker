@@ -127,7 +127,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         if (!accountOk)
             return Result<RecurringTransaction>.Fail("INVALID_ACCOUNT", "The selected account does not exist.");
 
-        var categoryOk = await db.Categories.OwnedOrShared(user).AnyAsync(c => c.Id == request.CategoryId!.Value);
+        var categoryOk = await db.Categories.Owned(user).AnyAsync(c => c.Id == request.CategoryId!.Value);
         if (!categoryOk)
             return Result<RecurringTransaction>.Fail("INVALID_CATEGORY", "The selected category does not exist.");
 
@@ -181,7 +181,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
         if (!accountOk)
             return Result<RecurringTransaction>.Fail("INVALID_ACCOUNT", "The selected account does not exist.");
 
-        var categoryOk = await db.Categories.OwnedOrShared(user).AnyAsync(c => c.Id == request.CategoryId!.Value);
+        var categoryOk = await db.Categories.Owned(user).AnyAsync(c => c.Id == request.CategoryId!.Value);
         if (!categoryOk)
             return Result<RecurringTransaction>.Fail("INVALID_CATEGORY", "The selected category does not exist.");
 

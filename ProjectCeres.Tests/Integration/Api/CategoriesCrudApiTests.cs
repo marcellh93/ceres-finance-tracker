@@ -119,10 +119,11 @@ public class CategoriesCrudApiTests : IAsyncLifetime
     [Fact]
     public async Task Patch_rejects_system_category()
     {
+        // Stage 7 (Task 8): System categories (UserId = null) are no longer visible via
+        // user-scoped Owned() queries. The API returns 404 rather than 422 because the
+        // row does not appear in the user's category set at all.
         var res = await _client.PatchAsJsonAsync($"/api/categories/{OpeningBalanceCategoryId}", new { name = "Hacked" });
-        res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        var body = await res.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetProperty("code").GetString().Should().Be("SYSTEM_CATEGORY_IMMUTABLE");
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -197,10 +198,11 @@ public class CategoriesCrudApiTests : IAsyncLifetime
     [Fact]
     public async Task Archive_rejects_system_category()
     {
+        // Stage 7 (Task 8): System categories (UserId = null) are no longer visible via
+        // user-scoped Owned() queries. The API returns 404 rather than 422 because the
+        // row does not appear in the user's category set at all.
         var res = await _client.PatchAsync($"/api/categories/{OpeningBalanceCategoryId}/archive", null);
-        res.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
-        var body = await res.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("error").GetProperty("code").GetString().Should().Be("SYSTEM_CATEGORY_IMMUTABLE");
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

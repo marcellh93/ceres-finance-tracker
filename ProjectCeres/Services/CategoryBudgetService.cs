@@ -35,7 +35,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
     public async Task<CategoryBudget> CreateAsync(CategoryBudgetCreateViewModel vm)
     {
         var category = await db.Categories
-            .OwnedOrShared(user)
+            .Owned(user)
             .Include(c => c.CategoryType)
             .FirstOrDefaultAsync(c => c.Id == vm.CategoryId)
             ?? throw new InvalidOperationException("Category not found.");

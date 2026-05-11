@@ -23,10 +23,17 @@ public static class QueryableExtensions
 
     private static Expression<Func<T, bool>> BuildOwnedPredicate<T>(Guid userId) where T : IUserOwned
     {
-        var p = Expression.Parameter(typeof(T), "x");
-        var body = Expression.Equal(
-            Expression.Property(p, nameof(IUserOwned.UserId)),
-            Expression.Constant(userId));
+        var p    = Expression.Parameter(typeof(T), "x");
+        var prop = Expression.Property(p, nameof(IUserOwned.UserId));
+
+        // Stage 7 bridge: Category.UserId is still Guid? until Task 16 drops the nullability.
+        // Expression.Equal requires both sides to be the same type; if the concrete property is
+        // Guid? we lift the constant to Guid? so EF Core can compile the expression tree.
+        Expression rhs = prop.Type == typeof(Guid?)
+            ? Expression.Convert(Expression.Constant(userId), typeof(Guid?))
+            : Expression.Constant(userId);
+
+        var body = Expression.Equal(prop, rhs);
         return Expression.Lambda<Func<T, bool>>(body, p);
     }
 
