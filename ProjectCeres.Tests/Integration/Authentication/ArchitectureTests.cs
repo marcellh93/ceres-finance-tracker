@@ -543,4 +543,38 @@ public class ArchitectureTests
         props.Should().NotContain(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?),
             "AuditLog must never have a decimal property.");
     }
+
+    // ── Stage 6.10: LockoutUnlockController architecture invariants ────────
+
+    [Fact]
+    public void LockoutUnlockController_action_has_AllowAnonymous()
+    {
+        var action = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController)
+            .GetMethod("Confirm")!;
+        action.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
+            .Should().NotBeEmpty(
+                "Confirm must be [AllowAnonymous] — pre-auth recovery endpoint, " +
+                "documented in security-model.md § Global Authorization Policy");
+    }
+
+    [Fact]
+    public void LockoutUnlockController_action_has_AuthLoginByIp_rate_limit()
+    {
+        var action = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController)
+            .GetMethod("Confirm")!;
+        var rateLimit = action.GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: false)
+            .Cast<EnableRateLimitingAttribute>()
+            .SingleOrDefault();
+        rateLimit.Should().NotBeNull("Confirm must declare a rate-limit policy");
+        rateLimit!.PolicyName.Should().Be(ProjectCeres.Common.Authentication.AuthRateLimitPolicies.AuthLoginByIp,
+            "Confirm reuses the existing AuthLoginByIp policy per Stage 6.10 D6");
+    }
+
+    [Fact]
+    public void LockoutUnlockController_does_not_have_class_level_AllowAnonymous()
+    {
+        var type = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController);
+        type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
+            .Should().BeEmpty("Anonymity must be declared on the action, not the class");
+    }
 }
