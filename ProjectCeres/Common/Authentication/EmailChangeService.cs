@@ -29,6 +29,7 @@ public sealed class EmailChangeService
     private readonly AppDbContext _db;
     private readonly Argon2idPasswordHasher _argon;
     private readonly EmailChangeTokenGenerator _tokens;
+    private readonly TokenLookupHasher _lookupHasher;
     private readonly IEmailService _email;
     private readonly IMemoryCache _cache;
     private readonly ILogger<EmailChangeService> _logger;
@@ -39,6 +40,7 @@ public sealed class EmailChangeService
         AppDbContext db,
         Argon2idPasswordHasher argon,
         EmailChangeTokenGenerator tokens,
+        TokenLookupHasher lookupHasher,
         IEmailService email,
         IMemoryCache cache,
         ILogger<EmailChangeService> logger,
@@ -48,6 +50,7 @@ public sealed class EmailChangeService
         _db = db;
         _argon = argon;
         _tokens = tokens;
+        _lookupHasher = lookupHasher;
         _email = email;
         _cache = cache;
         _auditLog = auditLog;
@@ -110,6 +113,8 @@ public sealed class EmailChangeService
             revokeRaw = _tokens.Generate();
             var verifyHash = _tokens.Hash(verifyRaw);
             var revokeHash = _tokens.Hash(revokeRaw);
+            var verifyLookup = _lookupHasher.ComputeLookup(verifyRaw);
+            var revokeLookup = _lookupHasher.ComputeLookup(revokeRaw);
 
             var now = DateTime.UtcNow;
             _db.EmailChangeTokens.Add(new EmailChangeToken
@@ -118,6 +123,7 @@ public sealed class EmailChangeService
                 UserId = user.Id,
                 Purpose = EmailChangeTokenPurpose.VerifyNew,
                 NewEmail = normalized,
+                TokenLookup = verifyLookup,
                 TokenHash = verifyHash,
                 CreatedAt = now,
                 ExpiresAt = now + VerifyTokenLifetime,
@@ -129,6 +135,7 @@ public sealed class EmailChangeService
                 UserId = user.Id,
                 Purpose = EmailChangeTokenPurpose.RevokeOld,
                 NewEmail = normalized,
+                TokenLookup = revokeLookup,
                 TokenHash = revokeHash,
                 CreatedAt = now,
                 ExpiresAt = now + RevokeTokenLifetime,
@@ -175,26 +182,26 @@ public sealed class EmailChangeService
             return new EmailChangeConfirmOutcome.InvalidToken();
         }
 
+        // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
+        // Purpose filter is defence-in-depth — a raw token must never match across
+        // purposes because each /request issues distinct VerifyNew + RevokeOld tokens.
         var now = DateTime.UtcNow;
-        var candidates = await _db.EmailChangeTokens
-            .Where(t => t.Purpose == EmailChangeTokenPurpose.VerifyNew
+        var lookup = _lookupHasher.ComputeLookup(rawToken);
+        var match = await _db.EmailChangeTokens
+            .Where(t => t.TokenLookup == lookup
+                     && t.Purpose == EmailChangeTokenPurpose.VerifyNew
                      && t.ConsumedAt == null
                      && t.ExpiresAt > now)
-            .ToListAsync(ct);
-
-        EmailChangeToken? match = null;
-        foreach (var candidate in candidates)
-        {
-            if (_tokens.Verify(rawToken, candidate.TokenHash))
-            {
-                match = candidate;
-                break;
-            }
-        }
+            .FirstOrDefaultAsync(ct);
 
         if (match is null)
         {
-            if (candidates.Count == 0) _argon.RunDummyHash();
+            _argon.RunDummyHash();
+            return new EmailChangeConfirmOutcome.InvalidToken();
+        }
+
+        if (!_tokens.Verify(rawToken, match.TokenHash))
+        {
             return new EmailChangeConfirmOutcome.InvalidToken();
         }
 
@@ -308,26 +315,24 @@ public sealed class EmailChangeService
             return new EmailChangeRevokeOutcome.InvalidToken();
         }
 
+        // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
         var now = DateTime.UtcNow;
-        var candidates = await _db.EmailChangeTokens
-            .Where(t => t.Purpose == EmailChangeTokenPurpose.RevokeOld
+        var lookup = _lookupHasher.ComputeLookup(rawToken);
+        var match = await _db.EmailChangeTokens
+            .Where(t => t.TokenLookup == lookup
+                     && t.Purpose == EmailChangeTokenPurpose.RevokeOld
                      && t.ConsumedAt == null
                      && t.ExpiresAt > now)
-            .ToListAsync(ct);
-
-        EmailChangeToken? match = null;
-        foreach (var candidate in candidates)
-        {
-            if (_tokens.Verify(rawToken, candidate.TokenHash))
-            {
-                match = candidate;
-                break;
-            }
-        }
+            .FirstOrDefaultAsync(ct);
 
         if (match is null)
         {
-            if (candidates.Count == 0) _argon.RunDummyHash();
+            _argon.RunDummyHash();
+            return new EmailChangeRevokeOutcome.InvalidToken();
+        }
+
+        if (!_tokens.Verify(rawToken, match.TokenHash))
+        {
             return new EmailChangeRevokeOutcome.InvalidToken();
         }
 

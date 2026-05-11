@@ -27,6 +27,7 @@ public sealed class PasswordResetService
     private readonly AppDbContext _db;
     private readonly Argon2idPasswordHasher _argon;
     private readonly PasswordResetTokenGenerator _tokens;
+    private readonly TokenLookupHasher _lookupHasher;
     private readonly TotpReplayGuard _replayGuard;
     private readonly FailedLoginRecorder _failedLogins;
     private readonly IEmailService _email;
@@ -40,6 +41,7 @@ public sealed class PasswordResetService
         AppDbContext db,
         Argon2idPasswordHasher argon,
         PasswordResetTokenGenerator tokens,
+        TokenLookupHasher lookupHasher,
         TotpReplayGuard replayGuard,
         FailedLoginRecorder failedLogins,
         IEmailService email,
@@ -48,11 +50,12 @@ public sealed class PasswordResetService
         IAuditLogWriter auditLog)
     {
         _userManager = userManager;
-        _signInManager = signInManager; // Reserved for ConfirmAsync (Task 13)
+        _signInManager = signInManager;
         _db = db;
         _argon = argon;
         _tokens = tokens;
-        _replayGuard = replayGuard;    // Reserved for ConfirmAsync (Task 13)
+        _lookupHasher = lookupHasher;
+        _replayGuard = replayGuard;
         _failedLogins = failedLogins;
         _email = email;
         _cache = cache;
@@ -106,12 +109,14 @@ public sealed class PasswordResetService
 
             rawToken = _tokens.Generate();
             var hash = _tokens.Hash(rawToken);
+            var lookup = _lookupHasher.ComputeLookup(rawToken);
 
             var now = DateTime.UtcNow;
             _db.PasswordResetTokens.Add(new PasswordResetToken
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
+                TokenLookup = lookup,
                 TokenHash = hash,
                 CreatedAt = now,
                 ExpiresAt = now + TokenLifetime,
@@ -205,25 +210,30 @@ public sealed class PasswordResetService
             return new PasswordResetConfirmOutcome.InvalidToken();
         }
 
+        // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
+        // Replaces the candidate-loop pattern that ran Argon2id verify against every
+        // unconsumed unexpired row (Argon2id-amplification DoS on /confirm).
         var now = DateTime.UtcNow;
-        var candidates = await _db.PasswordResetTokens
-            .Where(t => t.ConsumedAt == null && t.ExpiresAt > now)
-            .ToListAsync(ct);
-
-        PasswordResetToken? match = null;
-        foreach (var candidate in candidates)
-        {
-            if (_tokens.Verify(rawToken, candidate.TokenHash))
-            {
-                match = candidate;
-                break;
-            }
-        }
+        var lookup = _lookupHasher.ComputeLookup(rawToken);
+        var match = await _db.PasswordResetTokens
+            .Where(t => t.TokenLookup == lookup
+                     && t.ConsumedAt == null
+                     && t.ExpiresAt > now)
+            .FirstOrDefaultAsync(ct);
 
         if (match is null)
         {
-            // Even with zero candidates, run one verify so timing doesn't reveal "no candidates".
-            if (candidates.Count == 0) _argon.RunDummyHash();
+            // Constant-time floor: pay one Argon2 verify against a dummy hash so a miss
+            // doesn't reveal "no matching lookup" via timing.
+            _argon.RunDummyHash();
+            return new PasswordResetConfirmOutcome.InvalidToken();
+        }
+
+        // Defence-in-depth: the unique TokenLookup index already pins the match, but
+        // still verify the Argon2id-hashed TokenHash. If the hash check fails, the row
+        // was tampered with — reject without consuming.
+        if (!_tokens.Verify(rawToken, match.TokenHash))
+        {
             return new PasswordResetConfirmOutcome.InvalidToken();
         }
 

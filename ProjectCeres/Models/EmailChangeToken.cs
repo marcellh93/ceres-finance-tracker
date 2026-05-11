@@ -22,6 +22,10 @@ public sealed class EmailChangeToken
     public Guid UserId { get; set; }
     public EmailChangeTokenPurpose Purpose { get; set; }
     public string NewEmail { get; set; } = "";
+    // HMAC-SHA256(serverSecret, rawToken). Unique index ensures /confirm and /revoke
+    // locate the matching row in O(1) regardless of how many candidates exist
+    // (Stage 6.15 — closes the Argon2id-amplification DoS on the verify path).
+    public byte[] TokenLookup { get; set; } = Array.Empty<byte>();
     public string TokenHash { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     public DateTime ExpiresAt { get; set; }

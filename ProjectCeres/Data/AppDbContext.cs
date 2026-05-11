@@ -118,6 +118,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasKey(e => e.Id);
             b.HasIndex(e => new { e.UserId, e.ConsumedAt });
             b.HasIndex(e => e.ExpiresAt);
+            b.HasIndex(e => e.TokenLookup).IsUnique();
+            b.Property(e => e.TokenLookup).HasMaxLength(32);
             b.Property(e => e.TokenHash).HasMaxLength(512);
         });
     }
@@ -129,6 +131,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasKey(e => e.Id);
             b.HasIndex(e => new { e.UserId, e.ConsumedAt });
             b.HasIndex(e => e.ExpiresAt);
+            b.HasIndex(e => e.TokenLookup).IsUnique();
+            b.Property(e => e.TokenLookup).HasMaxLength(32);
             b.Property(e => e.NewEmail).HasMaxLength(256);
             b.Property(e => e.TokenHash).HasMaxLength(512);
             b.Property(e => e.Purpose).HasConversion<int>();

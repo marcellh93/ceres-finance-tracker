@@ -73,6 +73,13 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 builder.Services.Configure<Argon2idOptions>(
     builder.Configuration.GetSection("Authentication:Argon2id"));
 
+// Stage 6.15 — HMAC-SHA256-based token-lookup hasher for /password-reset/confirm,
+// /email-change/confirm, /email-change/revoke. Closes the Argon2id-amplification
+// DoS on those endpoints (verify cost is O(1) regardless of token table size).
+builder.Services.Configure<TokenLookupOptions>(
+    builder.Configuration.GetSection("Authentication:TokenLookupSecret"));
+builder.Services.AddSingleton<TokenLookupHasher>();
+
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
     {
