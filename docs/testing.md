@@ -4,25 +4,67 @@
 
 ---
 
+## Rules
+
+Tests describe the behavior the production code must have. The production code is the thing under test; the test is not.
+
+### How tests are written
+
+- Write or update the test before or alongside the production change. Run it and confirm it fails for the right reason (the assertion, not a misconfiguration) before making it pass.
+- Assert on specific, observable outputs: `result.Should().Be(100m)`, `account.Balance.Should().Be(expectedBalance)`, or `Assert.Equal(expected, actual)`. Do not use `Assert.True(result)`, `result.Should().NotBeNull()`, or "any error is fine" matchers as the sole assertion of a test.
+- One reason to fail per test. Name the test after the behavior: `TransferService_WhenCurrenciesDiffer_ThrowsValidationException`.
+- Mock at boundaries only: `DbContext` via `WebApplicationFactory` or (Phase 3) Testcontainers, `TimeProvider`, randomness, filesystem, outbound HTTP. Never mock the service, controller, or calculation whose behavior the test claims to verify.
+- Integration tests run against the real `project_ceres_test` PostgreSQL database, not the EF Core in-memory provider. The in-memory provider does not translate SQL the way Npgsql does and hides query bugs that surface in production.
+
+### When a test fails
+
+State the failing test name and the exact assertion that failed. Then state which of these is true:
+
+1. **The production code is wrong** → fix the production code. Do not touch the test.
+2. **The test's expected value was wrong** → name the user-facing behavior the test should describe, update the test, then update any related production code so test and production agree.
+3. **The contract intentionally changed** → name the contract change, update the test, update the production code, update any docs that reference the old contract.
+
+If the answer is none of (1), (2), or (3), the test is not legitimately failing — stop and tell the user.
+
+### Flaky tests
+
+A test that fails intermittently is treated as a failing test until proven otherwise. Do not add retries, do not mark `[Fact(Skip="flaky")]` silently, do not rerun until green. State that it is flaky, propose a root cause, and wait for direction.
+
+### IMPORTANT — prohibited shortcuts
+
+Do not delete tests, do not add `[Fact(Skip="…")]`, do not comment out assertions, do not wrap failing calls in `try/catch` to silence them, and do not call `DbContext`, repositories, or services directly to set state that the feature under test was supposed to set. If a test cannot be made to pass without one of these, stop and tell the user.
+
+### Definition of Done
+
+Before saying "done," "ready," "complete," or "passing":
+
+1. `dotnet build` is clean (no errors, no new warnings).
+2. `dotnet test` is all green with zero skipped tests, unless every skip has an inline comment with a tracked issue link.
+3. For each new branch in production code, name the test that exercises it.
+4. If any test file was modified in this change, state which of cases (1), (2), or (3) above applied.
+
+---
+
 ## Stack
 
 ### Backend (.NET)
 
-| Library | Role |
-|---------|------|
-| **xUnit** | Test framework — standard for .NET, used by ASP.NET Core itself |
-| **Moq** | Mocking library — isolates dependencies in unit tests |
-| **FluentAssertions** | Readable assertions — `result.Should().Be(100m)` over default xUnit assertions |
+| Library                   | Role                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| **xUnit**                 | Test framework — standard for .NET, used by ASP.NET Core itself                 |
+| **Moq**                   | Mocking library — isolates dependencies in unit tests                           |
+| **FluentAssertions**      | Readable assertions — `result.Should().Be(100m)` over default xUnit assertions  |
 | **WebApplicationFactory** | Integration test host for API controllers — boots full app in memory (Phase 2+) |
 
 ### Frontend (ProjectCeres.Client — Phase 2+)
 
-| Library | Role |
-|---------|------|
-| **Vitest** | Test runner — shares Vite config, no separate setup. See ADR-0032. |
+| Library                   | Role                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| **Vitest**                | Test runner — shares Vite config, no separate setup. See ADR-0032.            |
 | **React Testing Library** | Component-level tests — renders components and asserts on user-visible output |
 
 Frontend tests live in `ProjectCeres.Client/src/__tests__/`. What gets tested:
+
 - React components with non-trivial rendering logic (conditional display, derived state)
 - Chart data transformation functions
 - Import profile mapping logic (client-side validation)
@@ -33,11 +75,11 @@ Simple presentational components with no logic are not tested — the value is t
 
 ## Types of Tests
 
-| Type | What it tests | Database? | Introduced |
-|------|--------------|-----------|------------|
-| Unit | Individual calculation or business logic method in isolation | No | Phase 1 |
-| Integration | EF Core queries and service interactions against a real test database | Yes | Phase 1 |
-| E2E | Full browser-driven flows | Yes | Phase 3 |
+| Type        | What it tests                                                         | Database? | Introduced |
+| ----------- | --------------------------------------------------------------------- | --------- | ---------- |
+| Unit        | Individual calculation or business logic method in isolation          | No        | Phase 1    |
+| Integration | EF Core queries and service interactions against a real test database | Yes       | Phase 1    |
+| E2E         | Full browser-driven flows                                             | Yes       | Phase 3    |
 
 E2E tests are deferred until Phase 3. The prerequisites — CI/CD pipeline, Testcontainers, and a hosted environment — do not exist until that phase. E2E must also be written after the Phase 2 React migration stabilizes, not before, to avoid investing in tests against a frontend that is about to change.
 
@@ -101,13 +143,13 @@ Unit tests use Moq to mock `DbContext` dependencies where needed. See [xunit-bas
 
 ### Phase 1 Unit Test Coverage (as of 2026-04-21)
 
-| Class | Test file | What it covers |
-|-------|-----------|----------------|
-| `BalanceCalculationTests` | `Unit/BalanceCalculationTests.cs` | Asset and liability balance derivation formula |
-| `CategoryBudgetGuardTests` | `Unit/CategoryBudgetGuardTests.cs` | CategoryBudget expense-only enforcement |
-| `SavingsRateTests` | `Unit/SavingsRateTests.cs` | Savings rate calculation |
-| `NumberFormatHelper` | `Unit/NumberFormatHelperTests.cs` | `FormatAmount`, `FormatInputValue`, `TryParseDecimal`, and round-trip correctness |
-| `DecimalModelBinder` (via helper) | `Unit/DecimalParsingTests.cs` | Parsing in both number format modes including invariant-input tolerance |
+| Class                             | Test file                          | What it covers                                                                    |
+| --------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| `BalanceCalculationTests`         | `Unit/BalanceCalculationTests.cs`  | Asset and liability balance derivation formula                                    |
+| `CategoryBudgetGuardTests`        | `Unit/CategoryBudgetGuardTests.cs` | CategoryBudget expense-only enforcement                                           |
+| `SavingsRateTests`                | `Unit/SavingsRateTests.cs`         | Savings rate calculation                                                          |
+| `NumberFormatHelper`              | `Unit/NumberFormatHelperTests.cs`  | `FormatAmount`, `FormatInputValue`, `TryParseDecimal`, and round-trip correctness |
+| `DecimalModelBinder` (via helper) | `Unit/DecimalParsingTests.cs`      | Parsing in both number format modes including invariant-input tolerance           |
 
 ---
 
@@ -122,31 +164,31 @@ Unit tests use Moq to mock `DbContext` dependencies where needed. See [xunit-bas
 
 All Phase 1 services now have integration test coverage:
 
-| Service | Test file |
-|---------|-----------|
-| `AccountService` | `AccountServiceTests.cs` |
-| `TransactionService` | `TransactionServiceTests.cs` |
-| `TransferService` | `TransferValidationTests.cs` |
-| `CategoryService` | `CategoryServiceTests.cs` |
-| `LiabilityPaymentService` | `LiabilityPaymentServiceTests.cs` |
-| `BudgetService` | `BudgetServiceTests.cs` |
+| Service                       | Test file                             |
+| ----------------------------- | ------------------------------------- |
+| `AccountService`              | `AccountServiceTests.cs`              |
+| `TransactionService`          | `TransactionServiceTests.cs`          |
+| `TransferService`             | `TransferValidationTests.cs`          |
+| `CategoryService`             | `CategoryServiceTests.cs`             |
+| `LiabilityPaymentService`     | `LiabilityPaymentServiceTests.cs`     |
+| `BudgetService`               | `BudgetServiceTests.cs`               |
 | `RecurringTransactionService` | `RecurringTransactionServiceTests.cs` |
-| `ReportService` | `ReportServiceTests.cs` |
-| `DashboardService` | `DashboardServiceTests.cs` |
-| `SettingsService` | `SettingsServiceTests.cs` |
-| `FileAttachmentService` | `FileAttachmentServiceTests.cs` |
+| `ReportService`               | `ReportServiceTests.cs`               |
+| `DashboardService`            | `DashboardServiceTests.cs`            |
+| `SettingsService`             | `SettingsServiceTests.cs`             |
+| `FileAttachmentService`       | `FileAttachmentServiceTests.cs`       |
 
 ### Phase 2 Import Coverage
 
-| Service / Class | Test file |
-|---------|-----------|
-| `CsvImportParser`     | `Unit/CsvImportParserTests.cs`          |
-| `ExcelImportParser`   | `Unit/ExcelImportParserTests.cs`        |
-| `ImportParserFactory` | `Unit/ImportParserFactoryTests.cs`      |
-| `ImportService`       | `Unit/ImportServiceTests.cs` (unit), `Integration/ImportServiceTests.cs` (integration) |
-| `ImportProfileService`| `Integration/ImportProfileServiceTests.cs` |
-| `HeaderDetectionService` | `Unit/HeaderDetectionServiceTests.cs` |
-| Import headers API (`ImportHeadersController`) | `Integration/ImportApiTests.cs` (via `WebApplicationFactory`) |
+| Service / Class                                | Test file                                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `CsvImportParser`                              | `Unit/CsvImportParserTests.cs`                                                         |
+| `ExcelImportParser`                            | `Unit/ExcelImportParserTests.cs`                                                       |
+| `ImportParserFactory`                          | `Unit/ImportParserFactoryTests.cs`                                                     |
+| `ImportService`                                | `Unit/ImportServiceTests.cs` (unit), `Integration/ImportServiceTests.cs` (integration) |
+| `ImportProfileService`                         | `Integration/ImportProfileServiceTests.cs`                                             |
+| `HeaderDetectionService`                       | `Unit/HeaderDetectionServiceTests.cs`                                                  |
+| Import headers API (`ImportHeadersController`) | `Integration/ImportApiTests.cs` (via `WebApplicationFactory`)                          |
 
 Razor controller actions remain untested — they are thin HTTP handlers with a defined end-of-life in Phase 3; testing them is not worth the investment. API controllers in `Controllers/Api/` are integration tested using `WebApplicationFactory<Program>` (see ADR-0037).
 

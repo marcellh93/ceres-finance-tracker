@@ -70,6 +70,7 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 
 ## What NOT to Do
 
+- Do not modify, skip, or weaken tests to make them pass. If a test fails, fix the production code, or state which legitimate case applies before editing the test (see `docs/testing.md` § Rules)
 - Do not add authentication — Phase 3 only
 - Do not implement currency conversion — explicitly out of scope
 - Do not support cross-currency transfers — out of scope
@@ -81,7 +82,7 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 ## Docs
 
 - `docs/planning.md` — Phase 1 features, working assumptions, open questions. Phase 2+: see `planning-phase2.md`, `planning-phase3.md`, `planning-future.md`
-- `docs/testing.md` — testing strategy, TDD workflow (required), CI/CD scope
+- `docs/testing.md` — testing strategy, TDD workflow (required), CI/CD scope. **Binding rules — read § Rules before writing or modifying any test.**
 - `docs/models.md` — all entities, relationships, normalization, deletion rules
 - `docs/architecture.md` — layer model, request flow, how the architecture evolves across phases
 - `docs/security-model.md` — threat model, data protection rules, access control rules (unified view)
@@ -95,6 +96,7 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 ## Frontend Work
 
 For any change to `ProjectCeres.Client/` (React/TS, styling, layout, copy):
+
 1. Read `docs/design-system.md` — use existing tokens/recipes; never hard-code values.
 2. Invoke `frontend-design` for visual design and `vercel-react-best-practices` for React perf patterns before proposing.
 3. Show the result; wait for approval before committing.
@@ -104,6 +106,7 @@ For any change to `ProjectCeres.Client/` (React/TS, styling, layout, copy):
 ## After Completing Any Stage
 
 After finishing a stage implementation, regardless of phase:
+
 1. Identify the current phase from this file's **Current Phase** section
 2. Look for a roadmap doc in `docs/` matching that phase (e.g. `roadmap-phase-two.md`, `roadmap-phase-three.md`). If none exists, note that no roadmap checklist is available.
 3. Find the completed stage's section in that roadmap and its verification checklist items

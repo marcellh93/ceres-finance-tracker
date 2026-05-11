@@ -9,6 +9,15 @@
             "command": "node .claude/hooks/require-verify-against-codebase-before-spec.js"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/warn-on-test-edit.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -18,6 +27,26 @@
           {
             "type": "command",
             "command": "node .claude/hooks/flag-doc-change.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-assertion-count.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/run-tests.sh"
           }
         ]
       }
