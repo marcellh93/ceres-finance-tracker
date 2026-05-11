@@ -137,6 +137,10 @@
 
 #### Fixed
 
+**Authentication (Stage 6c.2 follow-up — `AuthMfaByUser` rate-limit partition fix, 2026-05-11)**
+- `AuthMfaByUser` rate-limit policy now correctly partitions per user. The prior implementation read `httpContext.User?.FindFirst(NameIdentifier)` before `UseAuthentication` ran, so every authenticated MFA request fell into the `"anonymous-mfa"` shared bucket and one hostile user could exhaust the budget for everyone. Fix mirrors `AuthReauthByUser` (shipped in 6c.2): explicit `httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme).Wait()` before reading the claim, applied to both `Program.cs` and the `RateLimitedAuthTestWebApplicationFactory` override.
+- New `MfaRegenerate_rate_limit_is_partitioned_by_user` test pins per-user isolation: drains user A's budget then asserts user B's first call is NOT 429.
+
 **Authentication (Stage 6.15 — Argon2id-amplification DoS on token verify, 2026-05-11)**
 - Argon2id-amplification DoS vector on `/password-reset/confirm`, `/email-change/confirm`, and `/email-change/revoke` closed via indexed `TokenLookup` column. Verify path is now O(1) regardless of token table size; pre-6.15 each call ran one Argon2id verify per unconsumed unexpired row (~20s at N=200 under OWASP-minimum params).
 - New `TokenLookupHasher` singleton computes `HMAC-SHA256(Authentication:TokenLookupSecret, rawToken)`; new column added to `PasswordResetToken` and `EmailChangeToken` with a unique index per table; existing rows backfilled and stamped `ConsumedAt = NOW()` so legacy tokens cannot match real verifies.

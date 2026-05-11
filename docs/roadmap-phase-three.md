@@ -409,7 +409,7 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 
 ## Stage 6 — Identity infrastructure (Batch 3b)
 
-**Status: ⚠️ In progress.** 10 of 12 sub-stages shipped (6a, 6b.2, 6b.3, 6c.1, 6c.2, 6.12, 6.14, 6.10, 6.15, plus the Stage 6b.1 latent bug fix). Remaining: the **`AuthMfaByUser` rate-limit partition follow-up** from Stage 6c.2, and the **Stage 6 close-out flow diagrams** in `security-model.md`. Server-side plumbing for real authentication; lands before Stage 7 (multi-tenancy cutover) so the cutover has a real `AspNetUsers` table to remap onto.
+**Status: ⚠️ In progress.** 10 of 12 sub-stages shipped (6a, 6b.2, 6b.3, 6c.1, 6c.2, 6.12, 6.14, 6.10, 6.15, plus the Stage 6b.1 latent bug fix and the Stage 6c.2 `AuthMfaByUser` rate-limit partition follow-up). **Only the Stage 6 close-out flow diagrams in `security-model.md` remain** before Stage 6 can flip to ✅ Done. Server-side plumbing for real authentication; lands before Stage 7 (multi-tenancy cutover) so the cutover has a real `AspNetUsers` table to remap onto.
 
 > **Goal:** ASP.NET Core Identity is wired with hardened options, password hashing pinned to Argon2id at OWASP minimums, TOTP infrastructure in place (encrypted seed, persistent replay-prevention, hashed backup codes), `UserSession` table and CSRF middleware operational, global authorization fallback policy enforced. **No UI yet — integration tests only.**
 

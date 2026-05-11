@@ -217,7 +217,14 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
 
                 opts.AddPolicy(AuthRateLimitPolicies.AuthMfaByUser, httpContext =>
                 {
-                    var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    // Mirror the production AuthMfaByUser partitioner exactly: rate-limit
+                    // middleware runs before UseAuthentication, so resolve the user by
+                    // calling AuthenticateAsync(ApplicationScheme) explicitly. Stage 6c.2
+                    // follow-up — prior to this fix the partition collapsed all
+                    // authenticated MFA requests into the "anonymous-mfa" fallback.
+                    var task = httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+                    task.Wait();
+                    var userId = task.Result.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                               ?? "anonymous-mfa";
                     return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
                     {

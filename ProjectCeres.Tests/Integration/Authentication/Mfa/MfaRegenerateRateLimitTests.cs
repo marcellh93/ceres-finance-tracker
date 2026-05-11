@@ -119,6 +119,43 @@ public class MfaRegenerateRateLimitTests : IAsyncLifetime
             "If this fails, the Gap B implementation missed the rate-limit — see spec § Gap B");
     }
 
+    // Stage 6c.2 follow-up: the AuthMfaByUser partitioner's lambda reads
+    // httpContext.User?.FindFirst(NameIdentifier) BEFORE UseAuthentication has run,
+    // so it always falls back to the shared "anonymous-mfa" bucket. The existing
+    // Regenerate_RateLimitedPerUser test only proves "any 429 fires" so it can't
+    // catch the partition miss. This test proves the partition is keyed per user:
+    // user A's exhaustion must NOT also exhaust user B.
+    [Fact]
+    public async Task MfaRegenerate_rate_limit_is_partitioned_by_user()
+    {
+        var (clientA, sessionA, _, userA) = await SetupAuthenticatedMfaUserAsync("rl-partA@mfa-rl-test.local");
+
+        // Drain user A's full budget — must produce at least one 429 to prove A is exhausted.
+        var sawAnyA429 = false;
+        for (int i = 0; i < 15; i++)
+        {
+            var resp = await PostRegenAsync(clientA, sessionA, userA.Id);
+            if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                sawAnyA429 = true;
+            }
+        }
+        sawAnyA429.Should().BeTrue("user A's budget must be exhausted before testing partition isolation");
+
+        // Now user B — in the SAME 60s sliding window — must NOT see 429. If the
+        // partitioner is collapsed onto a single shared bucket (the bug), B inherits
+        // A's exhausted state and returns 429 immediately.
+        var (clientB, sessionB, _, userB) = await SetupAuthenticatedMfaUserAsync("rl-partB@mfa-rl-test.local");
+
+        var bResp = await PostRegenAsync(clientB, sessionB, userB.Id);
+
+        bResp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
+            "user B's first regenerate call must not be rate-limited just because user A exhausted A's bucket; " +
+            "if this fires, the AuthMfaByUser partitioner is collapsing all users into the 'anonymous-mfa' fallback bucket. " +
+            "Fix: mirror AuthReauthByUser by calling httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme).Wait() " +
+            "before reading the NameIdentifier claim.");
+    }
+
     private static string? ExtractSetCookie(HttpResponseMessage response, string cookieName)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return null;

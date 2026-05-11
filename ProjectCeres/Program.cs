@@ -260,10 +260,16 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy(AuthRateLimitPolicies.AuthMfaByUser, httpContext =>
     {
-        // Authenticated endpoint — partition by the user's NameIdentifier claim.
-        // Defensive fallback: anonymous bucket (should never hit since [Authorize]
-        // gates the endpoint, but a misconfiguration shouldn't crash the limiter).
-        var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        // Rate limiter runs BEFORE UseAuthentication, so httpContext.User is empty here.
+        // Explicitly authenticate against the application cookie scheme to resolve the
+        // current user id for per-user partitioning. Mirrors AuthReauthByUser above and
+        // TotpByUserPartitioner (which authenticates against TwoFactorUserIdScheme).
+        // Stage 6c.2 follow-up: prior to this fix the partition key always fell back to
+        // "anonymous-mfa" because User claims hadn't been populated yet, collapsing every
+        // authenticated MFA request into a single shared bucket.
+        var task = httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        task.Wait();
+        var userId = task.Result.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                   ?? "anonymous-mfa";
         return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
         {
