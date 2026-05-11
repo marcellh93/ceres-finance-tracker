@@ -305,6 +305,8 @@ builder.Services.AddScoped<MonthlyCashFlowReportGenerator>();
 builder.Services.AddScoped<NetWorthOverTimeReportGenerator>();
 builder.Services.AddScoped<ReportGeneratorFactory>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.Configure<FileAttachmentOptions>(
+    builder.Configuration.GetSection("FileAttachments"));
 builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();

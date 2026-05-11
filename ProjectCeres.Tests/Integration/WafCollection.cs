@@ -29,6 +29,12 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     private const string TestConnectionString =
         "Host=localhost;Database=project_ceres_test;Username=postgres;Password=postgres";
 
+    // Per-factory upload root keeps WAF-based tests from leaking files into the SUT
+    // project root (ProjectCeres/uploads/). Cleaned up in Dispose(bool).
+    private readonly string _uploadsRoot =
+        Path.Combine(Path.GetTempPath(), $"ceres-waf-{Guid.NewGuid():N}");
+
+
     /// <summary>
     /// When true (default), the factory installs the TestAuthenticationHandler as the
     /// default scheme and drops the global antiforgery filter. Pre-Stage-6a CRUD tests
@@ -42,6 +48,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:DefaultConnection", TestConnectionString);
+        builder.UseSetting("FileAttachments:RootPath", _uploadsRoot);
 
         builder.ConfigureServices(services =>
         {
@@ -119,6 +126,16 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 foreach (var f in antiforgery) options.Filters.Remove(f);
             });
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing && Directory.Exists(_uploadsRoot))
+        {
+            try { Directory.Delete(_uploadsRoot, recursive: true); }
+            catch { /* best-effort cleanup; never mask test failures */ }
+        }
     }
 }
 

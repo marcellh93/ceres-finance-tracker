@@ -3,14 +3,30 @@ using MimeDetective.Definitions;
 using MimeDetective.Engine;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Services;
 
-public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICurrentUserAccessor user) : IFileAttachmentService
+public class FileAttachmentService : IFileAttachmentService
 {
+    private readonly AppDbContext db;
+    private readonly ICurrentUserAccessor user;
+    private readonly string _root;
+
+    public FileAttachmentService(
+        AppDbContext db,
+        IWebHostEnvironment env,
+        ICurrentUserAccessor user,
+        IOptions<FileAttachmentOptions>? options = null)
+    {
+        this.db   = db;
+        this.user = user;
+        _root     = options?.Value.RootPath ?? env.ContentRootPath;
+    }
+
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
     private const int  MaxFilesPerTransaction = 10;
 
@@ -73,7 +89,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICu
 
         // Build a safe stored path — no user-supplied values touch the filesystem.
         var relativePath = Path.Combine("uploads", transactionId.ToString(), $"{Guid.NewGuid()}{extension}");
-        var fullPath     = Path.Combine(env.ContentRootPath, relativePath);
+        var fullPath     = Path.Combine(_root, relativePath);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         await File.WriteAllBytesAsync(fullPath, bytes);
@@ -101,7 +117,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICu
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
-        var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
+        var fullPath = Path.Combine(_root, attachment.StoredPath);
         if (!File.Exists(fullPath))
             throw new InvalidOperationException("Attachment file not found on disk.");
 
@@ -122,7 +138,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICu
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
-        var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
+        var fullPath = Path.Combine(_root, attachment.StoredPath);
         if (File.Exists(fullPath))
             File.Delete(fullPath);
 
@@ -150,7 +166,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICu
             throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
 
         var relativePath = Path.Combine("uploads", "transfers", transferId.ToString(), $"{Guid.NewGuid()}{extension}");
-        var fullPath     = Path.Combine(env.ContentRootPath, relativePath);
+        var fullPath     = Path.Combine(_root, relativePath);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         await File.WriteAllBytesAsync(fullPath, bytes);
@@ -178,7 +194,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICu
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
-        var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
+        var fullPath = Path.Combine(_root, attachment.StoredPath);
         if (!File.Exists(fullPath))
             throw new InvalidOperationException("Attachment file not found on disk.");
 
@@ -198,7 +214,7 @@ public class FileAttachmentService(AppDbContext db, IWebHostEnvironment env, ICu
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
-        var fullPath = Path.Combine(env.ContentRootPath, attachment.StoredPath);
+        var fullPath = Path.Combine(_root, attachment.StoredPath);
         if (File.Exists(fullPath))
             File.Delete(fullPath);
 
