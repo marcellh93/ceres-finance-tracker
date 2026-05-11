@@ -3,7 +3,7 @@ using ProjectCeres.Common;
 
 namespace ProjectCeres.Tests.Common;
 
-public class IUserScopeTests
+public class UserScopeTests
 {
     [Fact]
     public void EnterAs_sets_Current_for_duration_of_using_block()
