@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -32,12 +33,12 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new SingleUserAccessor());
+        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
-        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
+        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
-        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService, new SingleUserAccessor());
+        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
         _service = new ImportService(parserFactory, _fixture.Db, transactionService, stagedTransactionService: stagedTransactionService);
 

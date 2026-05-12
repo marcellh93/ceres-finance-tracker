@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using ProjectCeres.Services;
 
 namespace ProjectCeres.Tests.Integration;
@@ -21,7 +22,7 @@ public class SettingsServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _service = new SettingsService(_fixture.Db, new SingleUserAccessor());
+        _service = new SettingsService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

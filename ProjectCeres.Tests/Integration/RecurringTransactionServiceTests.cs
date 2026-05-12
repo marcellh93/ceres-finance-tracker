@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -30,14 +31,14 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _service = new RecurringTransactionService(_fixture.Db, _accountService, new SingleUserAccessor());
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _service = new RecurringTransactionService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         // Create a reusable test account with no opening balance so any date is valid for ConfirmAsync.
         var account = new Account
         {
             Id            = Guid.NewGuid(),
-            UserId        = SingleUserAccessor.SentinelUserId,
+            UserId        = new Guid("00000000-0000-0000-0000-000000000001"),
             Name          = $"Recurring Test Account {Guid.NewGuid():N}",
             AccountTypeId = 1,
             CurrencyId    = 1,

@@ -101,10 +101,15 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             if (!UseTestAuthHandler) return;
 
             // ===== Pre-Stage-6a-test bypass =====
-            // Rebind ICurrentUserAccessor to the sentinel for non-auth tests.
+            // Rebind ICurrentUserAccessor to the sentinel for non-auth tests. Stage 7
+            // Task 17 deleted SingleUserAccessor; the replacement test double takes the
+            // sentinel Guid as a constructor argument, so the registration is now a
+            // singleton-instance binding instead of a type binding.
             var current = services.Where(d => d.ServiceType == typeof(ICurrentUserAccessor)).ToList();
             foreach (var d in current) services.Remove(d);
-            services.AddScoped<ICurrentUserAccessor, SingleUserAccessor>();
+            services.AddScoped<ICurrentUserAccessor>(_ =>
+                new ProjectCeres.Tests.Common.FakeCurrentUserAccessor(
+                    new Guid("00000000-0000-0000-0000-000000000001")));
 
             services.AddAuthentication(TestAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(

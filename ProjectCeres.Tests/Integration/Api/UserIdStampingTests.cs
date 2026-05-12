@@ -23,7 +23,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 [Collection("IntegrationTests")]
 public class UserIdStampingTests : IAsyncLifetime
 {
-    private static readonly Guid Sentinel              = SingleUserAccessor.SentinelUserId;
+    private static readonly Guid Sentinel              = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CashAccountId         = new("10000000-0000-0000-0000-000000000001");
     private static readonly Guid CheckingAccountId     = new("10000000-0000-0000-0000-000000000002");
     private static readonly Guid CreditCardId          = new("10000000-0000-0000-0000-000000000004");

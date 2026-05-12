@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Services.Reports;
@@ -35,8 +36,8 @@ public class ReportGeneratorTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService         = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _categoryBudgetService  = new CategoryBudgetService(_fixture.Db, new SingleUserAccessor());
+        _accountService         = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _categoryBudgetService  = new CategoryBudgetService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();
@@ -108,7 +109,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, UtilitiesCategoryId, 150m, new DateOnly(2026, 1, 15));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
@@ -140,7 +141,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, HousingCategoryId, 999m, new DateOnly(2026, 2, 5));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
@@ -160,7 +161,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, HousingCategoryId, 300m, new DateOnly(2026, 1, 10));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
@@ -176,7 +177,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         var from = new DateOnly(2026, 1, 1);
         var to   = new DateOnly(2026, 1, 31);
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
@@ -199,7 +200,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, HousingCategoryId, 600m, new DateOnly(2026, 2, 10));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
@@ -216,7 +217,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         await CreateAssetAccountAsync(currencyId: 1);
         await CreateCategoryBudgetAsync(HousingCategoryId, currencyId: 1, limit: 300m);
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -243,7 +244,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, HousingCategoryId, 300m, new DateOnly(2026, 2, 10));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new BudgetVsActualReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<BudgetVsActualRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: from, To: to));
 
@@ -268,7 +269,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, UtilitiesCategoryId, 500m, new DateOnly(2026, 1, 15));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new LargestExpensesReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new LargestExpensesReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<LargestExpenseRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31), Limit: 10));
 
@@ -286,7 +287,7 @@ public class ReportGeneratorTests : IAsyncLifetime
             AddTransaction(accountId, HousingCategoryId, i * 100m, new DateOnly(2026, 1, i));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new LargestExpensesReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new LargestExpensesReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<LargestExpenseRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31), Limit: 3));
 
@@ -302,7 +303,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, SalaryCategoryId,  3000m, new DateOnly(2026, 1, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new LargestExpensesReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new LargestExpensesReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<LargestExpenseRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -318,7 +319,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, HousingCategoryId, 999m, new DateOnly(2026, 2, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new LargestExpensesReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new LargestExpensesReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<LargestExpenseRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -341,7 +342,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, HousingCategoryId,  900m, new DateOnly(2026, 2, 15));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<MonthlyCashFlowRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 2, 28)));
 
@@ -366,7 +367,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, SalaryCategoryId, 2000m, new DateOnly(2026, 1, 5));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<MonthlyCashFlowRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -383,7 +384,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(usdAccountId, SalaryCategoryId, 9999m, new DateOnly(2026, 1, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<MonthlyCashFlowRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -398,7 +399,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, SalaryCategoryId, 2100m, new DateOnly(2026, 3, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new MonthlyCashFlowReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<MonthlyCashFlowRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 3, 31)));
 
@@ -420,7 +421,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, SalaryCategoryId,  1500m, new DateOnly(2026, 2, 10));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<NetWorthSnapshotRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 2, 28)));
 
@@ -446,7 +447,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(liabilityId, HousingCategoryId, 2000m, new DateOnly(2026, 1, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<NetWorthSnapshotRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -466,7 +467,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(usdAccountId, SalaryCategoryId, 9999m, new DateOnly(2026, 1, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<NetWorthSnapshotRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
 
@@ -483,7 +484,7 @@ public class ReportGeneratorTests : IAsyncLifetime
         AddTransaction(accountId, SalaryCategoryId, 1000m, new DateOnly(2026, 3, 1));
         await _fixture.Db.SaveChangesAsync();
 
-        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new SingleUserAccessor());
+        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var result    = (List<NetWorthSnapshotRow>)await generator.GenerateAsync(
             new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 3, 31)));
 

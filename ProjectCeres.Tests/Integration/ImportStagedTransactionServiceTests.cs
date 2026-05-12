@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
@@ -28,12 +29,12 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new SingleUserAccessor());
+        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
-        _transactionService         = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
+        _transactionService         = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
-        _service = new ImportStagedTransactionService(_fixture.Db, _transactionService, new SingleUserAccessor());
+        _service = new ImportStagedTransactionService(_fixture.Db, _transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         var account = new Account
         {
@@ -269,7 +270,7 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
         var ownStaged  = await CreateStagedAsync(ownTxId, StagedTransactionStatus.Pending);
 
         // Sanity: the helper stamped UserId to the sentinel via the SaveChanges interceptor.
-        ownStaged.UserId.Should().Be(SingleUserAccessor.SentinelUserId);
+        ownStaged.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
 
         // Intruder row: same MatchedTransactionId FK (FK is to Transactions, not user-scoped),
         // but stamped to a different user. Must bypass the helper to override the auto-stamp.

@@ -77,7 +77,7 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.RecurringTransactions.AsNoTracking().FirstAsync(r => r.Id == id);
-        row.UserId.Should().Be(SingleUserAccessor.SentinelUserId);
+        row.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
         row.IsActive.Should().BeTrue();
     }
 
@@ -169,7 +169,7 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var tx = await db.Transactions.FindAsync(txId);
-        tx!.UserId.Should().Be(SingleUserAccessor.SentinelUserId);
+        tx!.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
         tx.Description.Should().Be("confirmed-payment");
 
         var reminder = await db.RecurringTransactions.FindAsync(id);

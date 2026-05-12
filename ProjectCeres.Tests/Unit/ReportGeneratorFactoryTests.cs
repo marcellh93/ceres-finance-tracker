@@ -1,6 +1,7 @@
 using FluentAssertions;
 using ProjectCeres.Common;
 using ProjectCeres.Services.Reports;
+using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Unit;
 
@@ -8,14 +9,14 @@ public class ReportGeneratorFactoryTests
 {
     private static ReportGeneratorFactory BuildFactory()
     {
-        var nw   = new NetWorthGenerator(null!, new SingleUserAccessor());
-        var ie   = new IncomeExpenseGenerator(null!, new SingleUserAccessor());
-        var eb   = new ExpenseBreakdownGenerator(null!, new SingleUserAccessor());
-        var th   = new TransactionHistoryGenerator(null!, new SingleUserAccessor());
-        var bva  = new BudgetVsActualReportGenerator(null!, new SingleUserAccessor());
-        var le   = new LargestExpensesReportGenerator(null!, new SingleUserAccessor());
-        var mcf  = new MonthlyCashFlowReportGenerator(null!, new SingleUserAccessor());
-        var nwot = new NetWorthOverTimeReportGenerator(null!, new SingleUserAccessor());
+        var nw   = new NetWorthGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var ie   = new IncomeExpenseGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var eb   = new ExpenseBreakdownGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var th   = new TransactionHistoryGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var bva  = new BudgetVsActualReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var le   = new LargestExpensesReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var mcf  = new MonthlyCashFlowReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var nwot = new NetWorthOverTimeReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         return new ReportGeneratorFactory(nw, ie, eb, th, bva, le, mcf, nwot);
     }
 

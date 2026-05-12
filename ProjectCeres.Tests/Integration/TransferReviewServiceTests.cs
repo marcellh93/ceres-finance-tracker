@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using Moq;
@@ -18,14 +19,14 @@ public class TransferReviewServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new SingleUserAccessor());
+        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var attachmentMock          = new Mock<IFileAttachmentService>().Object;
         var transactionService      = new TransactionService(
-            _fixture.Db, accountService, liabilityPaymentService, attachmentMock, new SingleUserAccessor());
-        var transferService         = new TransferService(_fixture.Db, accountService, new SingleUserAccessor());
+            _fixture.Db, accountService, liabilityPaymentService, attachmentMock, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var transferService         = new TransferService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
-        _service = new TransferReviewService(_fixture.Db, transferService, transactionService, new SingleUserAccessor());
+        _service = new TransferReviewService(_fixture.Db, transferService, transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         var a = new Account { Id = Guid.NewGuid(), Name = "A", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var b = new Account { Id = Guid.NewGuid(), Name = "B", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

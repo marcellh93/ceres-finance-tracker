@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
+using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Integration;
 
@@ -22,10 +23,10 @@ public class TestDbFixture : IAsyncDisposable
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestConnectionString)
-            .AddInterceptors(new UserOwnershipInterceptor(new SingleUserAccessor()))
+            .AddInterceptors(new UserOwnershipInterceptor(new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001"))))
             .Options;
 
-        Db = new AppDbContext(options, new SingleUserAccessor());
+        Db = new AppDbContext(options, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
     }
 
     /// <summary>

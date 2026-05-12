@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Moq;
@@ -33,7 +34,7 @@ public class FileAttachmentServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         _tempRoot = Path.Combine(Path.GetTempPath(), $"ceres-attach-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempRoot);
@@ -41,7 +42,7 @@ public class FileAttachmentServiceTests : IAsyncLifetime
         var env = new Mock<IWebHostEnvironment>();
         env.Setup(e => e.ContentRootPath).Returns(_tempRoot);
 
-        _service = new FileAttachmentService(_fixture.Db, env.Object, new SingleUserAccessor());
+        _service = new FileAttachmentService(_fixture.Db, env.Object, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         // Create a real transaction to attach files to.
         var account = new Account

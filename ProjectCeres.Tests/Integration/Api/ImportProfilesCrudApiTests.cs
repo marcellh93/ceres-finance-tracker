@@ -62,7 +62,7 @@ public class ImportProfilesCrudApiTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.ImportProfiles.AsNoTracking().FirstAsync(p => p.Id == id);
-        row.UserId.Should().Be(SingleUserAccessor.SentinelUserId);
+        row.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
         row.DeletedAt.Should().BeNull();
     }
 

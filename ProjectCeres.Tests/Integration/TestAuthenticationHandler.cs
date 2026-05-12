@@ -31,7 +31,7 @@ public sealed class TestAuthenticationHandler : AuthenticationHandler<Authentica
         var identity = new ClaimsIdentity(
             new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, SingleUserAccessor.SentinelUserId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, new Guid("00000000-0000-0000-0000-000000000001").ToString()),
                 new Claim(ClaimTypes.Name, "test@local"),
                 new Claim(SessionConstants.SessionIdClaim, sid.ToString()),
             },

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
@@ -35,8 +36,8 @@ public class MovementServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        _service = new MovementService(_fixture.Db, new SingleUserAccessor());
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _service = new MovementService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         _assetAccountId = await CreateAssetAccountAsync();
         _secondAssetAccountId = await CreateAssetAccountAsync();

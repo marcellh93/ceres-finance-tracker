@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
@@ -20,7 +21,7 @@ public class ImportProfileServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _service = new ImportProfileService(_fixture.Db, new SingleUserAccessor());
+        _service = new ImportProfileService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using ProjectCeres.Models;
@@ -30,11 +31,11 @@ public class IsClearedTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new SingleUserAccessor());
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var attachmentService = new Mock<IFileAttachmentService>().Object;
-        _txService = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
-        _trService = new TransferService(_fixture.Db, _accountService, new SingleUserAccessor());
+        _txService = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _trService = new TransferService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         var a1 = new Account { Id = Guid.NewGuid(), Name = $"IsCleared A1 {Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var a2 = new Account { Id = Guid.NewGuid(), Name = $"IsCleared A2 {Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

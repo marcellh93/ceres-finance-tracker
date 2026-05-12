@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Tests.Common;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using ProjectCeres.Models;
@@ -34,10 +35,10 @@ public class TransactionServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new SingleUserAccessor());
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new SingleUserAccessor());
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
         var attachmentService = new Mock<IFileAttachmentService>().Object;
-        _service = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new SingleUserAccessor());
+        _service = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
 
         // Create a reusable test account (Asset, EUR) with no opening balance so any date is valid.
         var account = new Account
