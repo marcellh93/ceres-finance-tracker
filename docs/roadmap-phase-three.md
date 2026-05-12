@@ -999,12 +999,14 @@ Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
 
 > **Goal:** five-step wizard at `/onboarding` that takes a freshly-registered user from "I just created an account" to "I see my net worth on the dashboard." Full-screen stepper, distinct from the standard app shell. See [ADR-0053](decisions/ADR-0053-guided-onboarding-deferred.md).
 
+> **Decision gate before Step 1 design:** the timezone strategy is owed at this stage. ADR-0009 deferred the Phase 3 TZ decision to "before launch"; Stage 10's Preferences screen is the natural place to either add a TZ field (option B — per-user IANA) or commit to not adding one (option C — client passes its `today` in requests; recommended). See `planning-phase3.md` § Open Questions → "Timezone handling" for the 28-site audit, three options, and rationale. New ADR (next free: 0071 after CI/CD = 0069 and Playwright = 0070) supersedes ADR-0009's launch-gate follow-up at decision time.
+
 ### Sub-stages
 
 | # | Sub-stage | Reference |
 |---|---|---|
 | 10.1 | `/onboarding` route + full-screen stepper layout | `planning-phase3.md` § 11 Onboarding flow design |
-| 10.2 | Step 1 — Preferences (language, country, default currency, number format, date format) | (above) + `planning-phase3.md` § Localization |
+| 10.2 | Step 1 — Preferences (language, country, default currency, number format, date format; **timezone field gated on TZ-strategy ADR**) | (above) + `planning-phase3.md` § Localization + § Open Questions (Timezone handling) |
 | 10.3 | Step 2 — First asset account | (above) |
 | 10.4 | Step 3 — First liability (optional, skippable) | (above) |
 | 10.5 | Step 4 — Opening balance | (above) + ADR-0010 (opening balance as auto-created transaction) |
@@ -1023,6 +1025,7 @@ Layout + flow:
 
 Step 1 — Preferences:
 
+- [ ] **Timezone strategy ADR landed before this step ships** (`planning-phase3.md` § Open Questions → Timezone handling). Outcome is one of: (A) sweep 28 server-side `DateTime.Today` sites to UTC, no Preferences field; (B) add TimeZoneId column + IANA picker to this step + IUserTimeZone service; (C — recommended) endpoints accept `today` query parameter from the client, no Preferences field, no schema change. Choice locks the field set below.
 - [ ] Five fields grouped: Language (EN/ES), Country (ES, US, GB, CO, AR, VE, Other), Default Currency (EUR, USD, GBP, COP, ARS, VED), Number format (`comma_decimal` / `dot_decimal`), Date format (`DD/MM/YYYY` / `MM/DD/YYYY` / `YYYY-MM-DD`)
 - [ ] All fields pre-filled from `Accept-Language` detection (`security-model.md` § Localization, `planning-phase3.md`)
 - [ ] All fields independently overridable — no cascade (changing country does NOT change currency)
