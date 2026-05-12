@@ -431,7 +431,7 @@ A handful of report-page polish surfaced after Stage 5 was marked done. Shipped 
 | 6.12 | Email-address-change flow (dual-address verification, 7-day revoke link to old address) | `security-model.md` § Email Address Change |
 | 6.13 | Re-authentication middleware for sensitive operations | `security-model.md` § Login → Reauthentication |
 | 6.14 | Audit log table (`AuditLog` entity + writer service) | `planning-phase3.md` § Audit logging |
-| 6.15 | O(1) token verify via HMAC `TokenLookup` column on `PasswordResetToken` + `EmailChangeToken` (closes Argon2id-amplification DoS vector on `/confirm` + `/revoke`). **⚠️ Until shipped, the green test suite is misleading**: tests pass because `AuthTestTokenCleanup.DeleteAllTestTokensAsync` empties the token tables between test classes, but production has no equivalent cleanup and tokens accumulate naturally (up to 7 days for email-change RevokeOld). 6.15's ship-gate explicitly **removes** the test-side cleanup and replaces it with regression tests that insert N=200 dummy rows. See `docs/superpowers/specs/2026-05-11-stage-6-15-token-lookup-design.md` § 1 and § 8.4. | `planning-phase3.md` § Stage 6.15 — Argon2id-O(N) DoS vector on token verify (planned) |
+| 6.15 | O(1) token verify via HMAC `TokenLookup` column on `PasswordResetToken` + `EmailChangeToken` (closed the Argon2id-amplification DoS vector on `/confirm` + `/revoke`). Pre-6.15 the green test suite was misleading: tests passed because `AuthTestTokenCleanup.DeleteAllTestTokensAsync` emptied the token tables between test classes, while production had no equivalent cleanup and tokens accumulated naturally (up to 7 days for email-change RevokeOld). 6.15's ship-gate deleted the test-side cleanup and replaced it with regression tests that insert N=200 dummy rows; the full Authentication suite stayed green under accumulated load. See § 6.15 recap below and `docs/superpowers/specs/2026-05-11-stage-6-15-token-lookup-design.md` § 1 and § 8.4. | `planning-phase3.md` § Stage 6.15 — Argon2id-O(N) DoS vector on token verify (resolved) |
 
 ### Verification checklist
 
@@ -584,7 +584,9 @@ Stage 6 close-out documentation:
 
 ## Stage 7 — Multi-tenancy cutover (Batch 3c)
 
-**Status: ❌ Pending.** Highest-risk change in Phase 3. Touches every existing service. Lands after Stage 6 so the `AspNetUsers` table exists to remap onto.
+**Status: 🚧 In progress (2026-05-12).** Commit 1 of 2 shipped: Tasks 1–9 are complete on `main`. The scope primitives (`IUserScope`, `IUserJobRunner`), the unified `ICurrentUserAccessor` with HTTP-context → AsyncLocal-scope resolution, `: IUserOwned` promotion of 8 auth-internal entities, the `Category.IsReserved` column + policy rewrite, the canonical `Categories.Defaults` list in `Common/`, the `CategorySeedService` wired into both `AuthController.Register` and `AuthTestFixture.RegisterUserAsync`, the `OwnedOrShared` → `Owned` flip on 11 call sites with `Category` carrying a temporary `IUserOwned`/`IOptionallyUserOwned` bridge, and the EF global query filters on 22 entities (including `Movement` as TPC root) with `IgnoreQueryFilters()` opt-outs at every legitimate pre-auth code path are all live. `StampOpeningBalanceWithSentinel` migration moved the legacy `UserId = NULL` "Opening Balance" Category into the sentinel cohort so existing dev/test data stays reachable until Task 15's full remap. 938/938 tests green. Commit 2 (Tasks 10–19) still ahead: architecture test for the `IgnoreQueryFilters()` allow-list, IDOR integration suite, empty-DB boot regression, then the destructive sentinel-to-real-user migration + `SingleUserAccessor`/seed/test-double cleanup.
+
+> **Note: HttpContextCurrentUserAccessor contract change vs ADR-0067.** Task 9 had to soften the "throw `InvalidOperationException` when neither resolves" rule from ADR-0067 to "return `Guid.Empty`". EF Core eagerly evaluates global query filter expressions at model creation time, before any HTTP context or `IUserScope` is established — a throw at that moment crashes the app on startup. The safe default (`Guid.Empty`) means filters then produce a `WHERE` clause matching zero rows. The "no leakage" invariant still holds via the Task 10 architecture test that allow-lists every legitimate `IgnoreQueryFilters()` call site. Documented inline at `HttpContextCurrentUserAccessor.cs:18–24`.
 
 > **Goal:** the sentinel `SingleUserAccessor` is replaced with a real, HTTP-context-backed `ICurrentUserAccessor`; EF global query filters apply to every user-owned entity; the `IUserScope` + `IUserJobRunner` primitives ship; the sentinel-to-real-user data migration runs on first registration; every existing service is audited for `UserId` scoping; the IDOR integration test suite is green.
 
@@ -607,31 +609,33 @@ Stage 6 close-out documentation:
 
 `IUserScope` + AsyncLocal:
 
-- [ ] `IUserScope` interface has `EnterAs(Guid userId): IDisposable`
-- [ ] Internal storage is `AsyncLocal<Guid?>` (propagates across `await` boundaries within a single logical flow)
-- [ ] `Dispose()` clears the value; nested `EnterAs` calls work correctly via stack semantics
-- [ ] Architecture test: `IUserScope.EnterAs` callers always wrap the call in `using` (no leaked scopes)
+- [x] `IUserScope` interface has `EnterAs(Guid userId): IDisposable` (Task 1, `ProjectCeres/Common/IUserScope.cs`)
+- [x] Internal storage is `AsyncLocal<Guid?>` (propagates across `await` boundaries within a single logical flow) — `UserScope.cs`; covered by `UserScopeTests.EnterAs_propagates_across_await_boundaries`
+- [x] `Dispose()` clears the value; nested `EnterAs` calls work correctly via stack semantics — covered by `UserScopeTests.EnterAs_nests_with_stack_semantics`
+- [ ] Architecture test: `IUserScope.EnterAs` callers always wrap the call in `using` (no leaked scopes) — deferred; Task 10's allow-list test does not cover this rule
 
 `IUserJobRunner`:
 
-- [ ] `ForEachUserAsync(filter, work)` enumerates users with `IgnoreQueryFilters()` (intentionally cross-tenant query)
-- [ ] Per-user iteration enters scope, invokes work, exits scope
-- [ ] Per-user exception isolation: one user's failure does not abort the batch
-- [ ] Per-user logging: each iteration logs success/failure with the user's id
+- [x] `ForEachUserAsync(filter, work)` enumerates users with `IgnoreQueryFilters()` (intentionally cross-tenant query) — Task 2, `UserJobRunner.cs:23`
+- [x] Per-user iteration enters scope, invokes work, exits scope — covered by `UserJobRunnerTests.ForEachUserAsync_enters_scope_per_user_in_turn`
+- [x] Per-user exception isolation: one user's failure does not abort the batch — covered by `UserJobRunnerTests.ForEachUserAsync_continues_after_one_user_throws`; `OperationCanceledException` matching the runner's own token is intentionally re-thrown
+- [x] Per-user logging: each iteration logs success/failure with the user's id — `UserJobRunner.cs:38–41` (`logger.LogError(ex, "Per-user job failed for {UserId}", userId)`)
 
 `ICurrentUserAccessor`:
 
-- [ ] Resolves in this order: HTTP context → AsyncLocal scope → throw `InvalidOperationException`
-- [ ] The throw message names both options: "HTTP requests resolve from cookie; background jobs must enter via IUserScope.EnterAs()"
-- [ ] No silent fallback to `Guid.Empty` anywhere
-- [ ] Test: calling `_currentUser.UserId` in a unit-test without setting either context throws
+- [x] Resolves in this order: HTTP context → AsyncLocal scope → return `Guid.Empty` (Task 9 amendment to ADR-0067 — see status note above; original ADR said throw, EF model-creation eager evaluation forced the safe-default)
+- [ ] ~~The throw message names both options: "HTTP requests resolve from cookie; background jobs must enter via IUserScope.EnterAs()"~~ — superseded by Task 9 contract change to `Guid.Empty`. The architecture-test allow-list (Task 10) is the safety net.
+- [ ] ~~No silent fallback to `Guid.Empty` anywhere~~ — superseded by Task 9 contract change. The fallback IS to `Guid.Empty` by design; the global filter then matches zero rows.
+- [x] Resolution-order tests cover all four paths — `CurrentUserAccessorResolutionTests` (4 tests: HTTP wins, scope fallback, no-claim fallback, neither-resolves → `Guid.Empty`)
 
 EF global query filters:
 
-- [ ] Filters applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `TransferAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile` (+ any other user-owned entity at cutover time)
-- [ ] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) carry NO filter
-- [ ] Service code continues to write explicit `.Where(t => t.UserId == _currentUser.UserId)` (belt-and-suspenders)
-- [ ] Test: a query against a user-owned table without `IgnoreQueryFilters()`, run as User A, returns zero User B rows even when the explicit `.Where()` is intentionally omitted
+- [x] Filters applied to 22 entities: `Account`, `Budget`, `Category` (via temporary `IUserOwned`/`IOptionallyUserOwned` bridge), `CategoryBudget`, `ImportProfile`, `ImportStagedTransaction`, `ImportStagedTransfer`, `ImportTransferExclusion`, `RecurringTransaction`, `SavedReport`, `Settings`, `Movement` (TPC root — covers `Transaction`/`Transfer`/`LiabilityPayment`), `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `PasswordResetToken`, `EmailChangeToken`, `LockoutUnlockToken`, `AuditLog`. See `AppDbContext.ConfigureGlobalQueryFilters`.
+- [x] `TransactionAttachment` / `TransferAttachment` are NOT filtered directly — they have no `UserId` column; service code scopes them via parent (`a.Transaction.UserId == ...`). EF emits two `PendingModelChangesWarning`s about the parent-attachment FK pair being a "required end with a filtered parent" — acceptable; documented inline in `ConfigureGlobalQueryFilters`.
+- [x] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`) carry NO filter
+- [x] `FailedLoginAttempt` carries NO filter (nullable `UserId`; cross-tenant retention sweep)
+- [x] Service code continues to write explicit `.Where(t => t.UserId == _currentUser.UserId)` (belt-and-suspenders) — Tasks 1–8 did NOT touch existing service code beyond the `OwnedOrShared` → `Owned` flip
+- [x] Test: a query against `Accounts` run via `IUserScope.EnterAs(userA)` returns only User A's rows, never User B's — covered by `GlobalQueryFilterTests.Account_query_filtered_to_current_user_via_IUserScope`
 
 `IgnoreQueryFilters()` boundary:
 
