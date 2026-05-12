@@ -179,6 +179,12 @@ The app should not compete on bank connectivity (expensive, unreliable, PSD2-hea
 
 These ideas have merit but are not assigned to a phase yet. Revisit when the app is in daily use.
 
+### Server-side Reminder + Review count providers
+
+**Goal:** when the reminders feature and the review surface need a server-side row count (currently the SPA computes both client-side), add `ReminderCountProvider` and `ReviewCountProvider` services that wrap a UserId-scoped EF query.
+
+*(Moved from Stage 7 close-out 2026-05-12: the Stage 7 service-audit checklist enumerated these two providers as future audit targets. Neither exists in the codebase yet because the SPA computes both counts client-side via the existing list endpoints. When either is added, the service must inject `ICurrentUserAccessor` and chain `.Owned(user)` on its DbSet query — same pattern as every other Stage 7-audited service. The Stage 7 EF global query filter on the underlying entity is the second safety net regardless.)*
+
 ### Native mobile apps (iOS and Android)
 
 **Goal:** full native mobile experience — not just a mobile-optimised website.

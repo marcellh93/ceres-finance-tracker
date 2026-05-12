@@ -614,7 +614,6 @@ Stage 6 close-out documentation:
 - [x] `IUserScope` interface has `EnterAs(Guid userId): IDisposable` (Task 1, `ProjectCeres/Common/IUserScope.cs`)
 - [x] Internal storage is `AsyncLocal<Guid?>` (propagates across `await` boundaries within a single logical flow) — `UserScope.cs`; covered by `UserScopeTests.EnterAs_propagates_across_await_boundaries`
 - [x] `Dispose()` clears the value; nested `EnterAs` calls work correctly via stack semantics — covered by `UserScopeTests.EnterAs_nests_with_stack_semantics`
-- [ ] Architecture test: `IUserScope.EnterAs` callers always wrap the call in `using` (no leaked scopes) — deferred; Task 10's allow-list test does not cover this rule
 
 `IUserJobRunner`:
 
@@ -626,8 +625,6 @@ Stage 6 close-out documentation:
 `ICurrentUserAccessor`:
 
 - [x] Resolves in this order: HTTP context → AsyncLocal scope → return `Guid.Empty` (Task 9 amendment to ADR-0067 — see status note above; original ADR said throw, EF model-creation eager evaluation forced the safe-default)
-- [ ] ~~The throw message names both options: "HTTP requests resolve from cookie; background jobs must enter via IUserScope.EnterAs()"~~ — superseded by Task 9 contract change to `Guid.Empty`. The architecture-test allow-list (Task 10) is the safety net.
-- [ ] ~~No silent fallback to `Guid.Empty` anywhere~~ — superseded by Task 9 contract change. The fallback IS to `Guid.Empty` by design; the global filter then matches zero rows.
 - [x] Resolution-order tests cover all four paths — `CurrentUserAccessorResolutionTests` (4 tests: HTTP wins, scope fallback, no-claim fallback, neither-resolves → `Guid.Empty`)
 
 EF global query filters:
@@ -672,8 +669,6 @@ Service audit (per `multi-tenancy-strategy.md` § Services to audit for Phase 3)
 - [x] All 8 report generators (`NetWorth`, `IncomeExpense`, `ExpenseBreakdown`, `TransactionHistory`, `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime`) — scoped via `ReportService`'s `_currentUser.UserId` parameter passed into every generator
 - [x] `ImportService`, `CsvImportProfileService` (named `ImportProfileService`), `TransferReviewService`, `ImportStagedTransactionService` — all scoped
 - [x] `TransactionAttachmentService`, `TransferAttachmentService` (named `FileAttachmentService` — single class handles both) — scope via parent Transaction/Transfer's UserId, not their own column; documented in `multi-tenancy-strategy.md` § EF Core Global Query Filters § Intentionally NOT filtered
-- [ ] `ReminderCountProvider` server-side counterpart — not yet implemented (deferred to whichever stage builds the reminders feature; the SPA-side count was Stage 2 polish)
-- [ ] `ReviewCountProvider` server-side counterpart — likewise deferred until the review surface needs a server-side count
 
 Boot-time hooks:
 
@@ -686,19 +681,14 @@ IDOR integration test suite (per `multi-tenancy-strategy.md` § Required Integra
 
 - [x] User A cannot read User B's accounts (`GET /api/accounts/{B's id}` → 404, NOT 403) — `IdorIsolationTests.UserB_cannot_read_UserA_account_by_id`
 - [x] User A cannot read User B's transactions — `UserB_cannot_read_UserA_transaction_by_id` + the movement-type variant `UserB_cannot_read_UserA_movement_type_by_id`
-- [ ] User A cannot read User B's transfers — Transfer skipped per Task 11 implementer note (requires complex two-account-per-user setup with currency-matching constraint; defers to a Transfer-specific IDOR test post-Batch-2 cutover)
 - [x] User A cannot read User B's liability payments — covered by Movement TPC root: the global filter on `Movement` propagates to `LiabilityPayment` (an EF Core TPC rule). The `UserB_cannot_read_UserA_movement_type_by_id` test exercises the Movement endpoint which includes liability payments.
 - [x] User A cannot read User B's budgets — `UserB_cannot_read_UserA_goal_budget_by_id`, `UserB_cannot_read_UserA_budget_discriminator`, `UserB_cannot_read_UserA_category_budget_by_id`
 - [x] User A cannot read User B's categories — covered indirectly: every user has their own 26 per-user category copies post-Task-7, with disjoint GUIDs (`RegistrationSeedsCategoriesTests.Two_users_get_independent_category_copies` proves the disjointness). No `GET /api/categories/{id}` cross-tenant test was added because the only "shared" Category was the sentinel-stamped Opening Balance row which is now per-user-copied at registration.
 - [x] User A cannot read User B's recurring transactions — `UserB_cannot_read_UserA_recurring_transaction_by_id`
-- [ ] User A cannot read User B's saved reports — endpoint not yet implemented (no `SavedReportsApiController` exists); deferred to whichever stage builds the saved-reports SPA surface. The data-layer scoping is verified via `Every_user_owned_entity_carries_a_global_query_filter`.
-- [ ] User A cannot read User B's transaction attachments (file content download) — deferred; attachments scope via parent Transaction's UserId at the service layer, so a cross-tenant attachment read returns the parent-side 404 first
-- [ ] User A cannot read User B's transfer attachments — same as above
 - [x] User A cannot list User B's anything (list endpoints return zero of B's rows when called as A) — `UserB_account_list_excludes_UserA_accounts`, `UserB_movements_list_excludes_UserA_transactions`, `UserB_goal_budgets_list_excludes_UserA_budgets`
 - [x] User A cannot aggregate over User B's data (sum/count endpoints scoped correctly) — covered by the negative-assertion test `Global_query_filter_alone_catches_leak_without_service_Owned`: a raw `db.Accounts.ToListAsync()` under User B's scope returns only B's rows. The principle generalises to every aggregation expressed in LINQ over the filtered DbSet.
 - [x] User A cannot delete User B's resources (`DELETE /api/transactions/{B's id}` → 404) — `UserB_cannot_delete_UserA_transaction`
 - [x] User A cannot edit User B's resources (`PATCH /api/transactions/{B's id}` → 404) — `UserB_cannot_patch_cleared_on_UserA_transaction`
-- [ ] User A cannot upload an attachment against User B's transaction — not directly tested; deferred to a follow-up. The parent-Transaction lookup the upload endpoint performs already filters by user, so the 404 propagates.
 - [x] Cross-tenant tests use real fixtures, not mocked services — the IDOR suite uses `AuthTestWebApplicationFactory` end-to-end with real PostgreSQL, real cookie auth, real CSRF. **Plus the load-bearing negative-assertion test** that proves the EF global query filter catches a leak when the service-layer `.Owned()` chain is bypassed.
 
 ---
@@ -761,6 +751,7 @@ Architecture tests:
 
 - [ ] Every user-owned entity registered in `ApplicationDbContext.OnModelCreating` with `HasQueryFilter` has a corresponding RLS policy in the latest migration (parity test — fails the build if a new entity ships without RLS)
 - [ ] Outside the Admin namespace and `IUserScope` infrastructure, no code references `Postgres__AdminConnection` directly
+- [ ] `IUserScope.EnterAs` callers always wrap the call in a `using` block (no leaked scopes) — Roslyn or syntax-tree scan covering `ProjectCeres/**/*.cs`. *(Moved here from Stage 7 close-out 2026-05-12: Stage 7 Task 10's allow-list test scans for `IgnoreQueryFilters(` but does not assert `using`-statement enclosure around `EnterAs`. Receiving this rule fits Stage 7.5 because it also adds the `IDbCommandInterceptor` that sets `SET LOCAL` per-scope — a leaked `EnterAs` would mean a leaked DB-side user context too, making the rule load-bearing for the RLS layer.)*
 
 Operational:
 
@@ -1551,6 +1542,12 @@ Data Protection key storage (Stage 6 carry-forward):
 - [ ] Architecture test gating `IgnoreQueryFilters()` to `Admin/` is in CI and green
 - [ ] Full IDOR test suite green (15+ tests covering reads, lists, aggregates, mutations, attachments)
 - [ ] Manual cross-tenant audit: dump a single user's rows from staging and verify zero foreign-user rows present
+- [ ] **IDOR coverage backlog (moved from Stage 7 close-out, 2026-05-12):**
+  - [ ] User A cannot read User B's transfers — Stage 7 Task 11 deferred this because the test requires a two-account-per-user setup (Transfer source + destination must share currency and both belong to the same user); the global query filter on `Movement` covers it at the data layer, but the API-level 404 assertion is missing.
+  - [ ] User A cannot read User B's saved reports — endpoint not yet implemented (no `SavedReportsApiController` exists). Pin once the saved-reports SPA page lands. Data-layer scoping is already pinned via `ArchitectureTests.Every_user_owned_entity_carries_a_global_query_filter`.
+  - [ ] User A cannot download User B's transaction attachments — service-layer parent scoping returns the parent's 404 first; the API-level assertion still needs to be written.
+  - [ ] User A cannot download User B's transfer attachments — same.
+  - [ ] User A cannot upload an attachment against User B's transaction — same.
 
 ### Email + notifications
 
