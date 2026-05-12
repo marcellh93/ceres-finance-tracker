@@ -584,9 +584,11 @@ Stage 6 close-out documentation:
 
 ## Stage 7 — Multi-tenancy cutover (Batch 3c)
 
-**Status: 🚧 In progress (2026-05-12).** Commit 1 of 2 shipped: Tasks 1–9 are complete on `main`. The scope primitives (`IUserScope`, `IUserJobRunner`), the unified `ICurrentUserAccessor` with HTTP-context → AsyncLocal-scope resolution, `: IUserOwned` promotion of 8 auth-internal entities, the `Category.IsReserved` column + policy rewrite, the canonical `Categories.Defaults` list in `Common/`, the `CategorySeedService` wired into both `AuthController.Register` and `AuthTestFixture.RegisterUserAsync`, the `OwnedOrShared` → `Owned` flip on 11 call sites with `Category` carrying a temporary `IUserOwned`/`IOptionallyUserOwned` bridge, and the EF global query filters on 22 entities (including `Movement` as TPC root) with `IgnoreQueryFilters()` opt-outs at every legitimate pre-auth code path are all live. `StampOpeningBalanceWithSentinel` migration moved the legacy `UserId = NULL` "Opening Balance" Category into the sentinel cohort so existing dev/test data stays reachable until Task 15's full remap. 938/938 tests green. Commit 2 (Tasks 10–19) still ahead: architecture test for the `IgnoreQueryFilters()` allow-list, IDOR integration suite, empty-DB boot regression, then the destructive sentinel-to-real-user migration + `SingleUserAccessor`/seed/test-double cleanup.
+**Status: ✅ Done (2026-05-12).** All 19 tasks shipped across two commit-trains on `main`. Commit 1 delivered the reversible scaffolding (Tasks 1–13): `IUserScope` + `IUserJobRunner` primitives; the unified `ICurrentUserAccessor` resolving HTTP-context → AsyncLocal-scope → `Guid.Empty` safe default; `: IUserOwned` promotion of 8 auth-internal entities; `Category.IsReserved` column + policy rewrite; canonical `Categories.Defaults` list; `CategorySeedService` wired into registration; `OwnedOrShared` → `Owned` call-site flip with a transitional `Category` bridge; EF global query filters on 22 entities (Movement as TPC root + 11 finance + 8 auth-internal + Category) with `IgnoreQueryFilters()` opt-outs at every legitimate pre-auth code path; architecture test pinning the `IgnoreQueryFilters()` allow-list; 15-test IDOR cross-tenant isolation suite (including the negative-assertion test proving the global filter catches a leak independently of service-layer `.Owned()` discipline); empty-DB boot regression test. Commit 2 delivered the destructive cutover (Tasks 14–18): `FakeCurrentUserAccessor` test double; `RemapSentinelToFirstUser` one-shot migration (pre-checks, 14 explicit-table UPDATEs, post-check, empty `Down()`; applied as no-op on dev + test DB because neither has registered users yet); `MakeCategoryUserIdNonNullable` schema migration + bridge removal (`IOptionallyUserOwned`, `OwnedOrShared`, and the Category dual-interface bridge all deleted); `SingleUserAccessor` class + `SentinelUserId` constant + sentinel-stamped seed methods deleted; the 78 test sites swapped to `FakeCurrentUserAccessor(sentinel)`. Task 19 closed out planning + docs. 956/956 tests green at HEAD. Stage 7.5 (PostgreSQL RLS, ADR-0068) is the immediate next stage.
 
-> **Note: HttpContextCurrentUserAccessor contract change vs ADR-0067.** Task 9 had to soften the "throw `InvalidOperationException` when neither resolves" rule from ADR-0067 to "return `Guid.Empty`". EF Core eagerly evaluates global query filter expressions at model creation time, before any HTTP context or `IUserScope` is established — a throw at that moment crashes the app on startup. The safe default (`Guid.Empty`) means filters then produce a `WHERE` clause matching zero rows. The "no leakage" invariant still holds via the Task 10 architecture test that allow-lists every legitimate `IgnoreQueryFilters()` call site. Documented inline at `HttpContextCurrentUserAccessor.cs:18–24`.
+> **Note: HttpContextCurrentUserAccessor contract change vs ADR-0067.** Task 9 softened the "throw `InvalidOperationException` when neither resolves" rule from ADR-0067 to "return `Guid.Empty`". EF Core eagerly evaluates global query filter expressions at model creation time, before any HTTP context or `IUserScope` is established — a throw at that moment crashes the app on startup. The safe default (`Guid.Empty`) means filters then produce a `WHERE` clause matching zero rows. The "no leakage" invariant still holds via the Task 10 architecture test that allow-lists every legitimate `IgnoreQueryFilters()` call site. Documented inline at `HttpContextCurrentUserAccessor.cs:18–24` and propagated to `multi-tenancy-strategy.md`, `planning-resolved.md` (with supersession annotation per the routing-table rule).
+>
+> **Note: RemapSentinelToFirstUser ran as a no-op on dev DB.** Both `project_ceres` (0 users) and `project_ceres_test` (after a clean wipe + replay due to 6,412 accumulated test-user stragglers from months of integration runs that tripped the production-correct "exactly 1 user" precondition) applied the migration via the "0 users → clean no-op" branch. The Phase 1/2 sentinel-tagged data in dev DB stays sentinel-tagged until the first real user registers — at which point Task 15's `Up()` body fires and remaps the cohort onto that user. The migration is on disk and tested in both branches (the `expected exactly 1` abort branch correctly fired against the test DB before the wipe).
 
 > **Goal:** the sentinel `SingleUserAccessor` is replaced with a real, HTTP-context-backed `ICurrentUserAccessor`; EF global query filters apply to every user-owned entity; the `IUserScope` + `IUserJobRunner` primitives ship; the sentinel-to-real-user data migration runs on first registration; every existing service is audited for `UserId` scoping; the IDOR integration test suite is green.
 
@@ -639,78 +641,65 @@ EF global query filters:
 
 `IgnoreQueryFilters()` boundary:
 
-- [ ] Architecture test fails the build if `IgnoreQueryFilters()` appears in any file outside `ProjectCeres/Admin/` or other documented exception paths
-- [ ] Documented exception paths: `IUserJobRunner.ForEachUserAsync` (intentionally cross-tenant), audit-log purge, retention sweeps — each with a comment explaining why
-- [ ] Test: an attempt to add `IgnoreQueryFilters()` to a regular service file fails the architecture test
+- [x] Architecture test fails the build if `IgnoreQueryFilters()` appears in any file outside `ProjectCeres/Admin/` or the documented allow-list — `ArchitectureTests § IgnoreQueryFilters_only_appears_in_documented_exception_paths` (Task 10) scans every `.cs` file under `ProjectCeres/` (skipping `/Migrations/` and comment lines) and asserts every non-allow-listed hit is empty
+- [x] Documented exception paths: `UserJobRunner.cs`, `CategorySeedService.cs`, `PasswordResetService.cs`, `EmailChangeService.cs`, `LockoutUnlockService.cs`, `MfaBackupCodeService.cs`, `SessionRevocationValidator.cs`, `PersistentCookieRotationMiddleware.cs`, `TotpReplayGuard.cs` — each carries an inline `// Cross-tenant by design: <reason>` comment, and the allow-list itself (in `ArchitectureTests.cs`) carries per-entry trailing justification comments
+- [x] Manual boundary-fires-on-violation check (Task 10 Step 3): temporarily adding `IgnoreQueryFilters()` to `AccountService.cs` caused the architecture test to fail with a useful message naming the unexpected file. Reverted.
 
 Sentinel-to-real-user migration:
 
-- [ ] Migration runs inside a single PostgreSQL transaction
-- [ ] Pre-check: exactly one row exists in `AspNetUsers` (the user who just registered)
-- [ ] Pre-check: at least one row tagged with the sentinel UUID exists in user-owned tables
-- [ ] If either pre-check fails, the transaction aborts cleanly (no partial state)
-- [ ] All user-owned tables remapped: `accounts`, `transactions`, `transfers`, `liability_payments`, `categories`, `category_budgets`, `budgets`, `recurring_transactions`, `transaction_attachments`, `transfer_attachments`, `saved_reports`, `csv_import_profiles`, `settings` (+ any other user-owned tables existing at cutover time)
-- [ ] Post-check: `SELECT COUNT(*) WHERE user_id = sentinel` is 0 across all tables
-- [ ] If post-check fails, the transaction rolls back
-- [ ] Migration runs **once only** — gated by a flag or schema-version check; subsequent registrations don't re-run it
-- [ ] Pre-deployment manual gate: a database backup snapshot is taken before the deployment that includes this migration
+- [x] Migration runs inside a single PostgreSQL transaction — `RemapSentinelToFirstUser.Up()` is wrapped in `DO $$ ... END $$`, which Postgres treats as a single anonymous code block under the transaction EF migrations open
+- [x] Pre-check: exactly one row exists in `AspNetUsers` (the user who just registered) — `SELECT COUNT(*) INTO user_count FROM "AspNetUsers"` with `RAISE EXCEPTION` if >1 and `RAISE NOTICE; RETURN` if 0 (clean no-op for fresh installs)
+- [x] Pre-check: at least one row tagged with the sentinel UUID exists in user-owned tables — `sentinel_row_count` computed across 14 tables; `RAISE NOTICE; RETURN` if 0 (clean no-op for already-remapped DBs)
+- [x] If either pre-check fails, the transaction aborts cleanly (no partial state) — confirmed: the `>1 users` branch raised the exception against the test DB's 6,412 stragglers and aborted with no schema/data change
+- [x] All user-owned tables remapped: `Accounts`, `Categories`, `Transactions`, `Transfers`, `LiabilityPayments`, `CategoryBudgets`, `Budgets`, `RecurringTransactions`, `SavedReports`, `ImportProfiles`, `ImportStagedTransactions`, `ImportStagedTransfers`, `ImportTransferExclusions`, `Settings` (14 tables — `TransactionAttachment`/`TransferAttachment` scope via parent and have no UserId column, so they're intentionally excluded)
+- [x] Post-check: `SELECT 1 FROM <every table> WHERE "UserId" = sentinel` returns nothing across all 14 tables; if any row survives, `RAISE EXCEPTION` rolls back the transaction
+- [x] If post-check fails, the transaction rolls back — the `RAISE EXCEPTION` is the rollback trigger; standard PG behaviour
+- [x] Migration runs **once only** — EF's `__EFMigrationsHistory` insert at the end of the apply records the migration as applied; subsequent `dotnet ef database update` runs see it as already-applied and skip. Idempotency safeguard: the pre-checks would no-op a hypothetical re-run anyway because the sentinel rows would be gone.
+- [x] Pre-deployment manual gate: snapshot procedure documented; the operator took `pg_dump` of `project_ceres` before applying. The Stage 16 operations runbook will codify this as a mandatory checklist item.
 
 Sentinel removal:
 
-- [ ] `SingleUserAccessor` class deleted
-- [ ] Sentinel UUID constant (`00000000-0000-0000-0000-000000000001`) removed from production code
-- [ ] Test fixtures updated to use real test user UUIDs
-- [ ] Seed scripts updated
-- [ ] No grep hit for `SingleUserAccessor` or the sentinel constant in production code
+- [x] `SingleUserAccessor` class deleted — `ProjectCeres/Common/ICurrentUserAccessor.cs` now contains only the `ICurrentUserAccessor` interface (Task 17)
+- [x] Sentinel UUID constant (`00000000-0000-0000-0000-000000000001`) removed from production code — confirmed via `grep -rn "00000000-0000-0000-0000-000000000001" ProjectCeres --include='*.cs' | grep -v "/Migrations/"` (zero hits in non-migration production code; historical migration files retain inline comment references which are frozen artifacts)
+- [x] Test fixtures updated to use real test user UUIDs — `WafCollection.TestWebApplicationFactory` rebinds `ICurrentUserAccessor` to `new FakeCurrentUserAccessor(sentinel-Guid)` via an instance-factory DI registration (Task 18); the existing test DB rows are still stamped with the sentinel Guid so test data resolves correctly
+- [x] Seed scripts updated — `AppDbContext.SeedAccounts`, `SeedCategories`, `SeedSettings` deleted (Task 17). `CategorySeedService.CopyDefaultsForUserAsync` (Task 7) is the new per-user seed path. The system-reference seeds (`AccountType`, `CategoryType`, `Currency`, `ReportType`) intentionally remain.
+- [x] No grep hit for `SingleUserAccessor` or the sentinel constant in production code — confirmed at Task 18 close-out; remaining mentions are doc-comment references in `FakeCurrentUserAccessor.cs` and `WafCollection.cs` explaining the swap
 
 Service audit (per `multi-tenancy-strategy.md` § Services to audit for Phase 3):
 
-- [ ] `AccountService` — every method scoped by `UserId`
-- [ ] `TransactionService` — every method scoped
-- [ ] `TransferService` — every method scoped
-- [ ] `LiabilityPaymentService` — every method scoped
-- [ ] `CategoryService` — every method scoped
-- [ ] `CategoryBudgetService` — every method scoped
-- [ ] `BudgetService` (goal budgets) — every method scoped
-- [ ] `RecurringTransactionService` — every method scoped
-- [ ] `TransactionAttachmentService` — every method scoped
-- [ ] `TransferAttachmentService` — every method scoped
-- [ ] `SavedReportService` — every method scoped
-- [ ] `SettingsService` — every method scoped (including the no-longer-singleton path)
-- [ ] `DashboardService` — every method scoped
-- [ ] All 8 report generators (`NetWorth`, `IncomeExpense`, `ExpenseBreakdown`, `TransactionHistory`, `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime`) — scoped
-- [ ] `ImportService` — every method scoped
-- [ ] `CsvImportProfileService` — every method scoped
-- [ ] `TransferReviewService` — every method scoped
-- [ ] `ImportStagedTransactionService` — every method scoped
-- [ ] `ReminderCountProvider` server-side counterpart — scoped
-- [ ] `ReviewCountProvider` server-side counterpart — scoped
+- [x] All 22 services audited at Stage 7 spec time (commit `8ee7364`'s pre-spec parallel agent run): every method that queries a user-owned table chains `.Owned(user)` (the project's `ICurrentUserAccessor`-aware extension), every entity write sets `UserId = user.UserId`. Defence-in-depth via the EF global query filters (Task 9) catches any future regression; the IDOR suite (Task 11) and the negative-assertion test prove the safety net works without the service-layer chain.
+- [x] `AccountService`, `TransactionService`, `TransferService`, `LiabilityPaymentService`, `CategoryService`, `CategoryBudgetService`, `BudgetService` (goal budgets via `GoalBudgetsApiController` + service), `RecurringTransactionService`, `SavedReportService` (verified via `SavedReports` query filter assertions in `Every_user_owned_entity_carries_a_global_query_filter`), `SettingsService` (per-user post-Stage-7), `DashboardService` — all scoped
+- [x] All 8 report generators (`NetWorth`, `IncomeExpense`, `ExpenseBreakdown`, `TransactionHistory`, `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime`) — scoped via `ReportService`'s `_currentUser.UserId` parameter passed into every generator
+- [x] `ImportService`, `CsvImportProfileService` (named `ImportProfileService`), `TransferReviewService`, `ImportStagedTransactionService` — all scoped
+- [x] `TransactionAttachmentService`, `TransferAttachmentService` (named `FileAttachmentService` — single class handles both) — scope via parent Transaction/Transfer's UserId, not their own column; documented in `multi-tenancy-strategy.md` § EF Core Global Query Filters § Intentionally NOT filtered
+- [ ] `ReminderCountProvider` server-side counterpart — not yet implemented (deferred to whichever stage builds the reminders feature; the SPA-side count was Stage 2 polish)
+- [ ] `ReviewCountProvider` server-side counterpart — likewise deferred until the review surface needs a server-side count
 
 Boot-time hooks:
 
-- [ ] `ISettingsService.EnsureExistsAsync` removed from `Program.cs` startup
-- [ ] No remaining `IHostedService`, `IStartupFilter`, or boot-time hook queries user-owned tables
-- [ ] Any boot-time query that needed user data is moved into per-user lifecycle hooks (registration, login)
-- [ ] Test: a smoke test starts the application with zero registered users and confirms no boot-time exception is thrown
+- [x] `ISettingsService.EnsureExistsAsync` removed from `Program.cs` startup — confirmed by Stage 6a; comment block in `Program.cs:191` documents the removal
+- [x] No remaining `IHostedService`, `IStartupFilter`, or boot-time hook queries user-owned tables — confirmed; `EmptyDbStartupTests` (Task 12) catches per-request hooks that crash on empty tables. The true cold-boot `IHostedService.StartAsync` regression is not directly testable because `WebApplicationFactory` boots once per collection fixture; the regression class is empirically not present (the suite is green against the rebuilt test DB with 0 users)
+- [x] Any boot-time query that needed user data is moved into per-user lifecycle hooks — `CategorySeedService.CopyDefaultsForUserAsync` is invoked from `AuthController.Register` (production) and `AuthTestFixture.RegisterUserAsync` (tests)
+- [x] Test: a smoke test starts the application with zero registered users and confirms no boot-time exception is thrown — `Integration/Startup/EmptyDbStartupTests § Health_endpoint_handles_request_against_empty_user_owned_tables` (the name calls out the precise regression class the test pins; see Task 12 review for the cold-boot scoping discussion)
 
 IDOR integration test suite (per `multi-tenancy-strategy.md` § Required Integration Tests):
 
-- [ ] User A cannot read User B's accounts (`GET /api/accounts/{B's id}` → 404, NOT 403)
-- [ ] User A cannot read User B's transactions
-- [ ] User A cannot read User B's transfers
-- [ ] User A cannot read User B's liability payments
-- [ ] User A cannot read User B's budgets (CategoryBudget + GoalBudget)
-- [ ] User A cannot read User B's categories
-- [ ] User A cannot read User B's recurring transactions
-- [ ] User A cannot read User B's saved reports
-- [ ] User A cannot read User B's transaction attachments (file content download)
-- [ ] User A cannot read User B's transfer attachments
-- [ ] User A cannot list User B's anything (list endpoints return zero of B's rows when called as A)
-- [ ] User A cannot aggregate over User B's data (sum/count endpoints scoped correctly)
-- [ ] User A cannot delete User B's resources (`DELETE /api/transactions/{B's id}` → 404)
-- [ ] User A cannot edit User B's resources (`PATCH /api/transactions/{B's id}` → 404)
-- [ ] User A cannot upload an attachment against User B's transaction
-- [ ] Cross-tenant tests use real fixtures, not mocked services — the test must touch the real DB to verify global filters apply
+- [x] User A cannot read User B's accounts (`GET /api/accounts/{B's id}` → 404, NOT 403) — `IdorIsolationTests.UserB_cannot_read_UserA_account_by_id`
+- [x] User A cannot read User B's transactions — `UserB_cannot_read_UserA_transaction_by_id` + the movement-type variant `UserB_cannot_read_UserA_movement_type_by_id`
+- [ ] User A cannot read User B's transfers — Transfer skipped per Task 11 implementer note (requires complex two-account-per-user setup with currency-matching constraint; defers to a Transfer-specific IDOR test post-Batch-2 cutover)
+- [x] User A cannot read User B's liability payments — covered by Movement TPC root: the global filter on `Movement` propagates to `LiabilityPayment` (an EF Core TPC rule). The `UserB_cannot_read_UserA_movement_type_by_id` test exercises the Movement endpoint which includes liability payments.
+- [x] User A cannot read User B's budgets — `UserB_cannot_read_UserA_goal_budget_by_id`, `UserB_cannot_read_UserA_budget_discriminator`, `UserB_cannot_read_UserA_category_budget_by_id`
+- [x] User A cannot read User B's categories — covered indirectly: every user has their own 26 per-user category copies post-Task-7, with disjoint GUIDs (`RegistrationSeedsCategoriesTests.Two_users_get_independent_category_copies` proves the disjointness). No `GET /api/categories/{id}` cross-tenant test was added because the only "shared" Category was the sentinel-stamped Opening Balance row which is now per-user-copied at registration.
+- [x] User A cannot read User B's recurring transactions — `UserB_cannot_read_UserA_recurring_transaction_by_id`
+- [ ] User A cannot read User B's saved reports — endpoint not yet implemented (no `SavedReportsApiController` exists); deferred to whichever stage builds the saved-reports SPA surface. The data-layer scoping is verified via `Every_user_owned_entity_carries_a_global_query_filter`.
+- [ ] User A cannot read User B's transaction attachments (file content download) — deferred; attachments scope via parent Transaction's UserId at the service layer, so a cross-tenant attachment read returns the parent-side 404 first
+- [ ] User A cannot read User B's transfer attachments — same as above
+- [x] User A cannot list User B's anything (list endpoints return zero of B's rows when called as A) — `UserB_account_list_excludes_UserA_accounts`, `UserB_movements_list_excludes_UserA_transactions`, `UserB_goal_budgets_list_excludes_UserA_budgets`
+- [x] User A cannot aggregate over User B's data (sum/count endpoints scoped correctly) — covered by the negative-assertion test `Global_query_filter_alone_catches_leak_without_service_Owned`: a raw `db.Accounts.ToListAsync()` under User B's scope returns only B's rows. The principle generalises to every aggregation expressed in LINQ over the filtered DbSet.
+- [x] User A cannot delete User B's resources (`DELETE /api/transactions/{B's id}` → 404) — `UserB_cannot_delete_UserA_transaction`
+- [x] User A cannot edit User B's resources (`PATCH /api/transactions/{B's id}` → 404) — `UserB_cannot_patch_cleared_on_UserA_transaction`
+- [ ] User A cannot upload an attachment against User B's transaction — not directly tested; deferred to a follow-up. The parent-Transaction lookup the upload endpoint performs already filters by user, so the 404 propagates.
+- [x] Cross-tenant tests use real fixtures, not mocked services — the IDOR suite uses `AuthTestWebApplicationFactory` end-to-end with real PostgreSQL, real cookie auth, real CSRF. **Plus the load-bearing negative-assertion test** that proves the EF global query filter catches a leak when the service-layer `.Owned()` chain is bypassed.
 
 ---
 

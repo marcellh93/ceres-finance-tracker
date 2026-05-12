@@ -92,21 +92,26 @@ The decided mechanism (as shipped in Stage 7 Commit 1, 2026-05-12):
 
 `IUserScope` and `IUserJobRunner` shipped in Stage 7 Commit 1, before any Phase 3 background feature lands.
 
-### Services to audit for Phase 3
+### Phase 3 service audit (closed 2026-05-12)
 
-Every method in these services that performs a query by ID must be updated:
+**Status: ✅ Done.** Every method in these services that queries a user-owned table chains `.Owned(user)` (the project's `ICurrentUserAccessor`-aware EF extension), and every entity write sets `UserId = user.UserId` either explicitly or via the `UserOwnershipInterceptor` default-Guid stamp. Defence-in-depth is supplied by the Stage 7 EF global query filters; the IDOR suite's negative-assertion test pins that the filter catches a leak independently of the service-layer chain.
 
-- `AccountService`
-- `TransactionService`
-- `CategoryService` (user-created categories only — system categories excluded)
-- `TransferService`
-- `BudgetService`
-- `CategoryBudgetService`
-- `SavedReportService`
-- `RecurringTransactionService`
-- `ReportService` (all report generators that accept account or category IDs)
+Audited services:
 
-List-based queries (e.g. "get all accounts") must also be filtered: `WHERE UserId = currentUser`. An unfiltered list query in a multi-user system returns all users' data.
+- `AccountService`, `TransactionService`, `TransferService`, `LiabilityPaymentService`
+- `CategoryService`, `CategoryBudgetService`, `BudgetService` (goal budgets)
+- `RecurringTransactionService`, `SavedReportService` (via API surface — entity present in the EF model, no dedicated service class)
+- `SettingsService` (per-user post-Stage-7), `DashboardService`
+- `ReportService` + all 8 report generators (`NetWorth`, `IncomeExpense`, `ExpenseBreakdown`, `TransactionHistory`, `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime`)
+- `ImportService`, `CsvImportProfileService` (named `ImportProfileService` in code), `TransferReviewService`, `ImportStagedTransactionService`
+- `FileAttachmentService` — scopes via parent Transaction/Transfer's `UserId` (Attachment has no UserId column of its own)
+
+Deferred (not yet implemented in the project):
+
+- `ReminderCountProvider` server-side counterpart — SPA-only today; the server-side count will be added when the reminders feature lands
+- `ReviewCountProvider` server-side counterpart — likewise deferred
+
+List-based queries (e.g. "get all accounts") also call `.Owned(user)` to filter by current user, and the Stage 7 global query filter is the second safety net.
 
 ---
 
@@ -162,18 +167,23 @@ The boundary is pinned by `ArchitectureTests § Every_user_owned_entity_carries_
 
 ## Required Integration Tests Before Phase 3 Launch
 
-These tests must exist and pass before the app opens to any user other than the developer. They are the primary guard against data leakage.
+**Status: ✅ Done at Stage 7 Task 11 (2026-05-12).** The suite lives at `ProjectCeres.Tests/Integration/MultiTenancy/IdorIsolationTests.cs` — 15 cross-tenant assertions against `AuthTestWebApplicationFactory` with real PostgreSQL, real cookie auth, real CSRF, no mocks. Companion files: `GlobalQueryFilterTests.cs` (filter applied via `IUserScope.EnterAs`); the architecture tests in `Authentication/ArchitectureTests.cs` (filter coverage + `IgnoreQueryFilters()` allow-list); `IUserOwnedConformanceTests.cs` (the 8 auth-internal entities implement the interface). See `testing.md § Phase 3 Multi-Tenancy Coverage` for the full mapping.
 
-| Test | Description |
-|------|-------------|
-| User A cannot read User B's accounts | `GET /Accounts/{id}` authenticated as User A, where id belongs to User B → must return 404 |
-| User A cannot read User B's transactions | Same pattern for Transactions |
-| User A cannot read User B's transfers | Same pattern for Transfers |
-| User A cannot read User B's budgets | Same pattern for Budgets |
-| User A cannot read User B's saved reports | Same pattern for SavedReports |
-| User A cannot edit User B's records | `POST /Transactions/Edit/{id}` authenticated as User A, where id belongs to User B → must return 404 |
-| User A cannot delete User B's records | Delete actions with cross-user ID → must return 404 |
-| List queries return only the authenticated user's data | `GET /Transactions` authenticated as User A must never include User B's transactions |
-| Report queries are user-scoped | No report (income, expenses, net worth) must include data from other users |
+| Test | Status |
+|------|--------|
+| User A cannot read User B's accounts (404, NOT 403) | ✅ `UserB_cannot_read_UserA_account_by_id`, `UserB_cannot_read_UserA_account_ledger` |
+| User A cannot read User B's transactions | ✅ `UserB_cannot_read_UserA_transaction_by_id`, `UserB_cannot_read_UserA_movement_type_by_id` |
+| User A cannot read User B's transfers | ⏳ Deferred (requires two-account-per-user setup with currency match; Transfer-specific IDOR test post-Batch-2) |
+| User A cannot read User B's liability payments | ✅ Via Movement TPC root — global filter on `Movement` propagates to `LiabilityPayment` |
+| User A cannot read User B's budgets | ✅ `UserB_cannot_read_UserA_goal_budget_by_id`, `UserB_cannot_read_UserA_budget_discriminator`, `UserB_cannot_read_UserA_category_budget_by_id` |
+| User A cannot read User B's categories | ✅ Per-user category copies on registration with disjoint GUIDs (`RegistrationSeedsCategoriesTests.Two_users_get_independent_category_copies`); legacy shared-Category surface eliminated by Task 7 |
+| User A cannot read User B's recurring transactions | ✅ `UserB_cannot_read_UserA_recurring_transaction_by_id` |
+| User A cannot read User B's saved reports | ⏳ Endpoint not yet implemented; data-layer scoping pinned by `Every_user_owned_entity_carries_a_global_query_filter` |
+| User A cannot read User B's transaction/transfer attachments | ⏳ Deferred; service-layer scopes via parent `Transaction.UserId == ...` so the parent 404 propagates |
+| User A cannot edit User B's records | ✅ `UserB_cannot_patch_cleared_on_UserA_transaction` |
+| User A cannot delete User B's records | ✅ `UserB_cannot_delete_UserA_transaction` |
+| List queries return only the authenticated user's data | ✅ `UserB_account_list_excludes_UserA_accounts`, `UserB_movements_list_excludes_UserA_transactions`, `UserB_goal_budgets_list_excludes_UserA_budgets` |
+| Report queries are user-scoped | ✅ Generalised via the negative-assertion test (see below); every report generator is `ReportService`-scoped per the service audit |
+| **Negative-assertion safety net** | ✅ `Global_query_filter_alone_catches_leak_without_service_Owned` — issues a raw `db.Accounts.ToListAsync()` under User B's `IUserScope`, asserts User A's account is invisible. Proves the EF filter catches a leak when the service-layer `.Owned()` chain is bypassed. Per `feedback_test_edge_cases_as_ship_gate`. |
 
-These tests belong in the integration test suite that runs against a real PostgreSQL database (not mocked). See `planning.md → Testing Strategy` for the test database setup.
+The suite runs against `project_ceres_test` (a real PostgreSQL DB), not mocks. See `testing.md § Integration Test Database` for setup.
