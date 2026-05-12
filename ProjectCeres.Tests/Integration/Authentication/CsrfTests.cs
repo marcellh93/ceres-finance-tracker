@@ -27,7 +27,7 @@ public class CsrfTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@csrf-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }

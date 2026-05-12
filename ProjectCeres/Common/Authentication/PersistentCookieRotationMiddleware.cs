@@ -63,7 +63,9 @@ public sealed class PersistentCookieRotationMiddleware
         }
 
         var (sessionId, secret) = parsed.Value;
+        // Cross-tenant by design: looks up session by cookie-embedded ID before UseAuthentication runs — no user in scope. Stage 10 architecture test allow-lists this file.
         var match = await db.UserSessions
+            .IgnoreQueryFilters()
             .Where(s => s.Id == sessionId && s.IsPersistent && s.RevokedAt == null && s.PersistentTokenHash != null)
             .FirstOrDefaultAsync();
 

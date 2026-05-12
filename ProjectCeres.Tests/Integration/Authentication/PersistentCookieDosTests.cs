@@ -22,7 +22,7 @@ public class PersistentCookieDosTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@dos-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }
@@ -45,7 +45,7 @@ public class PersistentCookieDosTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var n = await db.UserSessions.Where(s => s.IsPersistent && s.RevokedAt == null).CountAsync();
+            var n = await db.UserSessions.IgnoreQueryFilters().Where(s => s.IsPersistent && s.RevokedAt == null).CountAsync();
             n.Should().BeGreaterThanOrEqualTo(5);
         }
 

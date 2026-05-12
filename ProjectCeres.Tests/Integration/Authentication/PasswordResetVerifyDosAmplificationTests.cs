@@ -68,7 +68,7 @@ public class PasswordResetVerifyDosAmplificationTests : IClassFixture<AuthTestWe
         }
 
         // Wipe any prior dummy rows for this marker user so the count stays at exactly N.
-        await db.PasswordResetTokens.Where(t => t.UserId == user.Id).ExecuteDeleteAsync();
+        await db.PasswordResetTokens.IgnoreQueryFilters().Where(t => t.UserId == user.Id).ExecuteDeleteAsync();
 
         var now = DateTime.UtcNow;
         var rows = new List<PasswordResetToken>(DummyRowCount);

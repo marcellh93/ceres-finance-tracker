@@ -15,9 +15,13 @@ public sealed class HttpContextCurrentUserAccessor(IHttpContextAccessor http, IU
 
             if (scope.Current is { } fromScope) return fromScope;
 
-            throw new InvalidOperationException(
-                "No user context available. HTTP requests resolve from cookie; " +
-                "background jobs must enter via IUserScope.EnterAs().");
+            // No HTTP context and no IUserScope.EnterAs() active. Return Guid.Empty so that
+            // EF global query filters evaluate to a WHERE clause that matches no rows — the
+            // safe default. Callers that legitimately need cross-tenant reads (token lookups,
+            // middleware pre-auth, test teardown helpers) must use .IgnoreQueryFilters().
+            // The previous throw made this accessor unusable at model-creation time (EF
+            // evaluates global filter expressions eagerly on first query).
+            return Guid.Empty;
         }
     }
 }

@@ -91,7 +91,7 @@ public class EmailChangeVerifyDosAmplificationTests : IClassFixture<AuthTestWebA
         }
 
         // Wipe any prior dummy rows for this marker user so the count stays at exactly N.
-        await db.EmailChangeTokens.Where(t => t.UserId == user.Id).ExecuteDeleteAsync();
+        await db.EmailChangeTokens.IgnoreQueryFilters().Where(t => t.UserId == user.Id).ExecuteDeleteAsync();
 
         var now = DateTime.UtcNow;
         var lifetime = purpose == EmailChangeTokenPurpose.VerifyNew

@@ -114,6 +114,7 @@ public class EmailChangeRevokeTests : IClassFixture<AuthTestWebApplicationFactor
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == arr.User.Id)
             .ToListAsync(Timeout30s());
         rows.Should().HaveCount(2);
@@ -145,6 +146,7 @@ public class EmailChangeRevokeTests : IClassFixture<AuthTestWebApplicationFactor
         using var scope2 = factory.Services.CreateScope();
         var db = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
         var sessions = await db.UserSessions
+            .IgnoreQueryFilters()
             .Where(s => s.UserId == arr.User.Id)
             .ToListAsync(Timeout30s());
         sessions.Should().NotBeEmpty();

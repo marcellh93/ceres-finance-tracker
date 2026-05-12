@@ -21,7 +21,7 @@ public class SessionRevocationDebounceTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@debounce-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }
@@ -42,6 +42,7 @@ public class SessionRevocationDebounceTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var session = await db.UserSessions
+            .IgnoreQueryFilters()
             .Where(s => s.UserId == user.Id && s.RevokedAt == null)
             .OrderByDescending(s => s.CreatedAt)
             .FirstAsync();
@@ -61,7 +62,7 @@ public class SessionRevocationDebounceTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var s = await db.UserSessions.AsNoTracking().FirstAsync(x => x.Id == sessionId);
+            var s = await db.UserSessions.IgnoreQueryFilters().AsNoTracking().FirstAsync(x => x.Id == sessionId);
             firstLastUsed = s.LastUsedAt;
         }
 
@@ -76,7 +77,7 @@ public class SessionRevocationDebounceTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var s = await db.UserSessions.AsNoTracking().FirstAsync(x => x.Id == sessionId);
+            var s = await db.UserSessions.IgnoreQueryFilters().AsNoTracking().FirstAsync(x => x.Id == sessionId);
             s.LastUsedAt.Should().Be(firstLastUsed,
                 "within the 60s debounce window, LastUsedAt must not be re-written on every request");
         }
@@ -97,6 +98,7 @@ public class SessionRevocationDebounceTests : IAsyncLifetime
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.UserSessions
+                .IgnoreQueryFilters()
                 .Where(s => s.Id == sessionId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.LastUsedAt, backdated));
         }
@@ -108,7 +110,7 @@ public class SessionRevocationDebounceTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var s = await db.UserSessions.AsNoTracking().FirstAsync(x => x.Id == sessionId);
+            var s = await db.UserSessions.IgnoreQueryFilters().AsNoTracking().FirstAsync(x => x.Id == sessionId);
             s.LastUsedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5),
                 "after the debounce window elapses, LastUsedAt must update on the next request");
             s.LastUsedAt.Should().NotBe(backdated);

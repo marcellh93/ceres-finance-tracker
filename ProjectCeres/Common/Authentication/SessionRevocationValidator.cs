@@ -25,7 +25,10 @@ public static class SessionRevocationValidator
         }
 
         var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+        // Cross-tenant by design: validates any session by ID during cookie auth — the HTTP context
+        // principal is not yet committed when this event fires. Stage 10 architecture test allow-lists this file.
         var session = await db.UserSessions
+            .IgnoreQueryFilters()
             .Where(s => s.Id == sessionId && s.RevokedAt == null)
             .FirstOrDefaultAsync();
 

@@ -68,6 +68,7 @@ public class PasswordResetSessionRevocationTests : IClassFixture<AuthTestWebAppl
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var sessions = await db.UserSessions
+                .IgnoreQueryFilters()
                 .Where(s => s.UserId == user.Id)
                 .ToListAsync(Timeout30s());
             sessions.Should().HaveCount(3);

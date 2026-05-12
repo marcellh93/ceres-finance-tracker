@@ -82,6 +82,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
             var user = await um.FindByEmailAsync(email);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user!.Id)
                 .SingleAsync(Timeout30s());
             row.ConsumedAt.Should().NotBeNull();
@@ -209,6 +210,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
             var user = await um.FindByEmailAsync(email);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user!.Id)
                 .SingleAsync(Timeout30s());
             row.ConsumedAt.Should().BeNull("token must remain usable after a policy rejection");
@@ -316,6 +318,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
             var user = await um.FindByEmailAsync(email);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user!.Id)
                 .SingleAsync(Timeout30s());
             row.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
@@ -401,7 +404,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var revoked = await db.UserSessions.CountAsync(
+            var revoked = await db.UserSessions.IgnoreQueryFilters().CountAsync(
                 s => s.UserId == userId && s.RevokedAt != null, Timeout30s());
             revoked.Should().Be(0);
         }
@@ -447,7 +450,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var session = await db.UserSessions.FirstAsync(
+            var session = await db.UserSessions.IgnoreQueryFilters().FirstAsync(
                 s => s.Id == persistentSessionId, Timeout30s());
             session.RevokedAt.Should().NotBeNull("persistent session must be revoked on reset");
         }

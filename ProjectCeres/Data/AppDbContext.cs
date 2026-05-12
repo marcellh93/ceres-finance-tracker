@@ -8,7 +8,13 @@ namespace ProjectCeres.Data;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    private readonly ICurrentUserAccessor _currentUser;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserAccessor currentUser)
+        : base(options)
+    {
+        _currentUser = currentUser;
+    }
 
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<AccountType> AccountTypes => Set<AccountType>();
@@ -46,6 +52,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         base.OnModelCreating(modelBuilder);
         ConfigureRelationships(modelBuilder);
         ConfigureUserOwnership(modelBuilder);
+        ConfigureGlobalQueryFilters(modelBuilder);
         ConfigureSessionEntities(modelBuilder);
         ConfigureMfaEntities(modelBuilder);
         ConfigurePasswordResetEntities(modelBuilder);
@@ -197,6 +204,51 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         modelBuilder.Entity<ImportStagedTransaction>().HasIndex(e => e.UserId);
         modelBuilder.Entity<ImportStagedTransfer>().HasIndex(e => e.UserId);
         modelBuilder.Entity<ImportTransferExclusion>().HasIndex(e => e.UserId);
+    }
+
+    /// <summary>
+    /// Stage 7 multi-tenancy: every IUserOwned entity carries an EF global query filter so an
+    /// accidentally-omitted <c>.Where(t => t.UserId == currentUser.UserId)</c> returns zero rows
+    /// instead of leaking. Service code still writes the explicit Where as belt-and-suspenders
+    /// (ADR-0065 explicit redundancy). Movement is abstract under TPC — filters apply to each
+    /// concrete subtype, not the abstract root.
+    ///
+    /// NOT filtered (and why):
+    /// - TransactionAttachment, TransferAttachment: no UserId column; scoped via parent in service code.
+    /// - FailedLoginAttempt: cross-tenant by design (ADR-0067); retention sweep iterates all rows.
+    /// - AccountType, CategoryType, Currency, ReportType: system reference tables.
+    /// - AspNet* Identity tables: cross-tenant by definition.
+    /// </summary>
+    private void ConfigureGlobalQueryFilters(ModelBuilder modelBuilder)
+    {
+        // Finance domain (11)
+        modelBuilder.Entity<Account>()                .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<Budget>()                 .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<Category>()               .HasQueryFilter(e => e.UserId == (Guid?)_currentUser.UserId);
+        modelBuilder.Entity<CategoryBudget>()         .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<ImportProfile>()          .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<ImportStagedTransaction>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<ImportStagedTransfer>()   .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<ImportTransferExclusion>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<RecurringTransaction>()   .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<SavedReport>()            .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<Settings>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+
+        // Movement TPC hierarchy: filter applied to abstract root; EF Core propagates it to
+        // all concrete subtypes (Transaction, Transfer, LiabilityPayment). Per EF Core rules,
+        // HasQueryFilter on a subtype is rejected when UseTpcMappingStrategy is in use —
+        // the filter must live on the root entity.
+        modelBuilder.Entity<Movement>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+
+        // Auth-internal (8, promoted to IUserOwned in Task 4)
+        modelBuilder.Entity<UserSession>()            .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<UserBlockedIp>()          .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<UserMfaBackupCode>()      .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<TotpReplayEntry>()        .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<PasswordResetToken>()     .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<EmailChangeToken>()       .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<LockoutUnlockToken>()     .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<AuditLog>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
     }
 
     // -------------------------------------------------------------------------
@@ -460,13 +512,16 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 
     private static void SeedCategories(ModelBuilder modelBuilder)
     {
-        // System categories have UserId = null (shared across all users).
-        // User-default categories are stamped with the pre-auth sentinel so they belong
-        // to the single bootstrap user; they will be remapped at auth time.
+        // Stage 7 bridge: every seeded Category — including the system Opening Balance row —
+        // is stamped with the pre-auth sentinel. Task 15's data migration remaps the entire
+        // sentinel cohort to the first real registered user. Earlier seeds left Opening
+        // Balance with UserId = null (system-shared row), but the Stage 7 query filter
+        // hides null-UserId rows from every authenticated user, so the row must move into
+        // the sentinel cohort to remain visible until Task 15 ships.
         var owner = (Guid?)SingleUserAccessor.SentinelUserId;
         modelBuilder.Entity<Category>().HasData(
             // --- System ---
-            new Category { Id = new Guid("20000000-0000-0000-0000-000000000001"), Name = "Opening Balance",    CategoryTypeId = 1, IsActive = true, IsSystem = true,  IsReserved = false, LifestyleTag = null,    UserId = null  },
+            new Category { Id = new Guid("20000000-0000-0000-0000-000000000001"), Name = "Opening Balance",    CategoryTypeId = 1, IsActive = true, IsSystem = true,  IsReserved = false, LifestyleTag = null,    UserId = owner },
 
             // --- Income (CategoryTypeId = 1) ---
             new Category { Id = new Guid("20000000-0000-0000-0000-000000000002"), Name = "Salary",             CategoryTypeId = 1, IsActive = true, IsSystem = false, IsReserved = false, LifestyleTag = null,    UserId = owner },

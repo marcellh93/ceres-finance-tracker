@@ -20,6 +20,7 @@ public class MfaBackupCodeServiceTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .Where(c => c.UserId.ToString().StartsWith("dddddddd-"))
             .ExecuteDeleteAsync();
     }
@@ -38,7 +39,7 @@ public class MfaBackupCodeServiceTests : IAsyncLifetime
         codes.Should().OnlyHaveUniqueItems();
         codes.Should().OnlyContain(c => c.Length == 19); // 16 chars + 3 hyphens
 
-        var rows = await db.UserMfaBackupCodes.Where(c => c.UserId == userId).ToListAsync();
+        var rows = await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == userId).ToListAsync();
         rows.Should().HaveCount(10);
         rows.Should().OnlyContain(r => r.CodeHash.StartsWith("$argon2id$v=19$m=19456,t=2,p=1$"));
         rows.Should().OnlyContain(r => r.UsedAt == null);
@@ -59,6 +60,7 @@ public class MfaBackupCodeServiceTests : IAsyncLifetime
         ok.Should().BeTrue();
 
         var row = await db.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .FirstAsync(c => c.UserId == userId && c.UsedAt != null);
         row.UsedFromIp.Should().Be("10.0.0.1");
     }
@@ -136,6 +138,7 @@ public class MfaBackupCodeServiceTests : IAsyncLifetime
         var first = await svc.GenerateAndPersistAsync(userId, CancellationToken.None);
         await svc.RegenerateAsync(userId, CancellationToken.None);
         var second = await db.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .Where(c => c.UserId == userId)
             .ToListAsync();
 

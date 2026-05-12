@@ -69,7 +69,9 @@ public sealed class MfaBackupCodeService
         var normalized = NormalizeForVerify(submittedCode);
         if (normalized is null) return false;
 
+        // Cross-tenant by design: called during MFA step before full identity cookie is issued; userId comes from the MFA-pending cookie claim. Stage 10 architecture test allow-lists this file.
         var unused = await _db.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .Where(c => c.UserId == userId && c.UsedAt == null)
             .ToListAsync(ct);
 
@@ -89,7 +91,8 @@ public sealed class MfaBackupCodeService
 
     public async Task<IReadOnlyList<string>> RegenerateAsync(Guid userId, CancellationToken ct)
     {
-        await _db.UserMfaBackupCodes.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+        // Cross-tenant by design: called via authenticated session; userId from session claim. Stage 10 allow-lists this file.
+        await _db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
         return await GenerateAndPersistAsync(userId, ct);
     }
 

@@ -31,12 +31,12 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith(EmailDomain)).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
-            await db.AuditLogs.Where(a => a.UserId == u.Id).ExecuteDeleteAsync();
-            await db.LockoutUnlockTokens.Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
-            await db.TotpReplayEntries.Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
+            await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == u.Id).ExecuteDeleteAsync();
+            await db.LockoutUnlockTokens.IgnoreQueryFilters().Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            await db.TotpReplayEntries.IgnoreQueryFilters().Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }
@@ -81,7 +81,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tokens = await db.LockoutUnlockTokens.Where(t => t.UserId == user.Id).ToListAsync();
+            var tokens = await db.LockoutUnlockTokens.IgnoreQueryFilters().Where(t => t.UserId == user.Id).ToListAsync();
             tokens.Should().ContainSingle();
             tokens[0].ConsumedAt.Should().BeNull();
             tokens[0].ExpiresAt.Should().BeAfter(DateTime.UtcNow);
@@ -117,7 +117,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
 
         using var scope2 = factory.Services.CreateScope();
         var db = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
-        (await db.LockoutUnlockTokens.AnyAsync(t => t.UserId == user.Id)).Should().BeFalse(
+        (await db.LockoutUnlockTokens.IgnoreQueryFilters().AnyAsync(t => t.UserId == user.Id)).Should().BeFalse(
             "no transition occurred (account was already locked), so no token should be issued");
         captured.Should().NotContain(m => m.To == email,
             "no transition → no email");
@@ -142,7 +142,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             tokenCountAfterPasswordPath = await db.LockoutUnlockTokens
-                .Where(t => t.UserId == user.Id).CountAsync();
+                .IgnoreQueryFilters().Where(t => t.UserId == user.Id).CountAsync();
         }
         tokenCountAfterPasswordPath.Should().Be(1);
 
@@ -152,7 +152,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
 
         using var scope2 = factory.Services.CreateScope();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
-        var totalTokens = await db2.LockoutUnlockTokens.Where(t => t.UserId == user.Id).CountAsync();
+        var totalTokens = await db2.LockoutUnlockTokens.IgnoreQueryFilters().Where(t => t.UserId == user.Id).CountAsync();
         totalTokens.Should().Be(1, "LoginTotp's IsLockedOutAsync branches observe the state but do not transition it");
     }
 
@@ -189,11 +189,11 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
 
         using var scope2 = factory.Services.CreateScope();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
-        var stale = await db2.LockoutUnlockTokens.SingleAsync(t => t.Id == staleId);
+        var stale = await db2.LockoutUnlockTokens.IgnoreQueryFilters().SingleAsync(t => t.Id == staleId);
         stale.ConsumedAt.Should().NotBeNull("the stale token must be superseded on issue");
 
         var unconsumed = await db2.LockoutUnlockTokens
-            .Where(t => t.UserId == user.Id && t.ConsumedAt == null).ToListAsync();
+            .IgnoreQueryFilters().Where(t => t.UserId == user.Id && t.ConsumedAt == null).ToListAsync();
         unconsumed.Should().ContainSingle("exactly one fresh unconsumed row should exist after supersession");
     }
 
@@ -220,7 +220,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var tokens = await db.LockoutUnlockTokens.Where(t => t.UserId == user.Id).ToListAsync();
+        var tokens = await db.LockoutUnlockTokens.IgnoreQueryFilters().Where(t => t.UserId == user.Id).ToListAsync();
         tokens.Should().ContainSingle("token row must commit even when the email send throws");
     }
 

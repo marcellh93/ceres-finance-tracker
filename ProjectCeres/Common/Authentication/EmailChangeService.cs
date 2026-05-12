@@ -105,7 +105,10 @@ public sealed class EmailChangeService
         try
         {
             // Supersede prior unused tokens (both Purposes).
+            // Cross-tenant by design: RequestAsync runs under the authenticated user's HttpContext
+            // but UserId is resolved via UserManager not the global filter. Stage 10 allow-lists this file.
             await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 
@@ -187,7 +190,9 @@ public sealed class EmailChangeService
         // purposes because each /request issues distinct VerifyNew + RevokeOld tokens.
         var now = DateTime.UtcNow;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
+        // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
         var match = await _db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup
                      && t.Purpose == EmailChangeTokenPurpose.VerifyNew
                      && t.ConsumedAt == null
@@ -209,7 +214,9 @@ public sealed class EmailChangeService
         await sem.WaitAsync(ct);
         try
         {
+            // Cross-tenant by design: re-read inside lock; still pre-auth. Stage 10 architecture test allow-lists this file.
             var current = await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
             if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
@@ -252,12 +259,16 @@ public sealed class EmailChangeService
             await _userManager.UpdateAsync(user);
 
             // Consume matched VerifyNew row.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.Id == match.Id)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 
             // Consume sibling RevokeOld row.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id
                          && t.Purpose == EmailChangeTokenPurpose.RevokeOld
                          && t.NewEmail == match.NewEmail
@@ -265,7 +276,9 @@ public sealed class EmailChangeService
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 
             // Bulk-revoke all sessions for this user.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.UserSessions
+                .IgnoreQueryFilters()
                 .Where(s => s.UserId == user.Id && s.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, DateTime.UtcNow), ct);
 
@@ -318,7 +331,9 @@ public sealed class EmailChangeService
         // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
         var now = DateTime.UtcNow;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
+        // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
         var match = await _db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup
                      && t.Purpose == EmailChangeTokenPurpose.RevokeOld
                      && t.ConsumedAt == null
@@ -340,7 +355,9 @@ public sealed class EmailChangeService
         await sem.WaitAsync(ct);
         try
         {
+            // Cross-tenant by design: re-read inside lock; still pre-auth. Stage 10 architecture test allow-lists this file.
             var current = await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
             if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
@@ -349,7 +366,9 @@ public sealed class EmailChangeService
             }
 
             // Consume both sibling rows atomically (the matched RevokeOld + its VerifyNew sibling).
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == match.UserId
                          && t.NewEmail == match.NewEmail
                          && t.ConsumedAt == null)

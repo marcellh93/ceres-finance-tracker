@@ -27,8 +27,8 @@ public class UserBlockedIpTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in userManager.Users.Where(u => u.Email!.EndsWith("@block-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserBlockedIps.Where(b => b.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserBlockedIps.IgnoreQueryFilters().Where(b => b.UserId == u.Id).ExecuteDeleteAsync();
             await userManager.DeleteAsync(u);
         }
     }
@@ -60,7 +60,7 @@ public class UserBlockedIpTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var session = await db.UserSessions.FirstAsync(s => s.UserId == user.Id);
+            var session = await db.UserSessions.IgnoreQueryFilters().FirstAsync(s => s.UserId == user.Id);
             db.UserBlockedIps.Add(new UserBlockedIp
             {
                 Id = Guid.NewGuid(),
@@ -79,7 +79,7 @@ public class UserBlockedIpTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var session = await db.UserSessions.FirstAsync(s => s.UserId == user.Id);
+            var session = await db.UserSessions.IgnoreQueryFilters().FirstAsync(s => s.UserId == user.Id);
             session.RevokedAt.Should().NotBeNull();
         }
     }

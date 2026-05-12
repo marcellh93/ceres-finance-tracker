@@ -28,9 +28,9 @@ public class LoginWithTotpTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in userManager.Users.Where(u => u.Email!.EndsWith("@mfa-login-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
-            await db.TotpReplayEntries.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            await db.TotpReplayEntries.IgnoreQueryFilters().Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
             await userManager.DeleteAsync(u);
         }
     }
@@ -83,7 +83,7 @@ public class LoginWithTotpTests : IAsyncLifetime
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var session = await db.UserSessions.FirstAsync(s => s.UserId == user.Id);
+        var session = await db.UserSessions.IgnoreQueryFilters().FirstAsync(s => s.UserId == user.Id);
         session.RevokedAt.Should().BeNull();
     }
 
@@ -128,6 +128,7 @@ public class LoginWithTotpTests : IAsyncLifetime
         using var scope2 = _factory.Services.CreateScope();
         var db = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
         var used = await db.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .Where(c => c.UserId == user.Id && c.UsedAt != null)
             .CountAsync();
         used.Should().Be(1);

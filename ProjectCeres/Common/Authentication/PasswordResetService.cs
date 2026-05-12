@@ -103,7 +103,9 @@ public sealed class PasswordResetService
         try
         {
             // Supersede prior unused tokens.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 
@@ -215,7 +217,9 @@ public sealed class PasswordResetService
         // unconsumed unexpired row (Argon2id-amplification DoS on /confirm).
         var now = DateTime.UtcNow;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
+        // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
         var match = await _db.PasswordResetTokens
+            .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup
                      && t.ConsumedAt == null
                      && t.ExpiresAt > now)
@@ -242,7 +246,9 @@ public sealed class PasswordResetService
         try
         {
             // Re-read the token row inside the lock; another concurrent caller may have consumed it.
+            // Cross-tenant by design: still pre-auth at this point; user id not yet in cookie. Stage 10 architecture test allow-lists this file.
             var current = await _db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
             if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
@@ -309,9 +315,11 @@ public sealed class PasswordResetService
             }
 
             // Mark token consumed; include MfaVerifiedAt when MFA was satisfied.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             if (mfaVerified)
             {
                 await _db.PasswordResetTokens
+                    .IgnoreQueryFilters()
                     .Where(t => t.Id == match.Id)
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(t => t.ConsumedAt, DateTime.UtcNow)
@@ -320,12 +328,15 @@ public sealed class PasswordResetService
             else
             {
                 await _db.PasswordResetTokens
+                    .IgnoreQueryFilters()
                     .Where(t => t.Id == match.Id)
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
             }
 
             // Bulk-revoke all sessions for this user.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.UserSessions
+                .IgnoreQueryFilters()
                 .Where(s => s.UserId == user.Id && s.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, DateTime.UtcNow), ct);
 
@@ -333,11 +344,14 @@ public sealed class PasswordResetService
             // is itself a recovery/compromise signal. If an attacker initiated /email-change/request
             // before being reset out, leaving the verify token live for up to 30 minutes would let
             // them complete the takeover after the legitimate user resets. Stage 6.12.
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             var hadPendingEmailChange = await _db.EmailChangeTokens
+                .IgnoreQueryFilters()
                 .AnyAsync(t => t.UserId == user.Id && t.ConsumedAt == null, ct);
             if (hadPendingEmailChange)
             {
                 await _db.EmailChangeTokens
+                    .IgnoreQueryFilters()
                     .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
                     .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 

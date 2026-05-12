@@ -27,7 +27,7 @@ public class LogoutEndpointTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in userManager.Users.Where(u => u.Email!.EndsWith("@logout-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await userManager.DeleteAsync(u);
         }
     }
@@ -75,7 +75,7 @@ public class LogoutEndpointTests : IAsyncLifetime
         // collection don't pollute the result — under load the table accumulates rows
         // from other tests and an unfiltered FirstAsync() returns whichever row landed
         // first in the table, not necessarily this test's session.
-        var session = await db.UserSessions.SingleAsync(s => s.UserId == user.Id);
+        var session = await db.UserSessions.IgnoreQueryFilters().SingleAsync(s => s.UserId == user.Id);
         session.RevokedAt.Should().NotBeNull();
     }
 

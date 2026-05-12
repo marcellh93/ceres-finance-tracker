@@ -84,6 +84,7 @@ public class PasswordResetConfirmMfaTests : IClassFixture<AuthTestWebApplication
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == userId)
                 .SingleAsync(Timeout30s());
             row.ConsumedAt.Should().BeNull("token must NOT be consumed at the probe step");
@@ -100,6 +101,7 @@ public class PasswordResetConfirmMfaTests : IClassFixture<AuthTestWebApplication
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == userId)
                 .SingleAsync(Timeout30s());
             row.ConsumedAt.Should().NotBeNull();
@@ -134,6 +136,7 @@ public class PasswordResetConfirmMfaTests : IClassFixture<AuthTestWebApplication
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var row = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == userId)
                 .SingleAsync(Timeout30s());
             row.ConsumedAt.Should().BeNull();
@@ -207,6 +210,7 @@ public class PasswordResetConfirmMfaTests : IClassFixture<AuthTestWebApplication
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var unused = await db.UserMfaBackupCodes
+                .IgnoreQueryFilters()
                 .CountAsync(c => c.UserId == userId && c.UsedAt == null, Timeout30s());
             unused.Should().BeGreaterThan(0);
         }

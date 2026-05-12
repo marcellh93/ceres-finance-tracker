@@ -29,7 +29,7 @@ public class PersistentCookieRotationTests : IAsyncLifetime
             .Where(u => u.Email!.EndsWith("@persist-test.local") || u.Email!.EndsWith("@persist-stamp-test.local"))
             .ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await userManager.DeleteAsync(u);
         }
     }
@@ -110,6 +110,7 @@ public class PersistentCookieRotationTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var activePersistent = await db.UserSessions
+            .IgnoreQueryFilters()
             .Where(s => s.UserId == user.Id && s.IsPersistent && s.RevokedAt == null)
             .CountAsync();
         activePersistent.Should().Be(1, "concurrent rotation must produce exactly one new active persistent session");

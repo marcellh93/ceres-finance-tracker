@@ -21,6 +21,7 @@ public class TotpReplayGuardTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.TotpReplayEntries
+            .IgnoreQueryFilters()
             .Where(e => e.UserId.ToString().StartsWith("ddddeeee-"))
             .ExecuteDeleteAsync();
     }
@@ -70,6 +71,7 @@ public class TotpReplayGuardTests : IAsyncLifetime
         await guard.TryAcceptAsync(userId, "111111", CancellationToken.None);
 
         var remaining = await db.TotpReplayEntries
+            .IgnoreQueryFilters()
             .Where(e => e.UserId == userId)
             .ToListAsync();
         // One row remains (the one we just accepted); the old one was purged.

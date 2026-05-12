@@ -132,6 +132,7 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope2 = factory.Services.CreateScope();
         var db = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
         var sessions = await db.UserSessions
+            .IgnoreQueryFilters()
             .Where(s => s.UserId == arr.User.Id)
             .ToListAsync(Timeout30s());
         sessions.Should().NotBeEmpty("MintAuthCookieWithLastReauthAt inserted a UserSession row");
@@ -157,6 +158,7 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == arr.User.Id)
             .ToListAsync(Timeout30s());
 
@@ -260,6 +262,7 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var verifyRow = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .SingleAsync(t => t.UserId == arr.User.Id && t.Purpose == EmailChangeTokenPurpose.VerifyNew, Timeout30s());
         verifyRow.ConsumedAt.Should().BeNull(
             "collision-at-confirm must NOT consume the token — caller can /revoke to clean up");

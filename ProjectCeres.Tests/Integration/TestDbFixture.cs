@@ -25,7 +25,7 @@ public class TestDbFixture : IAsyncDisposable
             .AddInterceptors(new UserOwnershipInterceptor(new SingleUserAccessor()))
             .Options;
 
-        Db = new AppDbContext(options);
+        Db = new AppDbContext(options, new SingleUserAccessor());
     }
 
     /// <summary>

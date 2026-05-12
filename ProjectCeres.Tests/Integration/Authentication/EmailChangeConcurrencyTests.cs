@@ -141,6 +141,7 @@ public class EmailChangeConcurrencyTests : IClassFixture<AuthTestWebApplicationF
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .ToListAsync(Timeout30s());
 
@@ -174,6 +175,7 @@ public class EmailChangeConcurrencyTests : IClassFixture<AuthTestWebApplicationF
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == arr.User.Id)
             .ToListAsync(Timeout30s());
 

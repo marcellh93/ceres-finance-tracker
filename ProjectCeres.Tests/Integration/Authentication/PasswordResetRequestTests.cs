@@ -47,6 +47,7 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var token = await db.PasswordResetTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .SingleAsync(Timeout30s());
 
@@ -150,7 +151,7 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            tokenCountBefore = await db.PasswordResetTokens.CountAsync(Timeout30s());
+            tokenCountBefore = await db.PasswordResetTokens.IgnoreQueryFilters().CountAsync(Timeout30s());
         }
 
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(
@@ -160,7 +161,7 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tokenCountAfter = await db.PasswordResetTokens.CountAsync(Timeout30s());
+            var tokenCountAfter = await db.PasswordResetTokens.IgnoreQueryFilters().CountAsync(Timeout30s());
             tokenCountAfter.Should().Be(tokenCountBefore,
                 "a request for an unknown email must not create any PasswordResetToken row");
         }

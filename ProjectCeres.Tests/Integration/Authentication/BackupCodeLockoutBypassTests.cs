@@ -25,8 +25,8 @@ public class BackupCodeLockoutBypassTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@bclock-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }
@@ -164,6 +164,7 @@ public class BackupCodeLockoutBypassTests : IAsyncLifetime
         using var scope2 = _factory.Services.CreateScope();
         var db = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
         var consumed = await db.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .Where(c => c.UserId == user.Id && c.UsedAt != null)
             .CountAsync();
         consumed.Should().Be(1);

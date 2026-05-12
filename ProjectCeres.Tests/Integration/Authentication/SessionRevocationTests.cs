@@ -27,7 +27,7 @@ public class SessionRevocationTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in userManager.Users.Where(u => u.Email!.EndsWith("@revoke-test.local")).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await userManager.DeleteAsync(u);
         }
     }
@@ -61,6 +61,7 @@ public class SessionRevocationTests : IAsyncLifetime
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.UserSessions
+                .IgnoreQueryFilters()
                 .Where(s => s.RevokedAt == null)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, DateTime.UtcNow));
         }

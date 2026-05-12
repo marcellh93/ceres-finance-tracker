@@ -75,6 +75,7 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .ToListAsync(Timeout30s());
 
@@ -148,6 +149,7 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .CountAsync(Timeout30s());
         rows.Should().Be(0, "stale-reauth request must not write any token rows");
@@ -182,6 +184,7 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .CountAsync(Timeout30s());
         rows.Should().Be(0);
@@ -214,6 +217,7 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .CountAsync(Timeout30s());
         rows.Should().Be(0);
@@ -249,6 +253,7 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.EmailChangeTokens
+            .IgnoreQueryFilters()
             .Where(t => t.UserId == user.Id)
             .ToListAsync(Timeout30s());
 

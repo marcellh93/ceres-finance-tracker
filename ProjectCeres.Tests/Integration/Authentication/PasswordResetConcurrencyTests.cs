@@ -58,6 +58,7 @@ public class PasswordResetConcurrencyTests : IClassFixture<AuthTestWebApplicatio
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var consumed = await db.PasswordResetTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id && t.ConsumedAt != null)
                 .CountAsync(Timeout30s());
             consumed.Should().Be(1);

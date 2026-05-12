@@ -21,7 +21,7 @@ public class MfaBackupCodeRaceTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@bc-race-test.local")).ToList())
         {
-            await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }
@@ -57,6 +57,7 @@ public class MfaBackupCodeRaceTests : IAsyncLifetime
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var consumed = await verifyDb.UserMfaBackupCodes
+            .IgnoreQueryFilters()
             .Where(c => c.UserId == user.Id && c.UsedAt != null)
             .CountAsync();
         consumed.Should().Be(1);

@@ -32,12 +32,12 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith(EmailDomain)).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
-            await db.AuditLogs.Where(a => a.UserId == u.Id).ExecuteDeleteAsync();
-            await db.LockoutUnlockTokens.Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
-            await db.TotpReplayEntries.Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
+            await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == u.Id).ExecuteDeleteAsync();
+            await db.LockoutUnlockTokens.IgnoreQueryFilters().Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            await db.TotpReplayEntries.IgnoreQueryFilters().Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
     }
@@ -196,7 +196,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
 
         using var scope2 = _factory.Services.CreateScope();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
-        var session = await db2.UserSessions.SingleAsync(s => s.Id == sessionId);
+        var session = await db2.UserSessions.IgnoreQueryFilters().SingleAsync(s => s.Id == sessionId);
         session.RevokedAt.Should().BeNull("unlock is undo-only — sessions are not touched");
     }
 
@@ -233,7 +233,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var rows = await db.AuditLogs.Where(r => r.UserId == user.Id).ToListAsync();
+        var rows = await db.AuditLogs.IgnoreQueryFilters().Where(r => r.UserId == user.Id).ToListAsync();
         rows.Should().ContainSingle()
             .Which.Action.Should().Be(AuditLogAction.LockoutSelfServiceUnlock);
     }
@@ -350,6 +350,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
             var unconsumed = await db.LockoutUnlockTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
                 .SingleAsync();
             generator.Verify(rawToken, unconsumed.TokenHash).Should().BeTrue();
@@ -371,6 +372,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             await db.LockoutUnlockTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.Id == tokenRowId)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ExpiresAt, DateTime.UtcNow.AddSeconds(-5)));
         }
@@ -396,10 +398,10 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             // Cascade-delete the dependent rows the disposer would otherwise sweep; we
             // delete the user mid-test so the in-lock FindByIdAsync returns null.
-            await db.UserSessions.Where(s => s.UserId == user.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == user.Id).ExecuteDeleteAsync();
             await db.FailedLoginAttempts.Where(e => e.UserId == user.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.Where(c => c.UserId == user.Id).ExecuteDeleteAsync();
-            await db.TotpReplayEntries.Where(r => r.UserId == user.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == user.Id).ExecuteDeleteAsync();
+            await db.TotpReplayEntries.IgnoreQueryFilters().Where(r => r.UserId == user.Id).ExecuteDeleteAsync();
             var fresh = await um.FindByIdAsync(user.Id.ToString());
             await um.DeleteAsync(fresh!);
         }

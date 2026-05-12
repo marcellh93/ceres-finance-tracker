@@ -61,7 +61,9 @@ public class LockoutUnlockService
         string rawToken;
         try
         {
+            // Cross-tenant by design: issued for a locked-out (unauthenticated) user; caller is not in session. Stage 10 allow-lists this file.
             await _db.LockoutUnlockTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.UserId == userId && t.ConsumedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 
@@ -106,7 +108,9 @@ public class LockoutUnlockService
         }
 
         var now = DateTime.UtcNow;
+        // Cross-tenant by design: scans unconsumed tokens across all users to verify by hash before the caller is identified. Stage 10 architecture test allow-lists this file.
         var candidates = await _db.LockoutUnlockTokens
+            .IgnoreQueryFilters()
             .Where(t => t.ConsumedAt == null && t.ExpiresAt > now)
             .ToListAsync(ct);
 
@@ -131,7 +135,9 @@ public class LockoutUnlockService
         await sem.WaitAsync(ct);
         try
         {
+            // Cross-tenant by design: re-read inside lock; user identity resolved from token row, not HTTP cookie. Stage 10 architecture test allow-lists this file.
             var current = await _db.LockoutUnlockTokens
+                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
             if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
@@ -148,7 +154,9 @@ public class LockoutUnlockService
             await _userManager.ResetAccessFailedCountAsync(user);
             await _userManager.SetLockoutEndDateAsync(user, null);
 
+            // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.LockoutUnlockTokens
+                .IgnoreQueryFilters()
                 .Where(t => t.Id == match.Id)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
 

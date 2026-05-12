@@ -52,7 +52,9 @@ public sealed class TotpReplayGuard
     {
         var threshold = DateTime.UtcNow - MfaConstants.ReplayWindow;
 
+        // Cross-tenant by design: called during MFA step before full identity cookie is issued; userId comes from the MFA-pending cookie claim. Stage 10 architecture test allow-lists this file.
         var candidates = await _db.TotpReplayEntries
+            .IgnoreQueryFilters()
             .Where(e => e.UserId == userId && e.AcceptedAt > threshold)
             .ToListAsync(ct);
 
@@ -73,7 +75,9 @@ public sealed class TotpReplayGuard
             CodeHash = _hasher.HashPassword(new ApplicationUser(), code),
             AcceptedAt = DateTime.UtcNow,
         });
+        // Cross-tenant by design: purge of expired replay entries; retention sweep operates across all users. Stage 10 architecture test allow-lists this file.
         await _db.TotpReplayEntries
+            .IgnoreQueryFilters()
             .Where(e => e.AcceptedAt < threshold)
             .ExecuteDeleteAsync(ct);
         await _db.SaveChangesAsync(ct);

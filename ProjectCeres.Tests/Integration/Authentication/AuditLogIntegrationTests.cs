@@ -33,13 +33,13 @@ public class AuditLogIntegrationTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith(EmailDomain)).ToList())
         {
-            await db.UserSessions.Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
-            await db.AuditLogs.Where(a => a.UserId == u.Id).ExecuteDeleteAsync();
-            await db.PasswordResetTokens.Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
-            await db.EmailChangeTokens.Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
-            await db.TotpReplayEntries.Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
+            await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == u.Id).ExecuteDeleteAsync();
+            await db.PasswordResetTokens.IgnoreQueryFilters().Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
+            await db.EmailChangeTokens.IgnoreQueryFilters().Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
+            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            await db.TotpReplayEntries.IgnoreQueryFilters().Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
             await um.DeleteAsync(u);
         }
         await db.FailedLoginAttempts
@@ -64,14 +64,14 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.AuditLogs.Where(r => r.UserId == userId).ExecuteDeleteAsync();
+        await db.AuditLogs.IgnoreQueryFilters().Where(r => r.UserId == userId).ExecuteDeleteAsync();
     }
 
     private static async Task<List<AuditLog>> ReadAuditAsync(WebApplicationFactory<Program> factory, Guid userId)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.AuditLogs.Where(r => r.UserId == userId).ToListAsync();
+        return await db.AuditLogs.IgnoreQueryFilters().Where(r => r.UserId == userId).ToListAsync();
     }
 
     // ── Writer-level behaviour ──────────────────────────────────────────────
