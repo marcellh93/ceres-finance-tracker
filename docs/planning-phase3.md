@@ -388,13 +388,11 @@ Net result: a clean URL space with one one-shot legacy redirect, and a pure Web 
 
 See [planning.md — Open Questions](planning.md#open-questions--decisions) for the full list. Key items:
 
-- Hosting platform
-- Invite mechanism
-- Concurrency handling — last-write-wins accepted for Phase 1/2; decide whether to add EF Core optimistic concurrency tokens (`RowVersion`) to mutable entities before Phase 3 launch
-- Production migration strategy — `dotnet ef database update` vs. pre-deploy CI/CD step vs. reviewed SQL scripts
-- CI service — GitHub Actions is the leading candidate; confirm before Phase 3 launch
-- CD strategy — no pipeline designed; must define trigger (merge to main, tag, manual), staging environment, migration step, and rollback plan
-- File attachment storage — local filesystem does not scale to hosted multi-user; must decide between cloud storage (Azure Blob, S3) and server disk; `StoredPath` will need a data migration if the backend changes after data exists
+- Hosting platform — no decision yet; revisit before launch. Gates ADR-0070's CD deploy-target spec and the production migration strategy below.
+- Invite mechanism — **Stage 13** (auth-extras / onboarding polish). Invite-token issuance + email-send naturally couples with the Stage 8 email service. Until then, registration is open.
+- Concurrency handling — **Stage 14** (data-integrity sweep). Last-write-wins is accepted for Phase 1/2 and remains accepted through Stages 7–13; Stage 14 sweeps all mutable entities to add EF Core optimistic concurrency tokens (`RowVersion`) together so the schema change lands atomically.
+- Production migration strategy — **Stage 15** (pre-launch hardening). The choice between `dotnet ef database update`, a pre-deploy CI/CD step, or reviewed SQL scripts depends on the hosting platform (Open Question above). Locked baseline (ADR-0070): every CD run takes a pre-migration DB snapshot.
+- File attachment storage — no decision yet; revisit before launch. Local filesystem does not scale to hosted multi-user; must decide between cloud storage (Azure Blob, S3) and server disk; `StoredPath` will need a data migration if the backend changes after data exists.
 - Timezone handling — transaction dates stored as local date with no timezone; must decide on a strategy before Phase 3 launch (ADR-0009 follow-up). **Audit 2026-05-12, revised 2026-05-13.** 28 production sites read "today" via `DateTime.Today` / `DateOnly.FromDateTime(DateTime.Today)` server-side — that's the **host machine's** local day (depends on container `TZ`), not the user's local day. Hits: `DashboardService` (5), `DashboardApiController` (6), `CategoryBudgetsApiController` (1), `ReportsApiController` (4), `RecurringTransactionService` (1), report generators (4), and 7 ViewModel defaults.
 
   **Refinement:** the 7 ViewModel defaults (`TransactionCreateViewModel.Date`, `TransferCreateViewModel.Date`, `BudgetCreateViewModel.StartDate`, `QuickAddDtos` ×3, `RecurringTransactionService` due-date logic) are effectively **dead for the SPA path** — `QuickAddModal.tsx:32` and `BudgetCreate.tsx:162` already compute "today" in the browser (`new Date().toISOString().slice(0, 10)`), so the user's actual local day is what gets POSTed. The server defaults only fire if the client omits the field, which the SPA never does. Surface left: the 22 *reading* sites (Dashboard MTD bounds, Reports default range, period-start calculations) that have to invent a "today" because the user didn't supply one.
@@ -405,9 +403,8 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
   - **(C) Pass client's today in the request — leading recommendation.** React already knows the user's local day; have endpoints accept a `today` query parameter (or read it from a header), default to UTC only when missing. Zero schema change. No new user-facing setting. Beta users get correct behaviour immediately. Per-user IANA TZ becomes a Phase 4 polish only if someone needs it for export/scheduled-job use cases (e.g. "send me my weekly digest at 9am *my* time"). Existing `DateTime.Today` reads in services become `clock.UserToday(request)` accepting the value from the controller.
 
   Decision deferred to Stage 10 (Preferences/onboarding) so the choice between (B) and (C) can be made alongside the Preferences screen design. No code change yet — the 22 reading sites still drift to server-local, but the user-visible impact for SPA users is contained to dashboard/report boundary cells near midnight. New ADR to be written at decision time supersedes ADR-0009's "before Phase 3 launch" follow-up.
-- Mobile app — React Native is the leading candidate; no scope, timeline, or platform targets defined
-- E2E testing — Playwright chosen; implement after Phase 2 React migration stabilizes. See [testing.md](testing.md#e2e-tool-playwright).
-- Import atomicity (`ImportService.ImportAsync`) — **Audit 2026-05-12.** Per-batch partial-success is deliberate (a bad row shouldn't kill a 1000-row CSV), but per-row partial-success is not. Each row does up to three sequential `SaveChangesAsync` calls (`CreateAsync` → `MarkClearedAsync` → `MarkNeedsReviewAsync`); if one of the later calls throws, the row is half-applied (e.g. transaction exists but is not cleared, or staged record exists without a matched transaction). Decision needed: wrap each row's writes in a per-row `BeginTransactionAsync` so a row is all-or-nothing? Tests don't catch this because they exercise the happy path. Spec out the contract (all-or-nothing per row vs. partial-row-allowed-with-explicit-error-message) before code change.
+- Mobile app — no decision yet; revisit before launch. React Native is the leading candidate; no scope, timeline, or platform targets defined.
+- Import atomicity (`ImportService.ImportAsync`) — **Review before Stage 9** (user has additional test scenarios to propose). **Audit 2026-05-12.** Per-batch partial-success is deliberate (a bad row shouldn't kill a 1000-row CSV), but per-row partial-success is not. Each row does up to three sequential `SaveChangesAsync` calls (`CreateAsync` → `MarkClearedAsync` → `MarkNeedsReviewAsync`); if one of the later calls throws, the row is half-applied (e.g. transaction exists but is not cleared, or staged record exists without a matched transaction). Decision needed: wrap each row's writes in a per-row `BeginTransactionAsync` so a row is all-or-nothing? Tests don't catch this because they exercise the happy path. Spec out the contract (all-or-nothing per row vs. partial-row-allowed-with-explicit-error-message) before code change.
 
 **Resolved** — full decisions archived in [planning-resolved.md](planning-resolved.md). Phase 3 foundational items resolved so far:
 
@@ -420,6 +417,9 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
 - ~~Settings migration~~ — Migrates with the rest of the sentinel data per ADR-0066; onboarding Preferences step handles per-user overrides for subsequent registrations.
 - ~~WCAG 2.1 AA compliance~~ — Full spec in §8 above.
 - ~~MVC → Web API decoupling~~ — Approach locked 2026-04-28. See `planning-phase3-spa-migration.md`.
+- ~~CI service~~ — GitHub Actions per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). Runs `dotnet test` + `pnpm test` against Postgres 16 on every PR.
+- ~~CD strategy~~ — GitHub Actions environments + OIDC per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). Deploy target still scoped to the hosting Open Question; pre-migration DB snapshot is the locked baseline.
+- ~~E2E testing~~ — Playwright per [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md). First suite ships post-Stage 9 covering register/login/reset/TOTP/lockout golden paths.
 
 ---
 

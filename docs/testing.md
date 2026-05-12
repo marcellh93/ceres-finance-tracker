@@ -83,15 +83,22 @@ Simple presentational components with no logic are not tested — the value is t
 
 E2E tests are deferred until Phase 3. The prerequisites — CI/CD pipeline, Testcontainers, and a hosted environment — do not exist until that phase. E2E must also be written after the Phase 2 React migration stabilizes, not before, to avoid investing in tests against a frontend that is about to change.
 
-### E2E Tool: Playwright
+### E2E Tool: Playwright (TypeScript)
 
-**Microsoft Playwright** (`Microsoft.Playwright` NuGet package) is the chosen tool. Rationale:
+**Microsoft Playwright** is the chosen tool. Per [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md), the **TypeScript** variant ships — not the `Microsoft.Playwright` NuGet port. Tests live in `ProjectCeres.Client/e2e/` next to the React app, run via `pnpm --dir ProjectCeres.Client e2e`, exercise the production-built SPA served against a real `dotnet run` + PostgreSQL fixture.
 
-- Native .NET/C# support — tests live in the existing xUnit project, no second test stack or language
-- Auto-wait eliminates manual `sleep` calls; parallel execution is built in
-- Trace viewer and screenshot/video on failure simplify debugging CI failures
-- Pairs naturally with Testcontainers: spin up the database in a container, host the app in-process, drive it with Playwright, tear down
-- Maintained by Microsoft — aligns with the .NET-first stack
+> **Supersession (2026-05-13):** prior versions of this section pinned `Microsoft.Playwright` NuGet inside the xUnit project. That choice predated the completion of the SPA migration. ADR-0071 reopened the question, audited feature parity between the .NET and TS variants, and confirmed that the .NET port lacks UI Mode (time-travel debugging, watch mode, locator picker), the `webServer` config block (auto-boot dev server before tests), and is the slower-moving target for new features. The TS variant also shares types with the SPA DTOs, which is the regression risk the E2E suite exists to catch.
+
+Rationale:
+
+- TypeScript-first — tests live next to the SPA in `ProjectCeres.Client/`. DTO types imported from `src/` keep API-contract regressions inside the test surface, not at runtime.
+- Native test runner with `playwright.config.ts` — `webServer` auto-boots `dotnet run` + Vite preview before tests, `projects` matrix runs Chromium / Firefox / WebKit, `fullyParallel` + `sharding` work first-party.
+- UI Mode (`pnpm playwright test --ui`) — time-travel scrubbing, watch mode, locator picker, DOM inspector. The single biggest DX win over the .NET variant.
+- Cross-origin and cookie semantics — Phase 3 uses cookie auth (`SameSite=Lax` + CSRF token per [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md)). Playwright's BrowserContext model handles these without workaround.
+- Trace files attach to failed CI runs — debugging across SPA + API + DB boundary is tractable from the GitHub Actions log alone.
+- Official GitHub Actions integration — `npx playwright install --with-deps` is the well-trod path; sharding across runner instances is first-party. Pairs cleanly with [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md).
+
+**.NET state.** The unit (Vitest) + integration (xUnit) split is by **what's tested**, not by host language. E2E tests drive the browser-on-SPA surface, which is TypeScript-native — the .NET server is exercised by the running app, but no `.cs` type is imported by the test. xUnit stays the integration-suite home; nothing in `ProjectCeres.Tests` changes.
 
 ### What Gets E2E Tested (Phase 3+)
 
@@ -246,9 +253,9 @@ Add `[Collection("IntegrationTests")]` to every new integration test class. Do n
 
 CI and CD are not active in Phase 1 or 2. This is an intentional deferral — the app runs locally for a single user, so automated pipelines add overhead with no benefit at this stage.
 
-**Phase 3 open questions (see [planning.md](planning.md#open-questions--decisions)):**
+**Phase 3 state:**
 
-- CI service — no provider chosen (GitHub Actions is the leading candidate). Required for automated build verification and vulnerability scanning before hosting.
-- CD strategy — no deployment pipeline designed. Must define: what triggers a deploy (merge to main, tag, manual), whether a staging environment exists, how database migrations run in the pipeline, and whether rollback is supported.
-- Production migration strategy — `dotnet ef database update` vs. pre-deploy CI/CD step vs. reviewed SQL scripts. Option 2 or 3 recommended.
-- Testcontainers — replaces the local `project_ceres_test` database in CI where a real PostgreSQL instance is not available.
+- **CI service** — **GitHub Actions** per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). PR-gating workflow at `.github/workflows/ci.yml` runs `dotnet build` + `dotnet test` + `pnpm tsc --noEmit` + `pnpm build` + `pnpm test` against a `services.postgres` Postgres 16 instance.
+- **CD strategy** — **GitHub Actions environments** + **OIDC** per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). Migration runs `dotnet ef database update` gated on green CI for the same commit. Pre-migration DB snapshot taken on every run, retained ≥7 days. Deploy target itself scoped to the still-open hosting-platform decision.
+- **Production migration strategy** — deferred to **Stage 15** (pre-launch hardening); choice depends on hosting platform.
+- **Testcontainers** — replaces the local `project_ceres_test` database in CI where a real PostgreSQL instance is not available. The `services.postgres` Postgres 16 image is the GitHub-Actions-native equivalent and is the default.
