@@ -307,4 +307,109 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         (await resp.Content.ReadAsStringAsync()).Should().Contain("REAUTH_REQUIRED");
         captured.Should().BeEmpty();
     }
+
+    // ── Stage 6.16 timing-channel regressions ───────────────────────────────
+    // Pin that the EmailAlreadyInUse and EmailUnchanged fast-return branches pay
+    // equivalent Argon2id cost to the happy path. Pre-6.16 both branches returned
+    // without any Argon2id work, leaking ≈300ms (two Argon2id missed: the
+    // FindByEmail-equalisation hash plus the two `_tokens.Hash` token-hash costs
+    // on the happy path). The fix adds THREE RunDummyHash calls to each fast-return
+    // branch. Threshold mirrors PasswordResetRequestTests.
+
+    private async Task<long> MeasureRequest(
+        WebApplicationFactory<Program> factory, ApplicationUser user, string newEmail)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var resp = await PostRequestAsync(factory, user, newEmail);
+        sw.Stop();
+        return sw.ElapsedMilliseconds;
+    }
+
+    private static double Median(List<long> values)
+    {
+        var sorted = values.OrderBy(v => v).ToList();
+        var n = sorted.Count;
+        if (n == 0) throw new InvalidOperationException("median of empty list");
+        return n % 2 == 1 ? sorted[n / 2] : (sorted[(n / 2) - 1] + sorted[n / 2]) / 2.0;
+    }
+
+    [Fact]
+    public async Task Request_for_email_already_in_use_has_same_timing_as_unknown_user_branch()
+    {
+        // Highest-severity timing channel: pre-6.16, an authenticated user could enumerate
+        // OTHER users' email addresses by timing /email-change/request against guessed
+        // addresses (≈300ms gap for the EmailAlreadyInUse fast-return path).
+        await using var factory = _factory.WithReplacedService<IEmailService>(new NoopEmailService());
+
+        var requester = await AuthTestFixture.RegisterUserAsync(_factory, $"req-already-{Guid.NewGuid():N}@example.com");
+
+        // Warm-up. Use a fresh occupier so the warm-up's EF cache state matches the
+        // measurement loop's cold-miss-per-iteration pattern.
+        var warmupUser = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-already-{Guid.NewGuid():N}@example.com");
+        await MeasureRequest(factory, warmupUser, $"warmup-unknown-{Guid.NewGuid():N}@example.com");
+        var warmupOccupier = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-occ-{Guid.NewGuid():N}@example.com");
+        await MeasureRequest(factory, requester, warmupOccupier.Email!);
+
+        // Measurement loop: a FRESH occupier per iteration so the EF identity-map
+        // cache is cold-miss for both branches. Reusing one occupier across all
+        // iterations would warm the cache after the first hit and make the
+        // already-in-use branch artificially fast — that's an EF-cache artefact,
+        // not a real timing-channel signal, and it caused the original 6.16 test
+        // to fail intermittently under full-suite load.
+        const int iterations = 7;
+        var unknownTimings = new List<long>(iterations);
+        var alreadyInUseTimings = new List<long>(iterations);
+        for (var i = 0; i < iterations; i++)
+        {
+            var occupier = await AuthTestFixture.RegisterUserAsync(_factory, $"occ-{i}-{Guid.NewGuid():N}@example.com");
+            unknownTimings.Add(await MeasureRequest(factory, requester, $"never-used-{i}-{Guid.NewGuid():N}@example.com"));
+            alreadyInUseTimings.Add(await MeasureRequest(factory, requester, occupier.Email!));
+        }
+
+        var medianUnknown = Median(unknownTimings);
+        var medianAlreadyInUse = Median(alreadyInUseTimings);
+        var diffMs = Math.Abs(medianUnknown - medianAlreadyInUse);
+
+        diffMs.Should().BeLessThan(125,
+            "Stage 6.16: EmailAlreadyInUse branch must pay equivalent Argon2id cost " +
+            "(3x RunDummyHash) to mask whether the target email is already taken by " +
+            "another user. Got unknown={0}ms in-use={1}ms diff={2}ms.",
+            medianUnknown, medianAlreadyInUse, diffMs);
+    }
+
+    [Fact]
+    public async Task Request_for_unchanged_email_has_same_timing_as_unknown_user_branch()
+    {
+        // Lower-severity channel: an attacker who can submit /email-change/request as
+        // the authenticated user could otherwise confirm what the user's current email
+        // address is by timing the response. Reauth gate + per-user scope limit blast
+        // radius, but the channel was still leaking ≈300ms.
+        await using var factory = _factory.WithReplacedService<IEmailService>(new NoopEmailService());
+
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, $"req-unchanged-{Guid.NewGuid():N}@example.com");
+
+        // Warm-up
+        var warmupUser = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-unchanged-{Guid.NewGuid():N}@example.com");
+        await MeasureRequest(factory, warmupUser, $"warmup-unknown-{Guid.NewGuid():N}@example.com");
+        await MeasureRequest(factory, user, user.Email!);
+
+        const int iterations = 7;
+        var unknownTimings = new List<long>(iterations);
+        var unchangedTimings = new List<long>(iterations);
+        for (var i = 0; i < iterations; i++)
+        {
+            unknownTimings.Add(await MeasureRequest(factory, user, $"never-used-{i}-{Guid.NewGuid():N}@example.com"));
+            unchangedTimings.Add(await MeasureRequest(factory, user, user.Email!));
+        }
+
+        var medianUnknown = Median(unknownTimings);
+        var medianUnchanged = Median(unchangedTimings);
+        var diffMs = Math.Abs(medianUnknown - medianUnchanged);
+
+        diffMs.Should().BeLessThan(125,
+            "Stage 6.16: EmailUnchanged branch must pay equivalent Argon2id cost " +
+            "(3x RunDummyHash) to mask whether the submitted address matches the " +
+            "user's current one. Got unknown={0}ms unchanged={1}ms diff={2}ms.",
+            medianUnknown, medianUnchanged, diffMs);
+    }
 }

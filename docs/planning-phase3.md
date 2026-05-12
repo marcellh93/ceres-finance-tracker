@@ -488,6 +488,54 @@ The following items were captured during Stage 6c.2 implementation, then deferre
 
 **Migration strategy.** Backfill a synthetic `TokenLookup` placeholder on existing rows, then immediately mark them all `ConsumedAt = NOW()`. Zero real-user impact because 6.15 ships before Phase 3 public launch (it's part of the Stage 6 verification gate per the master pre-launch checklist), so the affected populations at ship time are dev/test data only. See spec § 3.3.
 
+## Stage 6.16 — Timing channels on `/password-reset/request` and `/email-change/request` (surfaced 2026-05-12)
+
+**Status:** 🚧 Surfaced. Production fix designed below; ship-gated before Phase 3 public launch. Found by the Stage 7 `/verify` pass when the previously-intermittent `PasswordResetRequestTests.Request_with_unknown_email_returns_204_with_same_timing` failure was diagnosed as a real timing-channel gap, not test flakiness.
+
+**Bug — `PasswordResetService.RequestAsync`.** The "constant-time defence" pattern uses `_argon.RunDummyHash()` on the unknown-email branch to match the cost of the known branch's password hash. But the known branch ALSO performs `_tokens.Hash(rawToken)` — a SECOND Argon2id call — when it generates the password-reset token row. The unknown branch never matches that second cost.
+
+| Step | Known branch (user exists) | Unknown branch (no user) |
+|---|---|---|
+| `RunDummyHash` | 1 Argon2id (~150ms) | 1 Argon2id (~150ms) |
+| `_tokens.Hash(rawToken)` | **1 Argon2id (~150ms)** | none |
+| DB UPDATE (supersede) + INSERT (token row) + SaveChangesAsync | yes | none |
+| FailedLoginAttempt INSERT | none | yes (~ms-scale) |
+| Email send (NoopEmailService in test) | yes | none |
+
+Wall-clock difference on the production path is dominated by the second Argon2id, ≈150ms. The integration test `Request_with_unknown_email_returns_204_with_same_timing` asserts `|median diff| < 200ms` and passes most of the time *because* its threshold is loose enough to absorb ≈150ms of genuine inequality plus normal variance; under CI load (GC pauses, JIT, thread-pool contention) the difference exceeds 200ms and the test "flakes". The test was designed correctly; the threshold was set to keep it green despite the production gap.
+
+**Bug — `EmailChangeService.RequestAsync` (worse).** Three additional timing channels on the same endpoint family:
+
+1. **Happy path runs TWO `_tokens.Hash` calls** (lines 117–118: `verifyHash` and `revokeHash` for the two-token Verify + Revoke design from Stage 6.12). Unknown-user branch (line 84) runs ONE `RunDummyHash`. Gap: ≈150ms.
+2. **`EmailUnchanged` early return** (line 88, when the requested address matches the user's current one) does **zero** Argon2id work. An attacker who can submit `/email-change/request` for the authenticated user can confirm what the current email is by timing the response — though the reauth gate and per-user scope limit who can probe.
+3. **`EmailAlreadyInUse` early return** (line 95, when the requested new address is already taken by another user) does **zero** Argon2id work. **This is the higher-severity one**: an authenticated user can enumerate other users' email addresses by timing `/email-change/request` calls.
+
+**Production fix design.**
+
+- `PasswordResetService.RequestAsync` unknown-user branch: add a second `_argon.RunDummyHash()` immediately after the first to mirror the token-hash cost on the known path.
+- `EmailChangeService.RequestAsync` unknown-user branch (the `user is null` fast-return at line 82–86): add a second `_argon.RunDummyHash()` AND a third to mirror the Verify + Revoke token-hash cost (two Argon2id on the happy path → three total `RunDummyHash` calls on every fast-return that didn't already do work).
+- `EmailUnchanged` branch (line 88): run THREE `RunDummyHash` calls before returning (one to match the unknown-user `RunDummyHash`, two to match the Verify + Revoke token-hash cost on the happy path).
+- `EmailAlreadyInUse` branch (line 95): same — THREE `RunDummyHash` calls.
+
+This mirrors the dominant cost (Argon2id at OWASP minimums) on every branch. The remaining DB UPDATE + INSERT + email-send costs are not negligible but are <10ms each on a local socket; they fall well below the test's variance floor.
+
+**Test changes.**
+
+- Tighten the `PasswordResetRequestTests.Request_with_unknown_email_returns_204_with_same_timing` threshold from `< 200ms` to `< 75ms`. The new threshold reflects genuine GC/JIT/thread-pool variance after the production fix equalises the Argon2id cost; the old threshold was loose enough to hide the ≈150ms second-Argon2id gap.
+- Add equivalent tests for the two new EmailChange branches: `EmailChangeRequestTests.Request_for_email_already_in_use_has_same_timing_as_unknown_user` and `Request_for_unchanged_email_has_same_timing_as_unknown_user`. Same 7-iteration median pattern, same tightened threshold.
+
+**Risk profile.** Low-medium pre-launch.
+
+- The `EmailChangeService.EmailAlreadyInUse` branch is the most exploitable — it leaks *other users'* email-address membership. Mitigated by the per-user 5/hour rate limit on `/email-change/request`, but a determined attacker over hours could enumerate. Must ship before Phase 3 public launch.
+- `PasswordResetService` unknown-email leak is less severe — it leaks "is this address a registered user?" which is also leakable by other means (e.g. the `/register` endpoint's duplicate-email response, though Stage 6b.3 Gap 6 fixed that to return 204 either way). The bound is whether an attacker can confirm registration faster than other channels; ≈150ms over hundreds of probes is a reliable signal.
+- Threshold tightening (200ms → 75ms) catches future regressions that re-introduce ANY Argon2id-class unequal work on these paths.
+
+**Ship-gate.** Master pre-launch verification checklist § Authentication + identity gets a new line: "All `/request` endpoints (password-reset, email-change) verified constant-time against unknown / unchanged / already-in-use branches, tested at <75ms median variance."
+
+**Estimated work.** Half-day. 4 production-code dummy-hash insertions, 1 test threshold tighten, 2 new test methods, doc updates. No new ADR (this is a fix within the existing constant-time-defence frame established at Stage 6c.1, not a new architectural decision).
+
+**Why this is a planning entry, not a spec yet.** Per `feedback_log_for_later_is_not_execute_now` and `feedback_persist_deferred_decisions`: the diagnosis + fix are captured here in the durable doc so they survive context loss. A spec gets authored when 6.16 is scheduled (before Phase 3 public launch).
+
 ## Stage 7 — Multi-tenancy cutover (resolved 2026-05-12)
 
 **Status:** ✅ Done. All 19 tasks shipped across two commit-trains on `main`. Spec at [`docs/superpowers/specs/2026-05-12-stage-7-multi-tenancy-cutover-design.md`](superpowers/specs/2026-05-12-stage-7-multi-tenancy-cutover-design.md); plan at [`docs/superpowers/plans/2026-05-12-stage-7-multi-tenancy-cutover.md`](superpowers/plans/2026-05-12-stage-7-multi-tenancy-cutover.md). 956/956 tests green at HEAD. Stage 7.5 (PostgreSQL Row-Level Security, ADR-0068) is the immediate next stage.

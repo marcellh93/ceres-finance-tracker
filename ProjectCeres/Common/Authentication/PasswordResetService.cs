@@ -87,11 +87,20 @@ public sealed class PasswordResetService
 
         var user = await _userManager.FindByEmailAsync(normalized);
 
-        // Always pay the Argon2id cost — equalise wall-clock time across known/unknown branches.
+        // Stage 6.16: equalise the dominant Argon2id cost across known/unknown branches.
+        // The known branch pays TWO Argon2id hashes: one here for the FindByEmail-result
+        // matching cost, and one downstream when `_tokens.Hash(rawToken)` writes the
+        // PasswordResetToken row. The unknown branch must mirror both to close the
+        // ≈150ms timing channel an attacker would otherwise use to enumerate registered
+        // email addresses.
         _argon.RunDummyHash();
 
         if (user is null)
         {
+            // Stage 6.16: mirror the second `_tokens.Hash(rawToken)` Argon2id cost the
+            // known branch pays at line 113. Without this, an attacker can distinguish
+            // known vs unknown emails by a single Argon2id worth of wall-clock time.
+            _argon.RunDummyHash();
             await _failedLogins.RecordAsync(
                 normalized, null, FailedLoginReason.PasswordResetUnknownEmail, ip, userAgent, ct);
             return;

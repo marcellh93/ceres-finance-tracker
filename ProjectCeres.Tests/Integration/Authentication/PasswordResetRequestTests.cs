@@ -106,12 +106,23 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         var medianUnknown = Median(unknownTimings);
         var diffMs = Math.Abs(medianKnown - medianUnknown);
 
-        diffMs.Should().BeLessThan(200,
-            "constant-time defence requires |median diff| < 200ms; " +
+        diffMs.Should().BeLessThan(125,
+            "constant-time defence requires |median diff| < 125ms post-Stage-6.16; " +
             "got known={0}ms unknown={1}ms diff={2}ms. " +
-            "Threshold reflects empirical wall-clock variance under integration-test " +
-            "load; constant-time defence is provided by RunDummyHash equalising the " +
-            "dominant Argon2id cost.",
+            "Threshold reflects empirical wall-clock variance under full-suite " +
+            "CPU contention (GC, JIT, connection-pool warm-up) AFTER both branches " +
+            "pay TWO Argon2id hashes (FindByEmail-match-equalisation + token-hash " +
+            "equalisation). 125ms is below the practical network-jitter floor an " +
+            "attacker would face (~200ms+ over the internet), so even at the " +
+            "ceiling there's no exploitable signal; the threshold is set tight " +
+            "enough to catch a regression that re-removes a RunDummyHash (worth " +
+            "≈150ms — would push diff over the threshold). The pre-6.16 threshold " +
+            "of <200ms absorbed a ≈150ms timing-channel gap (the unknown branch " +
+            "was missing the second Argon2id call mirroring the happy-path " +
+            "`_tokens.Hash(rawToken)`); 125ms is strict enough to catch that " +
+            "regression. If this trips intermittently, investigate whether a " +
+            "RunDummyHash on the unknown branch was reverted, not whether the " +
+            "test is flaky.",
             medianKnown, medianUnknown, diffMs);
     }
 
