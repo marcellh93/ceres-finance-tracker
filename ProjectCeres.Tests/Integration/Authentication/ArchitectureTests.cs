@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectCeres.Common.Authentication;
@@ -78,24 +80,6 @@ public class ArchitectureTests
             .ToList();
 
         violations.Should().BeEmpty("API GET endpoints must be side-effect-free per RFC 9110");
-    }
-
-    [Fact]
-    public void FailedLoginAttempt_NotInGlobalQueryFilterList()
-    {
-        // ADR-0065 § Decision-1 enumerates the user-owned entities that receive
-        // HasQueryFilter. FailedLoginAttempt is intentionally NOT in that list.
-        // The test enforces the intent: when Stage 7 wires global filters,
-        // FailedLoginAttempt must remain unfiltered (per ADR-0067 § Decision-6 —
-        // failed-login retention purge is a cross-tenant operation).
-        //
-        // For now (pre-Stage-7), assert the entity has UserId nullable so the
-        // schema permits attempts against unknown users. The real "no global
-        // filter" assertion lands when Stage 7 wires global filters.
-        var entityType = typeof(ProjectCeres.Models.FailedLoginAttempt);
-        var userIdProp = entityType.GetProperty("UserId");
-        userIdProp.Should().NotBeNull();
-        userIdProp!.PropertyType.Should().Be(typeof(Guid?));
     }
 
     [Fact]
@@ -576,5 +560,154 @@ public class ArchitectureTests
         var type = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController);
         type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().BeEmpty("Anonymity must be declared on the action, not the class");
+    }
+
+    // ── Stage 7: IgnoreQueryFilters allow-list + global query filter pin ────
+
+    /// <summary>
+    /// Scans every .cs file under projectCeresRoot for actual IgnoreQueryFilters( call
+    /// sites (not comment mentions) and returns the list of files that contain one.
+    /// </summary>
+    private static IReadOnlyList<string> ScanIgnoreQueryFiltersCallSites(string projectCeresRoot)
+    {
+        var hits = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(projectCeresRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains("/Migrations/")) continue;
+            var lines = File.ReadAllLines(file);
+            foreach (var raw in lines)
+            {
+                var line = raw.TrimStart();
+                if (line.StartsWith("//")) continue;        // line comment
+                if (line.StartsWith("*"))  continue;         // block comment continuation
+                // The call site must include the opening paren, e.g. `.IgnoreQueryFilters()`.
+                if (line.Contains("IgnoreQueryFilters("))
+                {
+                    hits.Add(file);
+                    break; // one hit per file is enough
+                }
+            }
+        }
+        return hits;
+    }
+
+    /// <summary>
+    /// Walks up from the test bin directory to the repository root (identified by ProjectCeres.sln).
+    /// </summary>
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "ProjectCeres.sln")))
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("repo root not found");
+    }
+
+    [Fact]
+    public void IgnoreQueryFilters_only_appears_in_documented_exception_paths()
+    {
+        // Stage 7 safety net: every IgnoreQueryFilters() call site must be in the allow-list
+        // or under the pre-granted ProjectCeres/Admin/ surface (Phase 4+).
+        // Adding the call anywhere else bypasses multi-tenancy isolation — the test catches it.
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "ProjectCeres/Common/UserJobRunner.cs",
+            "ProjectCeres/Services/CategorySeedService.cs",
+            "ProjectCeres/Common/Authentication/PasswordResetService.cs",
+            "ProjectCeres/Common/Authentication/EmailChangeService.cs",
+            "ProjectCeres/Common/Authentication/LockoutUnlockService.cs",
+            "ProjectCeres/Common/Authentication/MfaBackupCodeService.cs",
+            "ProjectCeres/Common/Authentication/SessionRevocationValidator.cs",
+            "ProjectCeres/Common/Authentication/PersistentCookieRotationMiddleware.cs",
+            "ProjectCeres/Common/Authentication/TotpReplayGuard.cs",
+        };
+
+        var repoRoot = FindRepoRoot();
+        var projectCeres = Path.Combine(repoRoot, "ProjectCeres");
+        var hits = ScanIgnoreQueryFiltersCallSites(projectCeres);
+
+        var unexpected = hits
+            .Select(f => Path.GetRelativePath(repoRoot, f).Replace('\\', '/'))
+            .Where(rel => !allowed.Contains(rel) && !rel.StartsWith("ProjectCeres/Admin/", StringComparison.Ordinal))
+            .ToList();
+
+        unexpected.Should().BeEmpty(
+            "IgnoreQueryFilters() bypasses Stage 7's multi-tenancy safety net. " +
+            "Either move the call into one of the allow-listed services OR add the file to the allow-list " +
+            "in ArchitectureTests.cs with an inline justification comment.");
+    }
+
+    [Fact]
+    public void Every_user_owned_entity_carries_a_global_query_filter()
+    {
+        // Stage 7 Task 9 wired HasQueryFilter on 20 entity types (Movement covers its
+        // concrete subtypes Transaction/Transfer/LiabilityPayment via TPC inheritance).
+        // This test pins that contract: any entity removed from ConfigureGlobalQueryFilters
+        // breaks the build immediately.
+        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        try
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+
+            // Direct-filtered entities (filter declared on the entity type itself).
+            // Movement is the TPC root — its filter propagates to Transaction/Transfer/LiabilityPayment.
+            var expectedDirect = new[]
+            {
+                typeof(ProjectCeres.Models.Account),
+                typeof(ProjectCeres.Models.Budget),
+                typeof(ProjectCeres.Models.Category),
+                typeof(ProjectCeres.Models.CategoryBudget),
+                typeof(ProjectCeres.Models.ImportProfile),
+                typeof(ProjectCeres.Models.ImportStagedTransaction),
+                typeof(ProjectCeres.Models.ImportStagedTransfer),
+                typeof(ProjectCeres.Models.ImportTransferExclusion),
+                typeof(ProjectCeres.Models.RecurringTransaction),
+                typeof(ProjectCeres.Models.SavedReport),
+                typeof(ProjectCeres.Models.Settings),
+                typeof(ProjectCeres.Models.Movement),  // TPC root — filter propagates to subtypes
+                typeof(ProjectCeres.Models.UserSession),
+                typeof(ProjectCeres.Models.UserBlockedIp),
+                typeof(ProjectCeres.Models.UserMfaBackupCode),
+                typeof(ProjectCeres.Models.TotpReplayEntry),
+                typeof(ProjectCeres.Models.PasswordResetToken),
+                typeof(ProjectCeres.Models.EmailChangeToken),
+                typeof(ProjectCeres.Models.LockoutUnlockToken),
+                typeof(ProjectCeres.Models.AuditLog),
+            };
+
+            var missing = expectedDirect
+                .Where(t => !(db.Model.FindEntityType(t)?.GetDeclaredQueryFilters().Any() ?? false))
+                .Select(t => t.Name)
+                .ToList();
+
+            missing.Should().BeEmpty(
+                "Stage 7 requires a global query filter on every user-owned entity. " +
+                "Missing entities here mean Task 9's ConfigureGlobalQueryFilters needs the entity added.");
+        }
+        finally
+        {
+            factory.Dispose();
+        }
+    }
+
+    [Fact]
+    public void FailedLoginAttempt_has_no_global_query_filter()
+    {
+        // ADR-0067: FailedLoginAttempt is cross-tenant by design. The retention sweep iterates
+        // all rows regardless of user. UserId is nullable; users themselves are never queried
+        // by UserId on this table (queries are by IpAddress or EmailAttempted).
+        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        try
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+            db.Model.FindEntityType(typeof(ProjectCeres.Models.FailedLoginAttempt))!
+                .GetDeclaredQueryFilters().Should().BeEmpty(
+                    "FailedLoginAttempt must remain filter-free per ADR-0067 — retention sweep is cross-tenant by design.");
+        }
+        finally
+        {
+            factory.Dispose();
+        }
     }
 }
