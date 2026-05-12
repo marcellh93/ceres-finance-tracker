@@ -74,6 +74,13 @@ public sealed class AuthController : ControllerBase
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
 
+        // Atomicity: AspNetUsers row + category seed + audit log entry must commit or
+        // roll back together. Without the transaction, a post-CreateAsync failure
+        // (DB blip, request cancellation, seeding bug) leaves an orphan AspNetUsers
+        // row, and re-registration silently returns 204 per anti-enumeration —
+        // permanently locking the email out.
+        await using var tx = await _db.Database.BeginTransactionAsync(HttpContext.RequestAborted);
+
         var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
         var result = await _userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)
@@ -97,6 +104,7 @@ public sealed class AuthController : ControllerBase
         // Stage 7: every user owns their own copy of the default categories.
         await _categorySeedService.CopyDefaultsForUserAsync(user.Id, HttpContext.RequestAborted);
         await _auditLog.RecordAsync(user.Id, AuditLogAction.Registered, ct: HttpContext.RequestAborted);
+        await tx.CommitAsync(HttpContext.RequestAborted);
         return NoContent();
     }
 

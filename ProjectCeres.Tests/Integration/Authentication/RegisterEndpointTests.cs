@@ -3,6 +3,8 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Models;
+using ProjectCeres.Services;
+using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -93,6 +95,38 @@ public class RegisterEndpointTests : IAsyncLifetime
         // contract is that the server does NOT return 500.
         ((int)resp.StatusCode).Should().BeOneOf(new[] { 400, 415, 422 },
             "missing body must be rejected gracefully — not a 500");
+    }
+
+    // Registration must commit AspNetUsers + category seed + audit-log entry atomically.
+    // If category seeding fails, the AspNetUsers row must NOT remain — otherwise the
+    // email is permanently un-registrable (re-register would hit DuplicateUserName and
+    // return a silent 204 per anti-enumeration), and the user would be locked out from
+    // ever using the application with that email.
+    [Fact]
+    public async Task Register_rolls_back_user_row_when_category_seeding_fails()
+    {
+        await using var factory = _factory
+            .WithReplacedScopedService<CategorySeedService, ThrowingCategorySeedService>();
+        var client = factory.CreateClient();
+
+        var email = "atomic@register-test.local";
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/register", new
+        {
+            email,
+            password = "correct horse battery staple"
+        });
+
+        // The contract is: when the post-CreateAsync work fails, the endpoint must NOT
+        // report success. 500 is acceptable here (the seed failure is a server error);
+        // the critical assertion is the persistence-state check below.
+        ((int)resp.StatusCode).Should().NotBe((int)HttpStatusCode.NoContent,
+            "registration must not silently succeed if category seeding fails");
+
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var orphan = await userManager.FindByEmailAsync(email);
+        orphan.Should().BeNull(
+            "AspNetUsers row must be rolled back when the post-create transaction fails; otherwise the email is permanently un-registrable");
     }
 
     [Fact]

@@ -15,21 +15,31 @@ public class SettingsService(AppDbContext db, ICurrentUserAccessor user) : ISett
             .Owned(user)
             .FirstOrDefaultAsync();
 
-        if (settings is null)
-        {
-            settings = CreateDefaults(user.UserId);
-            db.Settings.Add(settings);
-            await db.SaveChangesAsync();
+        if (settings is not null) return settings;
 
-            // Re-fetch with the navigation populated.
-            settings = await db.Settings
-                .Include(s => s.DefaultCurrency)
-                .Owned(user)
-                .FirstAsync();
+        // First-touch insert. Concurrent callers for the same user (parallel SPA
+        // requests on first login) both reach this branch; UNIQUE(UserId) makes one
+        // win and the other surface a unique-violation. The loser detaches its
+        // attempted entity and re-fetches the winner's row.
+        var draft = CreateDefaults(user.UserId);
+        db.Settings.Add(draft);
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            db.Entry(draft).State = EntityState.Detached;
         }
 
-        return settings;
+        return await db.Settings
+            .Include(s => s.DefaultCurrency)
+            .Owned(user)
+            .FirstAsync();
     }
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
 
     public async Task<Result> TryUpdateAsync(UpdateSettingsRequest request)
     {

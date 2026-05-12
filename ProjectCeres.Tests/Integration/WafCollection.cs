@@ -169,6 +169,21 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
             }));
 
     /// <summary>
+    /// Replace a scoped service by type (TImpl must derive from / implement TService).
+    /// Used when the production registration is scoped (e.g. CategorySeedService) and
+    /// promoting it to singleton would change behaviour.
+    /// </summary>
+    public WebApplicationFactory<Program> WithReplacedScopedService<TService, TImpl>()
+        where TService : class
+        where TImpl : class, TService =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<TService>();
+                services.AddScoped<TService, TImpl>();
+            }));
+
+    /// <summary>
     /// Returns a derived factory that appends every log message to <paramref name="sink"/>.
     /// Chain with <see cref="WithReplacedService{T}"/> to combine effects.
     /// </summary>

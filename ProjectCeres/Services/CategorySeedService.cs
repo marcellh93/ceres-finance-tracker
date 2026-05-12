@@ -11,9 +11,12 @@ namespace ProjectCeres.Services;
 /// call it after <see cref="Microsoft.AspNetCore.Identity.UserManager{T}.CreateAsync"/>).
 /// Idempotent: if the user already has categories, the call is a no-op.
 /// </summary>
-public sealed class CategorySeedService(AppDbContext db)
+// Not sealed: integration tests subclass with ThrowingCategorySeedService to assert
+// that AuthController.Register rolls back the AspNetUsers row if seeding fails. Same
+// virtual-test-double pattern as Argon2idPasswordHasher.
+public class CategorySeedService(AppDbContext db)
 {
-    public async Task CopyDefaultsForUserAsync(Guid userId, CancellationToken ct = default)
+    public virtual async Task CopyDefaultsForUserAsync(Guid userId, CancellationToken ct = default)
     {
         // Idempotency: the cross-tenant query is intentional here — we're checking whether
         // THIS user already has categories. The query filter (Task 9) is not yet on
