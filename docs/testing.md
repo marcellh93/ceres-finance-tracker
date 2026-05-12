@@ -178,6 +178,28 @@ All Phase 1 services now have integration test coverage:
 | `SettingsService`             | `SettingsServiceTests.cs`             |
 | `FileAttachmentService`       | `FileAttachmentServiceTests.cs`       |
 
+### Phase 3 Multi-Tenancy Coverage (Stage 7, shipped 2026-05-12)
+
+Stage 7 Commit 1 added a dedicated coverage block under `ProjectCeres.Tests/Integration/MultiTenancy/` that pins the multi-tenancy safety net. **These tests are the Stage 7 acceptance gate** — Phase 3 cannot open to invited beta users without them green.
+
+| Test file | What it pins |
+| --------- | ------------ |
+| `Common/UserScopeTests.cs` | `IUserScope` AsyncLocal stack semantics: set/restore, nesting, propagation across `await` |
+| `Common/UserJobRunnerTests.cs` | `IUserJobRunner.ForEachUserAsync` per-user iteration, exception isolation, scope unwinds on throw |
+| `Common/CurrentUserAccessorResolutionTests.cs` | `HttpContextCurrentUserAccessor` resolution order: HTTP claim → `IUserScope.Current` → `Guid.Empty` safe default |
+| `Common/IUserOwnedConformanceTests.cs` | 8 auth-internal entities implement `IUserOwned`; `FailedLoginAttempt` does NOT |
+| `Common/CategoriesDefaultsTests.cs` | Canonical 26-entry default-category list shape |
+| `Integration/Authentication/ArchitectureTests § IgnoreQueryFilters_only_appears_in_documented_exception_paths` | Scans `ProjectCeres/**/*.cs`; fails the build if any non-comment `IgnoreQueryFilters(` call site appears outside the allow-list (9 enumerated files + the future `ProjectCeres/Admin/` namespace) |
+| `Integration/Authentication/ArchitectureTests § Every_user_owned_entity_carries_a_global_query_filter` | All 22 expected entities carry a declared global query filter (Movement as TPC root + 11 finance-domain + 10 auth/scopable) |
+| `Integration/Authentication/ArchitectureTests § FailedLoginAttempt_has_no_global_query_filter` | Cross-tenant retention sweep is unblocked |
+| `Integration/Authentication/RegistrationSeedsCategoriesTests.cs` | Every new user gets 26 per-user categories with independent GUIDs; second seed call is idempotent |
+| `Integration/MultiTenancy/GlobalQueryFilterTests.cs` | A query against `Accounts` run inside `IUserScope.EnterAs(userA)` returns only A's rows, never B's |
+| `Integration/MultiTenancy/IdorIsolationTests.cs` | **The IDOR acceptance suite.** 15 cross-tenant assertions: 9 GET-by-id endpoints return **404 (not 403, not 200)**, 2 mutation endpoints return 404, 3 list endpoints exclude the other user's rows, plus the **negative-assertion test** (`Global_query_filter_alone_catches_leak_without_service_Owned`) that proves the EF global query filter catches a leak independently of any service-layer `.Owned()` discipline. The negative assertion is the load-bearing safety-net test: it issues a raw `db.Accounts.ToListAsync()` under User B's `IUserScope` and asserts User A's seeded account is invisible. |
+| `Integration/Startup/EmptyDbStartupTests.cs` | The app serves `GET /api/health` after wiping user-owned business data (catches per-request hooks that crash on empty Settings/Accounts; documented limitation: WAF host boots once with the collection fixture so this does not catch true cold-boot `IHostedService.StartAsync` regressions — fresh-factory test is deferred) |
+| `Integration/Authentication/CurrentUserAccessorResolutionTests § Returns_GuidEmpty_when_neither_resolves` | Pins the Stage 7 Task 9 amendment to ADR-0067 (accessor returns `Guid.Empty` rather than throwing when neither HTTP context nor `IUserScope` resolves) |
+
+The 404-not-403 discipline matters: returning 403 leaks the row's existence to the requester, defeating the multi-tenancy isolation. Every cross-tenant assertion must be `HttpStatusCode.NotFound`. The IDOR suite's helpers (`GetAsB`, `DeleteAsB`, `PatchAsB`) attach User B's session cookie + CSRF token per-request so the same test can swap users without context bleed.
+
 ### Phase 2 Import Coverage
 
 | Service / Class                                | Test file                                                                              |

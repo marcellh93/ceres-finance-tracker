@@ -80,17 +80,17 @@ Alternatively, pass `currentUserId` as a parameter to service methods from the c
 
 **Resolved by [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md).**
 
-Once Phase 3 wires an `HttpContextAccessor`-backed `ICurrentUserAccessor`, any code path that runs outside an HTTP request resolves `HttpContext` as `null`. Reading `UserId` in that state must not silently fall back to a default — combined with the global query filters from [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md), a default `Guid.Empty` would scope every query to "no user" and produce silently empty results.
+Once Phase 3 wires an `HttpContextAccessor`-backed `ICurrentUserAccessor`, any code path that runs outside an HTTP request resolves `HttpContext` as `null`. The combination of global query filters from [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md) plus the safe-default fallback below means an unauthenticated, no-scope read returns zero rows rather than leaking data.
 
-The decided mechanism:
+The decided mechanism (as shipped in Stage 7 Commit 1, 2026-05-12):
 
-- **`IUserScope.EnterAs(userId)`** returns an `IDisposable`; the user id lives in `AsyncLocal<Guid?>` and propagates across `await` boundaries within a single logical flow.
-- **`IUserJobRunner.ForEachUserAsync(filter, work)`** is the convenience layer for per-user iteration jobs (weekly digest, recurring reminders); it enters/exits the scope per user and isolates per-user exceptions.
-- **`ICurrentUserAccessor`** resolves in fixed precedence: HTTP context → background scope → throw `InvalidOperationException`. Silent fallback to `Guid.Empty` is forbidden.
-- **Genuinely cross-tenant background jobs** (audit-log purge, failed-login retention) do not enter a user scope; they access shared/system tables or use `IgnoreQueryFilters()` with documented justification, consistent with the admin-only-bypass rule from ADR-0065.
-- **`Program.cs` boot-time hooks that touch user-owned data are removed.** `ISettingsService.EnsureExistsAsync` is no longer called at startup — Settings rows are created during user registration per [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md).
+- **`IUserScope.EnterAs(userId)`** returns an `IDisposable`; the user id lives in `AsyncLocal<Guid?>` and propagates across `await` boundaries within a single logical flow. Stack semantics: nested `EnterAs` calls restore the previous value on dispose, not `null`.
+- **`IUserJobRunner.ForEachUserAsync(filter, work)`** is the convenience layer for per-user iteration jobs (weekly digest, recurring reminders); it enters/exits the scope per user and isolates per-user exceptions. `OperationCanceledException` matching the runner's own `CancellationToken` re-throws to exit the batch; all other per-user exceptions are caught and logged.
+- **`ICurrentUserAccessor`** resolves in fixed precedence: HTTP context (`ClaimTypes.NameIdentifier`) → background scope (`IUserScope.Current`) → return **`Guid.Empty`** as the safe default. *(Amendment to ADR-0067, Stage 7 Task 9, 2026-05-12: the original ADR said throw `InvalidOperationException` and forbade `Guid.Empty` fallback. EF Core eagerly evaluates global query filter expressions at model creation time, before any HTTP context or `IUserScope` is established. A throw at that moment crashes the app on startup. The `Guid.Empty` fallback means the filter then produces a `WHERE UserId = '00000000-…'` clause that matches no rows — the safe failure mode. The "no leakage" invariant is preserved by the `IgnoreQueryFilters()` allow-list architecture test, which forces every legitimate cross-tenant reader to opt in explicitly.)*
+- **Genuinely cross-tenant code paths** (token verify before authentication, session revocation validators, MFA-pending lookups, retention sweeps, per-user job enumeration) use `IgnoreQueryFilters()` explicitly with an inline comment, and the file is enumerated in the allow-list maintained by `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs § IgnoreQueryFilters_only_appears_in_documented_exception_paths`. Adding the call anywhere else fails the architecture test.
+- **`Program.cs` boot-time hooks that touch user-owned data are removed.** `ISettingsService.EnsureExistsAsync` is no longer called at startup — Settings rows are created during user registration per [ADR-0066](decisions/ADR-0066-sentinel-remap-to-first-registered-user.md). Regression test: `ProjectCeres.Tests/Integration/Startup/EmptyDbStartupTests.cs`.
 
-`IUserScope` and `IUserJobRunner` ship in the same release as the multi-tenancy cutover, before any Phase 3 background feature lands. Audit every `IHostedService`, `IStartupFilter`, `Program.cs` boot hook, and `dotnet ef` command-line tool registration during the cutover to confirm none queries user-owned data without entering a scope.
+`IUserScope` and `IUserJobRunner` shipped in Stage 7 Commit 1, before any Phase 3 background feature lands.
 
 ### Services to audit for Phase 3
 
@@ -139,11 +139,24 @@ modelBuilder.Entity<Transaction>()
 
 Service code continues to write `.Where(t => t.UserId == _currentUser.UserId)` explicitly — the redundancy documents intent at the call site and is a second layer that survives if the global filter is ever misconfigured.
 
-**`IgnoreQueryFilters()` is reserved for the `Admin/` namespace.** An architecture test fails the build if it appears anywhere else. Admin services that legitimately cross the tenant boundary use it explicitly and pair it with the appropriate scoping (`.Where(t => t.UserId == targetUserId)` for per-user admin queries; no scoping for true platform aggregates).
+**`IgnoreQueryFilters()` is allow-listed.** The allow-list lives in `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs § IgnoreQueryFilters_only_appears_in_documented_exception_paths`. The test scans every `.cs` file under `ProjectCeres/` and fails the build if `IgnoreQueryFilters(` appears in a non-comment line outside the allow-list. As of Stage 7 Commit 1, the allow-list contains: `Common/UserJobRunner.cs` (cross-tenant user enumeration), `Services/CategorySeedService.cs` (registration-time idempotency check), `Common/Authentication/PasswordResetService.cs`, `EmailChangeService.cs`, `LockoutUnlockService.cs`, `MfaBackupCodeService.cs`, `SessionRevocationValidator.cs`, `PersistentCookieRotationMiddleware.cs`, `TotpReplayGuard.cs` (every pre-auth token/session/MFA lookup). The future `ProjectCeres/Admin/` namespace is pre-granted.
 
-The global filter expression resolves `_currentUser.UserId` via `ICurrentUserAccessor`, which reads from HTTP context first, then from the background scope set by `IUserScope.EnterAs` (see ADR-0067), then throws if neither is available. Raw SQL queries against user-owned tables are not subject to the filter — either avoid raw SQL on user-owned tables or always include an explicit `WHERE UserId` clause. PostgreSQL Row-Level Security in Phase 3 (Stage 7.5, ADR-0068) catches this category at the database level as the final defence-in-depth layer.
+The global filter expression resolves `_currentUser.UserId` via `ICurrentUserAccessor`, which reads from HTTP context first, then from the background scope set by `IUserScope.EnterAs` (see ADR-0067), then returns `Guid.Empty` (the safe default — see "Background processes and non-HTTP contexts" above for why this differs from ADR-0067's original "throw"). Raw SQL queries against user-owned tables are not subject to the filter — either avoid raw SQL on user-owned tables or always include an explicit `WHERE UserId` clause. PostgreSQL Row-Level Security in Phase 3 (Stage 7.5, ADR-0068) catches this category at the database level as the final defence-in-depth layer.
 
-Filters are applied to: `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `Settings`, `SupportTicket`, `AuditLog`, and any future user-owned entities. System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) receive no filter.
+**Filters as shipped in Stage 7 Commit 1 (22 concrete entities):**
+
+- *Finance domain (11):* `Account`, `Budget`, `Category`, `CategoryBudget`, `ImportProfile`, `ImportStagedTransaction`, `ImportStagedTransfer`, `ImportTransferExclusion`, `RecurringTransaction`, `SavedReport`, `Settings`.
+- *Movement TPC hierarchy (filter on the abstract root):* `Movement` — EF Core's TPC mapping propagates the filter to `Transaction`, `Transfer`, and `LiabilityPayment` automatically; filters cannot be declared on the concrete subtypes when TPC is in use.
+- *Auth-internal (8, promoted to `IUserOwned` in Stage 7 Task 4):* `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `PasswordResetToken`, `EmailChangeToken`, `LockoutUnlockToken`, `AuditLog`.
+
+**Intentionally NOT filtered:**
+
+- `TransactionAttachment`, `TransferAttachment` — no `UserId` column; service code scopes them via parent (`a.Transaction.UserId == ...`). EF emits two `PendingModelChangesWarning`s about the parent-attachment FK pair being a "required end with a filtered parent"; the warnings are documented inline in `AppDbContext.ConfigureGlobalQueryFilters` and accepted as the cost of the no-UserId-column design.
+- `FailedLoginAttempt` — cross-tenant by design per [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md); nullable `UserId`; retention sweep iterates all rows.
+- `AccountType`, `CategoryType`, `Currency`, `ReportType` — system reference tables.
+- `AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserTokens`, `AspNetRoleClaims` — Identity-managed; cross-tenant by definition.
+
+The boundary is pinned by `ArchitectureTests § Every_user_owned_entity_carries_a_global_query_filter` and `FailedLoginAttempt_has_no_global_query_filter`.
 
 ---
 

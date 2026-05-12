@@ -322,14 +322,24 @@ User-defined labels for classifying transactions.
 | CategoryTypeId | int     | FK, NOT NULL | → CategoryType                 |
 | IsActive       | bit     | NOT NULL     | False = deactivated, hidden from pickers but existing transactions unaffected |
 | IsSystem       | bit     | NOT NULL     | True = seeded by the app, not editable or deletable by the user |
+| IsReserved     | bit     | NOT NULL     | (Added Stage 7 Task 5, 2026-05-12.) True = user-owned but the application code depends on the row existing for this user (e.g. "Uncategorized Income", "Uncategorized Expense" — the fallback target when a category is removed). Distinct from `IsSystem`: a reserved row IS user-owned (each user has their own copy with their own GUID, stamped at registration by `CategorySeedService`); the immutability protection lives in `CategoryPolicies.CanEdit` which trips on either `IsSystem` or `IsReserved`. |
 | LifestyleTag   | varchar | nullable     | "Needs" or "Wants" — used for ratio-based budgeting framework reports (50/30/20). Null = untagged. Only meaningful for Expense categories; ignored on Income and system categories. Seeded expense categories ship with suggested default tags. Prompted once when a user creates a custom category. |
+| UserId         | uuid    | FK, nullable (transitional)  | (Stage 7 bridge state.) Owner; `IUserOwned`-style scope. **Currently nullable** because the single system "Opening Balance" row historically used `UserId = NULL` to mean "shared across all users". Stage 7 Task 9's `StampOpeningBalanceWithSentinel` migration moved that row into the sentinel cohort so the global query filter (`e.UserId == _currentUser.UserId`) can find it for each user. Task 16 (Commit 2) makes the column non-nullable after the sentinel-to-real-user remap; until then `Category` implements BOTH `IUserOwned` and `IOptionallyUserOwned` via an explicit interface bridge returning `UserId ?? Guid.Empty` for the `IUserOwned.UserId` getter. |
 
 **System categories:**
 Some categories are seeded by the app and must not be renamed or deleted because the application
-logic depends on them by name or ID. Currently one: "Opening Balance" (Income type, IsSystem = true).
+logic depends on them by name or ID. Currently one: "Opening Balance" (Income type, `IsSystem = true`).
 It is excluded from all income/expense report totals — its only purpose is to anchor the starting
-balance of an account. The UI must hide edit and delete controls for any category where IsSystem = true.
-The service layer must also enforce this — reject any edit or delete request for an IsSystem category regardless of how the request arrives. UI-only enforcement is bypassed by direct HTTP requests.
+balance of an account. The UI must hide edit and delete controls for any category where `IsSystem = true`.
+The service layer must also enforce this — reject any edit or delete request for a row where `IsSystem` OR `IsReserved` is true, regardless of how the request arrives. UI-only enforcement is bypassed by direct HTTP requests. Stage 7 changed the response shape: archive/patch attempts against a system row return **422 `SYSTEM_CATEGORY_IMMUTABLE`** when the row is visible to the user (which it always is post-`StampOpeningBalanceWithSentinel`, because every seeded Category — including the system Opening Balance — sits in the sentinel cohort that Task 15 will remap to the first real user).
+
+**Per-user category seeding:**
+At registration, `CategorySeedService.CopyDefaultsForUserAsync` writes 26 rows from the canonical
+`Categories.Defaults` list (`ProjectCeres/Common/Categories.cs`) stamped with the new user's id and
+new per-row GUIDs. Two of those rows ("Uncategorized Income", "Uncategorized Expense") are flagged
+`IsReserved = true`. The "Opening Balance" copy is flagged `IsSystem = true`. The remaining 23 are
+freely editable per-user copies of the default chart of accounts. The seeder is idempotent — a
+second call is a no-op via `IgnoreQueryFilters().AnyAsync(c => c.UserId == userId)`.
 
 **Opening Balance and the balance sign convention:**
 Although the Opening Balance category carries `CategoryTypeId = Income`, it is treated as a neutral
