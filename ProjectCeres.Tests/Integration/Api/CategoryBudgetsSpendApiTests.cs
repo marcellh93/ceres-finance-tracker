@@ -27,11 +27,20 @@ public class CategoryBudgetsSpendApiTests : IAsyncLifetime
         _client  = factory.CreateClient();
     }
 
+    // Stage 7: scope every Settings query to the sentinel UserId. The test's
+    // HTTP requests run under TestAuthenticationHandler which authenticates as
+    // the sentinel user; the test mutates THAT user's PeriodStartDay for the
+    // test's duration and restores it on cleanup. Post-Stage-7 the Settings
+    // table is per-user, so an order-non-deterministic FirstAsync() could
+    // target ANY user's row — wrong row mutated, wrong row restored, neither
+    // applied to the SUT under test.
+    private static readonly Guid SentinelUserId = new("00000000-0000-0000-0000-000000000001");
+
     public async Task InitializeAsync()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var settings = await db.Settings.FirstAsync();
+        var settings = await db.Settings.SingleAsync(s => s.UserId == SentinelUserId);
         _originalStartDay = settings.PeriodStartDay;
         settings.PeriodStartDay = 25;
         await db.SaveChangesAsync();
@@ -49,7 +58,7 @@ public class CategoryBudgetsSpendApiTests : IAsyncLifetime
             await db.Accounts.Where(a => _seededAccountIds.Contains(a.Id)).ExecuteDeleteAsync();
         if (_originalStartDay.HasValue)
         {
-            var settings = await db.Settings.FirstAsync();
+            var settings = await db.Settings.SingleAsync(s => s.UserId == SentinelUserId);
             settings.PeriodStartDay = _originalStartDay.Value;
             await db.SaveChangesAsync();
         }

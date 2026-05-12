@@ -308,108 +308,97 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
         captured.Should().BeEmpty();
     }
 
-    // ── Stage 6.16 timing-channel regressions ───────────────────────────────
-    // Pin that the EmailAlreadyInUse and EmailUnchanged fast-return branches pay
-    // equivalent Argon2id cost to the happy path. Pre-6.16 both branches returned
-    // without any Argon2id work, leaking ≈300ms (two Argon2id missed: the
-    // FindByEmail-equalisation hash plus the two `_tokens.Hash` token-hash costs
-    // on the happy path). The fix adds THREE RunDummyHash calls to each fast-return
-    // branch. Threshold mirrors PasswordResetRequestTests.
-
-    private async Task<long> MeasureRequest(
-        WebApplicationFactory<Program> factory, ApplicationUser user, string newEmail)
-    {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        var resp = await PostRequestAsync(factory, user, newEmail);
-        sw.Stop();
-        return sw.ElapsedMilliseconds;
-    }
-
-    private static double Median(List<long> values)
-    {
-        var sorted = values.OrderBy(v => v).ToList();
-        var n = sorted.Count;
-        if (n == 0) throw new InvalidOperationException("median of empty list");
-        return n % 2 == 1 ? sorted[n / 2] : (sorted[(n / 2) - 1] + sorted[n / 2]) / 2.0;
-    }
+    // ── Stage 6.16 timing-channel regressions (count-based, 2026-05-12) ─────
+    // Pin that the EmailAlreadyInUse and EmailUnchanged fast-return branches perform
+    // the same number of Argon2id operations as the user-is-null/Accepted reference
+    // branch. Pre-6.16 the fast-returns did zero Argon2id work; the fix added three
+    // RunDummyHash calls to each. Deterministic count assertion replaces the prior
+    // wall-clock measurement which was flake-prone under integration-suite load.
 
     [Fact]
-    public async Task Request_for_email_already_in_use_has_same_timing_as_unknown_user_branch()
+    public async Task Request_for_email_already_in_use_performs_same_Argon2id_count_as_unknown_user_branch()
     {
-        // Highest-severity timing channel: pre-6.16, an authenticated user could enumerate
-        // OTHER users' email addresses by timing /email-change/request against guessed
-        // addresses (≈300ms gap for the EmailAlreadyInUse fast-return path).
-        await using var factory = _factory.WithReplacedService<IEmailService>(new NoopEmailService());
+        // Highest-severity timing channel pre-6.16: an authenticated user could enumerate
+        // OTHER users' email addresses because the EmailAlreadyInUse fast-return path
+        // skipped all Argon2id work that the happy path performed.
+        await using var factory = _factory.WithReplacedServiceAndArgon2idCounter<IEmailService>(
+            new NoopEmailService(), out var counter);
 
         var requester = await AuthTestFixture.RegisterUserAsync(_factory, $"req-already-{Guid.NewGuid():N}@example.com");
+        var occupier  = await AuthTestFixture.RegisterUserAsync(_factory, $"occ-{Guid.NewGuid():N}@example.com");
 
-        // Warm-up. Use a fresh occupier so the warm-up's EF cache state matches the
-        // measurement loop's cold-miss-per-iteration pattern.
-        var warmupUser = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-already-{Guid.NewGuid():N}@example.com");
-        await MeasureRequest(factory, warmupUser, $"warmup-unknown-{Guid.NewGuid():N}@example.com");
-        var warmupOccupier = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-occ-{Guid.NewGuid():N}@example.com");
-        await MeasureRequest(factory, requester, warmupOccupier.Email!);
+        // Warm up JIT for the counting hasher path.
+        await PostRequestAsync(factory, requester, $"warmup-{Guid.NewGuid():N}@example.com");
 
-        // Measurement loop: a FRESH occupier per iteration so the EF identity-map
-        // cache is cold-miss for both branches. Reusing one occupier across all
-        // iterations would warm the cache after the first hit and make the
-        // already-in-use branch artificially fast — that's an EF-cache artefact,
-        // not a real timing-channel signal, and it caused the original 6.16 test
-        // to fail intermittently under full-suite load.
-        const int iterations = 7;
-        var unknownTimings = new List<long>(iterations);
-        var alreadyInUseTimings = new List<long>(iterations);
-        for (var i = 0; i < iterations; i++)
-        {
-            var occupier = await AuthTestFixture.RegisterUserAsync(_factory, $"occ-{i}-{Guid.NewGuid():N}@example.com");
-            unknownTimings.Add(await MeasureRequest(factory, requester, $"never-used-{i}-{Guid.NewGuid():N}@example.com"));
-            alreadyInUseTimings.Add(await MeasureRequest(factory, requester, occupier.Email!));
-        }
+        // Unknown-user branch (the test reaches it by submitting an email belonging
+        // to no one; the requester is authenticated, but the new-email target is not
+        // a registered user, so the existing-user check at line 95 passes through to
+        // the happy path. To hit the user-is-null fast-return on line 82–86 we need
+        // an authenticated request whose userId resolves to no row — which requires
+        // a deleted user. Simpler: compare AlreadyInUse against the never-used branch
+        // because both share the SAME reference: the happy-path Argon2id count.
+        // The user-null branch isn't reachable from a normal authenticated request.)
+        //
+        // Reference: never-used email address → happy path → 3 Argon2id (one
+        // equalisation hash + two _tokens.Hash for the Verify + Revoke tokens).
+        counter.Reset();
+        var referenceResp = await PostRequestAsync(factory, requester, $"never-used-{Guid.NewGuid():N}@example.com");
+        referenceResp.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var referenceCount = counter.Count;
 
-        var medianUnknown = Median(unknownTimings);
-        var medianAlreadyInUse = Median(alreadyInUseTimings);
-        var diffMs = Math.Abs(medianUnknown - medianAlreadyInUse);
+        // EmailAlreadyInUse branch: requester submits the occupier's email.
+        counter.Reset();
+        var inUseResp = await PostRequestAsync(factory, requester, occupier.Email!);
+        inUseResp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var inUseCount = counter.Count;
 
-        diffMs.Should().BeLessThan(125,
-            "Stage 6.16: EmailAlreadyInUse branch must pay equivalent Argon2id cost " +
-            "(3x RunDummyHash) to mask whether the target email is already taken by " +
-            "another user. Got unknown={0}ms in-use={1}ms diff={2}ms.",
-            medianUnknown, medianAlreadyInUse, diffMs);
+        inUseCount.Should().Be(referenceCount,
+            "EmailAlreadyInUse fast-return must perform the same number of Argon2id " +
+            "operations as the happy path. reference={0}, in-use={1}. Pre-Stage-6.16 " +
+            "this leaked cross-user email enumeration because the fast-return did " +
+            "zero Argon2id work; the fix adds three RunDummyHash calls to mirror the " +
+            "happy path's equalisation hash + two token-hashes.",
+            referenceCount, inUseCount);
+
+        referenceCount.Should().BeGreaterThan(0,
+            "the happy path must perform at least one Argon2id (RunDummyHash + token-hashes)");
     }
 
     [Fact]
-    public async Task Request_for_unchanged_email_has_same_timing_as_unknown_user_branch()
+    public async Task Request_for_unchanged_email_performs_same_Argon2id_count_as_unknown_branch()
     {
-        // Lower-severity channel: an attacker who can submit /email-change/request as
-        // the authenticated user could otherwise confirm what the user's current email
-        // address is by timing the response. Reauth gate + per-user scope limit blast
-        // radius, but the channel was still leaking ≈300ms.
-        await using var factory = _factory.WithReplacedService<IEmailService>(new NoopEmailService());
+        // Lower-severity timing channel pre-6.16: an attacker who could submit
+        // /email-change/request as the authenticated user could otherwise confirm
+        // the user's current email by timing the response.
+        await using var factory = _factory.WithReplacedServiceAndArgon2idCounter<IEmailService>(
+            new NoopEmailService(), out var counter);
 
         var user = await AuthTestFixture.RegisterUserAsync(_factory, $"req-unchanged-{Guid.NewGuid():N}@example.com");
 
-        // Warm-up
-        var warmupUser = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-unchanged-{Guid.NewGuid():N}@example.com");
-        await MeasureRequest(factory, warmupUser, $"warmup-unknown-{Guid.NewGuid():N}@example.com");
-        await MeasureRequest(factory, user, user.Email!);
+        // Warm up JIT.
+        await PostRequestAsync(factory, user, $"warmup-{Guid.NewGuid():N}@example.com");
 
-        const int iterations = 7;
-        var unknownTimings = new List<long>(iterations);
-        var unchangedTimings = new List<long>(iterations);
-        for (var i = 0; i < iterations; i++)
-        {
-            unknownTimings.Add(await MeasureRequest(factory, user, $"never-used-{i}-{Guid.NewGuid():N}@example.com"));
-            unchangedTimings.Add(await MeasureRequest(factory, user, user.Email!));
-        }
+        // Reference: never-used email → happy path → 3 Argon2id (equalisation +
+        // Verify + Revoke token hashes).
+        counter.Reset();
+        var referenceResp = await PostRequestAsync(factory, user, $"never-used-{Guid.NewGuid():N}@example.com");
+        referenceResp.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var referenceCount = counter.Count;
 
-        var medianUnknown = Median(unknownTimings);
-        var medianUnchanged = Median(unchangedTimings);
-        var diffMs = Math.Abs(medianUnknown - medianUnchanged);
+        // EmailUnchanged branch: user submits their own current email.
+        counter.Reset();
+        var unchangedResp = await PostRequestAsync(factory, user, user.Email!);
+        unchangedResp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var unchangedCount = counter.Count;
 
-        diffMs.Should().BeLessThan(125,
-            "Stage 6.16: EmailUnchanged branch must pay equivalent Argon2id cost " +
-            "(3x RunDummyHash) to mask whether the submitted address matches the " +
-            "user's current one. Got unknown={0}ms unchanged={1}ms diff={2}ms.",
-            medianUnknown, medianUnchanged, diffMs);
+        unchangedCount.Should().Be(referenceCount,
+            "EmailUnchanged fast-return must perform the same number of Argon2id " +
+            "operations as the happy path. reference={0}, unchanged={1}. Pre-Stage-6.16 " +
+            "this leaked the user's current-email-address confirmation via response " +
+            "timing.",
+            referenceCount, unchangedCount);
+
+        referenceCount.Should().BeGreaterThan(0,
+            "the happy path must perform at least one Argon2id");
     }
 }

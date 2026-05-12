@@ -85,23 +85,48 @@ public class LoginCrossFeatureRegressionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task BadCredentials_AlwaysReturnsArgon2idTimingFloor()
+    public async Task BadCredentials_known_user_and_unknown_email_perform_same_Argon2id_count()
     {
-        await AuthTestFixture.RegisterUserAsync(_factory, "timing@regress-test.local");
-        var client = _factory.CreateClient();
+        // Production audit (2026-05-12): the known-bad-password branch runs ONE Argon2id
+        // (via PasswordSignInAsync → VerifyHashedPassword); Identity's AccessFailedAsync
+        // does NOT verify again — it just increments AccessFailedCount. The unknown-email
+        // branch runs ONE Argon2id (via RunDummyHash). Count-equality is the security
+        // property the constant-time defence claims to guarantee; we assert it directly
+        // rather than measuring wall-clock duration (the latter was flake-prone under
+        // integration-suite CPU contention and went through three threshold tunings
+        // before this rewrite).
+        await using var factory = _factory.WithArgon2idCounter(out var counter);
+        var client = factory.CreateClient();
 
-        var sw1 = Stopwatch.StartNew();
-        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-            new { email = "timing@regress-test.local", password = "wrong-but-long-enough", rememberMe = false });
-        sw1.Stop();
+        // Warm up JIT for the counting hasher path.
+        var warmupUser = await AuthTestFixture.RegisterUserAsync(_factory, $"warm-count-{Guid.NewGuid():N}@regress-test.local");
+        await PostBadLoginAsync(client, warmupUser.Email!);
+        await PostBadLoginAsync(client, $"ghost-warm-{Guid.NewGuid():N}@regress-test.local");
 
-        var sw2 = Stopwatch.StartNew();
-        await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-            new { email = "ghost@regress-test.local", password = "wrong-but-long-enough", rememberMe = false });
-        sw2.Stop();
+        var knownUser = await AuthTestFixture.RegisterUserAsync(_factory, $"known-count-{Guid.NewGuid():N}@regress-test.local");
 
-        // Both must run Argon2id; allow generous ±200ms tolerance for CI noise.
-        var diff = Math.Abs(sw1.ElapsedMilliseconds - sw2.ElapsedMilliseconds);
-        diff.Should().BeLessThan(200);
+        // Known-user-bad-password branch.
+        counter.Reset();
+        await PostBadLoginAsync(client, knownUser.Email!);
+        var knownCount = counter.Count;
+
+        // Unknown-email branch.
+        counter.Reset();
+        await PostBadLoginAsync(client, $"ghost-{Guid.NewGuid():N}@regress-test.local");
+        var unknownCount = counter.Count;
+
+        unknownCount.Should().Be(knownCount,
+            "constant-time defence: both branches must perform the same number of " +
+            "Argon2id operations. known={0}, unknown={1}. If this trips, audit whether " +
+            "AccessFailedAsync started running a second Argon2id internally, or whether " +
+            "RunDummyHash was removed from the unknown branch.",
+            knownCount, unknownCount);
+
+        knownCount.Should().BeGreaterThan(0,
+            "both branches must perform at least one Argon2id (verify + dummy)");
     }
+
+    private Task<HttpResponseMessage> PostBadLoginAsync(HttpClient client, string email) =>
+        AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
+            new { email, password = "wrong-but-long-enough", rememberMe = false });
 }

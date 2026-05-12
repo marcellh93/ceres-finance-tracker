@@ -7,7 +7,13 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Common.Authentication;
 
-public sealed class Argon2idPasswordHasher : IPasswordHasher<ApplicationUser>
+// Not sealed: the test project subclasses this with CountingArgon2idPasswordHasher to
+// count Argon2id invocations per request, replacing the wall-clock-based constant-time
+// defence tests (which were flake-prone under integration-test CPU contention) with
+// deterministic invocation-count assertions. The class has no internal state that
+// subclassing could compromise — every method below creates its own Argon2id instance,
+// computes, and returns. Konscious's underlying Argon2id object is not retained.
+public class Argon2idPasswordHasher : IPasswordHasher<ApplicationUser>
 {
     private const int SaltLengthBytes = 16;
     private const int HashLengthBytes = 32;
@@ -20,14 +26,14 @@ public sealed class Argon2idPasswordHasher : IPasswordHasher<ApplicationUser>
         _options = options.Value;
     }
 
-    public string HashPassword(ApplicationUser user, string password)
+    public virtual string HashPassword(ApplicationUser user, string password)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltLengthBytes);
         var hash = ComputeHash(password, salt, _options.MemorySizeKb, _options.Iterations, _options.Parallelism);
         return Encode(_options.MemorySizeKb, _options.Iterations, _options.Parallelism, salt, hash);
     }
 
-    public PasswordVerificationResult VerifyHashedPassword(ApplicationUser user, string hashedPassword, string providedPassword)
+    public virtual PasswordVerificationResult VerifyHashedPassword(ApplicationUser user, string hashedPassword, string providedPassword)
     {
         if (!TryParse(hashedPassword, out var m, out var t, out var p, out var salt, out var expected))
         {
@@ -45,7 +51,7 @@ public sealed class Argon2idPasswordHasher : IPasswordHasher<ApplicationUser>
             : PasswordVerificationResult.Success;
     }
 
-    public void RunDummyHash()
+    public virtual void RunDummyHash()
     {
         var salt = new byte[SaltLengthBytes];
         ComputeHash(DummyPlaintext, salt, _options.MemorySizeKb, _options.Iterations, _options.Parallelism);

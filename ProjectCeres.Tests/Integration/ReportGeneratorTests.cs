@@ -231,7 +231,12 @@ public class ReportGeneratorTests : IAsyncLifetime
     {
         // With PeriodStartDay=15, the period spanning Jan 15 – Feb 14 is named "February".
         // A range of Jan 15 to Apr 14 covers 3 full periods (Feb, Mar, Apr).
-        var settings = await _fixture.Db.Settings.SingleAsync();
+        // Stage 7: scope the Settings query to the sentinel UserId — Settings is
+        // per-user post-cutover, and SingleAsync() would throw if any other test
+        // had registered users and triggered SettingsService.GetAsync (which
+        // lazily creates a Settings row on first read).
+        var sentinelUserId = new Guid("00000000-0000-0000-0000-000000000001");
+        var settings = await _fixture.Db.Settings.SingleAsync(s => s.UserId == sentinelUserId);
         settings.PeriodStartDay = 15;
         await _fixture.Db.SaveChangesAsync();
 

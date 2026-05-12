@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Integration;
@@ -174,6 +176,70 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
         this.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
                 services.AddSingleton<ILoggerProvider>(new InMemoryLoggerProvider(sink))));
+
+    /// <summary>
+    /// Returns a derived factory in which every <see cref="Argon2idPasswordHasher"/>
+    /// invocation increments the singleton <see cref="Argon2idCallCounter"/> exposed
+    /// via the out parameter. Used by constant-time-defence tests to assert that
+    /// two HTTP branches perform the same number of Argon2id operations — a
+    /// deterministic replacement for wall-clock timing assertions.
+    ///
+    /// Both production DI registrations are replaced (the <see cref="IPasswordHasher{T}"/>
+    /// interface for Identity's UserManager AND the concrete <see cref="Argon2idPasswordHasher"/>
+    /// for services that call `RunDummyHash` directly), so every Argon2id call site
+    /// is observed.
+    ///
+    /// Usage:
+    /// <code>
+    /// await using var factory = _factory.WithArgon2idCounter(out var counter);
+    /// counter.Reset();
+    /// await PostKnownBranch();
+    /// var knownCount = counter.Count;
+    /// counter.Reset();
+    /// await PostUnknownBranch();
+    /// var unknownCount = counter.Count;
+    /// unknownCount.Should().Be(knownCount);
+    /// </code>
+    /// </summary>
+    public WebApplicationFactory<Program> WithArgon2idCounter(out ProjectCeres.Tests.Common.Argon2idCallCounter counter)
+    {
+        var c = new ProjectCeres.Tests.Common.Argon2idCallCounter();
+        counter = c;
+        return this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => ConfigureCountingHasher(services, c)));
+    }
+
+    /// <summary>
+    /// Combined hook for tests that need BOTH a replaced singleton service AND the
+    /// Argon2id counter. Necessary because both <see cref="WithReplacedService{T}"/>
+    /// and <see cref="WithArgon2idCounter"/> return the base
+    /// <see cref="WebApplicationFactory{Program}"/> (the configuration methods don't
+    /// live on the derived type), so they can't be fluently chained on this factory.
+    /// </summary>
+    public WebApplicationFactory<Program> WithReplacedServiceAndArgon2idCounter<T>(
+        T replacement, out ProjectCeres.Tests.Common.Argon2idCallCounter counter) where T : class
+    {
+        var c = new ProjectCeres.Tests.Common.Argon2idCallCounter();
+        counter = c;
+        return this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<T>();
+                services.AddSingleton(replacement);
+                ConfigureCountingHasher(services, c);
+            }));
+    }
+
+    private static void ConfigureCountingHasher(IServiceCollection services, ProjectCeres.Tests.Common.Argon2idCallCounter counter)
+    {
+        services.RemoveAll<IPasswordHasher<ApplicationUser>>();
+        services.RemoveAll<ProjectCeres.Common.Authentication.Argon2idPasswordHasher>();
+        services.AddSingleton(counter);
+        services.AddScoped<ProjectCeres.Common.Authentication.Argon2idPasswordHasher,
+                           ProjectCeres.Tests.Common.CountingArgon2idPasswordHasher>();
+        services.AddScoped<IPasswordHasher<ApplicationUser>>(sp =>
+            sp.GetRequiredService<ProjectCeres.Common.Authentication.Argon2idPasswordHasher>());
+    }
 }
 
 /// <summary>

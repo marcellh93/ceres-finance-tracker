@@ -81,13 +81,16 @@ public sealed class EmailChangeService
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user is null)
         {
-            // Stage 6.16: equalise Argon2id cost across all branches. The happy path
-            // pays THREE Argon2id hashes total (one for FindByEmail-match-cost equalisation
-            // PLUS two for `_tokens.Hash(verifyRaw)` and `_tokens.Hash(revokeRaw)` at
-            // lines 122–123). Every fast-return branch must mirror all three to close
-            // the ≈150ms-per-hash timing channels an attacker would otherwise use to
-            // distinguish user-exists / email-unchanged / email-taken from the success path.
-            _argon.RunDummyHash();
+            // Stage 6.16 (corrected 2026-05-12 by count-based regression test):
+            // equalise Argon2id cost across all branches. Unlike PasswordResetService,
+            // EmailChangeService's happy path does NOT perform a FindByEmail-match
+            // equalisation hash — the user lookup at line 81 is by UserId (no
+            // Argon2id), so the happy path performs only TWO Argon2id calls (the
+            // `_tokens.Hash(verifyRaw)` and `_tokens.Hash(revokeRaw)` calls at lines
+            // 137–138). Each fast-return branch must mirror exactly two RunDummyHash
+            // calls — not three. Three was the initial 6.16 fix; it created an
+            // inverse timing channel (fast-returns ran 3x ≈450ms while happy path
+            // ran 2x ≈300ms) which the Argon2id-count regression test now pins.
             _argon.RunDummyHash();
             _argon.RunDummyHash();
             return new EmailChangeRequestOutcome.Accepted();
@@ -96,9 +99,8 @@ public sealed class EmailChangeService
         if (string.Equals(user.NormalizedEmail, _userManager.NormalizeEmail(normalized),
                 StringComparison.Ordinal))
         {
-            // Stage 6.16: three RunDummyHash to mirror the happy-path Argon2id cost
-            // (one match-equalisation + two `_tokens.Hash` for Verify + Revoke).
-            _argon.RunDummyHash();
+            // Stage 6.16: two RunDummyHash to mirror the happy-path's two `_tokens.Hash`
+            // calls (Verify + Revoke). See comment on the user-null branch above.
             _argon.RunDummyHash();
             _argon.RunDummyHash();
             return new EmailChangeRequestOutcome.EmailUnchanged();
@@ -107,11 +109,10 @@ public sealed class EmailChangeService
         var existing = await _userManager.FindByEmailAsync(normalized);
         if (existing is not null)
         {
-            // Stage 6.16: three RunDummyHash to mirror the happy-path Argon2id cost.
+            // Stage 6.16: two RunDummyHash to mirror the happy-path Argon2id cost.
             // This branch is the highest-severity timing channel — an authenticated
             // user could otherwise enumerate other users' email addresses by timing
             // `/email-change/request` against guessed addresses.
-            _argon.RunDummyHash();
             _argon.RunDummyHash();
             _argon.RunDummyHash();
             return new EmailChangeRequestOutcome.EmailAlreadyInUse();

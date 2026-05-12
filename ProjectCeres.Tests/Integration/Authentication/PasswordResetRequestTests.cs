@@ -65,84 +65,59 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
     }
 
     // ── Test #7 ─────────────────────────────────────────────────────────────
-    // Constant-time defence: known vs unknown branch median wall-clock diff < 200ms.
-    // Uses median, not mean: under load, mean is skewed by single-outlier GC pauses
-    // and thread-pool contention with sibling auth tests in the IntegrationTests
-    // collection. Median ignores those outliers, which is what we actually care about
-    // for constant-time — the property is per-call indistinguishability, not
-    // average-case indistinguishability.
-    //
-    // The actual constant-time defence is provided by RunDummyHash equalising the
-    // dominant Argon2id cost; the threshold here guards only against gross
-    // regressions (e.g. RunDummyHash being removed entirely from the unknown branch).
-    // Each iteration registers a fresh user so the per-email rate gate (5/hour) is
-    // never tripped across the warm-up + 7 measurement iterations.
+    // Constant-time defence (post-2026-05-12): deterministic Argon2id-call-count
+    // assertion. Pre-2026-05-12 this was a wall-clock median test with a tuned
+    // threshold that kept flaking under integration-suite CPU contention; the
+    // wall-clock approach cannot stably pin the property under that load because
+    // the variance floor is the same order of magnitude as a single Argon2id call.
+    // The count-based assertion is exact: by the time the HTTP response returns,
+    // every Argon2id call is complete (Argon2id is synchronous within the request
+    // handler), so the counter holds an exact integer total. Two branches with
+    // equal counts perform equal Argon2id work — which is the security property
+    // the constant-time defence claims to guarantee.
     [Fact]
-    public async Task Request_with_unknown_email_returns_204_with_same_timing()
+    public async Task Request_with_unknown_email_performs_same_Argon2id_count_as_known_branch()
     {
-        await using var factory = _factory.WithReplacedService<IEmailService>(new NoopEmailService());
+        await using var factory = _factory.WithReplacedServiceAndArgon2idCounter<IEmailService>(
+            new NoopEmailService(), out var counter);
         var client = factory.CreateClient();
 
-        // Warm-up: discard the first measurement of each branch (JIT, EF cache fill).
-        var warmupKnownEmail = $"req-known-timing-warmup-{Guid.NewGuid():N}@example.com";
+        // Warm up JIT for the counting hasher path; counter values from this run
+        // are discarded.
+        var warmupKnownEmail = $"req-known-warm-{Guid.NewGuid():N}@example.com";
         await AuthTestFixture.RegisterUserAsync(factory, warmupKnownEmail);
         await Hit(factory, client, warmupKnownEmail);
-        await Hit(factory, client, $"unknown-warmup-{Guid.NewGuid():N}@example.com");
+        await Hit(factory, client, $"unknown-warm-{Guid.NewGuid():N}@example.com");
 
-        // 7 iterations so a single outlier (e.g. one GC pause) doesn't dominate
-        // the median window; trimming the top 1 sample post-hoc is also tolerated.
-        const int iterations = 7;
-        var knownTimings = new List<long>(iterations);
-        var unknownTimings = new List<long>(iterations);
-        for (var i = 0; i < iterations; i++)
-        {
-            var knownEmail = $"req-known-timing-{i}-{Guid.NewGuid():N}@example.com";
-            await AuthTestFixture.RegisterUserAsync(factory, knownEmail);
-            knownTimings.Add(await Measure(factory, client, knownEmail));
-            unknownTimings.Add(await Measure(factory, client, $"unknown-{Guid.NewGuid():N}@example.com"));
-        }
+        // Known-email branch: register a fresh user, count Argon2id calls during
+        // the password-reset/request handler.
+        var knownEmail = $"req-known-{Guid.NewGuid():N}@example.com";
+        await AuthTestFixture.RegisterUserAsync(factory, knownEmail);
+        counter.Reset();
+        var knownResp = await Hit(factory, client, knownEmail);
+        knownResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var knownCount = counter.Count;
 
-        var medianKnown = Median(knownTimings);
-        var medianUnknown = Median(unknownTimings);
-        var diffMs = Math.Abs(medianKnown - medianUnknown);
+        // Unknown-email branch.
+        counter.Reset();
+        var unknownResp = await Hit(factory, client, $"unknown-{Guid.NewGuid():N}@example.com");
+        unknownResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var unknownCount = counter.Count;
 
-        diffMs.Should().BeLessThan(125,
-            "constant-time defence requires |median diff| < 125ms post-Stage-6.16; " +
-            "got known={0}ms unknown={1}ms diff={2}ms. " +
-            "Threshold reflects empirical wall-clock variance under full-suite " +
-            "CPU contention (GC, JIT, connection-pool warm-up) AFTER both branches " +
-            "pay TWO Argon2id hashes (FindByEmail-match-equalisation + token-hash " +
-            "equalisation). 125ms is below the practical network-jitter floor an " +
-            "attacker would face (~200ms+ over the internet), so even at the " +
-            "ceiling there's no exploitable signal; the threshold is set tight " +
-            "enough to catch a regression that re-removes a RunDummyHash (worth " +
-            "≈150ms — would push diff over the threshold). The pre-6.16 threshold " +
-            "of <200ms absorbed a ≈150ms timing-channel gap (the unknown branch " +
-            "was missing the second Argon2id call mirroring the happy-path " +
-            "`_tokens.Hash(rawToken)`); 125ms is strict enough to catch that " +
-            "regression. If this trips intermittently, investigate whether a " +
-            "RunDummyHash on the unknown branch was reverted, not whether the " +
-            "test is flaky.",
-            medianKnown, medianUnknown, diffMs);
-    }
+        unknownCount.Should().Be(knownCount,
+            "constant-time defence: both branches must perform the same number of " +
+            "Argon2id operations. known branch performed {0}; unknown branch performed {1}. " +
+            "Stage 6.16 closed a gap where the unknown branch was missing the second " +
+            "RunDummyHash mirroring `_tokens.Hash(rawToken)` on the known branch. If " +
+            "this trips, an Argon2id call on one branch was added or removed without " +
+            "the mirror on the other.",
+            knownCount, unknownCount);
 
-    private static double Median(List<long> values)
-    {
-        var sorted = values.OrderBy(v => v).ToList();
-        var n = sorted.Count;
-        if (n == 0) throw new InvalidOperationException("median of empty list");
-        return n % 2 == 1
-            ? sorted[n / 2]
-            : (sorted[(n / 2) - 1] + sorted[n / 2]) / 2.0;
-    }
-
-    private async Task<long> Measure(WebApplicationFactory<Program> factory, HttpClient client, string email)
-    {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        var resp = await Hit(factory, client, email);
-        sw.Stop();
-        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        return sw.ElapsedMilliseconds;
+        // Sanity: both branches must have actually run Argon2id. A regression that
+        // removes Argon2id from BOTH branches would otherwise pass count-equality
+        // trivially.
+        knownCount.Should().BeGreaterThan(0,
+            "the known branch must perform at least one Argon2id (verify + token-hash)");
     }
 
     private Task<HttpResponseMessage> Hit(WebApplicationFactory<Program> factory, HttpClient client, string email) =>
