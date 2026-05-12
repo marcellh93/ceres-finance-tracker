@@ -64,14 +64,28 @@ public class EmptyDbStartupTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task App_boots_against_empty_db_and_responds_to_health()
+    public async Task Health_endpoint_handles_request_against_empty_user_owned_tables()
     {
         // Stage 6a removed ISettingsService.EnsureExistsAsync from Program.cs.
-        // Stage 7's safety net for that removal: this test confirms the app boots
-        // and serves /api/health even when zero rows exist in user-owned tables.
-        // A regression that reintroduces a boot-time hook querying Settings or
-        // Accounts would throw during DI resolution → /api/health would never
-        // respond → this test fails.
+        // What this test catches: a middleware, action filter, or per-request hook
+        // that queries Settings/Accounts and crashes when the row doesn't exist —
+        // e.g. a number-format middleware that loads the user's Settings on every
+        // request and dereferences a null result. Such a regression would surface
+        // here because /api/health is the path with the least production code on
+        // it, so any "every request crashes against empty tables" failure mode is
+        // isolated cleanly.
+        //
+        // What this test does NOT catch: a true boot-time IHostedService that
+        // queries user-owned tables and crashes at StartAsync. The
+        // AuthTestWebApplicationFactory is registered as a collection fixture in
+        // WafCollection.cs — the host boots ONCE when the first test in the
+        // collection resolves the factory, with whatever seed data was present at
+        // that moment. By the time InitializeAsync wipes the tables, StartAsync
+        // has long since completed. A boot-from-empty test would need a
+        // dedicated, freshly-constructed factory inside the test body; that's
+        // deferred — the per-request regression is the more likely failure mode
+        // in practice, and Stage 6a's removal of ISettingsService.EnsureExistsAsync
+        // already eliminated the canonical boot-time hook.
         using var client = _factory.CreateClient();
         var resp = await client.GetAsync("/api/health");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
