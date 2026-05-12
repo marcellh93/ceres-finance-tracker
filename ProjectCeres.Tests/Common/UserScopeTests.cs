@@ -52,4 +52,31 @@ public class UserScopeTests
             scope.Current.Should().Be(userId);
         }
     }
+
+    [Fact]
+    public void Dispose_called_twice_is_a_no_op_and_does_not_restore_previous_again()
+    {
+        // Pins ScopeReleaser.Dispose's idempotency guard (`if (_disposed) return;`).
+        // Without the guard, a second Dispose call would restore `previous` a second
+        // time — which, if a nested scope had since entered, would clobber the
+        // current value back to a stale captured `previous`.
+        IUserScope scope = new UserScope();
+        var outer = Guid.NewGuid();
+        var inner = Guid.NewGuid();
+
+        var outerReleaser = scope.EnterAs(outer);
+        scope.Current.Should().Be(outer);
+
+        outerReleaser.Dispose();
+        scope.Current.Should().BeNull("first Dispose restored the pre-outer value (null)");
+
+        // Now enter a nested scope and call Dispose on the already-disposed outer
+        // releaser. The guard must prevent it from clobbering the inner value.
+        using (scope.EnterAs(inner))
+        {
+            scope.Current.Should().Be(inner);
+            outerReleaser.Dispose();  // second dispose
+            scope.Current.Should().Be(inner, "second Dispose on an already-disposed releaser must be a no-op");
+        }
+    }
 }

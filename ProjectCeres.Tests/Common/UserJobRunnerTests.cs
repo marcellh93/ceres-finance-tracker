@@ -88,4 +88,61 @@ public class UserJobRunnerTests : IAsyncLifetime
 
         userScope.Current.Should().BeNull("scope must unwind even when per-user work throws");
     }
+
+    [Fact]
+    public async Task ForEachUserAsync_exits_loop_early_when_token_cancels_between_users()
+    {
+        // Pins the pre-iteration cancellation check (`if (ct.IsCancellationRequested) break;`).
+        // Two users, A and B. Work on A cancels the token. The runner must NOT invoke
+        // work on B — even though both passed the filter and would otherwise iterate.
+        var userA = await AuthTestFixture.RegisterUserAsync(_factory, $"cancel-a-{Guid.NewGuid():N}{TestEmailSuffix}");
+        var userB = await AuthTestFixture.RegisterUserAsync(_factory, $"cancel-b-{Guid.NewGuid():N}{TestEmailSuffix}");
+
+        using var diScope = _factory.Services.CreateScope();
+        var db = diScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var runner = new UserJobRunner(db, new UserScope(), NullLogger<UserJobRunner>.Instance);
+        using var cts = new CancellationTokenSource();
+        var invoked = new List<Guid>();
+
+        await runner.ForEachUserAsync(
+            u => u.Id == userA.Id || u.Id == userB.Id,
+            id =>
+            {
+                invoked.Add(id);
+                if (id == userA.Id) cts.Cancel();
+                return Task.CompletedTask;
+            },
+            cts.Token);
+
+        invoked.Should().ContainSingle()
+            .Which.Should().Be(userA.Id,
+                "the pre-iteration cancellation check must skip user B's invocation once A's work cancelled the token");
+    }
+
+    [Fact]
+    public async Task ForEachUserAsync_rethrows_OperationCanceledException_when_runners_own_token_fires()
+    {
+        // Pins the `catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }`
+        // branch. If a user's work throws OperationCanceledException AFTER the runner's own token
+        // has fired, the runner must propagate the exception (it's cooperative cancellation, not a
+        // per-user failure). The general `catch (Exception)` branch must NOT swallow this one.
+        var userA = await AuthTestFixture.RegisterUserAsync(_factory, $"rethrow-{Guid.NewGuid():N}{TestEmailSuffix}");
+
+        using var diScope = _factory.Services.CreateScope();
+        var db = diScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var runner = new UserJobRunner(db, new UserScope(), NullLogger<UserJobRunner>.Instance);
+        using var cts = new CancellationTokenSource();
+
+        var act = async () => await runner.ForEachUserAsync(
+            u => u.Id == userA.Id,
+            _ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            },
+            cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>(
+            "the runner's own cancellation must propagate, not be swallowed by the per-user exception isolation");
+    }
 }
