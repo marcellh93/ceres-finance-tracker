@@ -182,7 +182,10 @@ public class IdorIsolationTests : IAsyncLifetime
     // ---------------------------------------------------------------------------
 
     /// <summary>
-    /// Creates an HttpClient that sends User B's session cookie on every request.
+    /// Creates a cookieless HttpClient. Per-request helpers (<see cref="GetAsB"/>,
+    /// <see cref="DeleteAsB"/>, <see cref="PatchAsB"/>) attach User B's session cookie
+    /// explicitly via the <c>Cookie</c> header. The factory does not retain auth state
+    /// between requests — that's intentional so the suite can swap users mid-test.
     /// </summary>
     private HttpClient CreateClientAsB() =>
         _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
@@ -416,6 +419,10 @@ public class IdorIsolationTests : IAsyncLifetime
         }
 
         // Enter User B's scope and issue a raw query — no .Owned(), no .Where(UserId == ...).
+        // Ordering matters: AppDbContext must be resolved AFTER EnterAs so the scoped
+        // ICurrentUserAccessor injected into the DbContext reads B's id from the AsyncLocal
+        // already-set scope. Resolving the DbContext before EnterAs would capture an
+        // accessor whose UserId resolves to Guid.Empty (the no-context safe default).
         using var queryScope = _factory.Services.CreateScope();
         var userScope = queryScope.ServiceProvider.GetRequiredService<IUserScope>();
         using (userScope.EnterAs(_userB.Id))
