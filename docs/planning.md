@@ -319,7 +319,7 @@ See [docs/testing.md](testing.md) for the full testing strategy — stack, TDD w
 - [ ] **File attachment storage for Phase 3** — local filesystem does not scale to hosted multi-user. Must decide between cloud storage (Azure Blob Storage, S3) and server disk before Phase 3 begins. **Note: `StoredPath` will need a data migration if the storage backend changes after data exists — this decision affects Phase 1 schema.**
 - [ ] **Timezone handling** — transaction dates stored as local date with no timezone. Must decide on a strategy before Phase 3: store UTC and convert for display, require users to set their timezone, or accept local-date ambiguity.
 - [ ] **Hosting platform for Phase 3** — Azure, AWS, DigitalOcean, Fly.io, or bare VPS. All other Phase 3 infrastructure decisions depend on this.
-- [ ] **Email service for Phase 3** — no provider chosen (SendGrid, AWS SES, Mailgun, SMTP). Required before Phase 3 auth can launch.
+- [x] **Email service for Phase 3** — **Resend** chosen 2026-05-12. Integration ships in Stage 8 per `roadmap-phase-three.md` § Stage 8 sub-stage 8.1. See `planning-resolved.md` § Email provider for Phase 3 for the resolved entry.
 - [ ] **Invite mechanism for Phase 3** — "invite-only beta" stated but not designed. No invitation entity, flow, or admin mechanism exists.
 - [ ] **Concurrency handling (Phase 3)** — last-write-wins accepted for Phase 1/2. Before Phase 3, decide whether to add EF Core optimistic concurrency tokens (`RowVersion`) to mutable entities.
 - [ ] **Production migration strategy (Phase 3)** — `dotnet ef database update` vs. pre-deploy CI/CD step vs. reviewed SQL scripts. Option 2 or 3 recommended.

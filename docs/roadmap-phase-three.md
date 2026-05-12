@@ -772,7 +772,7 @@ Operational:
 
 | # | Sub-stage | Spec / Reference |
 |---|---|---|
-| 8.1 | Pick provider (SendGrid / Postmark / AWS SES / Mailgun) | `planning.md` § Open Questions: Email service |
+| 8.1 | Integrate Resend (chosen 2026-05-12; see `planning-resolved.md`) | `planning-resolved.md` § Email provider for Phase 3 |
 | 8.2 | `IEmailService` abstraction + provider implementation | New abstraction; provider behind interface for testability |
 | 8.3 | DNS authentication: SPF, DKIM, DMARC | `security-model.md` § Email Security Rules → Layer 1 |
 | 8.4 | Application controls: recipient lock, sanitization, per-user rate limit | `security-model.md` § Email Security Rules → Layer 2 |
