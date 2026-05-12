@@ -2,7 +2,7 @@ using ProjectCeres.Common;
 
 namespace ProjectCeres.Models;
 
-public class Category : IUserOwned, IOptionallyUserOwned
+public class Category : IUserOwned
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -19,17 +19,15 @@ public class Category : IUserOwned, IOptionallyUserOwned
     /// </summary>
     public bool IsReserved { get; set; }
     public string? LifestyleTag { get; set; }
-    /// <summary>NULL for the single legacy "Opening Balance" row (UserId = null) until Task 15
-    /// remaps it to a real user. Set for all user-owned categories (all rows after Task 7).</summary>
-    public Guid? UserId { get; set; }
 
     /// <summary>
-    /// Stage 7 bridge: IUserOwned requires a non-nullable Guid, but Category.UserId is still
-    /// nullable until Task 16 remaps the sentinel-stamped data and drops the nullability.
-    /// The explicit interface implementation returns Guid.Empty for the single legacy
-    /// UserId-null "Opening Balance" row — that row is remapped to a real user in Task 15.
+    /// Owner. Set by CategorySeedService at registration (per-user copies of the canonical
+    /// 26-entry Categories.Defaults list). Non-nullable post-Stage-7-Task-16; the legacy
+    /// "Opening Balance" UserId-NULL row was stamped with the sentinel in
+    /// StampOpeningBalanceWithSentinel and is remapped to the first real user by
+    /// RemapSentinelToFirstUser.
     /// </summary>
-    Guid IUserOwned.UserId => UserId ?? Guid.Empty;
+    public Guid UserId { get; set; }
 
     public CategoryType CategoryType { get; set; } = null!;
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();

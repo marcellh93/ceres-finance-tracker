@@ -193,7 +193,6 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         modelBuilder.Entity<Transfer>().HasIndex(e => e.UserId);
         modelBuilder.Entity<LiabilityPayment>().HasIndex(e => e.UserId);
 
-        // Category.UserId is nullable: NULL = system category shared across all users.
         modelBuilder.Entity<Category>().HasIndex(e => e.UserId);
 
         // Settings is one row per user. The unique constraint is what makes that true.
@@ -224,7 +223,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         // Finance domain (11)
         modelBuilder.Entity<Account>()                .HasQueryFilter(e => e.UserId == _currentUser.UserId);
         modelBuilder.Entity<Budget>()                 .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<Category>()               .HasQueryFilter(e => e.UserId == (Guid?)_currentUser.UserId);
+        modelBuilder.Entity<Category>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
         modelBuilder.Entity<CategoryBudget>()         .HasQueryFilter(e => e.UserId == _currentUser.UserId);
         modelBuilder.Entity<ImportProfile>()          .HasQueryFilter(e => e.UserId == _currentUser.UserId);
         modelBuilder.Entity<ImportStagedTransaction>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
@@ -512,13 +511,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 
     private static void SeedCategories(ModelBuilder modelBuilder)
     {
-        // Stage 7 bridge: every seeded Category — including the system Opening Balance row —
-        // is stamped with the pre-auth sentinel. Task 15's data migration remaps the entire
-        // sentinel cohort to the first real registered user. Earlier seeds left Opening
-        // Balance with UserId = null (system-shared row), but the Stage 7 query filter
-        // hides null-UserId rows from every authenticated user, so the row must move into
-        // the sentinel cohort to remain visible until Task 15 ships.
-        var owner = (Guid?)SingleUserAccessor.SentinelUserId;
+        // Stage 7: every seeded Category is stamped with the pre-auth sentinel.
+        // Task 15's data migration remaps the sentinel cohort to the first real registered
+        // user. Task 17 will remove the sentinel and this seed data entirely once all
+        // test fixtures have migrated to FakeCurrentUserAccessor.
+        var owner = SingleUserAccessor.SentinelUserId;
         modelBuilder.Entity<Category>().HasData(
             // --- System ---
             new Category { Id = new Guid("20000000-0000-0000-0000-000000000001"), Name = "Opening Balance",    CategoryTypeId = 1, IsActive = true, IsSystem = true,  IsReserved = false, LifestyleTag = null,    UserId = owner },

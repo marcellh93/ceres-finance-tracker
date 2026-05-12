@@ -75,8 +75,7 @@ public class CategoriesCrudApiTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var fresh = await db.Categories.FindAsync(id);
-        fresh!.UserId.Should().NotBeNull();
-        fresh.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
+        fresh!.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
     }
 
     [Fact]

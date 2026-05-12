@@ -12,8 +12,6 @@ namespace ProjectCeres.Common;
 ///
 /// Rules:
 /// - IUserOwned (non-nullable UserId): default(Guid) → set to current user's id.
-/// - IOptionallyUserOwned (nullable UserId): null → leave alone (system rows). Set,
-///   non-empty values are also left alone.
 /// - Modified entities: never overwrite an existing UserId — that would let a write
 ///   silently change ownership.
 /// </summary>
@@ -42,9 +40,6 @@ public sealed class UserOwnershipInterceptor(ICurrentUserAccessor user) : SaveCh
             {
                 entry.Property(nameof(IUserOwned.UserId)).CurrentValue = user.UserId;
             }
-            // IOptionallyUserOwned (Category): leave null intact; only stamp if value
-            // is default(Guid) (which is a meaningful zero-Guid, not "unset"). System
-            // rows pass UserId = null and stay null.
         }
     }
 }
