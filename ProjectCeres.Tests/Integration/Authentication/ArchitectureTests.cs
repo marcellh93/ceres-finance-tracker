@@ -608,17 +608,20 @@ public class ArchitectureTests
         // Stage 7 safety net: every IgnoreQueryFilters() call site must be in the allow-list
         // or under the pre-granted ProjectCeres/Admin/ surface (Phase 4+).
         // Adding the call anywhere else bypasses multi-tenancy isolation — the test catches it.
+        // Each allow-listed file performs a legitimately cross-tenant read. The trailing
+        // justification comments let a reader audit the allow-list without grepping the
+        // codebase — keep them in lockstep with the production code.
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
-            "ProjectCeres/Common/UserJobRunner.cs",
-            "ProjectCeres/Services/CategorySeedService.cs",
-            "ProjectCeres/Common/Authentication/PasswordResetService.cs",
-            "ProjectCeres/Common/Authentication/EmailChangeService.cs",
-            "ProjectCeres/Common/Authentication/LockoutUnlockService.cs",
-            "ProjectCeres/Common/Authentication/MfaBackupCodeService.cs",
-            "ProjectCeres/Common/Authentication/SessionRevocationValidator.cs",
-            "ProjectCeres/Common/Authentication/PersistentCookieRotationMiddleware.cs",
-            "ProjectCeres/Common/Authentication/TotpReplayGuard.cs",
+            "ProjectCeres/Common/UserJobRunner.cs",                                   // enumerates AspNetUsers for per-user fan-out background jobs
+            "ProjectCeres/Services/CategorySeedService.cs",                           // idempotency check at registration; user not yet authenticated in scope
+            "ProjectCeres/Common/Authentication/PasswordResetService.cs",             // token verify before the user is authenticated (no cookie yet)
+            "ProjectCeres/Common/Authentication/EmailChangeService.cs",               // token verify before the user is authenticated (no cookie yet)
+            "ProjectCeres/Common/Authentication/LockoutUnlockService.cs",             // unlock token candidate scan before the user is authenticated
+            "ProjectCeres/Common/Authentication/MfaBackupCodeService.cs",             // MFA-pending step: principal not yet committed to the cookie
+            "ProjectCeres/Common/Authentication/SessionRevocationValidator.cs",       // runs during cookie validation, before HTTP principal is committed
+            "ProjectCeres/Common/Authentication/PersistentCookieRotationMiddleware.cs", // runs before UseAuthentication; resolves session by cookie-embedded id
+            "ProjectCeres/Common/Authentication/TotpReplayGuard.cs",                  // MFA-pending step + cross-tenant retention purge of expired entries
         };
 
         var repoRoot = FindRepoRoot();
