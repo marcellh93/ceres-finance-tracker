@@ -6,7 +6,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) : ICategoryBudgetService
+public class CategoryBudgetService(AppDbContext db, ISettingsService settingsService, ICurrentUserAccessor user) : ICategoryBudgetService
 {
     public async Task<IEnumerable<CategoryBudget>> GetAllAsync(bool includeInactive = false, string? currency = null)
     {
@@ -108,8 +108,7 @@ public class CategoryBudgetService(AppDbContext db, ICurrentUserAccessor user) :
         var budget = await db.CategoryBudgets.Owned(user).FirstOrDefaultAsync(cb => cb.Id == id)
             ?? throw new InvalidOperationException($"CategoryBudget {id} not found.");
 
-        var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
-            ?? throw new InvalidOperationException("Settings row missing.");
+        var settings = await settingsService.GetAsync();
 
         var (periodStart, periodEnd) =
             BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);

@@ -13,7 +13,7 @@ public record BudgetVsActualRow(
     decimal ActualSpend,
     decimal Variance);
 
-public class BudgetVsActualReportGenerator(AppDbContext db, ICurrentUserAccessor user) : IReportGenerator
+public class BudgetVsActualReportGenerator(AppDbContext db, ISettingsService settingsService, ICurrentUserAccessor user) : IReportGenerator
 {
     public async Task<object> GenerateAsync(ReportParameters parameters)
     {
@@ -21,7 +21,7 @@ public class BudgetVsActualReportGenerator(AppDbContext db, ICurrentUserAccessor
         var from       = parameters.From        ?? throw new ArgumentException("From is required.");
         var to         = parameters.To          ?? throw new ArgumentException("To is required.");
 
-        var settings = await db.Settings.Owned(user).SingleAsync();
+        var settings = await settingsService.GetAsync();
         var periodCount = CountPeriodsInRange(from, to, settings.PeriodStartDay);
 
         var budgets = await db.CategoryBudgets

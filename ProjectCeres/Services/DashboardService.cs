@@ -244,8 +244,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         decimal budgetReserve = 0m;
         if (activeBudgets.Count > 0)
         {
-            var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
-                ?? throw new InvalidOperationException("Settings row missing.");
+            var settings = await settingsService.GetAsync();
             var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
             var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
@@ -381,8 +380,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         var today = DateOnly.FromDateTime(DateTime.Today);
 
         // "Current period" follows the user's configured budget cycle.
-        var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
-            ?? throw new InvalidOperationException("Settings row missing.");
+        var settings = await settingsService.GetAsync();
         var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
         var (periodStart, _) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 
@@ -458,8 +456,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         if (totalLimit == 0m)
             return (null, null, null);
 
-        var settings = await db.Settings.Owned(user).FirstOrDefaultAsync()
-            ?? throw new InvalidOperationException("Settings row missing.");
+        var settings = await settingsService.GetAsync();
         var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
         var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
 

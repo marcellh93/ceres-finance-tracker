@@ -34,8 +34,10 @@ public class CategoryBudgetServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        _service = new CategoryBudgetService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var sentinel = new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001"));
+        _accountService = new AccountService(_fixture.Db, sentinel);
+        var settingsService = new SettingsService(_fixture.Db, sentinel);
+        _service = new CategoryBudgetService(_fixture.Db, settingsService, sentinel);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

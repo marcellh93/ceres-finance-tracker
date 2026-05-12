@@ -1,5 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Common;
+using ProjectCeres.Services;
 using ProjectCeres.Services.Reports;
 using ProjectCeres.Tests.Common;
 
@@ -9,14 +10,15 @@ public class ReportGeneratorFactoryTests
 {
     private static ReportGeneratorFactory BuildFactory()
     {
-        var nw   = new NetWorthGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var ie   = new IncomeExpenseGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var eb   = new ExpenseBreakdownGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var th   = new TransactionHistoryGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var bva  = new BudgetVsActualReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var le   = new LargestExpensesReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var mcf  = new MonthlyCashFlowReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var nwot = new NetWorthOverTimeReportGenerator(null!, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var user = new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001"));
+        var nw   = new NetWorthGenerator(null!, user);
+        var ie   = new IncomeExpenseGenerator(null!, user);
+        var eb   = new ExpenseBreakdownGenerator(null!, user);
+        var th   = new TransactionHistoryGenerator(null!, user);
+        var bva  = new BudgetVsActualReportGenerator(null!, new SettingsService(null!, user), user);
+        var le   = new LargestExpensesReportGenerator(null!, user);
+        var mcf  = new MonthlyCashFlowReportGenerator(null!, user);
+        var nwot = new NetWorthOverTimeReportGenerator(null!, user);
         return new ReportGeneratorFactory(nw, ie, eb, th, bva, le, mcf, nwot);
     }
 
