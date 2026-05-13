@@ -33,21 +33,46 @@ createdb project_ceres
 
 If using Postgres.app, start it from the menubar, then run `createdb project_ceres` in the terminal.
 
-**2. Configure your connection string via User Secrets**
+**2. Create the three Postgres roles (Stage 7.5 / ADR-0068 — RLS)**
+
+The application uses three roles for Row-Level Security defence-in-depth:
+
+- `ceres_app` — runtime role, subject to RLS (no `BYPASSRLS`)
+- `ceres_admin` — admin services + background jobs, `BYPASSRLS`
+- `ceres_migrator` — `dotnet ef database update` only, DDL + `BYPASSRLS`
+
+Run the idempotent setup script once per database (safe to re-run):
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
-  "Host=localhost;Database=project_ceres;Username=postgres;Password=<your-password>" \
+psql -d project_ceres      -f scripts/setup-postgres-roles.sql
+psql -d project_ceres_test -f scripts/setup-postgres-roles.sql
+```
+
+Default passwords are committed for local dev. Override in production by setting `CERES_APP_PASSWORD`, `CERES_ADMIN_PASSWORD`, `CERES_MIGRATOR_PASSWORD` before running the script.
+
+**3. Configure your connection strings via User Secrets**
+
+```bash
+dotnet user-secrets set "ConnectionStrings:ApplicationConnection" \
+  "Host=localhost;Database=project_ceres;Username=ceres_app;Password=ceres_app_dev_password" \
+  --project ProjectCeres
+
+dotnet user-secrets set "ConnectionStrings:AdminConnection" \
+  "Host=localhost;Database=project_ceres;Username=ceres_admin;Password=ceres_admin_dev_password" \
+  --project ProjectCeres
+
+dotnet user-secrets set "ConnectionStrings:MigrationConnection" \
+  "Host=localhost;Database=project_ceres;Username=ceres_migrator;Password=ceres_migrator_dev_password" \
   --project ProjectCeres
 ```
 
-**3. Apply migrations**
+**4. Apply migrations** (uses `MigrationConnection` → `ceres_migrator`)
 
 ```bash
 dotnet ef database update --project ProjectCeres
 ```
 
-**4. Run the app**
+**5. Run the app**
 
 ```bash
 dotnet run --project ProjectCeres
