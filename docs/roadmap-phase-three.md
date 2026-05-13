@@ -24,16 +24,18 @@
 6. [Stage 5 — Frontend polish + data-loading ease-in](#stage-5--frontend-polish--data-loading-ease-in)
 7. [Stage 6 — Identity infrastructure (Batch 3b)](#stage-6--identity-infrastructure-batch-3b)
 8. [Stage 7 — Multi-tenancy cutover (Batch 3c)](#stage-7--multi-tenancy-cutover-batch-3c)
-9. [Stage 8 — Email service + email security (Batch 3d)](#stage-8--email-service--email-security-batch-3d)
-10. [Stage 9 — Auth SPA pages (Batch 3e)](#stage-9--auth-spa-pages-batch-3e)
-11. [Stage 10 — Onboarding wizard (Batch 3f)](#stage-10--onboarding-wizard-batch-3f)
-12. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
-13. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
-14. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
-15. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
-16. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
-17. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
-18. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
+9. [Stage 7.5 — PostgreSQL Row-Level Security (Batch 3c continued)](#stage-75--postgresql-row-level-security-batch-3c-continued)
+10. [Stage 8 — Email service + email security (Batch 3d)](#stage-8--email-service--email-security-batch-3d)
+11. [Stage 9 — Auth SPA pages (Batch 3e)](#stage-9--auth-spa-pages-batch-3e)
+12. [Stage 10 — Onboarding wizard (Batch 3f)](#stage-10--onboarding-wizard-batch-3f)
+13. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
+14. [Stage 11.5 — Import sandbox + admin tooling (Batch 4)](#stage-115--import-sandbox--admin-tooling-batch-4)
+15. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
+16. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
+17. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
+18. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
+19. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
+20. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
 
 ---
 
@@ -1167,6 +1169,62 @@ Frontend lint cleanup (sub-stage 11.8):
 - [ ] Both `react-hooks/exhaustive-deps` warnings (`ReviewCountProvider.tsx`, `ReminderCountProvider.tsx`) resolved — each one verified as either a real stale-closure bug fixed by adding the dep, or a deliberate capture-at-mount with a per-line disable + `Why:` comment
 - [ ] Full Vitest suite still passes after the cleanup (no regressions in form-reset effects or matchMedia hooks)
 - [ ] `pnpm --dir ProjectCeres.Client build` still passes with all bundle-size budgets clean
+
+---
+
+## Stage 11.5 — Import sandbox + admin tooling (Batch 4)
+
+**Status: ❌ Pending.** Developer-facing test environment for the CSV/XLSX import pipeline. Sits after Stage 11 (Razor cleanup) so the admin SPA route lands into a fully SPA-only world. See [ADR-0072](decisions/ADR-0072-import-sandbox-as-separate-environment.md) for the architecture pattern (multi-environment separation, NOT runtime switch) and the sequencing rationale (post-SPA-migration).
+
+> **Goal:** the developer can iterate on parser bugs against fake bank data with zero risk of contaminating real data, including per-import bulk wipe and row-level multi-select delete. Same code, separate database, separate launch profile, separate port. The boundary is physical — different process, different database, different URL.
+
+### Sub-stages
+
+| # | Sub-stage | Spec / Reference |
+|---|---|---|
+| 11.5.1 | New `ASPNETCORE_ENVIRONMENT=Sandbox` + `appsettings.Sandbox.json` + `Sandbox` launch profile in `Properties/launchSettings.json` | ADR-0072 § Decision 1 |
+| 11.5.2 | `project_ceres_sandbox` database created locally via `createdb`; `scripts/migrate-all.sh` applies migrations to both DBs | ADR-0072 § Decision 1 |
+| 11.5.3 | Fail-fast startup check: refuses to boot the `Sandbox` build if connection string `Database=` does not end with `_sandbox` | ADR-0072 § Decision 1 |
+| 11.5.4 | `ImportBatch` entity + nullable `ImportBatchId` FK on `Transaction`, `Transfer`, `LiabilityPayment`; `ImportService` mints a batch row per import and stamps every produced row | ADR-0072 § Decision 2 |
+| 11.5.5 | Admin SPA route `/admin/import-batches` (list view + detail view) in `ProjectCeres.Client/`; uses shadcn DataTable + TanStack row selection; bulk-wipe and multi-select-delete actions | ADR-0072 § Decision 2 |
+| 11.5.6 | Admin API endpoints register conditionally (`Sandbox` + `Development` only); architecture test asserts production 404 | ADR-0072 § Decision 1 |
+| 11.5.7 | `IHostedService` seed runner gated to `Sandbox` environment: creates one sandbox user + fixed test accounts (Test Checking EUR / Test Checking USD / Test Savings / Test Credit Card) + default category set on first boot; idempotent | ADR-0072 § Decision 1 |
+
+### Verification checklist
+
+Sandbox environment + database:
+
+- [ ] `dotnet run --launch-profile Sandbox` boots the app against `project_ceres_sandbox` on a port distinct from `Development`
+- [ ] `Development` and `Sandbox` builds can run simultaneously without port conflicts
+- [ ] `scripts/migrate-all.sh` applies pending migrations to both databases and exits non-zero on any per-database failure
+- [ ] Startup fail-fast: launching `Sandbox` with a connection string whose `Database=` value does not match `*_sandbox` throws before `app.Run()` (integration test against deliberate misconfiguration)
+- [ ] Seed runner creates the fixed sandbox user + accounts + categories on first sandbox boot; idempotent on subsequent boots
+- [ ] Seed runner is NOT registered when `EnvironmentName != "Sandbox"` (architecture test)
+
+`ImportBatch` primitive:
+
+- [ ] `ImportBatch` entity exists with `Id`, `UserId`, `StartedAt`, `SourceFileName`, `ParserVersion?`, `RowsTotal`, `RowsImported`, `Status` columns
+- [ ] `Transaction`, `Transfer`, `LiabilityPayment` each carry nullable `ImportBatchId Guid?` FK with index
+- [ ] EF query filter on `ImportBatch` registered alongside the other `IUserOwned` filters in `OnModelCreating`
+- [ ] `ImportService.ImportAsync` creates the `ImportBatch` row first, sets its `Status = InProgress`, then stamps every produced row with `ImportBatchId`; final status set to `Succeeded` / `Failed` / `Aborted` before commit
+- [ ] Existing rows from before Stage 11.5 have `ImportBatchId = null` and continue to read/write normally (back-compat test)
+- [ ] Architecture test: every entity created by an `IImporter<T>` implementation has an `ImportBatchId` column
+
+Admin SPA route:
+
+- [ ] `/admin/import-batches` lists every batch in reverse-chronological order for the current user
+- [ ] Per-batch "Delete batch" cascades to every produced row + the `ImportBatch` row itself, in a single transaction
+- [ ] Detail view `/admin/import-batches/:id` lists the rows the batch produced with a checkbox column
+- [ ] "Delete selected" deletes exactly the multi-selected rows in a single transaction; the `ImportBatch` row remains (only its `RowsImported` count is recalculated)
+- [ ] Empty-state copy when a batch has no surviving rows (all were deleted individually)
+- [ ] Admin route + API endpoints register only when `EnvironmentName` is `Sandbox` or `Development`
+- [ ] Integration test: in `Production` environment, `GET /api/admin/import-batches` returns 404 (route does not exist in the route table)
+
+Operational:
+
+- [ ] README's "Setup" section documents creating the sandbox database + running `migrate-all.sh`
+- [ ] `appsettings.Sandbox.json` is checked in; secrets (if any) live in User Secrets keyed to the Sandbox environment
+- [ ] CI smoke test: spin up a throwaway Postgres, run `migrate-all.sh`, run the seed runner, import a checked-in fake CSV, assert the rows landed, bulk-wipe, assert the rows are gone
 
 ---
 
