@@ -160,7 +160,7 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
         throw err;
       }
       toast.error("Couldn't save. Try again.");
-      throw new Error('server');
+      throw new Error('server', { cause: err });
     }
   }
 
