@@ -350,8 +350,9 @@ This batch is already documented in detail in [`planning-phase3-spa-migration.md
 3. Delete every per-area 302 redirect added during Batch 2.
 4. Strip MVC infrastructure from `Program.cs` (controllers-only API surface remains).
 5. Delete the Razor host views (`Views/App/`, `Views/Home/`, `Views/Shared/_Layout.cshtml`, etc.) and any remaining `.cshtml` scaffolding.
+6. **Frontend lint cleanup sweep** (added 2026-05-13). 34 pre-existing lint problems (32 errors, 2 warnings) across the React client — all surfaced by the ESLint 10 / `typescript-eslint` 8.59.3 upgrade, none Razor-related on their face but deliberately deferred to this batch because the violations cluster in files (provider components, form-reset effects, date-range picker pair) that the SPA migration is still churning. Fixing them in-flight risks merge conflicts with the migration batches. Three rule families to address: 18× `react-hooks/set-state-in-effect` (mix of false positives needing per-line disables and real anti-patterns needing derive-during-render refactors), 14× `react-refresh/only-export-components` (split into shadcn-authored files that get per-file disables vs Provider files that get split into `provider.tsx` + `context.ts`), and 2× `react-hooks/exhaustive-deps` (case-by-case stale-closure vs deliberate-capture-at-mount inspection — do not bulk-fix). Full file-by-file remediation list in [`planning-phase3-spa-migration.md` → Final cleanup plan, item 6](planning-phase3-spa-migration.md#final-cleanup-plan-after-every-razor-view-is-gone).
 
-Net result: a clean URL space with one one-shot legacy redirect, and a pure Web API + SPA hosting model.
+Net result: a clean URL space with one one-shot legacy redirect, a pure Web API + SPA hosting model, and a zero-warning lint baseline.
 
 ### Batch 5 — Launch readiness
 

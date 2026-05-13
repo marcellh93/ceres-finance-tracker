@@ -223,7 +223,6 @@ describe('MovementsLayout', () => {
 
   it('wires onAfterBulk to trigger refetch', async () => {
     const user = userEvent.setup();
-    const refetchSpy = vi.fn();
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ items: [], totalCount: 10, page: 1, pageSize: 50 }),

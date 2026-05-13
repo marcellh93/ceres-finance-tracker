@@ -1111,6 +1111,7 @@ See [`planning-phase3-spa-migration.md` → Final cleanup plan](planning-phase3-
 | 11.5 | MVC infrastructure stripped from `Program.cs` (controllers-only API surface) |
 | 11.6 | Razor host views deleted (`Views/App/`, `Views/Home/`, `Views/Shared/_Layout.cshtml`, `Error.cshtml`, `_ViewStart.cshtml`, `_ViewImports.cshtml`, `_ValidationScriptsPartial.cshtml`) |
 | 11.7 | Stage 6a architecture tests widened back to full scope (`No_api_controller_class_has_AllowAnonymous` → `No_controller_class_has_AllowAnonymous`; `Api_HttpGet_actions_must_not_have_write_verb_names` → `HttpGet_actions_must_not_have_write_verb_names`). Both rules are dropped to API-only in 6a because of legacy Razor controllers; Stage 11 deletes those, restoring the full-scope contract. |
+| 11.8 | Frontend lint cleanup sweep — drive `pnpm --dir ProjectCeres.Client lint` to zero. Logged 2026-05-13 after the ESLint 10 / `typescript-eslint` 8.59.3 upgrade surfaced 34 pre-existing violations. Detail: 18× `react-hooks/set-state-in-effect`, 14× `react-refresh/only-export-components`, 2× `react-hooks/exhaustive-deps`. Full file-by-file remediation plan in [`planning-phase3-spa-migration.md` → Final cleanup plan, item 6](planning-phase3-spa-migration.md#final-cleanup-plan-after-every-razor-view-is-gone). |
 
 ### Verification checklist
 
@@ -1157,6 +1158,15 @@ Smoke tests:
 - [ ] Browser dev-tools network tab shows no 404s for legacy assets
 - [ ] All API integration tests still pass (the API surface is unchanged by this batch)
 - [ ] No regressions in the IDOR test suite from Stage 7
+
+Frontend lint cleanup (sub-stage 11.8):
+
+- [ ] `pnpm --dir ProjectCeres.Client lint` exits 0 with zero errors and zero warnings
+- [ ] All 18 `react-hooks/set-state-in-effect` violations either fixed (derive-during-render or refactored form-reset logic) or disabled per-line with a `Why:` comment justifying the external-system-sync exception (see `planning-phase3-spa-migration.md` § 6 for the false-positive list)
+- [ ] All 14 `react-refresh/only-export-components` violations resolved: shadcn-authored files (`badge.tsx`, `button.tsx`, `tabs.tsx`) carry a per-file disable comment with a `Why:` noting the shadcn convention; provider files are split into `provider.tsx` + `context.ts`; helpers/types are moved to sibling `*-types.ts` / `*-utils.ts`
+- [ ] Both `react-hooks/exhaustive-deps` warnings (`ReviewCountProvider.tsx`, `ReminderCountProvider.tsx`) resolved — each one verified as either a real stale-closure bug fixed by adding the dep, or a deliberate capture-at-mount with a per-line disable + `Why:` comment
+- [ ] Full Vitest suite still passes after the cleanup (no regressions in form-reset effects or matchMedia hooks)
+- [ ] `pnpm --dir ProjectCeres.Client build` still passes with all bundle-size budgets clean
 
 ---
 

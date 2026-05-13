@@ -63,7 +63,6 @@ function startFetch(): Promise<void> {
       // Fall back to a sensible default rather than blocking the UI. The
       // user's actual settings will load on next page navigation if the
       // server recovers; for now they get the conservative default.
-      // eslint-disable-next-line no-console
       console.warn('[useSettings] failed to load /api/settings, using fallback:', error);
       cache.data = FALLBACK;
       cache.loading = false;

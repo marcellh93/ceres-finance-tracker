@@ -68,7 +68,6 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
   // `item.useBadge` is a stable hook reference set at module load (see nav-items.ts).
   // Calling it conditionally is safe because the same items render in the same order
   // on every pass — `navGroups` and `bottomItems` are static module-level arrays.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const badgeCount = item.useBadge?.() ?? 0;
   const ariaLabel = badgeCount > 0 ? `${item.label}, ${badgeCount} pending` : item.label;
 

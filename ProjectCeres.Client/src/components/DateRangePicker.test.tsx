@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DateRangePicker } from './DateRangePicker';
 
 vi.mock('@/components/ui/calendar', () => ({
-  Calendar: ({ selected, onSelect }: { selected: unknown; onSelect: (r: unknown) => void }) => (
+  Calendar: ({ onSelect }: { selected: unknown; onSelect: (r: unknown) => void }) => (
     <div data-testid="mock-calendar">
       <button
         type="button"

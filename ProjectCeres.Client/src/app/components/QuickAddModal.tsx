@@ -69,7 +69,6 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
       .catch((e) => {
         if (controller.signal.aborted) return;
         toast.error('Could not load accounts or categories.');
-        // eslint-disable-next-line no-console
         console.error(e);
       });
     return () => controller.abort();
