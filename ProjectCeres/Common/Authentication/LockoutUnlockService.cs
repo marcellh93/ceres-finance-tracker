@@ -155,10 +155,13 @@ public class LockoutUnlockService
             await _userManager.SetLockoutEndDateAsync(user, null);
 
             // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
+            // Stage 7.6.3: Exactly-1 — the row was just re-read inside the lock and verified
+            // unconsumed; a 0-row outcome means GUC drift or concurrent supersede and must
+            // fail loud rather than silently report "unlock succeeded".
             await _db.LockoutUnlockTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.Id == match.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateExactlyAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct: ct);
 
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LockoutSelfServiceUnlock, ct: ct);
 

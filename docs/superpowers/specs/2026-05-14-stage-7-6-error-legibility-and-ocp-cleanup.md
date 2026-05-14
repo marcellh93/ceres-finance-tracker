@@ -9,19 +9,19 @@
 
 ## Session state (last updated 2026-05-14, mid-stage)
 
-**Three of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.3.
+**Four of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.5.
 
 | # | Sub-stage | Status | Commit |
 |---|---|---|---|
 | 7.6.1 | WAF test-mode exception bodies | ✅ Done | `33e00cd` |
 | 7.6.2 | `RlsPolicyViolationException` + `RlsExceptionTranslator` | ✅ Done | (commit landed; see `RlsPolicyViolationException` & `RlsExceptionTranslator` files) |
-| 7.6.3 | `AffectedRowCount` enforcement helper | ❌ Pending — START HERE | — |
+| 7.6.3 | `AffectedRowCount` enforcement helper | ✅ Done | (this commit; see `BulkOperationExtensions` + `AffectedRowCountMismatchException` files) |
 | 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext` | ✅ Done | `fdbf960` |
-| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ❌ Pending | — |
+| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ❌ Pending — START HERE | — |
 | 7.6.6 | Split `TestDbFixture` into three focused fixtures | ❌ Pending | — |
 | 7.6.7 | `UserContext` discriminated union (ADR-0073) | ❌ Pending | — |
 
-**Lessons baked in from the three shipped sub-stages** (read before starting 7.6.3):
+**Lessons baked in from the four shipped sub-stages** (read before starting 7.6.5):
 
 1. **7.6.2 mechanism correction.** The spec originally said `IDbCommandInterceptor.CommandFailed` for translating Postgres 42501. **That hook is observational only — it cannot replace the propagating exception**, and `ISaveChangesInterceptor.SaveChangesFailed` is the same. The shipped implementation overrides `SaveChanges` / `SaveChangesAsync` on `AppDbContext` and calls a static `RlsExceptionTranslator.TryTranslate(...)` helper in a `catch` block. Same pattern likely applies to 7.6.5's `DbExceptionTranslator` — plan accordingly.
 
@@ -29,9 +29,25 @@
 
 3. **7.6.4 closure-capture pitfall.** First attempt built filter lambdas via `Expression.Lambda` with `Expression.Constant(_currentUser, ...)` — baked the specific accessor instance into EF's cached model, breaking ~162 tests. The shipped version uses `MethodInfo.MakeGenericMethod(t.EntityType).Invoke(this, new[] { modelBuilder })` to dispatch to a generic helper `RegisterUserOwnedFilter<TEntity>` whose body is a regular C# lambda. The compiler emits the right `this`-closure semantics; EF parameterizes the filter correctly. See dotnet/efcore #14740 for the documented pitfall.
 
-4. **Order-of-operations adjustment.** 7.6.4 lands BEFORE 7.6.2 in the as-shipped order (not after, as the original spec implied) because 7.6.2's `RlsExceptionTranslator` reads from `UserOwnedTables.All` directly — same source of truth. The remaining sub-stages have no such inter-dependency; 7.6.3 → 7.6.5 → 7.6.6 → 7.6.7 is the right order from here.
+4. **Order-of-operations adjustment.** 7.6.4 lands BEFORE 7.6.2 in the as-shipped order (not after, as the original spec implied) because 7.6.2's `RlsExceptionTranslator` reads from `UserOwnedTables.All` directly — same source of truth. The remaining sub-stages have no such inter-dependency; 7.6.5 → 7.6.6 → 7.6.7 is the right order from here.
 
-5. **Test counts at session pause.** Full suite green at 1021/1021 in 3m55s. Each remaining sub-stage adds tests per the table in § 4.
+5. **7.6.3 call-site-audit narrowing.** The spec named 8 production call sites with "exactly-one-row semantics" for migration. Reading the code revealed only **2** are honest exactly-1 sites:
+   - `LockoutUnlockService.ConfirmAsync` L161 — token consume by Id, just verified to exist inside the lock.
+   - `EmailChangeService.ConfirmAsync` L287 — verify-token consume by Id, just verified to exist inside the lock.
+
+   The other 6 were re-classified after reading their semantics:
+   - `LockoutUnlockService.IssueAsync` L68 — supersede prior unconsumed token. **0-or-1** (no prior token on first lockout).
+   - `EmailChangeService.RequestAsync` L134 — supersede prior unconsumed tokens. **0-or-many** (could be 0 on first request, could be 2 if both VerifyNew + RevokeOld siblings still unconsumed).
+   - `EmailChangeService.ConfirmAsync` L297 — consume RevokeOld sibling. **0-or-1** (could have been revoked concurrently).
+   - `EmailChangeService.ConfirmAsync` L304 — revoke all sessions. **0-or-many** (a user with no active sessions still confirms successfully).
+   - `EmailChangeService.RevokeAsync` L396 — consume both sibling rows. **1-or-2** (VerifyNew may have already been consumed via Confirm in a race).
+   - `UserBlockedIpMiddleware.cs` L32 — revoke sessions from blocked IP. **0-or-many** (blocking an IP with no active sessions is valid).
+   - `MfaBackupCodeService.RegenerateAsync` L95 — delete all unused backup codes. **0-or-many** (retention sweep).
+   - `TotpReplayGuard.TryAcceptLockedAsync` L82 — purge out-of-window replay entries. **0-or-many** (retention sweep).
+
+   Wrapping any of the latter 6 in `ExecuteUpdate/DeleteExactlyAsync` would convert correct silent-zero behaviour into spurious crashes. The audit lesson generalizes: **before wrapping a bulk operation in an Exactly helper, name the invariant that makes 0 a regression** — "the row was just verified to exist by Id inside the lock" qualifies; "we expect some rows to exist" does not.
+
+6. **Test counts.** Full suite green at 1029/1029 in 3m13s after 7.6.3 ships (1021 pause baseline + 8 new `BulkOperationExtensionsTests`; the spec § 4 table predicted 6 — the 2 extra cover `ExecuteDeleteExactlyAsync` parity with the update helper).
 
 ---
 
