@@ -362,6 +362,18 @@ builder.Services.AddViteServices();
 
 var app = builder.Build();
 
+// Stage 7.5 / ADR-0068 — refuse to start if the runtime role can issue DDL. Skipped
+// when the test harness explicitly opts out via `Stage75:SkipPrivilegeLeakCheck=true`
+// because the WAF spins up the same Program.cs many times per suite and the probe
+// round-trip is wasteful per test; production + dev start the app once and the
+// check is cheap there.
+if (!app.Configuration.GetValue<bool>("Stage75:SkipPrivilegeLeakCheck"))
+{
+    await PrivilegeLeakStartupCheck.EnsureApplicationConnectionLacksDdlAsync(
+        app.Configuration.GetConnectionString("ApplicationConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:ApplicationConnection is not configured."));
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");

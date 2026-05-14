@@ -59,6 +59,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Stage 7.5 — skip the privilege-leak startup probe inside the WAF. The check
+        // is unnecessary per-test (the connection strings are fixed in this fixture)
+        // and would add a round-trip per WAF construction.
+        builder.UseSetting("Stage75:SkipPrivilegeLeakCheck", "true");
+
         builder.UseSetting("ConnectionStrings:ApplicationConnection", AppConnectionString);
         builder.UseSetting("ConnectionStrings:AdminConnection",       AdminConnectionString);
         builder.UseSetting("ConnectionStrings:MigrationConnection",   MigratorConnectionString);
