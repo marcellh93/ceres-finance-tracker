@@ -35,7 +35,7 @@ public class UserJobRunnerTests : IAsyncLifetime
 
         var observed = new List<Guid>();
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var userScope = new UserScope();
         var runner = new UserJobRunner(db, userScope, NullLogger<UserJobRunner>.Instance);
 
@@ -57,7 +57,7 @@ public class UserJobRunnerTests : IAsyncLifetime
         var userB = await AuthTestFixture.RegisterUserAsync(_factory, $"ok-{Guid.NewGuid():N}{TestEmailSuffix}");
 
         using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var runner = new UserJobRunner(db, new UserScope(), NullLogger<UserJobRunner>.Instance);
         var succeeded = new List<Guid>();
 
@@ -78,7 +78,7 @@ public class UserJobRunnerTests : IAsyncLifetime
     {
         var userA = await AuthTestFixture.RegisterUserAsync(_factory, $"u-{Guid.NewGuid():N}{TestEmailSuffix}");
         using var diScope = _factory.Services.CreateScope();
-        var db = diScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = diScope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var userScope = new UserScope();
         var runner = new UserJobRunner(db, userScope, NullLogger<UserJobRunner>.Instance);
 
@@ -99,7 +99,7 @@ public class UserJobRunnerTests : IAsyncLifetime
         var userB = await AuthTestFixture.RegisterUserAsync(_factory, $"cancel-b-{Guid.NewGuid():N}{TestEmailSuffix}");
 
         using var diScope = _factory.Services.CreateScope();
-        var db = diScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = diScope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var runner = new UserJobRunner(db, new UserScope(), NullLogger<UserJobRunner>.Instance);
         using var cts = new CancellationTokenSource();
         var invoked = new List<Guid>();
@@ -129,7 +129,7 @@ public class UserJobRunnerTests : IAsyncLifetime
         var userA = await AuthTestFixture.RegisterUserAsync(_factory, $"rethrow-{Guid.NewGuid():N}{TestEmailSuffix}");
 
         using var diScope = _factory.Services.CreateScope();
-        var db = diScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = diScope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var runner = new UserJobRunner(db, new UserScope(), NullLogger<UserJobRunner>.Instance);
         using var cts = new CancellationTokenSource();
 

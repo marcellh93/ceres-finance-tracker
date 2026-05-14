@@ -18,6 +18,19 @@ namespace ProjectCeres.Common;
 /// regressions are loud in dev/log scanning.
 /// </para>
 ///
+/// <para>
+/// SET LOCAL runs as a separate command via <c>connection.CreateCommand()</c> sharing
+/// the EF command's transaction, NOT prepended into <c>command.CommandText</c> — the
+/// prepend pattern misaligns Npgsql's per-statement rows-affected array on writes and
+/// raises <c>DbUpdateConcurrencyException</c>. See Npgsql/efcore.pg #2412.
+/// </para>
+///
+/// <para>
+/// Async interception methods <c>await ExecuteNonQueryAsync</c>; sync paths call the
+/// sync variant. Mixing sync IO into async EF pipelines starves the thread pool under
+/// any request load.
+/// </para>
+///
 /// Registered only on AppDbContext (the runtime, RLS-bound context). AdminDbContext
 /// uses the ceres_admin role which has BYPASSRLS — the SET LOCAL would be redundant
 /// there and is intentionally not registered.
@@ -37,12 +50,12 @@ public sealed class RowLevelSecurityInterceptor(
         return base.ReaderExecuting(command, eventData, result);
     }
 
-    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+    public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
         DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
         CancellationToken cancellationToken = default)
     {
-        SetUserGuc(command);
-        return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        await SetUserGucAsync(command, cancellationToken).ConfigureAwait(false);
+        return await base.ReaderExecutingAsync(command, eventData, result, cancellationToken).ConfigureAwait(false);
     }
 
     public override InterceptionResult<int> NonQueryExecuting(
@@ -52,12 +65,12 @@ public sealed class RowLevelSecurityInterceptor(
         return base.NonQueryExecuting(command, eventData, result);
     }
 
-    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+    public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
         DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
-        SetUserGuc(command);
-        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        await SetUserGucAsync(command, cancellationToken).ConfigureAwait(false);
+        return await base.NonQueryExecutingAsync(command, eventData, result, cancellationToken).ConfigureAwait(false);
     }
 
     public override InterceptionResult<object> ScalarExecuting(
@@ -67,15 +80,41 @@ public sealed class RowLevelSecurityInterceptor(
         return base.ScalarExecuting(command, eventData, result);
     }
 
-    public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
+    public override async ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
         DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
         CancellationToken cancellationToken = default)
     {
-        SetUserGuc(command);
-        return base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
+        await SetUserGucAsync(command, cancellationToken).ConfigureAwait(false);
+        return await base.ScalarExecutingAsync(command, eventData, result, cancellationToken).ConfigureAwait(false);
     }
 
     private void SetUserGuc(DbCommand command)
+    {
+        if (!TryBuildSetLocalCommand(command, out var setLocal))
+            return;
+
+        using (setLocal)
+        {
+            setLocal.ExecuteNonQuery();
+        }
+    }
+
+    private async ValueTask SetUserGucAsync(DbCommand command, CancellationToken cancellationToken)
+    {
+        if (!TryBuildSetLocalCommand(command, out var setLocal))
+            return;
+
+#if NET8_0_OR_GREATER
+        await using (setLocal.ConfigureAwait(false))
+#else
+        using (setLocal)
+#endif
+        {
+            await setLocal.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private bool TryBuildSetLocalCommand(DbCommand command, out DbCommand setLocal)
     {
         var userId = user.UserId;
         if (userId == Guid.Empty)
@@ -87,14 +126,16 @@ public sealed class RowLevelSecurityInterceptor(
                     "RLS policies will evaluate to zero rows. Command: {CommandText}",
                     command.CommandText);
             }
-            return;
+            setLocal = null!;
+            return false;
         }
 
-        // Prepend SET LOCAL to the same DbCommand so it runs in the same transaction
-        // and against the same connection that EF is about to execute. Using a single
-        // batched command avoids opening a separate connection that might not share
-        // the pooled transaction context.
-        command.CommandText =
-            $"SET LOCAL \"{GucName}\" = '{userId:D}'; " + command.CommandText;
+        var connection = command.Connection
+            ?? throw new InvalidOperationException("DbCommand has no Connection when interceptor fired.");
+
+        setLocal = connection.CreateCommand();
+        setLocal.Transaction = command.Transaction;
+        setLocal.CommandText = $"SET LOCAL \"{GucName}\" = '{userId:D}'";
+        return true;
     }
 }

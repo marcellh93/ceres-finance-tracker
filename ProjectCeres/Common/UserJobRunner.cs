@@ -7,7 +7,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Common;
 
 public sealed class UserJobRunner(
-    AppDbContext db,
+    AdminDbContext db,
     IUserScope scope,
     ILogger<UserJobRunner> logger) : IUserJobRunner
 {
@@ -17,8 +17,9 @@ public sealed class UserJobRunner(
         CancellationToken ct = default)
     {
         // Cross-tenant by design: this is the entry point that enumerates the user list.
-        // AspNetUsers carries no query filter; the Stage 7 architecture test grants this
-        // file the IgnoreQueryFilters() allow-list exemption.
+        // Backed by AdminDbContext (Postgres role ceres_admin with BYPASSRLS, Stage 7.5);
+        // IgnoreQueryFilters() remains for defence-in-depth on the EF filter side, with
+        // the Stage 7 architecture test granting this file the allow-list exemption.
         var userIds = await db.Users
             .IgnoreQueryFilters()
             .Where(filter)

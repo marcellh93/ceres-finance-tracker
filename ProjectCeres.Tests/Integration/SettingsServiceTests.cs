@@ -134,7 +134,7 @@ public class SettingsServiceTests : IAsyncLifetime
     private static AppDbContext NonTransactionalContext(ICurrentUserAccessor user)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql("Host=localhost;Database=project_ceres_test;Username=postgres;Password=postgres")
+            .UseNpgsql(TestDbFixture.AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(user))
             .Options;
         return new AppDbContext(options, user);

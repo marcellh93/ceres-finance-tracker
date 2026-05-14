@@ -65,9 +65,26 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
 builder.Services.AddScoped<UserOwnershipInterceptor>();
 
+// Stage 7.5 / ADR-0068 — PostgreSQL Row-Level Security defence in depth.
+builder.Services.AddScoped<IPreAuthCallSiteTagger, PreAuthCallSiteTagger>();
+builder.Services.AddScoped<RowLevelSecurityInterceptor>();
+
+// AppDbContext — runtime, bound to ceres_app (NOBYPASSRLS). Every command issued
+// against this DbContext is filtered by Postgres RLS using the GUC set by the
+// RowLevelSecurityInterceptor.
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("ApplicationConnection"));
+    options.AddInterceptors(sp.GetRequiredService<UserOwnershipInterceptor>());
+    options.AddInterceptors(sp.GetRequiredService<RowLevelSecurityInterceptor>());
+});
+
+// AdminDbContext — cross-tenant variant, bound to ceres_admin (BYPASSRLS). Used by
+// IUserJobRunner for background-job user enumeration and by future Admin/* services.
+// Intentionally NOT wired with RowLevelSecurityInterceptor — ceres_admin bypasses RLS.
+builder.Services.AddDbContext<AdminDbContext>((sp, options) =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("AdminConnection"));
     options.AddInterceptors(sp.GetRequiredService<UserOwnershipInterceptor>());
 });
 

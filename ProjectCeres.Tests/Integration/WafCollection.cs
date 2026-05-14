@@ -28,8 +28,18 @@ namespace ProjectCeres.Tests.Integration;
 /// </summary>
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private const string TestConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=postgres;Password=postgres";
+    // Stage 7.5 / ADR-0068 — three role-scoped connection strings into project_ceres_test.
+    // The hosted app resolves ApplicationConnection (ceres_app) at request time; admin
+    // services + IUserJobRunner resolve AdminConnection (ceres_admin / BYPASSRLS); the
+    // fixture itself uses MigratorConnection for schema setup.
+    private const string AppConnectionString =
+        "Host=localhost;Database=project_ceres_test;Username=ceres_app;Password=ceres_app_dev_password";
+
+    private const string AdminConnectionString =
+        "Host=localhost;Database=project_ceres_test;Username=ceres_admin;Password=ceres_admin_dev_password";
+
+    private const string MigratorConnectionString =
+        "Host=localhost;Database=project_ceres_test;Username=ceres_migrator;Password=ceres_migrator_dev_password";
 
     // Per-factory upload root keeps WAF-based tests from leaking files into the SUT
     // project root (ProjectCeres/uploads/). Cleaned up in Dispose(bool).
@@ -49,7 +59,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseSetting("ConnectionStrings:DefaultConnection", TestConnectionString);
+        builder.UseSetting("ConnectionStrings:ApplicationConnection", AppConnectionString);
+        builder.UseSetting("ConnectionStrings:AdminConnection",       AdminConnectionString);
+        builder.UseSetting("ConnectionStrings:MigrationConnection",   MigratorConnectionString);
         builder.UseSetting("FileAttachments:RootPath", _uploadsRoot);
 
         builder.ConfigureServices(services =>

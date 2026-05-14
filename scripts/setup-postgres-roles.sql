@@ -105,9 +105,56 @@ ALTER DEFAULT PRIVILEGES FOR ROLE ceres_migrator IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE ceres_migrator IN SCHEMA public
     GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ceres_app, ceres_admin;
 
--- Existing tables: grant DML on tables already in the schema.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ceres_app, ceres_admin;
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ceres_app, ceres_admin;
+-- Existing tables: grant DML on tables already in the schema. The migrator gets the
+-- same DML rights as the app role so it can read __EFMigrationsHistory regardless of
+-- who originally owned the table (bootstrap from a pre-Stage-7.5 schema migrated by
+-- the postgres superuser); it then takes table ownership below.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
+    TO ceres_app, ceres_admin, ceres_migrator;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public
+    TO ceres_app, ceres_admin, ceres_migrator;
+
+-- Reassign ownership of every table, view, and standalone sequence in `public` to
+-- ceres_migrator. Without this, future ALTER TABLE / migrations would fail because the
+-- current owner is whichever role first ran `dotnet ef database update` (typically
+-- `postgres` in pre-Stage-7.5 dev databases). Identity-column sequences are SKIPPED —
+-- they are linked to their owning table and follow the table's owner automatically;
+-- trying to reassign them directly raises `cannot change owner of sequence`.
+-- Idempotent: setting owner to the same role is a no-op.
+DO $$
+DECLARE
+    obj record;
+BEGIN
+    FOR obj IN
+        SELECT n.nspname AS schema, c.relname AS name, c.relkind AS kind
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind IN ('r', 'S', 'v', 'm')
+          -- Skip sequences owned by a table column (identity / serial sequences); they
+          -- are renamed/dropped with the table and cannot be reassigned independently.
+          AND NOT (
+              c.relkind = 'S'
+              AND EXISTS (
+                  SELECT 1 FROM pg_depend d
+                  WHERE d.objid = c.oid
+                    AND d.classid = 'pg_class'::regclass
+                    AND d.refclassid = 'pg_class'::regclass
+                    AND d.deptype IN ('a', 'i')
+              )
+          )
+    LOOP
+        EXECUTE format('ALTER %s %I.%I OWNER TO ceres_migrator',
+            CASE obj.kind
+                WHEN 'r' THEN 'TABLE'
+                WHEN 'S' THEN 'SEQUENCE'
+                WHEN 'v' THEN 'VIEW'
+                WHEN 'm' THEN 'MATERIALIZED VIEW'
+            END,
+            obj.schema, obj.name);
+    END LOOP;
+END
+$$;
 
 -- Sanity check: confirm role attributes are what we expect.
 DO $$

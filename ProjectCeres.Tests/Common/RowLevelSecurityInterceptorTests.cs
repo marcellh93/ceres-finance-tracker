@@ -14,63 +14,68 @@ public class RowLevelSecurityInterceptorTests
     private const string OriginalSql = "SELECT * FROM \"Transactions\"";
 
     [Fact]
-    public void ReaderExecuting_prepends_SET_LOCAL_with_resolved_user_id()
+    public void ReaderExecuting_runs_SET_LOCAL_as_a_separate_command_on_the_same_connection()
     {
         var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var (sut, _) = MakeSut(userId);
-        var cmd = new FakeDbCommand { CommandText = OriginalSql };
+        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
 
         sut.ReaderExecuting(cmd, FakeEventData(), default);
 
-        cmd.CommandText.Should().Be(
-            $"SET LOCAL \"app.current_user_ref\" = '{userId:D}'; {OriginalSql}");
+        cmd.CommandText.Should().Be(OriginalSql, "the original command must be untouched");
+        connection.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().Be($"SET LOCAL \"app.current_user_ref\" = '{userId:D}'");
     }
 
     [Fact]
-    public async Task ReaderExecutingAsync_prepends_SET_LOCAL_with_resolved_user_id()
+    public async Task ReaderExecutingAsync_runs_SET_LOCAL_as_a_separate_command()
     {
         var userId = Guid.NewGuid();
         var (sut, _) = MakeSut(userId);
-        var cmd = new FakeDbCommand { CommandText = OriginalSql };
+        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
 
         await sut.ReaderExecutingAsync(cmd, FakeEventData(), default);
 
-        cmd.CommandText.Should().StartWith($"SET LOCAL \"app.current_user_ref\" = '{userId:D}';");
+        connection.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
     }
 
     [Fact]
-    public void NonQueryExecuting_prepends_SET_LOCAL()
+    public void NonQueryExecuting_runs_SET_LOCAL_as_a_separate_command()
     {
         var userId = Guid.NewGuid();
         var (sut, _) = MakeSut(userId);
-        var cmd = new FakeDbCommand { CommandText = "UPDATE \"Transactions\" SET \"Amount\" = 1" };
+        var (cmd, connection) = MakeCommandWithConnection("UPDATE \"Transactions\" SET \"Amount\" = 1");
 
         sut.NonQueryExecuting(cmd, FakeEventData(), default);
 
-        cmd.CommandText.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
+        connection.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
     }
 
     [Fact]
-    public void ScalarExecuting_prepends_SET_LOCAL()
+    public void ScalarExecuting_runs_SET_LOCAL_as_a_separate_command()
     {
         var userId = Guid.NewGuid();
         var (sut, _) = MakeSut(userId);
-        var cmd = new FakeDbCommand { CommandText = "SELECT COUNT(*) FROM \"Transactions\"" };
+        var (cmd, connection) = MakeCommandWithConnection("SELECT COUNT(*) FROM \"Transactions\"");
 
         sut.ScalarExecuting(cmd, FakeEventData(), default);
 
-        cmd.CommandText.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
+        connection.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
     }
 
     [Fact]
     public void Skips_SET_LOCAL_when_user_is_empty_and_preauth_is_tagged_and_does_not_warn()
     {
         var (sut, logs) = MakeSut(Guid.Empty, isPreAuth: true);
-        var cmd = new FakeDbCommand { CommandText = OriginalSql };
+        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
 
         sut.ReaderExecuting(cmd, FakeEventData(), default);
 
-        cmd.CommandText.Should().Be(OriginalSql, "pre-auth path leaves the command untouched");
+        cmd.CommandText.Should().Be(OriginalSql);
+        connection.ExecutedCommands.Should().BeEmpty("pre-auth path issues no SET LOCAL");
         logs.Should().NotContain(l => l.Contains("Warning"));
     }
 
@@ -78,11 +83,12 @@ public class RowLevelSecurityInterceptorTests
     public void Logs_warning_when_user_is_empty_outside_preauth_paths()
     {
         var (sut, logs) = MakeSut(Guid.Empty, isPreAuth: false);
-        var cmd = new FakeDbCommand { CommandText = OriginalSql };
+        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
 
         sut.ReaderExecuting(cmd, FakeEventData(), default);
 
-        cmd.CommandText.Should().Be(OriginalSql, "still no SET LOCAL on Guid.Empty");
+        cmd.CommandText.Should().Be(OriginalSql);
+        connection.ExecutedCommands.Should().BeEmpty("no SET LOCAL when user is empty");
         logs.Should().Contain(l => l.Contains("Warning") && l.Contains("Guid.Empty"));
     }
 
@@ -92,7 +98,7 @@ public class RowLevelSecurityInterceptorTests
         // Pins option A: the interceptor is the safety-net, not the doorway.
         // Doorway refusal lives in BackgroundJobScope (Commit 6).
         var (sut, _) = MakeSut(Guid.Empty, isPreAuth: false);
-        var cmd = new FakeDbCommand { CommandText = OriginalSql };
+        var (cmd, _) = MakeCommandWithConnection(OriginalSql);
 
         var act = () => sut.ReaderExecuting(cmd, FakeEventData(), default);
 
@@ -102,10 +108,10 @@ public class RowLevelSecurityInterceptorTests
     [Fact]
     public void Returns_base_interception_result_unchanged()
     {
-        // The interceptor's job is to mutate command text, not to short-circuit EF.
+        // The interceptor's job is to issue SET LOCAL, not short-circuit EF.
         // Returning InterceptionResult.SuppressWithResult would cancel the real query.
         var (sut, _) = MakeSut(Guid.NewGuid());
-        var cmd = new FakeDbCommand { CommandText = OriginalSql };
+        var (cmd, _) = MakeCommandWithConnection(OriginalSql);
 
         var result = sut.ReaderExecuting(cmd, FakeEventData(), default);
 
@@ -129,11 +135,16 @@ public class RowLevelSecurityInterceptorTests
         return (new RowLevelSecurityInterceptor(user, tagger.Object, logger), logs);
     }
 
-    private static CommandEventData FakeEventData()
+    private static (FakeDbCommand Command, RecordingConnection Connection) MakeCommandWithConnection(
+        string commandText)
     {
-        // The interceptor only needs the DbCommand argument; CommandEventData
-        // is constructed with the minimal surface required by the abstract base.
-        return new CommandEventData(
+        var connection = new RecordingConnection();
+        var cmd = new FakeDbCommand(connection) { CommandText = commandText };
+        return (cmd, connection);
+    }
+
+    private static CommandEventData FakeEventData() =>
+        new(
             eventDefinition: null!,
             messageGenerator: (d, _) => d.ToString() ?? string.Empty,
             connection: null!,
@@ -147,23 +158,56 @@ public class RowLevelSecurityInterceptorTests
             logParameterValues: false,
             startTime: DateTimeOffset.UtcNow,
             commandSource: CommandSource.Unknown);
+
+    // Minimal DbConnection that records every CommandText executed against it.
+    // No real database — ExecuteNonQuery returns 0; we assert only on the captured text.
+    private sealed class RecordingConnection : DbConnection
+    {
+        public List<string> ExecutedCommands { get; } = new();
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "test";
+        public override string DataSource => "test";
+        public override string ServerVersion => "16.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) =>
+            throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand()
+        {
+            var cmd = new FakeDbCommand(this);
+            return cmd;
+        }
     }
 
-    // Minimal DbCommand test double. We only need the CommandText property
-    // mutation to be observable; the rest is plumbing the abstract base requires.
     private sealed class FakeDbCommand : DbCommand
     {
+        private readonly RecordingConnection _connection;
+
+        public FakeDbCommand(RecordingConnection connection) => _connection = connection;
+
         [System.Diagnostics.CodeAnalysis.AllowNull]
         public override string CommandText { get; set; } = string.Empty;
         public override int CommandTimeout { get; set; }
         public override CommandType CommandType { get; set; }
         public override bool DesignTimeVisible { get; set; }
         public override UpdateRowSource UpdatedRowSource { get; set; }
-        protected override DbConnection? DbConnection { get; set; }
+        protected override DbConnection? DbConnection
+        {
+            get => _connection;
+            set { /* fixed to the recording connection */ }
+        }
         protected override DbParameterCollection DbParameterCollection { get; } = new FakeParamCollection();
         protected override DbTransaction? DbTransaction { get; set; }
         public override void Cancel() { }
-        public override int ExecuteNonQuery() => 0;
+        public override int ExecuteNonQuery()
+        {
+            _connection.ExecutedCommands.Add(CommandText);
+            return 0;
+        }
         public override object? ExecuteScalar() => null;
         public override void Prepare() { }
         protected override DbParameter CreateDbParameter() => throw new NotSupportedException();
