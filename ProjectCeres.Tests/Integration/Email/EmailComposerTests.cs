@@ -46,6 +46,9 @@ public sealed class EmailComposerTests
         msg.BodyText.Should().NotBeNullOrWhiteSpace();
         msg.BodyHtml.Should().NotBeNullOrWhiteSpace();
         msg.Subject.Should().NotContain("{0}").And.NotContain("{1}");
+        msg.Subject.Should().NotBe($"{key}.Subject", "localizer must load the actual resx value, not fall back to returning the key");
+        msg.BodyText.Should().NotBe($"{key}.BodyText");
+        msg.BodyHtml.Should().NotBe($"{key}.BodyHtml");
     }
 
     [Fact]
@@ -74,6 +77,28 @@ public sealed class EmailComposerTests
 
         msg.BodyHtml.Should().NotContain("<script>alert(1)</script>");
         msg.BodyHtml.Should().Contain("&lt;script&gt;");
+    }
+
+    [Fact]
+    public void LockoutUnlock_args_map_to_correct_slots()
+    {
+        // {0} = unlock URL (appears in href). {1} = IP address (appears as a separate strong/text).
+        // A swap at the call site would put the URL in the IP slot. Pin it.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.LockoutUnlock,
+            new CultureInfo("en"),
+            "https://example.invalid/unlock-token-XYZ",
+            "203.0.113.5");
+
+        // URL must appear in the HTML body's href attribute.
+        msg.BodyHtml.Should().Contain("href=\"https://example.invalid/unlock-token-XYZ\"");
+        // IP must appear in the body but NOT inside an href.
+        msg.BodyHtml.Should().Contain("203.0.113.5");
+        msg.BodyHtml.Should().NotContain("href=\"203.0.113.5\"");
+        msg.BodyHtml.Should().NotContain("href=\"<strong>");
     }
 
     [Fact]
