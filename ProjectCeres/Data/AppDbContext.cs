@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -220,40 +221,40 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     /// </summary>
     private void ConfigureGlobalQueryFilters(ModelBuilder modelBuilder)
     {
-        // Finance domain (11)
-        modelBuilder.Entity<Account>()                .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<Budget>()                 .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<Category>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<CategoryBudget>()         .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<ImportProfile>()          .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<ImportStagedTransaction>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<ImportStagedTransfer>()   .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<ImportTransferExclusion>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<RecurringTransaction>()   .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<SavedReport>()            .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<Settings>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        // Stage 7.6.4: iterate UserOwnedTables.All so adding a new user-owned entity is one
+        // append to that list. The Movement TPC abstract root is registered explicitly first
+        // — EF rejects HasQueryFilter on TPC subtypes (Transaction / Transfer / LiabilityPayment)
+        // because the filter must live on the root and EF propagates it to each concrete table.
+        //
+        // Implementation note: we invoke a generic helper via reflection rather than building
+        // the filter as a raw Expression tree. Both work, but the generic-method approach lets
+        // the C# compiler emit the lambda with the correct `this`-closure semantics so EF
+        // parameterizes the filter (`WHERE "UserId" = @__currentUser_UserId_0`) and re-evaluates
+        // `_currentUser.UserId` per query. Building the expression directly with
+        // `Expression.Constant(_currentUser, ...)` would bake the specific accessor instance
+        // into the cached model — every subsequent DbContext would query against the wrong
+        // user. See dotnet/efcore#14740 for the documented closure-evaluation pitfall.
+        modelBuilder.Entity<Movement>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
 
-        // Movement TPC hierarchy: filter applied to abstract root; EF Core propagates it to
-        // all concrete subtypes (Transaction, Transfer, LiabilityPayment). Per EF Core rules,
-        // HasQueryFilter on a subtype is rejected when UseTpcMappingStrategy is in use —
-        // the filter must live on the root entity.
-        modelBuilder.Entity<Movement>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        var registerMethod = typeof(AppDbContext).GetMethod(
+            nameof(RegisterUserOwnedFilter),
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-        // Attachments (2, promoted to IUserOwned in Stage 7.5 Commit 5). UserId column is
-        // added to both tables in the AddRowLevelSecurityPolicies migration's Phase A
-        // and backfilled from the parent movement.
-        modelBuilder.Entity<TransactionAttachment>()  .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<TransferAttachment>()     .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        foreach (var table in UserOwnedTables.All)
+        {
+            if (typeof(Movement).IsAssignableFrom(table.EntityType))
+                continue; // TPC subtype — covered by Movement above.
 
-        // Auth-internal (8, promoted to IUserOwned in Task 4)
-        modelBuilder.Entity<UserSession>()            .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<UserBlockedIp>()          .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<UserMfaBackupCode>()      .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<TotpReplayEntry>()        .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<PasswordResetToken>()     .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<EmailChangeToken>()       .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<LockoutUnlockToken>()     .HasQueryFilter(e => e.UserId == _currentUser.UserId);
-        modelBuilder.Entity<AuditLog>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+            registerMethod
+                .MakeGenericMethod(table.EntityType)
+                .Invoke(this, new object[] { modelBuilder });
+        }
+    }
+
+    private void RegisterUserOwnedFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, IUserOwned
+    {
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e => e.UserId == _currentUser.UserId);
     }
 
     // -------------------------------------------------------------------------

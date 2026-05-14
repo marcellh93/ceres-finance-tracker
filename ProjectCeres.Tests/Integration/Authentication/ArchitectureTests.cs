@@ -745,6 +745,51 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void UserOwnedTables_All_matches_HasQueryFilter_registrations()
+    {
+        // Stage 7.6.4: pin that every entity in UserOwnedTables.All has a HasQueryFilter
+        // registration on the runtime EF model (either directly, or via TPC inheritance from
+        // a base type that has the filter — that's the Transaction/Transfer/LiabilityPayment
+        // case, where Movement carries the filter). UserOwnedTables.All is the source of
+        // truth used by the Stage 7.5 RLS parity test and the migration generator;
+        // ConfigureGlobalQueryFilters loops it via a generic helper. This test fails the
+        // build if any future addition to UserOwnedTables.All slips through without an
+        // EF-side filter — closing the OCP gap.
+        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        try
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+
+            var missing = ProjectCeres.Common.UserOwnedTables.All
+                .Where(t => !HasFilterOnSelfOrBase(db.Model.FindEntityType(t.EntityType)))
+                .Select(t => t.EntityType.Name)
+                .ToList();
+
+            missing.Should().BeEmpty(
+                "Every entry in UserOwnedTables.All must have a HasQueryFilter registration on " +
+                "the EF model (directly or via TPC inheritance). Stage 7.5's RLS parity test " +
+                "catches the migration-side drift; this test catches the EF-side drift. " +
+                "Add the missing entity to ConfigureGlobalQueryFilters in AppDbContext.cs.");
+        }
+        finally
+        {
+            factory.Dispose();
+        }
+
+        static bool HasFilterOnSelfOrBase(Microsoft.EntityFrameworkCore.Metadata.IEntityType? et)
+        {
+            while (et is not null)
+            {
+                if (et.GetDeclaredQueryFilters().Any())
+                    return true;
+                et = et.BaseType;
+            }
+            return false;
+        }
+    }
+
+    [Fact]
     public void FailedLoginAttempt_has_no_global_query_filter()
     {
         // ADR-0067: FailedLoginAttempt is cross-tenant by design. The retention sweep iterates
