@@ -16,6 +16,12 @@ public class Settings : IUserOwned
     /// (e.g., 31 in April), the cycle starts on that month's last day. See BudgetPeriod helper.
     /// </summary>
     public int PeriodStartDay { get; set; } = 1;
+    /// <summary>
+    /// User's preferred UI language. "en" | "es". Default "en". Drives the culture
+    /// used by IStringLocalizer for server-rendered emails and reports. Wired by
+    /// Stage 8b; the SPA language toggle PATCHes this column in Stage 9.
+    /// </summary>
+    public string Language { get; set; } = "en";
 
     public Currency DefaultCurrency { get; set; } = null!;
 }

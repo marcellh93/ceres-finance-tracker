@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="PasswordResetRequest.Subject" xml:space="preserve"><value>Restablece tu contraseña de Ceres</value></data>
+  <data name="PasswordResetRequest.BodyText" xml:space="preserve"><value>Hemos recibido una solicitud para restablecer tu contraseña.
+
+Haz clic en el enlace dentro de los próximos 15 minutos para elegir una nueva contraseña:
+{0}
+
+Si no fuiste tú, no es necesario hacer nada.</value></data>
+  <data name="PasswordResetRequest.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Hemos recibido una solicitud para restablecer tu contraseña.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Restablecer contraseña&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Este enlace caduca en 15 minutos. Si no fuiste tú, no es necesario hacer nada.&lt;/p&gt;</value></data>
+
+  <data name="PasswordChanged.Subject" xml:space="preserve"><value>Se ha cambiado tu contraseña de Ceres</value></data>
+  <data name="PasswordChanged.BodyText" xml:space="preserve"><value>Se acaba de cambiar tu contraseña de Ceres.
+
+Si fuiste tú, no es necesario hacer nada. Todas las demás sesiones activas se han cerrado como medida de precaución.
+
+Si no fuiste tú, contacta con soporte de inmediato.</value></data>
+  <data name="PasswordChanged.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Se acaba de cambiar tu contraseña de Ceres.&lt;/p&gt;&lt;p&gt;Si fuiste tú, no es necesario hacer nada. Todas las demás sesiones activas se han cerrado como medida de precaución.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, contacta con soporte de inmediato.&lt;/p&gt;</value></data>
+
+  <data name="PasswordResetCancelledEmailChange.Subject" xml:space="preserve"><value>Cambio de correo pendiente cancelado</value></data>
+  <data name="PasswordResetCancelledEmailChange.BodyText" xml:space="preserve"><value>Se ha restablecido tu contraseña de Ceres. Cualquier cambio pendiente de la dirección de correo electrónico de tu cuenta ha sido cancelado como medida de precaución.
+
+La dirección de correo de tu cuenta no ha cambiado.
+
+Si no restableciste la contraseña, contacta con soporte de inmediato.</value></data>
+  <data name="PasswordResetCancelledEmailChange.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Se ha restablecido tu contraseña de Ceres. Cualquier cambio pendiente de la dirección de correo electrónico de tu cuenta ha sido cancelado como medida de precaución.&lt;/p&gt;&lt;p&gt;La dirección de correo de tu cuenta no ha cambiado.&lt;/p&gt;&lt;p&gt;Si no restableciste la contraseña, contacta con soporte de inmediato.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeVerifyNew.Subject" xml:space="preserve"><value>Confirma tu nueva dirección de correo de Ceres</value></data>
+  <data name="EmailChangeVerifyNew.BodyText" xml:space="preserve"><value>Confirma que quieres que esta dirección pase a ser el correo de tu cuenta de Ceres.
+
+Haz clic en el enlace dentro de los próximos 30 minutos:
+{0}
+
+Si no solicitaste este cambio, ignora este mensaje.</value></data>
+  <data name="EmailChangeVerifyNew.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Confirma que quieres que esta dirección pase a ser el correo de tu cuenta de Ceres.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Confirmar nuevo correo&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Este enlace caduca en 30 minutos. Si no solicitaste este cambio, ignora este mensaje.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeRevokeOld.Subject" xml:space="preserve"><value>Solicitud de cambio de correo en tu cuenta de Ceres</value></data>
+  <data name="EmailChangeRevokeOld.BodyText" xml:space="preserve"><value>Se ha solicitado un cambio de correo a {0} en tu cuenta de Ceres.
+
+Si no fuiste tú, haz clic en el enlace dentro de los próximos 7 días para revocar el cambio:
+{1}
+
+Si fuiste tú, puedes ignorar este mensaje.</value></data>
+  <data name="EmailChangeRevokeOld.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Se ha solicitado un cambio de correo a &lt;strong&gt;{0}&lt;/strong&gt; en tu cuenta de Ceres.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, &lt;a href="{1}"&gt;revoca el cambio&lt;/a&gt; dentro de los próximos 7 días.&lt;/p&gt;&lt;p&gt;Si fuiste tú, puedes ignorar este mensaje.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeConfirmed.Subject" xml:space="preserve"><value>Cambio de correo electrónico confirmado en Ceres</value></data>
+  <data name="EmailChangeConfirmed.BodyText" xml:space="preserve"><value>Tu dirección de correo de Ceres se acaba de cambiar a esta dirección.
+
+Todas las demás sesiones activas se han cerrado como medida de precaución.
+
+Si NO fuiste tú, contacta con soporte de inmediato.</value></data>
+  <data name="EmailChangeConfirmed.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Tu dirección de correo de Ceres se acaba de cambiar a esta dirección.&lt;/p&gt;&lt;p&gt;Todas las demás sesiones activas se han cerrado como medida de precaución.&lt;/p&gt;&lt;p&gt;Si NO fuiste tú, contacta con soporte de inmediato.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeConfirmedToOld.Subject" xml:space="preserve"><value>Cambio de correo electrónico confirmado en Ceres</value></data>
+  <data name="EmailChangeConfirmedToOld.BodyText" xml:space="preserve"><value>La cuenta de Ceres que antes estaba asociada a esta dirección ({0}) se ha trasladado a {1}.
+
+Todas las demás sesiones activas se han cerrado como medida de precaución.
+
+Si NO fuiste tú, contacta con soporte de inmediato — todavía podrías recuperar la cuenta.</value></data>
+  <data name="EmailChangeConfirmedToOld.BodyHtml" xml:space="preserve"><value>&lt;p&gt;La cuenta de Ceres que antes estaba asociada a esta dirección (&lt;strong&gt;{0}&lt;/strong&gt;) se ha trasladado a &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;Todas las demás sesiones activas se han cerrado como medida de precaución.&lt;/p&gt;&lt;p&gt;Si NO fuiste tú, contacta con soporte de inmediato — todavía podrías recuperar la cuenta.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeRevokeNotificationToOld.Subject" xml:space="preserve"><value>Cambio de correo cancelado</value></data>
+  <data name="EmailChangeRevokeNotificationToOld.BodyText" xml:space="preserve"><value>Se ha cancelado el cambio de correo pendiente en tu cuenta de Ceres.
+
+La dirección de correo de tu cuenta no ha cambiado.
+
+Si no iniciaste esta cancelación, contacta con soporte de inmediato.</value></data>
+  <data name="EmailChangeRevokeNotificationToOld.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Se ha cancelado el cambio de correo pendiente en tu cuenta de Ceres.&lt;/p&gt;&lt;p&gt;La dirección de correo de tu cuenta no ha cambiado.&lt;/p&gt;&lt;p&gt;Si no iniciaste esta cancelación, contacta con soporte de inmediato.&lt;/p&gt;</value></data>
+
+  <data name="LockoutUnlock.Subject" xml:space="preserve"><value>Cuenta de Ceres bloqueada</value></data>
+  <data name="LockoutUnlock.BodyText" xml:space="preserve"><value>Demasiados intentos fallidos de inicio de sesión en tu cuenta de Ceres desde la IP {1}.
+
+Para desbloquear la cuenta, haz clic en el enlace dentro de la próxima hora:
+{0}
+
+Si no fuiste tú, el enlace sigue permitiendo el desbloqueo — cambia tu contraseña inmediatamente después de iniciar sesión.</value></data>
+  <data name="LockoutUnlock.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Demasiados intentos fallidos de inicio de sesión en tu cuenta de Ceres desde la IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Desbloquear cuenta&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Si no fuiste tú, el enlace sigue permitiendo el desbloqueo — cambia tu contraseña inmediatamente después de iniciar sesión.&lt;/p&gt;</value></data>
+</root>

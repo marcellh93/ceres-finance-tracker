@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="PasswordResetRequest.Subject" xml:space="preserve"><value>Reset your Ceres password</value></data>
+  <data name="PasswordResetRequest.BodyText" xml:space="preserve"><value>We received a request to reset your password.
+
+Click the link below within 15 minutes to choose a new password:
+{0}
+
+If this wasn't you, no action is needed.</value></data>
+  <data name="PasswordResetRequest.BodyHtml" xml:space="preserve"><value>&lt;p&gt;We received a request to reset your password.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Reset password&lt;/a&gt;&lt;/p&gt;&lt;p&gt;This link expires in 15 minutes. If this wasn't you, no action is needed.&lt;/p&gt;</value></data>
+
+  <data name="PasswordChanged.Subject" xml:space="preserve"><value>Your Ceres password was changed</value></data>
+  <data name="PasswordChanged.BodyText" xml:space="preserve"><value>Your Ceres password was just changed.
+
+If this was you, no further action is needed. All other active sessions have been signed out as a precaution.
+
+If you did not change your password, contact support immediately.</value></data>
+  <data name="PasswordChanged.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your Ceres password was just changed.&lt;/p&gt;&lt;p&gt;If this was you, no further action is needed. All other active sessions have been signed out as a precaution.&lt;/p&gt;&lt;p&gt;If you did not change your password, contact support immediately.&lt;/p&gt;</value></data>
+
+  <data name="PasswordResetCancelledEmailChange.Subject" xml:space="preserve"><value>Pending email change cancelled</value></data>
+  <data name="PasswordResetCancelledEmailChange.BodyText" xml:space="preserve"><value>Your Ceres password was just reset. Any pending change to your account email address has been cancelled as a precaution.
+
+Your account email address is unchanged.
+
+If you did not reset your password, contact support immediately.</value></data>
+  <data name="PasswordResetCancelledEmailChange.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your Ceres password was just reset. Any pending change to your account email address has been cancelled as a precaution.&lt;/p&gt;&lt;p&gt;Your account email address is unchanged.&lt;/p&gt;&lt;p&gt;If you did not reset your password, contact support immediately.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeVerifyNew.Subject" xml:space="preserve"><value>Confirm your new Ceres email address</value></data>
+  <data name="EmailChangeVerifyNew.BodyText" xml:space="preserve"><value>Confirm that you want this address to become the email on your Ceres account.
+
+Click the link below within 30 minutes:
+{0}
+
+If you did not request this change, ignore this email.</value></data>
+  <data name="EmailChangeVerifyNew.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Confirm that you want this address to become the email on your Ceres account.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Confirm new email&lt;/a&gt;&lt;/p&gt;&lt;p&gt;This link expires in 30 minutes. If you did not request this change, ignore this email.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeRevokeOld.Subject" xml:space="preserve"><value>Email change requested on your Ceres account</value></data>
+  <data name="EmailChangeRevokeOld.BodyText" xml:space="preserve"><value>An email change to {0} was requested on your Ceres account.
+
+If this wasn't you, click the link below within 7 days to revoke the change:
+{1}
+
+If you did request it, you can ignore this message.</value></data>
+  <data name="EmailChangeRevokeOld.BodyHtml" xml:space="preserve"><value>&lt;p&gt;An email change to &lt;strong&gt;{0}&lt;/strong&gt; was requested on your Ceres account.&lt;/p&gt;&lt;p&gt;If this wasn't you, &lt;a href="{1}"&gt;revoke the change&lt;/a&gt; within 7 days.&lt;/p&gt;&lt;p&gt;If you did request it, you can ignore this message.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeConfirmed.Subject" xml:space="preserve"><value>Ceres email change confirmed</value></data>
+  <data name="EmailChangeConfirmed.BodyText" xml:space="preserve"><value>Your Ceres email address was just changed to this address.
+
+All other active sessions have been signed out as a precaution.
+
+If this was NOT you, contact support immediately.</value></data>
+  <data name="EmailChangeConfirmed.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your Ceres email address was just changed to this address.&lt;/p&gt;&lt;p&gt;All other active sessions have been signed out as a precaution.&lt;/p&gt;&lt;p&gt;If this was NOT you, contact support immediately.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeConfirmedToOld.Subject" xml:space="preserve"><value>Ceres email change confirmed</value></data>
+  <data name="EmailChangeConfirmedToOld.BodyText" xml:space="preserve"><value>The Ceres account previously associated with this address ({0}) has been moved to {1}.
+
+All other active sessions have been signed out as a precaution.
+
+If this was NOT you, contact support immediately — you may still be able to recover the account.</value></data>
+  <data name="EmailChangeConfirmedToOld.BodyHtml" xml:space="preserve"><value>&lt;p&gt;The Ceres account previously associated with this address (&lt;strong&gt;{0}&lt;/strong&gt;) has been moved to &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;All other active sessions have been signed out as a precaution.&lt;/p&gt;&lt;p&gt;If this was NOT you, contact support immediately — you may still be able to recover the account.&lt;/p&gt;</value></data>
+
+  <data name="EmailChangeRevokeNotificationToOld.Subject" xml:space="preserve"><value>Email change cancelled</value></data>
+  <data name="EmailChangeRevokeNotificationToOld.BodyText" xml:space="preserve"><value>The pending email change on your Ceres account has been cancelled.
+
+Your account email address is unchanged.
+
+If you did not initiate this cancellation, contact support immediately.</value></data>
+  <data name="EmailChangeRevokeNotificationToOld.BodyHtml" xml:space="preserve"><value>&lt;p&gt;The pending email change on your Ceres account has been cancelled.&lt;/p&gt;&lt;p&gt;Your account email address is unchanged.&lt;/p&gt;&lt;p&gt;If you did not initiate this cancellation, contact support immediately.&lt;/p&gt;</value></data>
+
+  <data name="LockoutUnlock.Subject" xml:space="preserve"><value>Ceres account locked</value></data>
+  <data name="LockoutUnlock.BodyText" xml:space="preserve"><value>Too many failed sign-in attempts on your Ceres account from IP {1}.
+
+To unlock the account, click the link below within 1 hour:
+{0}
+
+If this wasn't you, the link still allows you to unlock — change your password immediately after signing in.</value></data>
+  <data name="LockoutUnlock.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Too many failed sign-in attempts on your Ceres account from IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Unlock your account&lt;/a&gt;&lt;/p&gt;&lt;p&gt;If this wasn't you, the link still allows you to unlock — change your password immediately after signing in.&lt;/p&gt;</value></data>
+</root>

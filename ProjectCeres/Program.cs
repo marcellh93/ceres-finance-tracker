@@ -154,6 +154,9 @@ if (builder.Environment.IsDevelopment())
 // DI will throw at startup until Stage 8 wires the real provider.
 
 builder.Services.AddScoped<IEmailRecipientResolver, EmailRecipientResolver>();
+builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+builder.Services.AddScoped<IEmailComposer, EmailComposer>();
+builder.Services.AddScoped<ILanguageResolver, LanguageResolver>();
 
 builder.Services.AddScoped<MfaBackupCodeService>();
 builder.Services.AddScoped<TotpReplayGuard>();

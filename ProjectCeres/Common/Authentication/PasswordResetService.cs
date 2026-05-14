@@ -31,6 +31,9 @@ public sealed class PasswordResetService
     private readonly TotpReplayGuard _replayGuard;
     private readonly FailedLoginRecorder _failedLogins;
     private readonly IEmailService _email;
+    private readonly IEmailComposer _composer;
+    private readonly IEmailRecipientResolver _recipients;
+    private readonly ILanguageResolver _languages;
     private readonly IMemoryCache _cache;
     private readonly ILogger<PasswordResetService> _logger;
     private readonly IAuditLogWriter _auditLog;
@@ -45,6 +48,9 @@ public sealed class PasswordResetService
         TotpReplayGuard replayGuard,
         FailedLoginRecorder failedLogins,
         IEmailService email,
+        IEmailComposer composer,
+        IEmailRecipientResolver recipients,
+        ILanguageResolver languages,
         IMemoryCache cache,
         ILogger<PasswordResetService> logger,
         IAuditLogWriter auditLog)
@@ -58,6 +64,9 @@ public sealed class PasswordResetService
         _replayGuard = replayGuard;
         _failedLogins = failedLogins;
         _email = email;
+        _composer = composer;
+        _recipients = recipients;
+        _languages = languages;
         _cache = cache;
         _logger = logger;
         _auditLog = auditLog;
@@ -145,7 +154,11 @@ public sealed class PasswordResetService
 
         try
         {
-            await _email.SendAsync(BuildRequestEmail(user.Email!, resetUrl), ct);
+            var recipient = await _recipients.ResolveAsync(user.Id, ct);
+            var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+            var msg = _composer.Compose(EmailTemplateKey.PasswordResetRequest, culture, resetUrl)
+                with { To = recipient };
+            await _email.SendAsync(msg, ct);
         }
         catch (Exception ex)
         {
@@ -188,27 +201,6 @@ public sealed class PasswordResetService
     {
         public DateTime WindowStart { get; set; }
         public int Count { get; set; }
-    }
-
-    private static EmailMessage BuildRequestEmail(string to, string resetUrl)
-    {
-        const string subject = "Reset your Project Ceres password";
-        var bodyText = $"""
-            We received a request to reset your Project Ceres password.
-
-            Click or paste this link into your browser to set a new password:
-            {resetUrl}
-
-            This link expires in {(int)TokenLifetime.TotalMinutes} minutes and can only be used once.
-            If you did not request a reset, you can ignore this email.
-            """;
-        var bodyHtml = $"""
-            <p>We received a request to reset your Project Ceres password.</p>
-            <p><a href="{resetUrl}">Reset your password</a></p>
-            <p>This link expires in {(int)TokenLifetime.TotalMinutes} minutes and can only be used once.</p>
-            <p>If you did not request a reset, you can ignore this email.</p>
-            """;
-        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
     }
 
     public async Task<PasswordResetConfirmOutcome> ConfirmAsync(
@@ -366,7 +358,11 @@ public sealed class PasswordResetService
 
                 try
                 {
-                    await _email.SendAsync(BuildEmailChangeCancelledByPasswordResetEmail(user.Email!), ct);
+                    var recipient = await _recipients.ResolveAsync(user.Id, ct);
+                    var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+                    var msg = _composer.Compose(EmailTemplateKey.PasswordResetCancelledEmailChange, culture)
+                        with { To = recipient };
+                    await _email.SendAsync(msg, ct);
                 }
                 catch (Exception ex)
                 {
@@ -387,7 +383,11 @@ public sealed class PasswordResetService
             // Notification email — never blocks the return.
             try
             {
-                await _email.SendAsync(BuildChangedEmail(user.Email!), ct);
+                var recipient = await _recipients.ResolveAsync(user.Id, ct);
+                var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+                var msg = _composer.Compose(EmailTemplateKey.PasswordChanged, culture)
+                    with { To = recipient };
+                await _email.SendAsync(msg, ct);
             }
             catch (Exception ex)
             {
@@ -404,42 +404,4 @@ public sealed class PasswordResetService
         }
     }
 
-    private static EmailMessage BuildEmailChangeCancelledByPasswordResetEmail(string to)
-    {
-        const string subject = "Pending email change cancelled";
-        const string bodyText = """
-            Your Project Ceres password was just reset. Any pending change to your
-            account email address has been cancelled as a precaution.
-
-            Your account email address is unchanged.
-
-            If you did not reset your password, contact support immediately.
-            """;
-        const string bodyHtml = """
-            <p>Your Project Ceres password was just reset. Any pending change to your account email address has been cancelled as a precaution.</p>
-            <p>Your account email address is unchanged.</p>
-            <p>If you did not reset your password, contact support immediately.</p>
-            """;
-        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
-    }
-
-    private static EmailMessage BuildChangedEmail(string to)
-    {
-        const string subject = "Your Project Ceres password was changed";
-        const string bodyText = """
-            Your Project Ceres password was just changed.
-
-            If this was you, no further action is needed. All other active sessions
-            have been signed out as a precaution.
-
-            If you did not change your password, contact support immediately.
-            """;
-        var bodyHtml = """
-            <p>Your Project Ceres password was just changed.</p>
-            <p>If this was you, no further action is needed. All other active
-            sessions have been signed out as a precaution.</p>
-            <p>If you did not change your password, contact support immediately.</p>
-            """;
-        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
-    }
 }

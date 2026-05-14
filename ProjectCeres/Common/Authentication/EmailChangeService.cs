@@ -31,6 +31,9 @@ public sealed class EmailChangeService
     private readonly EmailChangeTokenGenerator _tokens;
     private readonly TokenLookupHasher _lookupHasher;
     private readonly IEmailService _email;
+    private readonly IEmailComposer _composer;
+    private readonly IEmailRecipientResolver _recipients;
+    private readonly ILanguageResolver _languages;
     private readonly IMemoryCache _cache;
     private readonly ILogger<EmailChangeService> _logger;
     private readonly IAuditLogWriter _auditLog;
@@ -42,6 +45,9 @@ public sealed class EmailChangeService
         EmailChangeTokenGenerator tokens,
         TokenLookupHasher lookupHasher,
         IEmailService email,
+        IEmailComposer composer,
+        IEmailRecipientResolver recipients,
+        ILanguageResolver languages,
         IMemoryCache cache,
         ILogger<EmailChangeService> logger,
         IAuditLogWriter auditLog)
@@ -52,6 +58,9 @@ public sealed class EmailChangeService
         _tokens = tokens;
         _lookupHasher = lookupHasher;
         _email = email;
+        _composer = composer;
+        _recipients = recipients;
+        _languages = languages;
         _cache = cache;
         _auditLog = auditLog;
         _logger = logger;
@@ -177,7 +186,10 @@ public sealed class EmailChangeService
 
         try
         {
-            await _email.SendAsync(BuildVerifyNewEmail(normalized, verifyUrl), ct);
+            var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+            var msg = _composer.Compose(EmailTemplateKey.EmailChangeVerifyNew, culture, verifyUrl)
+                with { To = EmailRecipient.OverrideForEmailChange(normalized) };
+            await _email.SendAsync(msg, ct);
         }
         catch (Exception ex)
         {
@@ -186,7 +198,10 @@ public sealed class EmailChangeService
 
         try
         {
-            await _email.SendAsync(BuildRevokeOldEmail(user.Email!, normalized, revokeUrl), ct);
+            var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+            var msg = _composer.Compose(EmailTemplateKey.EmailChangeRevokeOld, culture, normalized, revokeUrl)
+                with { To = EmailRecipient.OverrideForEmailChange(user.Email!) };
+            await _email.SendAsync(msg, ct);
         }
         catch (Exception ex)
         {
@@ -313,7 +328,11 @@ public sealed class EmailChangeService
             // New address (now address-of-record): "your email was just changed to this address".
             try
             {
-                await _email.SendAsync(BuildChangeConfirmedEmail(match.NewEmail), ct);
+                var recipient = await _recipients.ResolveAsync(user.Id, ct);
+                var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+                var msg = _composer.Compose(EmailTemplateKey.EmailChangeConfirmed, culture)
+                    with { To = recipient };
+                await _email.SendAsync(msg, ct);
             }
             catch (Exception ex)
             {
@@ -326,7 +345,10 @@ public sealed class EmailChangeService
             {
                 try
                 {
-                    await _email.SendAsync(BuildChangeConfirmedToOldEmail(oldEmail, match.NewEmail), ct);
+                    var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+                    var msg = _composer.Compose(EmailTemplateKey.EmailChangeConfirmedToOld, culture, oldEmail, match.NewEmail)
+                        with { To = EmailRecipient.OverrideForEmailChange(oldEmail) };
+                    await _email.SendAsync(msg, ct);
                 }
                 catch (Exception ex)
                 {
@@ -404,7 +426,11 @@ public sealed class EmailChangeService
             {
                 try
                 {
-                    await _email.SendAsync(BuildRevokeNotificationToOldEmail(user.Email!), ct);
+                    var recipient = await _recipients.ResolveAsync(user.Id, ct);
+                    var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+                    var msg = _composer.Compose(EmailTemplateKey.EmailChangeRevokeNotificationToOld, culture)
+                        with { To = recipient };
+                    await _email.SendAsync(msg, ct);
                 }
                 catch (Exception ex)
                 {
@@ -452,104 +478,4 @@ public sealed class EmailChangeService
         public int Count { get; set; }
     }
 
-    private static EmailMessage BuildVerifyNewEmail(string newEmail, string verifyUrl)
-    {
-        const string subject = "Confirm your new Project Ceres email address";
-        var bodyText = $"""
-            We received a request to change the email address on your Project Ceres account
-            to this address.
-
-            Click or paste this link into your browser to confirm:
-            {verifyUrl}
-
-            This link expires in {(int)VerifyTokenLifetime.TotalMinutes} minutes and can only be used once.
-            If you did not request this change, ignore this email.
-            """;
-        var bodyHtml = $"""
-            <p>We received a request to change the email address on your Project Ceres account to this address.</p>
-            <p><a href="{verifyUrl}">Confirm your new email address</a></p>
-            <p>This link expires in {(int)VerifyTokenLifetime.TotalMinutes} minutes and can only be used once.</p>
-            <p>If you did not request this change, ignore this email.</p>
-            """;
-        return new EmailMessage(EmailRecipient.OverrideForEmailChange(newEmail), subject, bodyHtml, bodyText);
-    }
-
-    private static EmailMessage BuildRevokeOldEmail(string oldEmail, string newEmail, string revokeUrl)
-    {
-        const string subject = "An email change was requested on your Project Ceres account";
-        var bodyText = $"""
-            Someone (probably you) requested a change to your Project Ceres email address
-            from {oldEmail} to {newEmail}.
-
-            Until the new address is confirmed, this address remains your address of record.
-
-            If this was NOT you, click or paste this link to cancel the change:
-            {revokeUrl}
-
-            This cancellation link is valid for {(int)RevokeTokenLifetime.TotalDays} days.
-            """;
-        var bodyHtml = $"""
-            <p>Someone (probably you) requested a change to your Project Ceres email address from <strong>{oldEmail}</strong> to <strong>{newEmail}</strong>.</p>
-            <p>Until the new address is confirmed, this address remains your address of record.</p>
-            <p>If this was NOT you, <a href="{revokeUrl}">cancel the change</a>.</p>
-            <p>This cancellation link is valid for {(int)RevokeTokenLifetime.TotalDays} days.</p>
-            """;
-        return new EmailMessage(EmailRecipient.OverrideForEmailChange(oldEmail), subject, bodyHtml, bodyText);
-    }
-
-    private static EmailMessage BuildChangeConfirmedEmail(string newEmail)
-    {
-        const string subject = "Your Project Ceres email address was changed";
-        const string bodyText = """
-            Your Project Ceres email address was just changed to this address.
-
-            All other active sessions have been signed out as a precaution.
-
-            If this was NOT you, contact support immediately.
-            """;
-        const string bodyHtml = """
-            <p>Your Project Ceres email address was just changed to this address.</p>
-            <p>All other active sessions have been signed out as a precaution.</p>
-            <p>If this was NOT you, contact support immediately.</p>
-            """;
-        return new EmailMessage(EmailRecipient.OverrideForEmailChange(newEmail), subject, bodyHtml, bodyText);
-    }
-
-    private static EmailMessage BuildChangeConfirmedToOldEmail(string oldEmail, string newEmail)
-    {
-        const string subject = "Your Project Ceres email address was changed";
-        var bodyText = $"""
-            The Project Ceres account previously associated with this address ({oldEmail})
-            has been moved to {newEmail}.
-
-            All other active sessions have been signed out as a precaution.
-
-            If this was NOT you, contact support immediately — you may still be able to
-            recover the account.
-            """;
-        var bodyHtml = $"""
-            <p>The Project Ceres account previously associated with this address (<strong>{oldEmail}</strong>) has been moved to <strong>{newEmail}</strong>.</p>
-            <p>All other active sessions have been signed out as a precaution.</p>
-            <p>If this was NOT you, contact support immediately — you may still be able to recover the account.</p>
-            """;
-        return new EmailMessage(EmailRecipient.OverrideForEmailChange(oldEmail), subject, bodyHtml, bodyText);
-    }
-
-    private static EmailMessage BuildRevokeNotificationToOldEmail(string oldEmail)
-    {
-        const string subject = "Email change cancelled";
-        const string bodyText = """
-            The pending email change on your Project Ceres account has been cancelled.
-
-            Your account email address is unchanged.
-
-            If you did not initiate this cancellation, contact support immediately.
-            """;
-        const string bodyHtml = """
-            <p>The pending email change on your Project Ceres account has been cancelled.</p>
-            <p>Your account email address is unchanged.</p>
-            <p>If you did not initiate this cancellation, contact support immediately.</p>
-            """;
-        return new EmailMessage(EmailRecipient.OverrideForEmailChange(oldEmail), subject, bodyHtml, bodyText);
-    }
 }

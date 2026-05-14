@@ -674,6 +674,7 @@ public class ArchitectureTests
             "ProjectCeres/Common/Authentication/PersistentCookieRotationMiddleware.cs", // runs before UseAuthentication; resolves session by cookie-embedded id
             "ProjectCeres/Common/Authentication/TotpReplayGuard.cs",                  // MFA-pending step + cross-tenant retention purge of expired entries
             "ProjectCeres/Common/Email/EmailRecipientResolver.cs",                    // Stage 8a: resolves To: from ApplicationUser.Email; callers include pre-auth flows (password reset, lockout) where the user is not yet signed in
+            "ProjectCeres/Common/Email/LanguageResolver.cs",                          // Stage 8b: pre-auth flows may read Settings.Language before the user has signed in (password reset, lockout-unlock)
         };
 
         var repoRoot = FindRepoRoot();

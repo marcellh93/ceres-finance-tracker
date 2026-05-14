@@ -103,7 +103,7 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
 
         captured.Should().HaveCount(2, "one verify email to new address + one revoke email to old address");
         captured.Should().Contain(m => m.To.Address == newEmail && m.Subject.Contains("Confirm"));
-        captured.Should().Contain(m => m.To.Address == oldEmail && m.Subject.Contains("change was requested"));
+        captured.Should().Contain(m => m.To.Address == oldEmail && m.Subject.Contains("Email change requested"));
 
         var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == newEmail));
         var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == oldEmail));

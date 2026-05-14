@@ -31,6 +31,9 @@ public class LockoutUnlockService
     private readonly Argon2idPasswordHasher _argon;
     private readonly LockoutUnlockTokenGenerator _tokens;
     private readonly IEmailService _email;
+    private readonly IEmailComposer _composer;
+    private readonly IEmailRecipientResolver _recipients;
+    private readonly ILanguageResolver _languages;
     private readonly ILogger<LockoutUnlockService> _logger;
     private readonly IAuditLogWriter _auditLog;
 
@@ -40,6 +43,9 @@ public class LockoutUnlockService
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
         IEmailService email,
+        IEmailComposer composer,
+        IEmailRecipientResolver recipients,
+        ILanguageResolver languages,
         ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog)
     {
@@ -48,6 +54,9 @@ public class LockoutUnlockService
         _argon = argon;
         _tokens = tokens;
         _email = email;
+        _composer = composer;
+        _recipients = recipients;
+        _languages = languages;
         _logger = logger;
         _auditLog = auditLog;
     }
@@ -90,7 +99,11 @@ public class LockoutUnlockService
 
         try
         {
-            await _email.SendAsync(BuildLockoutEmail(userEmail, unlockUrl, ip), ct);
+            var recipient = await _recipients.ResolveAsync(userId, ct);
+            var culture = await _languages.ResolveForUserAsync(userId, ct);
+            var msg = _composer.Compose(EmailTemplateKey.LockoutUnlock, culture, unlockUrl, ip)
+                with { To = recipient };
+            await _email.SendAsync(msg, ct);
         }
         catch (Exception ex)
         {
@@ -173,31 +186,4 @@ public class LockoutUnlockService
         }
     }
 
-    private static EmailMessage BuildLockoutEmail(string to, string unlockUrl, string ip)
-    {
-        const string subject = "Your Project Ceres account was locked";
-        var bodyText = $"""
-            Your Project Ceres account was just locked after several failed sign-in
-            attempts from IP address {ip}.
-
-            If this was you, your account will automatically unlock in 15 minutes.
-            You can also unlock it now by clicking or pasting this link:
-            {unlockUrl}
-
-            This link expires in 15 minutes and can only be used once.
-
-            If you did not attempt to sign in, your password may have been guessed.
-            We recommend resetting your password from the sign-in page.
-            """;
-        var bodyHtml = $"""
-            <p>Your Project Ceres account was just locked after several failed
-            sign-in attempts from IP address <code>{ip}</code>.</p>
-            <p>If this was you, your account will automatically unlock in 15 minutes.
-            You can also unlock it now: <a href="{unlockUrl}">Unlock account</a>.</p>
-            <p>This link expires in 15 minutes and can only be used once.</p>
-            <p>If you did not attempt to sign in, your password may have been guessed.
-            We recommend resetting your password from the sign-in page.</p>
-            """;
-        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
-    }
 }

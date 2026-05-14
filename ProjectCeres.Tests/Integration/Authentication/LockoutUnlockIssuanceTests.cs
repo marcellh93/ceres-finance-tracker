@@ -272,9 +272,12 @@ internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
         IEmailService email,
+        ProjectCeres.Common.Email.IEmailComposer composer,
+        ProjectCeres.Common.Email.IEmailRecipientResolver recipients,
+        ProjectCeres.Common.Email.ILanguageResolver languages,
         Microsoft.Extensions.Logging.ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog)
-        : base(userManager, db, argon, tokens, email, logger, auditLog) { }
+        : base(userManager, db, argon, tokens, email, composer, recipients, languages, logger, auditLog) { }
 
     public override Task IssueAsync(
         Guid userId, string userEmail, string ip, string userAgent,

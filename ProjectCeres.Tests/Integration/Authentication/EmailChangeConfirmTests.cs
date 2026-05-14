@@ -319,9 +319,9 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         var resp = await PostConfirmAsync(factory, _factory, arr.VerifyToken);
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        captured.Should().Contain(m => m.To.Address == arr.NewEmail && m.Subject.Contains("was changed"),
+        captured.Should().Contain(m => m.To.Address == arr.NewEmail && m.Subject.Contains("change confirmed"),
             "a change-confirmed notification must be sent to the new (now address-of-record) address");
-        captured.Should().Contain(m => m.To.Address == arr.OldEmail && m.Subject.Contains("was changed"),
+        captured.Should().Contain(m => m.To.Address == arr.OldEmail && m.Subject.Contains("change confirmed"),
             "a change-confirmed notification must also be sent to the old address per security-model.md");
     }
 }
