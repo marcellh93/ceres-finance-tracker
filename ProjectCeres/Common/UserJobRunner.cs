@@ -8,7 +8,7 @@ namespace ProjectCeres.Common;
 
 public sealed class UserJobRunner(
     AdminDbContext db,
-    IUserScope scope,
+    IBackgroundJobScope backgroundScope,
     ILogger<UserJobRunner> logger) : IUserJobRunner
 {
     public async Task ForEachUserAsync(
@@ -29,21 +29,21 @@ public sealed class UserJobRunner(
         foreach (var userId in userIds)
         {
             if (ct.IsCancellationRequested) break;
-            using (scope.EnterAs(userId))
+            try
             {
-                try
-                {
-                    await work(userId);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    // Cooperative cancellation — propagate so the loop exits.
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Per-user job failed for {UserId}", userId);
-                }
+                // Stage 7.5 Commit 6: routes through BackgroundJobScope which holds the
+                // Guid.Empty doorway refusal. Direct IUserScope.EnterAs() calls outside
+                // BackgroundJobScope are forbidden by an architecture test.
+                await backgroundScope.RunAsync(userId, nameof(ForEachUserAsync), () => work(userId));
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // Cooperative cancellation — propagate so the loop exits.
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Per-user job failed for {UserId}", userId);
             }
         }
     }

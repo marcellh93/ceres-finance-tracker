@@ -591,6 +591,57 @@ public class ArchitectureTests
         return hits;
     }
 
+    [Fact]
+    public void EnterAs_only_called_inside_BackgroundJobScope()
+    {
+        // Stage 7.5 Commit 6: `IUserScope.EnterAs(...)` is the primitive that sets the
+        // current-user AsyncLocal. Every background-job entry point must route through
+        // BackgroundJobScope.RunAsync (which holds the Guid.Empty doorway refusal and
+        // logs job-name on failure). The only file allowed to call `EnterAs(...)` is
+        // BackgroundJobScope itself — anything else risks bypassing the refusal.
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "ProjectCeres/Common/BackgroundJobScope.cs", // the doorway implementation
+        };
+
+        var repoRoot = FindRepoRoot();
+        var projectCeres = Path.Combine(repoRoot, "ProjectCeres");
+        var hits = ScanEnterAsCallSites(projectCeres);
+
+        var unexpected = hits
+            .Select(f => Path.GetRelativePath(repoRoot, f).Replace('\\', '/'))
+            .Where(rel => !allowed.Contains(rel))
+            .ToList();
+
+        unexpected.Should().BeEmpty(
+            "IUserScope.EnterAs() must only be called from BackgroundJobScope. " +
+            "Every other background-job entry point must route through IBackgroundJobScope.RunAsync " +
+            "to inherit the Guid.Empty doorway refusal and job-name logging.");
+    }
+
+    private static IReadOnlyList<string> ScanEnterAsCallSites(string projectCeresRoot)
+    {
+        var hits = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(projectCeresRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains("/Migrations/")) continue;
+            var lines = File.ReadAllLines(file);
+            foreach (var raw in lines)
+            {
+                var line = raw.TrimStart();
+                if (line.StartsWith("//")) continue;
+                if (line.StartsWith("*"))  continue;
+                // Match `.EnterAs(` to avoid matching the interface declaration `EnterAs(Guid)`.
+                if (line.Contains(".EnterAs("))
+                {
+                    hits.Add(file);
+                    break;
+                }
+            }
+        }
+        return hits;
+    }
+
     /// <summary>
     /// Walks up from the test bin directory to the repository root (identified by ProjectCeres.sln).
     /// </summary>
