@@ -20,18 +20,18 @@ public sealed class EmailRecipientResolver : IEmailRecipientResolver
         // reset triggered before the user is fully signed in) AND from authenticated
         // contexts. Reading ApplicationUser.Email is safe because the userId always came
         // from server-side context (session, token row, audit context) — never from a
-        // request payload. Stage 10 architecture test allow-lists this file.
-        var user = await _db.Users
+        // request payload. Stage 7 architecture test
+        // (`IgnoreQueryFilters_only_appears_in_documented_exception_paths`) allow-lists
+        // this file; entry added in Stage 8a.
+        var email = await _db.Users
             .IgnoreQueryFilters()
             .Where(u => u.Id == userId)
-            .Select(u => new { u.Email, u.EmailConfirmed })
+            .Select(u => u.Email)
             .FirstOrDefaultAsync(ct);
 
-        if (user is null)
-            throw new EmailRecipientNotResolvableException(userId, "user not found");
-        if (string.IsNullOrWhiteSpace(user.Email))
-            throw new EmailRecipientNotResolvableException(userId, "user has no email");
+        if (string.IsNullOrWhiteSpace(email))
+            throw new EmailRecipientNotResolvableException(userId, "user not found or has no email");
 
-        return EmailRecipient.FromVerifiedUser(user.Email!);
+        return EmailRecipient.FromVerifiedUser(email);
     }
 }

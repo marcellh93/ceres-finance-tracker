@@ -8,13 +8,13 @@ namespace ProjectCeres.Common.Email;
 /// and <see cref="OverrideForEmailChange"/> (server-resolved from
 /// <c>EmailChangeToken</c> — only the email-change flow uses this).
 /// </summary>
-public sealed class EmailRecipient
+public sealed record EmailRecipient
 {
     public string Address { get; }
 
     private EmailRecipient(string address) => Address = address;
 
-    /// <summary>Placeholder used by IEmailComposer before the resolver populates the To slot.</summary>
+    /// <summary>Placeholder used by IEmailComposer (Task 2) before the resolver populates the To slot.</summary>
     internal static readonly EmailRecipient None = new("");
 
     internal static EmailRecipient FromVerifiedUser(string email) => new(email);

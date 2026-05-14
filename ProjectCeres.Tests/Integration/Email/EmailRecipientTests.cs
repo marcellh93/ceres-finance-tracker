@@ -31,28 +31,52 @@ public sealed class EmailRecipientTests
         // to call OverrideForEmailChange. A new caller is either the email-change flow
         // (in which case rename or extend the factory + update this test) or a security
         // regression that must be reverted.
-        var asm = typeof(EmailRecipient).Assembly;
-        var override_ = typeof(EmailRecipient).GetMethod(
+        var factoryMethod = typeof(EmailRecipient).GetMethod(
             "OverrideForEmailChange",
             BindingFlags.Static | BindingFlags.NonPublic);
-        override_.Should().NotBeNull();
+        factoryMethod.Should().NotBeNull();
 
         // We grep the on-disk source rather than reflecting over IL: the IL doesn't carry
         // a stable indication of which type contains a call to an internal static method
         // without a full MethodBody walk, and this test is meant to be cheap.
-        var projectRoot = AppContext.BaseDirectory;
-        // Walk up until we find ProjectCeres/Common/Authentication/EmailChangeService.cs
-        var dir = new DirectoryInfo(projectRoot);
-        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "ProjectCeres", "Common", "Authentication")))
+        //
+        // Walk up from the test bin directory to the repository root (identified by
+        // ProjectCeres.sln) — matches ArchitectureTests.FindRepoRoot. Anchoring on the
+        // .sln file is robust under dotnet-test working-dir overrides.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "ProjectCeres.sln")))
             dir = dir.Parent;
-        dir.Should().NotBeNull("test must be able to locate the ProjectCeres source tree");
+        dir.Should().NotBeNull("test must be able to locate the repo root (ProjectCeres.sln)");
 
         var authDir = Path.Combine(dir!.FullName, "ProjectCeres", "Common", "Authentication");
+        Directory.Exists(authDir).Should().BeTrue("auth services directory must exist");
+
+        // Strip pure-comment lines before scanning so that xmldoc references such as
+        // `<see cref="EmailRecipient.OverrideForEmailChange"/>` in unrelated files do
+        // not produce a false positive — matches ArchitectureTests comment-strip rules.
         var matches = Directory.EnumerateFiles(authDir, "*.cs", SearchOption.TopDirectoryOnly)
-            .Where(f => File.ReadAllText(f).Contains("OverrideForEmailChange", StringComparison.Ordinal))
+            .Where(f => FileContainsCallSite(f, "OverrideForEmailChange"))
             .Select(Path.GetFileName)
             .ToList();
 
         matches.Should().BeEquivalentTo(new[] { "EmailChangeService.cs" });
+    }
+
+    /// <summary>
+    /// Returns true if any non-comment line in the file contains the given token.
+    /// Drops lines whose first non-whitespace characters are "//" (line comment) or
+    /// "*" (block-comment continuation / xmldoc).
+    /// </summary>
+    private static bool FileContainsCallSite(string path, string token)
+    {
+        foreach (var raw in File.ReadAllLines(path))
+        {
+            var line = raw.TrimStart();
+            if (line.StartsWith("//")) continue;        // line comment
+            if (line.StartsWith("*"))  continue;         // block comment / xmldoc continuation
+            if (line.Contains(token, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
     }
 }
