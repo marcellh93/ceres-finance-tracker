@@ -9,7 +9,7 @@
 
 ## Session state (last updated 2026-05-14, mid-stage)
 
-**Five of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.6.
+**Six of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.7.
 
 | # | Sub-stage | Status | Commit |
 |---|---|---|---|
@@ -17,11 +17,11 @@
 | 7.6.2 | `RlsPolicyViolationException` + `RlsExceptionTranslator` | ✅ Done | (commit landed; see `RlsPolicyViolationException` & `RlsExceptionTranslator` files) |
 | 7.6.3 | `AffectedRowCount` enforcement helper | ✅ Done | `07283f3` |
 | 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext` | ✅ Done | `fdbf960` |
-| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ✅ Done | (this commit; see `DbExceptionTranslator` + 3 typed exceptions + `AppDbContext` chain + `SettingsService` catch rewrite) |
-| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ❌ Pending — START HERE | — |
-| 7.6.7 | `UserContext` discriminated union (ADR-0073) | ❌ Pending | — |
+| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ✅ Done | `70f7eff` |
+| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ✅ Done | (this commit; see `Infrastructure/MigrationFixture.cs` + `AppContextFactory.cs` + `AdminContextFactory.cs` and the now-thin `TestDbFixture.cs`) |
+| 7.6.7 | `UserContext` discriminated union (ADR-0073) | ❌ Pending — START HERE | — |
 
-**Lessons baked in from the five shipped sub-stages** (read before starting 7.6.6):
+**Lessons baked in from the six shipped sub-stages** (read before starting 7.6.7):
 
 1. **7.6.2 mechanism correction.** The spec originally said `IDbCommandInterceptor.CommandFailed` for translating Postgres 42501. **That hook is observational only — it cannot replace the propagating exception**, and `ISaveChangesInterceptor.SaveChangesFailed` is the same. The shipped implementation overrides `SaveChanges` / `SaveChangesAsync` on `AppDbContext` and calls a static `RlsExceptionTranslator.TryTranslate(...)` helper in a `catch` block. Same pattern likely applies to 7.6.5's `DbExceptionTranslator` — plan accordingly.
 
@@ -57,6 +57,8 @@
    Unlike RLS 42501 (lesson #2) which leaves `TableName` empty for WITH CHECK violations and required regex parsing of `MessageText`, these three need no message-parsing fallback. The translator reads structured fields with a defensive `NullIfEmpty` guard so a future code path that emits these SqlStates without populating the structured fields still gets the typed exception (per Postgres protocol-docs warning that frontends should not assume field presence).
 
 8. **7.6.5 SettingsService catch-rewrite.** Wiring the translator into `AppDbContext.SaveChanges{Async}` re-throws 23505 as `UniqueConstraintViolationException` (which is `InvalidOperationException`, NOT `DbUpdateException`). One existing in-tree handler — `SettingsService.GetAsync` first-touch race — caught raw `DbUpdateException` and would have silently broken (the catch wouldn't match, the exception would surface to the caller, and the SPA's first request-after-login would 500). Generalizable rule: **before wiring an exception-translation layer, grep for every existing `catch (DbUpdateException ...)` AND any `Throw<DbUpdateException>()` test assertion in the affected SqlState space, and rewrite or update each in the same commit.** The grep here found exactly one site; result was a one-line catch-type swap.
+
+9. **7.6.6 fixture-split: thin coordinator pattern.** The original `TestDbFixture` had three responsibilities tangled (migration, app-context construction, admin-context construction). Splitting them into single-responsibility helpers under `Infrastructure/` (`MigrationFixture`, `AppContextFactory`, `AdminContextFactory`) was tempting to do as a "rename and move" — but the public surface of `TestDbFixture` is referenced by 26 test files plus 4 fixture-internal callers (`SettingsServiceTests`, `PrivilegeLeakStartupCheckTests`, `Rls/RlsTestFixture`, `Rls/Group4_BackstopTests` for the connection-string constants). Cleanest path: keep `TestDbFixture`'s public surface 100% unchanged and turn it into a thin coordinator that delegates to the new helpers. Connection-string constants and `SentinelUserId` stay on `TestDbFixture` (`internal` so the new factories can read them) because they're the de-facto public registry. Result: zero call-site churn, full suite green at 1036/1036 with no test changes.
 
 ---
 
