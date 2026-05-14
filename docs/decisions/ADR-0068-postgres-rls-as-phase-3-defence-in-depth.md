@@ -11,6 +11,20 @@
 
 ADR-0065 itself is **not** superseded — its core decision (Option B: global query filters + explicit redundancy + admin-only bypass) remains accepted. Only the line that defers RLS to Phase 4 is overridden.
 
+## Implementation note (added 2026-05-14 at Stage 7.5 close-out)
+
+Stage 7.5 shipped on 2026-05-14. The decision (RLS in Phase 3, three-role separation, parity test) stands. **Two mechanism choices in this ADR were corrected during implementation** — captured here rather than in a new ADR because the corrections are at the implementation level, not the decision level:
+
+1. **Component 2 below says "per-command `IDbCommandInterceptor` issuing `SET LOCAL`".** That mechanism is unsafe for this codebase. EF Core 7+ bulk operations (`ExecuteDeleteAsync`, `ExecuteUpdateAsync`) do not open an EF transaction by default — and `SET LOCAL` outside an active transaction is a no-op per Postgres. Production paths using bulk ops (`LockoutUnlockService`, `EmailChangeService`, `MfaBackupCodeService`, `TotpReplayGuard`, `UserBlockedIpMiddleware` — 10+ call sites) would silently bypass the GUC and run with the policy filtering all rows. As shipped, the interceptor is a `DbConnectionInterceptor.ConnectionOpenedAsync` hook issuing `SELECT set_config('app.current_user_ref', '<uuid>', false)` once per pooled-connection acquisition. The Npgsql default `DISCARD ALL` reset clears the GUC when the connection returns to the pool; the interceptor also issues an explicit `RESET` on `Guid.Empty` as belt-and-braces if any future deployment sets `No Reset On Close=true` (required for pgBouncer transaction mode). See [npgsql/efcore.pg #2412](https://github.com/npgsql/efcore.pg/issues/2412) and [Npgsql #4889](https://github.com/npgsql/npgsql/issues/4889) for the upstream evidence.
+
+2. **Component 2 also says "if `ICurrentUserAccessor` cannot resolve a user, the interceptor throws".** As amended at Stage 7 Task 9 (and now re-amended here), `ICurrentUserAccessor` returns `Guid.Empty` as the safe default rather than throwing, because EF Core eagerly evaluates expressions at model-creation time before any HTTP context is established. The Stage 7.5 interceptor therefore never throws on `Guid.Empty`; it issues `RESET` + a warning log if the call site is not tagged pre-auth. The doorway refusal for background jobs lives in `IBackgroundJobScope.RunAsync` (new in Stage 7.5 Commit 6), which DOES throw `InvalidOperationException` on `Guid.Empty` before invoking the work delegate — that's the right enforcement point because background jobs always have a known user before they enter the scope, unlike pre-auth HTTP requests.
+
+3. **Component 3 below lists `CsvImportProfile` and `SupportTicket` among the protected tables.** The actual class name is `ImportProfile` (the filename `CsvImportProfile.cs` is historical); the migration uses the correct C# class + Postgres table name `ImportProfiles`. `SupportTicket` does not exist yet — Stage 12 ships the table and at that point must append `SupportTickets` to `UserOwnedTables.All` in the same migration that creates the table. The Stage 7.5 parity test will otherwise fail the build.
+
+4. **Component 3's policy SQL needed `NULLIF(current_setting(...), '')` around the GUC read.** Postgres's documented limitation: `DISCARD ALL` resets custom-namespace GUCs to their boot value, which for a custom GUC like `app.current_user_ref` is **empty string, not NULL**. Without `NULLIF`, every pooled-connection reuse would raise `22P02 invalid input syntax for type uuid: ""` when the policy casts the empty string to uuid. With `NULLIF(..., '')` the empty string collapses to NULL, the cast yields NULL, the comparison evaluates to false, and the policy fails closed.
+
+Everything else in this ADR (the decision, the rationale, the three-role separation, the parity test, the per-table integration suite, the Phase-3 timing) shipped as written. See `docs/roadmap-phase-three.md` § Stage 7.5 and `docs/planning-resolved.md` for the close-out narrative.
+
 ## Context
 
 Phase 3 ships multi-tenancy via EF Core global query filters (ADR-0065). The defence stack at Phase 3 launch — as originally specified — was:

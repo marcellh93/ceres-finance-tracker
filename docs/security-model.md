@@ -247,7 +247,7 @@ IDOR prevention applies equally to list endpoints (GET /api/v1/transactions, GET
 
 **Integration test requirement:** for every list endpoint, there must be a test that: (1) creates records belonging to User A and User B, (2) authenticates as User A, (3) calls the list endpoint, and (4) asserts the response contains only User A's records.
 
-### PostgreSQL Row-Level Security (Defense in Depth — Phase 3, Stage 7.5)
+### PostgreSQL Row-Level Security (Defense in Depth — Phase 3, Stage 7.5 — built 2026-05-14)
 
 RLS ships in Phase 3, immediately after the Stage 7 multi-tenancy cutover. It catches the one failure mode the EF global-query-filter stack does not: raw SQL (e.g. `FromSqlRaw`) against user-owned tables without an explicit `WHERE UserId = @currentUser` clause. RLS was originally deferred to Phase 4 by ADR-0065 — that deferral was overturned by [ADR-0068](decisions/ADR-0068-postgres-rls-as-phase-3-defence-in-depth.md) on 2026-05-09.
 
@@ -257,17 +257,23 @@ Enable RLS on every user-owned table with both `USING` and `WITH CHECK` policies
 ALTER TABLE "Transactions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Transactions" FORCE ROW LEVEL SECURITY;  -- applies even to table owners
 CREATE POLICY user_isolation ON "Transactions"
-  USING ("UserId" = current_setting('app.current_user_ref')::uuid)
-  WITH CHECK ("UserId" = current_setting('app.current_user_ref')::uuid);
+  USING ("UserId" = NULLIF(current_setting('app.current_user_ref', true), '')::uuid)
+  WITH CHECK ("UserId" = NULLIF(current_setting('app.current_user_ref', true), '')::uuid);
 ```
 
-The application sets `app.current_user_ref` per command via an `IDbCommandInterceptor` issuing `SET LOCAL` against the same connection inside the same transaction. `SET LOCAL` is transaction-scoped — safe with Npgsql connection pooling because it does not leak across transactions.
+The `NULLIF(..., '')` guard handles a Postgres quirk: `DISCARD ALL` (Npgsql's default reset on pooled-connection return) resets custom GUCs to their boot value, which for a custom-namespace GUC is empty string — not NULL. Without `NULLIF`, the `::uuid` cast raises `22P02 invalid input syntax for type uuid: ""` on every pooled-connection reuse. With it, both unset (NULL) and reset-to-empty collapse to NULL; the policy then evaluates to false / fails closed.
+
+The application sets `app.current_user_ref` once per database connection acquisition via a `DbConnectionInterceptor.ConnectionOpenedAsync` hook that issues `SELECT set_config('app.current_user_ref', '<uuid>', false)` (session scope, not local). **Connection-open scope is mandatory, not per-command.** EF Core 7+ bulk operations (`ExecuteDeleteAsync`, `ExecuteUpdateAsync`) do not open an explicit EF transaction by default — `SET LOCAL` outside a transaction is a NOTICE and a no-op, so a per-command interceptor would silently bypass the GUC on every token-consumption update, MFA cleanup, and IP-block revocation in production. Connection-open scope fires before any command (bulk or otherwise) runs. The leak surface that connection-open scope opens up — a pooled connection retaining the GUC across handouts — is closed by Npgsql's default `DISCARD ALL` reset, plus a defensive `RESET "app.current_user_ref"` issued by the interceptor whenever `ICurrentUserAccessor.UserId == Guid.Empty` (belt-and-braces against any future `No Reset On Close=true` deployment).
 
 Three Postgres roles back this:
 
 - `ceres_app` — application runtime; RLS policies apply.
 - `ceres_admin` — Admin services + `IUserJobRunner` cross-tenant background jobs (ADR-0067); has `BYPASSRLS`. Selected via a separate connection string + DI scope; the `Admin/` architecture test enforces that no non-admin code path reaches this connection.
 - `ceres_migrator` — DDL + `BYPASSRLS`; only `dotnet ef database update` uses it.
+
+Setup script `scripts/setup-postgres-roles.sql` is idempotent and creates the three roles + default-privilege grants + a one-time ownership reassignment of legacy public-schema tables to `ceres_migrator`. A privilege-leak startup check in `Program.cs` refuses to start if the runtime `ApplicationConnection` can issue DDL (CREATE TABLE → expects 42501; if it succeeds, the connection string is wired to a privileged role and the app exits).
+
+Background-job entry points route through `IBackgroundJobScope.RunAsync(userId, jobName, work)` rather than calling `IUserScope.EnterAs` directly. The wrapper refuses `Guid.Empty` with `LogError` + `InvalidOperationException` before invoking the work delegate. An architecture test in `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs` pins that `.EnterAs(` only appears in `BackgroundJobScope.cs` — every other background path must inherit the doorway refusal.
 
 RLS remains a secondary control — application-layer IDOR prevention via EF global query filters + explicit `.Where(t => t.UserId == _currentUser.UserId)` redundancy + the IDOR integration test suite is still primary. RLS is not a substitute for correct `WHERE UserId = ?` clauses; it is the last layer that catches the cases primary controls miss.
 

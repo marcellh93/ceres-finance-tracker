@@ -415,6 +415,7 @@ The actual file is saved to the filesystem — only the reference lives in the d
 |---------------|----------|--------------|------------------------------------------------------------|
 | Id            | uuid     | PK           |                                                            |
 | TransactionId | uuid     | FK, NOT NULL | → Transaction                                              |
+| UserId        | uuid     | FK, NOT NULL, indexed | → AspNetUsers. Added Stage 7.5 (2026-05-14) for Postgres Row-Level Security — backfilled from the parent Transaction. `IUserOwned` so the EF global query filter + RLS `user_isolation` policy apply to the attachment row directly, not just via parent FK. |
 | FileName      | varchar  | NOT NULL     | Original filename as uploaded (e.g. "receipt.pdf")        |
 | StoredPath    | varchar  | NOT NULL     | Path used to locate the file. Phase 1/2: absolute filesystem path. Phase 3+: cloud storage URL or blob key — provider TBD, see open question in planning.md |
 | ContentType   | varchar  | NOT NULL     | MIME type (e.g. "application/pdf", "image/jpeg")           |
@@ -902,7 +903,7 @@ to entity sections above when implemented or in the entity sections below for St
 ### TransferAttachment (new entity — Phase 2)
 
 Mirrors `TransactionAttachment` with `TransferId` FK instead of `TransactionId`.
-Hard delete with confirmation. See ADR-0042.
+Hard delete with confirmation. See ADR-0042. Also gains a `UserId uuid NOT NULL` column in Stage 7.5 (2026-05-14) — backfilled from the parent Transfer, `IUserOwned`, and covered by the same Postgres RLS `user_isolation` policy that protects all other user-owned tables.
 
 ### ImportProfile (new entity — Phase 2)
 

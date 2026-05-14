@@ -697,70 +697,84 @@ IDOR integration test suite (per `multi-tenancy-strategy.md` § Required Integra
 
 ## Stage 7.5 — PostgreSQL Row-Level Security (Batch 3c continued)
 
-**Status: ❌ Pending.** Closes the named gap left by Stage 7 (raw SQL bypasses EF query filters). Ships immediately after Stage 7 so the schema already contains real `AspNetUsers.Id` values when policies turn on. See [ADR-0068](decisions/ADR-0068-postgres-rls-as-phase-3-defence-in-depth.md) for the full rationale (this stage was originally deferred to Phase 4 by ADR-0065 and superseded on 2026-05-09).
+**Status: ✅ Done (2026-05-14).** Closes the named gap left by Stage 7 (raw SQL bypasses EF query filters). Shipped immediately after Stage 7 so policies turn on against a schema that already holds real `AspNetUsers.Id` values from the sentinel-to-real-user remap. See [ADR-0068](decisions/ADR-0068-postgres-rls-as-phase-3-defence-in-depth.md) for the full rationale (this stage was originally deferred to Phase 4 by ADR-0065 and superseded on 2026-05-09). 1009/1009 tests green at close-out.
 
-> **Goal:** PostgreSQL Row-Level Security is enabled on every user-owned table with both `USING` and `WITH CHECK` policies tied to `current_setting('app.current_user_ref')`; an EF `IDbCommandInterceptor` sets that GUC per command from `ICurrentUserAccessor`; a separate Postgres role with `BYPASSRLS` backs Admin services and `IUserJobRunner` cross-tenant jobs; integration tests prove RLS catches `FromSqlRaw` bypass attempts and `IgnoreQueryFilters()` mistakes.
+> **Goal (achieved):** PostgreSQL Row-Level Security is enabled on every user-owned table with both `USING` and `WITH CHECK` policies tied to `current_setting('app.current_user_ref', true)`; a `DbConnectionInterceptor.ConnectionOpenedAsync` hook sets that GUC from `ICurrentUserAccessor` on every connection open; a separate Postgres role with `BYPASSRLS` backs Admin services and `IUserJobRunner` cross-tenant jobs; integration tests prove RLS catches `FromSqlRaw` bypass attempts and `IgnoreQueryFilters()` mistakes.
 
-### Sub-stages
+### Mechanism correction (built differently than the spec)
 
-| # | Sub-stage | Spec / Reference |
+The spec ([`docs/superpowers/specs/2026-05-13-stage-7-5-postgres-rls-design.md`](superpowers/specs/2026-05-13-stage-7-5-postgres-rls-design.md) § 2.2) prescribed a per-command `IDbCommandInterceptor` issuing `SET LOCAL` inside the EF command's transaction. **That mechanism is unsafe for this codebase** and was replaced during implementation by a `DbConnectionInterceptor.ConnectionOpenedAsync` hook issuing `SELECT set_config('app.current_user_ref', '<uuid>', false)` (session scope) once per pooled-connection acquisition. Reasons:
+
+1. EF Core 7+ bulk operations (`ExecuteDeleteAsync`, `ExecuteUpdateAsync`) do not open an EF transaction by default. `SET LOCAL` outside a transaction is a NOTICE and a no-op. The runtime uses bulk operations in 10+ production paths (`LockoutUnlockService`, `EmailChangeService`, `MfaBackupCodeService`, `TotpReplayGuard`, `UserBlockedIpMiddleware`) — every one would have silently bypassed the GUC and run with the policy filtering all rows. See Npgsql/efcore.pg [#2412](https://github.com/npgsql/efcore.pg/issues/2412) and [#4889](https://github.com/npgsql/npgsql/issues/4889).
+2. The prepend-to-`CommandText` pattern broke EF's optimistic-concurrency reads on writes — Npgsql returned the prepended `SET`'s rows-affected (0) to EF as if it belonged to the INSERT/UPDATE, raising `DbUpdateConcurrencyException` on every write.
+
+The connection-open variant relies on Npgsql's default `DISCARD ALL` reset to clear the GUC when a connection returns to the pool. As belt-and-braces, the interceptor explicitly issues `RESET "app.current_user_ref"` when `ICurrentUserAccessor.UserId == Guid.Empty` — so the property holds even if a deployment ever disables Npgsql's reset (required for pgBouncer transaction mode). The policy SQL uses `NULLIF(current_setting(...), '')::uuid` because `DISCARD ALL` resets custom-namespace GUCs to empty string (not NULL) per Postgres's documented limitation; without `NULLIF` every pooled-connection reuse would raise `22P02`.
+
+### Sub-stages (commits)
+
+| # | Sub-stage | Commit |
 |---|---|---|
-| 7.5.1 | Postgres roles: `ceres_app`, `ceres_admin` (BYPASSRLS), `ceres_migrator` (BYPASSRLS + DDL) | ADR-0068 § Decision (1) + `security-model.md` § Database Credentials |
-| 7.5.2 | `RowLevelSecurityInterceptor : IDbCommandInterceptor` issues `SET LOCAL "app.current_user_ref"` per command | ADR-0068 § Decision (2) |
-| 7.5.3 | DI: two `DbContext` configurations (app vs admin connection) selected by HTTP context vs `IUserScope.EnterAs` | ADR-0067 + ADR-0068 § Decision (1) |
-| 7.5.4 | Migration `AddRowLevelSecurityPolicies` enables RLS + FORCE RLS + adds `user_isolation` policy on every user-owned table | ADR-0068 § Decision (3) |
-| 7.5.5 | Per-table integration tests: `FromSqlRaw` bypass, `WITH CHECK` insert blocked, admin role sees all rows, `IUserScope.EnterAs` honours scope | ADR-0068 § Decision (5) |
-| 7.5.6 | Architecture test: every user-owned entity has both an EF `HasQueryFilter` registration AND a corresponding RLS policy in the latest migration | New — enforces parity between layers |
+| 7.5.1 | Postgres roles: `ceres_app`, `ceres_admin` (BYPASSRLS), `ceres_migrator` (BYPASSRLS + DDL); `scripts/setup-postgres-roles.sql` + README setup section | `f3f6ead` |
+| 7.5.2 | `RowLevelSecurityInterceptor : DbConnectionInterceptor` + `IPreAuthCallSiteTagger`, code-only (no DI yet) | `27141ef` |
+| 7.5.3 | DI split: three connection strings + `AdminDbContext` subclass + interceptor wired on `AppDbContext` only | `2a47eb8` |
+| 7.5.4 | Privilege-leak startup check refuses DDL-capable runtime role | `e7290b2` |
+| 7.5.5 | The wall — `UserOwnedTables.cs` source-of-truth + `IUserOwned` promotion of attachment tables + `AddRowLevelSecurityPolicies` migration + 15-test RLS integration suite | `d4a803e` |
+| 7.5.6 | `BackgroundJobScope` doorway refusal + architecture test pinning `.EnterAs(` to `BackgroundJobScope.cs` only | `c2795a5` |
+| 7.5.7 | Doc sync + roadmap close-out | this commit |
 
 ### Verification checklist
 
 Postgres roles + connection strings:
 
-- [ ] Three roles exist in production-equivalent local Postgres: `ceres_app`, `ceres_admin`, `ceres_migrator`
-- [ ] `ceres_app` has DML rights, no DDL, **no** `BYPASSRLS`
-- [ ] `ceres_admin` has DML rights, no DDL, **has** `BYPASSRLS`
-- [ ] `ceres_migrator` has DDL rights, has `BYPASSRLS`, used only by `dotnet ef database update`
-- [ ] Three connection strings configured: `Postgres__ApplicationConnection`, `Postgres__AdminConnection`, `Postgres__MigrationConnection`
-- [ ] DI container resolves the correct `DbContext` based on whether the request is in `Admin/` namespace or under an `IUserScope` admin-context override
+- [x] Three roles exist in production-equivalent local Postgres: `ceres_app`, `ceres_admin`, `ceres_migrator` *(both `project_ceres` and `project_ceres_test`, verified by `pg_roles` query)*
+- [x] `ceres_app` has DML rights, no DDL, **no** `BYPASSRLS` *(privilege-leak startup check verifies; `PrivilegeLeakStartupCheckTests` covers in tests)*
+- [x] `ceres_admin` has DML rights, no DDL, **has** `BYPASSRLS`
+- [x] `ceres_migrator` has DDL rights, has `BYPASSRLS`, used only by `dotnet ef database update`
+- [x] Three connection strings configured: `ConnectionStrings:ApplicationConnection`, `ConnectionStrings:AdminConnection`, `ConnectionStrings:MigrationConnection`
+- [x] DI container resolves `AppDbContext` from `ApplicationConnection` and `AdminDbContext` from `AdminConnection` *(`DbContextRegistrationTests`)*
 
 `RowLevelSecurityInterceptor`:
 
-- [ ] Implements `IDbCommandInterceptor` (`ScalarExecuting`, `ReaderExecuting`, `NonQueryExecuting`)
-- [ ] Reads current `UserId` from `ICurrentUserAccessor`
-- [ ] Issues `SET LOCAL "app.current_user_ref" = '<uuid>'` against the same connection inside the same transaction, immediately before the EF command runs
-- [ ] Throws if `ICurrentUserAccessor` cannot resolve a user (matches existing accessor contract)
-- [ ] Skipped (does not run `SET LOCAL`) when the active `DbContext` is the admin-connection variant — admin role uses `BYPASSRLS` instead
-- [ ] Integration test: `SET LOCAL` does not leak across transactions when Npgsql pooling reuses the underlying connection
+- [x] Implements `DbConnectionInterceptor.ConnectionOpened` + `ConnectionOpenedAsync` *(spec § 2.2 said `IDbCommandInterceptor`; mechanism corrected during implementation — see "Mechanism correction" above)*
+- [x] Reads current `UserId` from `ICurrentUserAccessor`
+- [x] Issues `SELECT set_config('app.current_user_ref', '<uuid>', false)` immediately after the connection opens
+- [x] On `Guid.Empty`: issues `RESET "app.current_user_ref"` (belt-and-braces against `No Reset On Close`); logs a warning if the call site is not tagged pre-auth; never throws
+- [x] Not registered on `AdminDbContext` (the admin role bypasses RLS at the database level)
+- [x] GUC does not leak across pooled-connection reuse *(Group 4 test `GUC_does_not_leak_across_pooled_connections`)*
 
 RLS policies on every user-owned table:
 
-- [ ] `Transaction`, `Transfer`, `LiabilityPayment`, `Account`, `Category`, `CategoryBudget`, `Budget`, `RecurringTransaction`, `TransactionAttachment`, `SavedReport`, `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, `Settings`, `SupportTicket`, `AuditLog`, `CsvImportProfile`, `ImportStagedTransaction`, `ImportStagedTransfer`, `ImportTransferExclusion` all have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`
-- [ ] Each user-owned table has a `user_isolation` policy with both `USING ("UserId" = current_setting('app.current_user_ref')::uuid)` and `WITH CHECK (...)` clauses
-- [ ] System tables (`AccountType`, `CategoryType`, `Currency`, `ReportType`, `SystemCategory`) have **no** RLS — verified by SQL query against `pg_policies`
-- [ ] Admin tables that are intentionally cross-tenant (e.g. failed-login log if scoped this way) are documented and intentionally excluded
+- [x] All 24 tables listed in `UserOwnedTables.All` (`Accounts`, `Budgets`, `Categories`, `CategoryBudgets`, `ImportProfiles`, `ImportStagedTransactions`, `ImportStagedTransfers`, `ImportTransferExclusions`, `RecurringTransactions`, `SavedReports`, `Settings`, `Transactions`, `Transfers`, `LiabilityPayments`, `TransactionAttachments`, `TransferAttachments`, `UserSessions`, `UserBlockedIps`, `UserMfaBackupCodes`, `TotpReplayEntries`, `PasswordResetTokens`, `EmailChangeTokens`, `LockoutUnlockTokens`, `AuditLogs`) have `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` *(`ParityTests.Every_user_owned_table_has_FORCE_RLS_enabled`)*
+- [x] Each user-owned table has a `user_isolation` policy with both `USING ("UserId" = NULLIF(current_setting('app.current_user_ref', true), '')::uuid)` and `WITH CHECK (...)` clauses *(`ParityTests.UserOwnedTables_All_matches_pg_policies_user_isolation_set`)*
+- [x] System tables (`AccountTypes`, `CategoryTypes`, `Currencies`, `ReportTypes`, `AspNetUsers` et al., `__EFMigrationsHistory`) have **no** RLS *(`ParityTests.System_tables_have_no_user_isolation_policy`)*
+- [ ] **Deferred to Stage 12.** When the `SupportTicket` table ships, the same migration must add a `user_isolation` policy and append `SupportTickets` to `UserOwnedTables.All`. The parity test will fail the build until this happens.
 
-Per-table integration tests (one suite per user-owned entity):
+Per-table integration tests (representative table per archetype + parameterized parity):
 
-- [ ] `FromSqlRaw("SELECT * FROM \"Transactions\"")` under User B's context returns **only** User B's rows (proves RLS catches EF-bypass)
-- [ ] `INSERT` of a row with a foreign `UserId` raises Postgres `42501` permission denied
-- [ ] `UPDATE` that would change `UserId` to a foreign value raises `42501`
-- [ ] `DELETE` against a foreign-`UserId` row affects 0 rows
-- [ ] Admin services using `ceres_admin` connection + `IgnoreQueryFilters()` return all rows (proves `BYPASSRLS` works)
-- [ ] Background job entered via `IUserScope.EnterAs(targetUserId)` sees **only** that user's rows on `ceres_app` (proves interceptor honours background scope)
-- [ ] User A cannot read User B's row even via `FromSqlRaw` with an explicit `WHERE "Id" = @bs_id` clause (final IDOR catch)
+- [x] Group 1 — `FromSqlRaw` bypass returns 0 foreign rows (`Accounts`, `UserSessions`, `AuditLogs`); parity test ensures the same property holds for every other user-owned table by construction
+- [x] Group 2 — `INSERT` with foreign `UserId` raises Postgres `42501` (`Accounts`, `UserSessions`); `UPDATE` to foreign `UserId` raises `42501` (`Accounts`); `DELETE` against foreign-`UserId` row affects 0 rows (`Accounts`)
+- [x] Group 3 — `AdminDbContext` with `IgnoreQueryFilters` returns rows from all users; `AppDbContext` under user A does NOT see B's rows even with `IgnoreQueryFilters()` *(RLS is the wall the EF filter can't lift)*
+- [x] Group 4 — interceptor warns on `Guid.Empty` outside pre-auth; no warning on pre-auth; GUC does not leak across pooled connections
 
 Architecture tests:
 
-- [ ] Every user-owned entity registered in `ApplicationDbContext.OnModelCreating` with `HasQueryFilter` has a corresponding RLS policy in the latest migration (parity test — fails the build if a new entity ships without RLS)
-- [ ] Outside the Admin namespace and `IUserScope` infrastructure, no code references `Postgres__AdminConnection` directly
-- [ ] `IUserScope.EnterAs` callers always wrap the call in a `using` block (no leaked scopes) — Roslyn or syntax-tree scan covering `ProjectCeres/**/*.cs`. *(Moved here from Stage 7 close-out 2026-05-12: Stage 7 Task 10's allow-list test scans for `IgnoreQueryFilters(` but does not assert `using`-statement enclosure around `EnterAs`. Receiving this rule fits Stage 7.5 because it also adds the `IDbCommandInterceptor` that sets `SET LOCAL` per-scope — a leaked `EnterAs` would mean a leaked DB-side user context too, making the rule load-bearing for the RLS layer.)*
+- [x] `UserOwnedTables.All` ↔ `pg_policies` parity (`ParityTests.UserOwnedTables_All_matches_pg_policies_user_isolation_set`)
+- [x] `RowLevelSecurityInterceptor` registered only on `AppDbContext`, not `AdminDbContext` (`DbContextRegistrationTests.RowLevelSecurityInterceptor_is_registered_only_on_AppDbContext`)
+- [x] `.EnterAs(` called only from `BackgroundJobScope.cs` (`ArchitectureTests.EnterAs_only_called_inside_BackgroundJobScope`)
+- [x] `IgnoreQueryFilters()` allow-list still pins documented exception paths (`ArchitectureTests.IgnoreQueryFilters_only_appears_in_documented_exception_paths`, intact from Stage 7)
 
 Operational:
 
-- [ ] Local-dev seed script creates all three roles
-- [ ] Production deployment guide updated to require all three roles + their connection strings
-- [ ] `dotnet ef database update` runs as `ceres_migrator` in production runbook
-- [ ] Application startup fails fast if it can connect as `ceres_migrator` (privilege-leak detection)
+- [x] Local-dev seed script `scripts/setup-postgres-roles.sql` creates all three roles; idempotent
+- [x] README's Setup section documents the `psql -f` invocation against both databases + the env-var password override for production
+- [x] `dotnet ef database update --connection <MigrationConnection>` runs as `ceres_migrator` (verified locally on both `project_ceres` and `project_ceres_test`)
+- [x] Application startup fails fast if `ApplicationConnection` is wired to a role with DDL rights (privilege-leak startup check; gated on `Stage75:SkipPrivilegeLeakCheck` for WAF tests only)
+- [ ] **Deferred to Stage 16.** Production database setup must create `ceres_app`, `ceres_admin`, `ceres_migrator` per Stage 7.5; only `ceres_app` and `ceres_admin` credentials are deployed with the application; `ceres_migrator` credentials are held by the deploy operator and used only when applying migrations. The Stage 16 hosting runbook needs this note baked in.
+
+Follow-ups recorded for future stages:
+
+- **Stage 12 — `SupportTicket` table.** When the table ships, append `SupportTickets` to `UserOwnedTables.All` in the same migration that creates the table. The Stage 7.5 parity test will otherwise fail the build.
+- **Stage 16 — production runbook.** Per the operational checklist item above.
 
 ---
 
@@ -1244,6 +1258,7 @@ Operational:
 | 12.4 | `/support` SPA page (ticket form + list) | `planning-phase3.md` § Support ticket system |
 | 12.5 | `SupportTicket` entity + service + API endpoints (if not already present) | (above) |
 | 12.6 | Admin email notification on new ticket | (above) |
+| 12.7 | **Stage 7.5 follow-up.** When the `SupportTicket` table ships, append `SupportTickets` to `ProjectCeres/Common/UserOwnedTables.cs § All` AND add an `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + `user_isolation` policy to the same migration. The Stage 7.5 parity test (`ProjectCeres.Tests/Integration/Rls/ParityTests.UserOwnedTables_All_matches_pg_policies_user_isolation_set`) will fail the build until both halves land. | Stage 7.5 / ADR-0068 |
 
 ### Verification checklist
 
@@ -1510,6 +1525,7 @@ Cache headers:
 | 16.12 | Monitoring + alerting (uptime, error rate, certificate expiry) | (operational) |
 | 16.13 | Container / runtime hardening | `security-model.md` § Container / Runtime Hardening |
 | 16.14 | Data Protection key persistence + rotation | `security-model.md` § TOTP Secrets + § Secrets Rotation Procedures + Stage 6 carry-forward |
+| 16.15 | **Stage 7.5 follow-up.** Production database setup creates `ceres_app`, `ceres_admin`, `ceres_migrator` per `scripts/setup-postgres-roles.sql`. Only `ceres_app` (NOBYPASSRLS) and `ceres_admin` (BYPASSRLS) credentials are deployed with the application; `ceres_migrator` (DDL + BYPASSRLS) credentials are held by the deploy operator and used only when applying migrations. The privilege-leak startup check in `Program.cs` refuses to start if the runtime `ApplicationConnection` is wired to a privileged role — confirm it fires correctly under the production deployment configuration. | Stage 7.5 / ADR-0068 |
 
 ### Verification checklist
 
