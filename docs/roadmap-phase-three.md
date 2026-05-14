@@ -25,17 +25,18 @@
 7. [Stage 6 — Identity infrastructure (Batch 3b)](#stage-6--identity-infrastructure-batch-3b)
 8. [Stage 7 — Multi-tenancy cutover (Batch 3c)](#stage-7--multi-tenancy-cutover-batch-3c)
 9. [Stage 7.5 — PostgreSQL Row-Level Security (Batch 3c continued)](#stage-75--postgresql-row-level-security-batch-3c-continued)
-10. [Stage 8 — Email service + email security (Batch 3d)](#stage-8--email-service--email-security-batch-3d)
-11. [Stage 9 — Auth SPA pages (Batch 3e)](#stage-9--auth-spa-pages-batch-3e)
-12. [Stage 10 — Onboarding wizard (Batch 3f)](#stage-10--onboarding-wizard-batch-3f)
-13. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
-14. [Stage 11.5 — Import sandbox + admin tooling (Batch 4)](#stage-115--import-sandbox--admin-tooling-batch-4)
-15. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
-16. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
-17. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
-18. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
-19. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
-20. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
+10. [Stage 7.6 — Error legibility + OCP cleanup (Batch 3c continued)](#stage-76--error-legibility--ocp-cleanup-batch-3c-continued)
+11. [Stage 8 — Email service + email security (Batch 3d)](#stage-8--email-service--email-security-batch-3d)
+12. [Stage 9 — Auth SPA pages (Batch 3e)](#stage-9--auth-spa-pages-batch-3e)
+13. [Stage 10 — Onboarding wizard (Batch 3f)](#stage-10--onboarding-wizard-batch-3f)
+14. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
+15. [Stage 11.5 — Import sandbox + admin tooling (Batch 4)](#stage-115--import-sandbox--admin-tooling-batch-4)
+16. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
+17. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
+18. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
+19. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
+20. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
+21. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
 
 ---
 
@@ -775,6 +776,69 @@ Follow-ups recorded for future stages:
 
 - **Stage 12 — `SupportTicket` table.** When the table ships, append `SupportTickets` to `UserOwnedTables.All` in the same migration that creates the table. The Stage 7.5 parity test will otherwise fail the build.
 - **Stage 16 — production runbook.** Per the operational checklist item above.
+- **Stage 7.6 — error legibility + OCP cleanup.** Stage 7.5 surfaced several diagnostic gaps (silent zero-row failures, stringly-typed pre-auth registry, hand-written `HasQueryFilter` registrations duplicating `UserOwnedTables.All`). Stage 7.6 closes them before Stage 8 begins so the cleanup lands while RLS is fresh in the codebase. See § Stage 7.6 below.
+
+---
+
+## Stage 7.6 — Error legibility + OCP cleanup (Batch 3c continued)
+
+**Status: ❌ Pending.** Closes seven diagnostic + OCP gaps surfaced during Stage 7.5. Infrastructure-only — no user-facing behaviour changes, no schema changes. Lands before Stage 8 so the cleanups apply while the RLS pattern is fresh.
+
+> **Goal:** every test failure shows the production stack trace on first run; every silent-zero-row failure mode is converted to a loud exception; `UserOwnedTables.All` becomes the single source of truth for the EF filter registration; the four meanings of `Guid.Empty` are replaced by a typed `UserContext` discriminated union.
+
+Authority for sub-stage 7.6.7 (the `UserContext` rewrite): [ADR-0073](decisions/ADR-0073-user-context-as-discriminated-union.md).
+
+Brainstorm spec: [`docs/superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md`](superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md).
+
+### Sub-stages
+
+| # | Sub-stage | Effort | Spec § |
+|---|---|---|---|
+| 7.6.1 | WAF test-mode returns exception bodies — `app.UseExceptionHandler` writes the full exception text to the response body inside the WAF; no more "InternalServerError" with no stack. | ~50 LOC | § 2.1 |
+| 7.6.2 | `RlsPolicyViolationException` wrapping `SqlState 42501` on user-owned tables — typed exception carrying `TableName`, `AttemptedUserId`, `GucUserId`. | ~110 LOC | § 2.2 |
+| 7.6.3 | `AffectedRowCount` enforcement helper — `ExecuteUpdateExactlyAsync` / `ExecuteDeleteExactlyAsync` throw `AffectedRowCountMismatchException` when row count != expected. Migrates 8 production call sites with exactly-one-row semantics. | ~145 LOC | § 2.3 |
+| 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext.OnModelCreating` — replaces 22 hand-written `HasQueryFilter` registrations with a loop. | ~25 LOC | § 2.4 |
+| 7.6.5 | `DbExceptionTranslator` mapping SqlState codes (23505, 23503, 23502) to typed exceptions. | ~150 LOC | § 2.5 |
+| 7.6.6 | Split `TestDbFixture` into three single-responsibility fixtures: `MigrationFixture`, `AppContextFactory`, `AdminContextFactory`. | ~90 LOC | § 2.6 |
+| 7.6.7 | `UserContext` discriminated union + `[PreAuthCallSite]` attribute + `UserContextRequiredException`. Deletes `IPreAuthCallSiteTagger`. ADR-0073 is the design record. | ~200 LOC | § 2.7 |
+
+### Verification checklist
+
+Diagnostic improvements:
+
+- [ ] WAF integration test failures show the full server-side exception body. Verified by a deliberate-throw probe test.
+- [ ] `RlsPolicyViolationException` is thrown (not `PostgresException`) when a write hits a user-owned table under the wrong user.
+- [ ] `AffectedRowCountMismatchException` fires when a `ExecuteUpdateExactlyAsync` or `ExecuteDeleteExactlyAsync` call affects 0 rows where 1 was expected.
+- [ ] `UniqueConstraintViolationException` / `ForeignKeyViolationException` / `NullConstraintViolationException` are thrown (not generic `DbUpdateException`) for the three documented `SqlState` codes.
+- [ ] `BackgroundJobScope.RunAsync` exception message names the rejected `UserContext` case.
+- [ ] `UserContextRequiredException` is thrown by `_currentUser.Require()` when the context is not `Resolved`.
+
+OCP improvements:
+
+- [ ] `AppDbContext.OnModelCreating` references `UserOwnedTables.All` and contains no hand-written `HasQueryFilter` registrations except `Movement` (TPC root).
+- [ ] Adding a new user-owned entity is one append to `UserOwnedTables.All`. The Stage 7.5 parity test still catches RLS-policy drift.
+
+Architecture tests:
+
+- [ ] `IUserScope.EnterAs` allow-list test from Stage 7.5 continues to pass.
+- [ ] **New** `Every_anonymous_endpoint_that_hits_the_db_carries_a_PreAuthCallSite_attribute` — Roslyn-free scan of `Assembly.GetTypes()` for `[AllowAnonymous]` actions that touch `AppDbContext`; each must have `[PreAuthCallSite]`.
+- [ ] `IgnoreQueryFilters()` allow-list test from Stage 7 continues to pass.
+
+Removals:
+
+- [ ] `ProjectCeres/Common/IPreAuthCallSiteTagger.cs` + `PreAuthCallSiteTagger.cs` deleted.
+- [ ] `ProjectCeres.Tests/Common/PreAuthCallSiteTaggerTests.cs` deleted. Replacement coverage in the rewritten `CurrentUserAccessorResolutionTests.cs` + the new architecture test.
+
+Doc supersession (per ADR-0073 § Consequences):
+
+- [ ] `docs/multi-tenancy-strategy.md` § Background processes — the "`Guid.Empty` as safe default" amendment line is annotated, not deleted, with the supersession note.
+- [ ] `docs/planning-resolved.md` — Stage 7 entry's `Guid.Empty` reference is annotated.
+- [ ] ADR-0073 status flipped from "proposed" to "Accepted" at close-out.
+- [ ] ADR-0067's "`Guid.Empty` safe default" amendment cross-referenced from ADR-0073.
+
+Test count:
+
+- [ ] Full suite ≥1024 passed, 0 failed. Per `feedback_test_edge_cases_as_ship_gate`: every typed exception added has a unit test pinning what triggers it.
 
 ---
 
