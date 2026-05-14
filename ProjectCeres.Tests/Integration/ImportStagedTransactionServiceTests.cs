@@ -286,9 +286,11 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
 
         var act = async () => await _fixture.Db.SaveChangesAsync();
 
-        var ex = await act.Should().ThrowAsync<DbUpdateException>();
-        ex.Which.InnerException.Should().BeOfType<PostgresException>()
-            .Which.SqlState.Should().Be("42501");
+        // Stage 7.6.2: RlsExceptionTranslator wraps 42501 on a user-owned table into
+        // RlsPolicyViolationException with the diagnostic payload.
+        var ex = await act.Should().ThrowAsync<ProjectCeres.Common.Exceptions.RlsPolicyViolationException>();
+        ex.Which.TableName.Should().Be("ImportStagedTransactions");
+        ex.Which.OriginalException.SqlState.Should().Be("42501");
     }
 
     /// <summary>

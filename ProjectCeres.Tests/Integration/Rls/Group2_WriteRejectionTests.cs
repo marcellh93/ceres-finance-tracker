@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using ProjectCeres.Common.Exceptions;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Rls;
@@ -19,7 +19,7 @@ public class Group2_WriteRejectionTests
     public Group2_WriteRejectionTests(RlsTestFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task INSERT_Account_with_foreign_UserId_raises_42501()
+    public async Task INSERT_Account_with_foreign_UserId_raises_RlsPolicyViolation()
     {
         await using var appA = _fixture.CreateAppContext(_fixture.UserA);
         appA.Accounts.Add(new Account
@@ -34,13 +34,16 @@ public class Group2_WriteRejectionTests
 
         var act = async () => await appA.SaveChangesAsync();
 
-        var ex = await act.Should().ThrowAsync<DbUpdateException>();
-        ex.Which.InnerException.Should().BeOfType<PostgresException>()
-            .Which.SqlState.Should().Be("42501");
+        // Stage 7.6.2: the RlsExceptionTranslator wraps PostgresException 42501 on a
+        // user-owned table into RlsPolicyViolationException carrying the diagnostic data.
+        var ex = await act.Should().ThrowAsync<RlsPolicyViolationException>();
+        ex.Which.TableName.Should().Be("Accounts");
+        ex.Which.GucUserId.Should().Be(_fixture.UserA);
+        ex.Which.OriginalException.SqlState.Should().Be("42501");
     }
 
     [Fact]
-    public async Task UPDATE_account_to_set_foreign_UserId_raises_42501()
+    public async Task UPDATE_account_to_set_foreign_UserId_raises_RlsPolicyViolation()
     {
         // Seed an account for user A via the admin role (avoids interceptor-tracking quirks).
         var accountId = Guid.NewGuid();
@@ -66,9 +69,10 @@ public class Group2_WriteRejectionTests
 
             var act = async () => await appA.SaveChangesAsync();
 
-            var ex = await act.Should().ThrowAsync<DbUpdateException>();
-            ex.Which.InnerException.Should().BeOfType<PostgresException>()
-                .Which.SqlState.Should().Be("42501");
+            var ex = await act.Should().ThrowAsync<RlsPolicyViolationException>();
+            ex.Which.TableName.Should().Be("Accounts");
+            ex.Which.GucUserId.Should().Be(_fixture.UserA);
+            ex.Which.OriginalException.SqlState.Should().Be("42501");
         }
         finally
         {
@@ -125,7 +129,7 @@ public class Group2_WriteRejectionTests
     }
 
     [Fact]
-    public async Task INSERT_UserSession_with_foreign_UserId_raises_42501()
+    public async Task INSERT_UserSession_with_foreign_UserId_raises_RlsPolicyViolation()
     {
         await using var appA = _fixture.CreateAppContext(_fixture.UserA);
         appA.UserSessions.Add(new UserSession
@@ -141,8 +145,8 @@ public class Group2_WriteRejectionTests
 
         var act = async () => await appA.SaveChangesAsync();
 
-        var ex = await act.Should().ThrowAsync<DbUpdateException>();
-        ex.Which.InnerException.Should().BeOfType<PostgresException>()
-            .Which.SqlState.Should().Be("42501");
+        var ex = await act.Should().ThrowAsync<RlsPolicyViolationException>();
+        ex.Which.TableName.Should().Be("UserSessions");
+        ex.Which.GucUserId.Should().Be(_fixture.UserA);
     }
 }

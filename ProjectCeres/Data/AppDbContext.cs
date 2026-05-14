@@ -17,6 +17,36 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         _currentUser = currentUser;
     }
 
+    // Stage 7.6.2: catch and translate the DbUpdateException wrapping Postgres 42501
+    // (RLS WITH CHECK policy rejection) on a user-owned table into the typed
+    // RlsPolicyViolationException. EF Core's ISaveChangesInterceptor hooks are
+    // observational only — they don't let you replace the exception that bubbles out
+    // of SaveChanges. Overriding SaveChangesAsync here is the documented mechanism
+    // for transforming exceptions at the EF boundary.
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        try
+        {
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, out var rls))
+        {
+            throw rls!;
+        }
+    }
+
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, out var rls))
+        {
+            throw rls!;
+        }
+    }
+
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<AccountType> AccountTypes => Set<AccountType>();
     public DbSet<CategoryType> CategoryTypes => Set<CategoryType>();

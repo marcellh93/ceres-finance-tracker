@@ -69,6 +69,8 @@ builder.Services.AddScoped<UserOwnershipInterceptor>();
 // Stage 7.5 / ADR-0068 — PostgreSQL Row-Level Security defence in depth.
 builder.Services.AddScoped<IPreAuthCallSiteTagger, PreAuthCallSiteTagger>();
 builder.Services.AddScoped<RowLevelSecurityInterceptor>();
+// Stage 7.6.2: RlsExceptionTranslator is a static helper invoked from
+// AppDbContext.SaveChangesAsync's catch block. No DI registration needed.
 
 // AppDbContext — runtime, bound to ceres_app (NOBYPASSRLS). Every command issued
 // against this DbContext is filtered by Postgres RLS using the GUC set by the

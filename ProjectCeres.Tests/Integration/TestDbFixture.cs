@@ -85,6 +85,9 @@ public class TestDbFixture : IAsyncDisposable
         // (NOBYPASSRLS). Without the RowLevelSecurityInterceptor, every WRITE against
         // an RLS-bound table fails with "new row violates row-level security policy"
         // because the GUC app.current_user_ref is unset.
+        // Stage 7.6.2 — RlsPolicyViolationException translation is wired into
+        // AppDbContext.SaveChangesAsync directly (no interceptor); the fixture
+        // doesn't need to opt in.
         return new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(user))
