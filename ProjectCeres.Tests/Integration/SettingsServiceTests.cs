@@ -133,17 +133,15 @@ public class SettingsServiceTests : IAsyncLifetime
 
     private static AppDbContext NonTransactionalContext(ICurrentUserAccessor user)
     {
+        // Stage 7.6.7 / ADR-0073: interceptor takes UserContext via the accessor — no
+        // tagger param. The settings tests bind a real user, so the interceptor sees
+        // Resolved.
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestDbFixture.AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(user))
             .AddInterceptors(new RowLevelSecurityInterceptor(
-                user, new NeverPreAuthTagger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<RowLevelSecurityInterceptor>.Instance))
+                user, Microsoft.Extensions.Logging.Abstractions.NullLogger<RowLevelSecurityInterceptor>.Instance))
             .Options;
         return new AppDbContext(options, user);
-    }
-
-    private sealed class NeverPreAuthTagger : IPreAuthCallSiteTagger
-    {
-        public bool IsLegitimatePreAuth() => false;
     }
 }

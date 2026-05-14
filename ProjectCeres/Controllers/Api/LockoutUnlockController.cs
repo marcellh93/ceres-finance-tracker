@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.ViewModels.Auth;
 
@@ -14,7 +15,7 @@ public sealed class LockoutUnlockController : ControllerBase
 
     public LockoutUnlockController(LockoutUnlockService service) => _service = service;
 
-    [HttpPost(""), AllowAnonymous]
+    [HttpPost(""), AllowAnonymous, PreAuthCallSite("LockoutUnlock.Confirm")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Confirm([FromBody] LockoutUnlockRequest request)
     {

@@ -7,9 +7,9 @@
 
 ---
 
-## Session state (last updated 2026-05-14, mid-stage)
+## Session state (last updated 2026-05-14, **stage closed**)
 
-**Six of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.7.
+**All seven sub-stages shipped on `main`.** Stage 7.6 is ✅ Done. Stage 8 is the next.
 
 | # | Sub-stage | Status | Commit |
 |---|---|---|---|
@@ -18,10 +18,12 @@
 | 7.6.3 | `AffectedRowCount` enforcement helper | ✅ Done | `07283f3` |
 | 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext` | ✅ Done | `fdbf960` |
 | 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ✅ Done | `70f7eff` |
-| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ✅ Done | (this commit; see `Infrastructure/MigrationFixture.cs` + `AppContextFactory.cs` + `AdminContextFactory.cs` and the now-thin `TestDbFixture.cs`) |
-| 7.6.7 | `UserContext` discriminated union (ADR-0073) | ❌ Pending — START HERE | — |
+| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ✅ Done | `7c5f3e1` |
+| 7.6.7 | `UserContext` discriminated union (ADR-0073) | ✅ Done | (this commit; see `UserContext.cs`, `PreAuthCallSiteAttribute.cs`, rewritten `HttpContextCurrentUserAccessor`, `RowLevelSecurityInterceptor`, `BackgroundJobScope`, deleted `IPreAuthCallSiteTagger.cs` + `PreAuthCallSiteTagger.cs` + `PreAuthCallSiteTaggerTests.cs`) |
 
-**Lessons baked in from the six shipped sub-stages** (read before starting 7.6.7):
+**Final test count:** 1038 / 1038 green in 3m21s (1009 baseline at Stage 7.5 close + 8 BulkOpExt + 7 DbExceptionTranslator + 4 UserContext + 5 CurrentUserAccessorExtensions + 2 new resolution cases - 4 deleted tagger tests + 7 misc deltas across rewrites).
+
+**Implementation lessons (read before any future related work):**
 
 1. **7.6.2 mechanism correction.** The spec originally said `IDbCommandInterceptor.CommandFailed` for translating Postgres 42501. **That hook is observational only — it cannot replace the propagating exception**, and `ISaveChangesInterceptor.SaveChangesFailed` is the same. The shipped implementation overrides `SaveChanges` / `SaveChangesAsync` on `AppDbContext` and calls a static `RlsExceptionTranslator.TryTranslate(...)` helper in a `catch` block. Same pattern likely applies to 7.6.5's `DbExceptionTranslator` — plan accordingly.
 
@@ -59,6 +61,14 @@
 8. **7.6.5 SettingsService catch-rewrite.** Wiring the translator into `AppDbContext.SaveChanges{Async}` re-throws 23505 as `UniqueConstraintViolationException` (which is `InvalidOperationException`, NOT `DbUpdateException`). One existing in-tree handler — `SettingsService.GetAsync` first-touch race — caught raw `DbUpdateException` and would have silently broken (the catch wouldn't match, the exception would surface to the caller, and the SPA's first request-after-login would 500). Generalizable rule: **before wiring an exception-translation layer, grep for every existing `catch (DbUpdateException ...)` AND any `Throw<DbUpdateException>()` test assertion in the affected SqlState space, and rewrite or update each in the same commit.** The grep here found exactly one site; result was a one-line catch-type swap.
 
 9. **7.6.6 fixture-split: thin coordinator pattern.** The original `TestDbFixture` had three responsibilities tangled (migration, app-context construction, admin-context construction). Splitting them into single-responsibility helpers under `Infrastructure/` (`MigrationFixture`, `AppContextFactory`, `AdminContextFactory`) was tempting to do as a "rename and move" — but the public surface of `TestDbFixture` is referenced by 26 test files plus 4 fixture-internal callers (`SettingsServiceTests`, `PrivilegeLeakStartupCheckTests`, `Rls/RlsTestFixture`, `Rls/Group4_BackstopTests` for the connection-string constants). Cleanest path: keep `TestDbFixture`'s public surface 100% unchanged and turn it into a thin coordinator that delegates to the new helpers. Connection-string constants and `SentinelUserId` stay on `TestDbFixture` (`internal` so the new factories can read them) because they're the de-facto public registry. Result: zero call-site churn, full suite green at 1036/1036 with no test changes.
+
+10. **7.6.7 stale-registry-drift catch + 6 → 8 endpoint surface correction.** The spec listed 5 pre-auth endpoints to decorate. Reading the codebase revealed two corrections:
+    - `IPreAuthCallSiteTagger`'s registry held the key `"Auth.PasswordResetRequest"` — a key that **never matched any real MVC endpoint**. The actual endpoint is `PasswordReset.RequestReset` (different controller, different method name). The warning-log "DB connection opened with no resolved user" had been firing on every password-reset-request in production for the entire lifetime of the registry. The new `[PreAuthCallSite]` attribute lives on the action method itself, so this drift class is structurally impossible.
+    - The architecture test caught two more pre-auth DB-touching endpoints the spec missed (`EmailChange.ConfirmChange` + `EmailChange.RevokeChange`) plus one anonymous no-DB endpoint (`AuthController.Csrf`) that needed allow-listing. **Final endpoint surface: 8 attribute decorations + 3 explicit no-DB allow-list entries (`HealthApiController.Get`, `Validate`, `AuthController.Csrf`).**
+
+    Generalizable rule: **a stringly-typed registry whose entries are never validated against real symbol names will silently drift.** The fix is moving the tagging from "a separate registry someone keeps in sync" to "an attribute on the thing being tagged." The architecture test then becomes the single source of truth — any pre-auth endpoint without the attribute fails the build at the next CI run.
+
+11. **7.6.7 default-interface-method discoverability.** Adding `Guid UserId => Context is UserContext.Resolved r ? r.UserId : Guid.Empty;` as a default-interface-method on `ICurrentUserAccessor` keeps 83+ existing call sites working without churn — but only when callers reach the accessor through the **interface type**. The `CurrentUserAccessorResolutionTests` originally used `var sut = new HttpContextCurrentUserAccessor(...)`, which inferred the concrete type and lost access to the default method. Fix is one-line per test (`ICurrentUserAccessor sut = ...`); flagged here because the same gotcha will hit anyone adding similar default-interface methods later.
 
 ---
 

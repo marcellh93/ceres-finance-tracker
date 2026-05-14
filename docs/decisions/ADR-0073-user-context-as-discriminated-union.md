@@ -1,6 +1,6 @@
 # ADR-0073 — `UserContext` as a discriminated union replacing the `Guid.Empty` overload
 
-**Status:** Accepted (Phase 3, Stage 7.6 — proposed)
+**Status:** Accepted (Phase 3, Stage 7.6.7 shipped 2026-05-14)
 
 **Date:** 2026-05-14
 

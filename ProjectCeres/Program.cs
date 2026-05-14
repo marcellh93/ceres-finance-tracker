@@ -67,7 +67,8 @@ builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>
 builder.Services.AddScoped<UserOwnershipInterceptor>();
 
 // Stage 7.5 / ADR-0068 — PostgreSQL Row-Level Security defence in depth.
-builder.Services.AddScoped<IPreAuthCallSiteTagger, PreAuthCallSiteTagger>();
+// Stage 7.6.7 / ADR-0073: IPreAuthCallSiteTagger registry deleted; pre-auth call sites
+// are tagged by the [PreAuthCallSite] attribute on the action method itself.
 builder.Services.AddScoped<RowLevelSecurityInterceptor>();
 // Stage 7.6.2: RlsExceptionTranslator is a static helper invoked from
 // AppDbContext.SaveChangesAsync's catch block. No DI registration needed.

@@ -37,7 +37,7 @@ public class UserJobRunnerTests : IAsyncLifetime
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var userScope = new UserScope();
-        var bgScope = new BackgroundJobScope(userScope, NullLogger<BackgroundJobScope>.Instance);
+        var bgScope = new BackgroundJobScope(new FakeCurrentUserAccessor(UserContext.Uninitialized.Instance), userScope, NullLogger<BackgroundJobScope>.Instance);
         var runner = new UserJobRunner(db, bgScope, NullLogger<UserJobRunner>.Instance);
 
         await runner.ForEachUserAsync(
@@ -59,7 +59,7 @@ public class UserJobRunnerTests : IAsyncLifetime
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
-        var bgScope = new BackgroundJobScope(new UserScope(), NullLogger<BackgroundJobScope>.Instance);
+        var bgScope = new BackgroundJobScope(new FakeCurrentUserAccessor(UserContext.Uninitialized.Instance), new UserScope(), NullLogger<BackgroundJobScope>.Instance);
         var runner = new UserJobRunner(db, bgScope, NullLogger<UserJobRunner>.Instance);
         var succeeded = new List<Guid>();
 
@@ -82,7 +82,7 @@ public class UserJobRunnerTests : IAsyncLifetime
         using var diScope = _factory.Services.CreateScope();
         var db = diScope.ServiceProvider.GetRequiredService<AdminDbContext>();
         var userScope = new UserScope();
-        var bgScope = new BackgroundJobScope(userScope, NullLogger<BackgroundJobScope>.Instance);
+        var bgScope = new BackgroundJobScope(new FakeCurrentUserAccessor(UserContext.Uninitialized.Instance), userScope, NullLogger<BackgroundJobScope>.Instance);
         var runner = new UserJobRunner(db, bgScope, NullLogger<UserJobRunner>.Instance);
 
         await runner.ForEachUserAsync(
@@ -103,7 +103,7 @@ public class UserJobRunnerTests : IAsyncLifetime
 
         using var diScope = _factory.Services.CreateScope();
         var db = diScope.ServiceProvider.GetRequiredService<AdminDbContext>();
-        var bgScope = new BackgroundJobScope(new UserScope(), NullLogger<BackgroundJobScope>.Instance);
+        var bgScope = new BackgroundJobScope(new FakeCurrentUserAccessor(UserContext.Uninitialized.Instance), new UserScope(), NullLogger<BackgroundJobScope>.Instance);
         var runner = new UserJobRunner(db, bgScope, NullLogger<UserJobRunner>.Instance);
         using var cts = new CancellationTokenSource();
         var invoked = new List<Guid>();
@@ -134,7 +134,7 @@ public class UserJobRunnerTests : IAsyncLifetime
 
         using var diScope = _factory.Services.CreateScope();
         var db = diScope.ServiceProvider.GetRequiredService<AdminDbContext>();
-        var bgScope = new BackgroundJobScope(new UserScope(), NullLogger<BackgroundJobScope>.Instance);
+        var bgScope = new BackgroundJobScope(new FakeCurrentUserAccessor(UserContext.Uninitialized.Instance), new UserScope(), NullLogger<BackgroundJobScope>.Instance);
         var runner = new UserJobRunner(db, bgScope, NullLogger<UserJobRunner>.Instance);
         using var cts = new CancellationTokenSource();
 

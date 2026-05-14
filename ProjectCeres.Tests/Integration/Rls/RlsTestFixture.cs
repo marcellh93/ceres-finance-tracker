@@ -51,12 +51,16 @@ public sealed class RlsTestFixture : IAsyncLifetime
     /// </summary>
     public AppDbContext CreateAppContext(Guid actingAs)
     {
+        // Stage 7.6.7 / ADR-0073: interceptor takes UserContext via the accessor — no
+        // tagger param. FakeCurrentUserAccessor wraps the Guid in UserContext.Resolved
+        // (or Uninitialized if Guid.Empty), so the interceptor's switch fires the right
+        // branch automatically.
         var accessor = new FakeCurrentUserAccessor(actingAs);
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestDbFixture.AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(accessor))
             .AddInterceptors(new RowLevelSecurityInterceptor(
-                accessor, new NeverPreAuthTagger(), NullLogger<RowLevelSecurityInterceptor>.Instance))
+                accessor, NullLogger<RowLevelSecurityInterceptor>.Instance))
             .Options;
         return new AppDbContext(options, accessor);
     }
@@ -91,10 +95,6 @@ public sealed class RlsTestFixture : IAsyncLifetime
         return conn;
     }
 
-    private sealed class NeverPreAuthTagger : IPreAuthCallSiteTagger
-    {
-        public bool IsLegitimatePreAuth() => false;
-    }
 }
 
 [CollectionDefinition("RlsTests")]

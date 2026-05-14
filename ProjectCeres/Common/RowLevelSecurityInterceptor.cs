@@ -31,13 +31,11 @@ namespace ProjectCeres.Common;
 /// </para>
 ///
 /// <para>
-/// <b>Failure mode.</b> When <c>ICurrentUserAccessor.UserId == Guid.Empty</c>
-/// (pre-auth requests: login, register, password-reset request, etc.), the
-/// interceptor RESETs the GUC to its default (empty string in Postgres for
-/// custom GUCs). The RLS policy uses <c>NULLIF(current_setting(...), '')</c> to
-/// collapse both unset and reset-to-empty into NULL, then casts to uuid. NULL
-/// comparisons evaluate to NULL/false in policy USING/WITH CHECK clauses, so
-/// every row is filtered — the fail-closed property holds.
+/// Stage 7.6.7 / ADR-0073: switches on <see cref="UserContext"/> instead of
+/// consulting the prior <c>IPreAuthCallSiteTagger</c> registry. Each case has a
+/// distinct log signature so legitimate pre-auth quietly RESETs while
+/// <c>Background</c> (the bug case — request reached the DB without auth or a
+/// <c>[PreAuthCallSite]</c> tag) logs an error every time.
 /// </para>
 ///
 /// Registered only on AppDbContext (the runtime, RLS-bound context). AdminDbContext
@@ -46,7 +44,6 @@ namespace ProjectCeres.Common;
 /// </summary>
 public sealed class RowLevelSecurityInterceptor(
     ICurrentUserAccessor user,
-    IPreAuthCallSiteTagger preAuth,
     ILogger<RowLevelSecurityInterceptor> logger)
     : DbConnectionInterceptor
 {
@@ -54,73 +51,65 @@ public sealed class RowLevelSecurityInterceptor(
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
-        SetUserGuc(connection);
+        SetUserGuc(connection, async: false).GetAwaiter().GetResult();
         base.ConnectionOpened(connection, eventData);
     }
 
     public override async Task ConnectionOpenedAsync(
         DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
     {
-        await SetUserGucAsync(connection, cancellationToken).ConfigureAwait(false);
+        await SetUserGuc(connection, async: true, cancellationToken).ConfigureAwait(false);
         await base.ConnectionOpenedAsync(connection, eventData, cancellationToken).ConfigureAwait(false);
     }
 
-    private void SetUserGuc(DbConnection connection)
-    {
-        var userId = user.UserId;
-        if (userId == Guid.Empty)
-        {
-            HandleEmptyUser(connection, async: false).GetAwaiter().GetResult();
-            return;
-        }
-
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText = $"SELECT set_config('{GucName}', '{userId:D}', false)";
-        cmd.ExecuteNonQuery();
-    }
-
-    private async ValueTask SetUserGucAsync(DbConnection connection, CancellationToken cancellationToken)
-    {
-        var userId = user.UserId;
-        if (userId == Guid.Empty)
-        {
-            await HandleEmptyUser(connection, async: true, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        await using var cmd = connection.CreateCommand();
-        cmd.CommandText = $"SELECT set_config('{GucName}', '{userId:D}', false)";
-        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// On Guid.Empty (pre-auth requests, or the rare background path with no user
-    /// resolved yet) we still issue <c>RESET</c> to clear any leaked GUC from a
-    /// previous pool user. Npgsql's default <c>DISCARD ALL</c> on connection return
-    /// would handle this, but RESET is belt-and-braces: the property still holds if
-    /// someone ever sets <c>No Reset On Close=true</c> (required for pgBouncer
-    /// transaction mode). Logs a warning when the call site isn't tagged pre-auth.
-    /// </summary>
-    private async ValueTask HandleEmptyUser(
+    private async ValueTask SetUserGuc(
         DbConnection connection, bool async, CancellationToken cancellationToken = default)
     {
-        if (!preAuth.IsLegitimatePreAuth())
+        switch (user.Context)
         {
-            logger.LogWarning(
-                "DB connection opened with no resolved user (Guid.Empty) outside a tagged pre-auth call site. " +
-                "RLS policies will evaluate to zero rows for every command on this connection.");
-        }
+            case UserContext.Resolved resolved:
+                await ExecuteAsync(connection, $"SELECT set_config('{GucName}', '{resolved.UserId:D}', false)", async, cancellationToken)
+                    .ConfigureAwait(false);
+                return;
 
+            case UserContext.PreAuth preAuth:
+                logger.LogDebug("RLS GUC RESET on pre-auth call site {CallSite}.", preAuth.CallSite);
+                await ExecuteAsync(connection, $"RESET \"{GucName}\"", async, cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+
+            case UserContext.Background background:
+                logger.LogError(
+                    "DB connection opened in Background context without a resolved user. " +
+                    "Reason: {Reason}. RLS policies will evaluate to zero rows.",
+                    background.Reason);
+                await ExecuteAsync(connection, $"RESET \"{GucName}\"", async, cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+
+            case UserContext.Uninitialized:
+                // Fires at EF model-creation time before any HTTP context exists. Logging here
+                // would be noise — the model creator is supposed to be empty. Connection still
+                // gets RESET so a leaked GUC from a prior pool user can't bleed through.
+                await ExecuteAsync(connection, $"RESET \"{GucName}\"", async, cancellationToken)
+                    .ConfigureAwait(false);
+                return;
+        }
+    }
+
+    private static async ValueTask ExecuteAsync(
+        DbConnection connection, string sql, bool async, CancellationToken cancellationToken)
+    {
         if (async)
         {
             await using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"RESET \"{GucName}\"";
+            cmd.CommandText = sql;
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         else
         {
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"RESET \"{GucName}\"";
+            cmd.CommandText = sql;
             cmd.ExecuteNonQuery();
         }
     }

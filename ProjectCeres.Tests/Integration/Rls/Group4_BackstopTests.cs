@@ -34,28 +34,31 @@ public class Group4_BackstopTests
     public Group4_BackstopTests(RlsTestFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task Interceptor_warns_when_user_is_empty_outside_preauth()
+    public async Task Interceptor_logs_Error_when_context_is_Background()
     {
+        // Stage 7.6.7 / ADR-0073: replaces the old Guid.Empty-without-tagger contract.
+        // A request that reaches the DB without auth and without a [PreAuthCallSite] tag
+        // surfaces as UserContext.Background, which is an Error (not a Warning) — the
+        // case is always a bug worth investigating.
         var logs = new List<string>();
-        var interceptor = MakeInterceptor(Guid.Empty, isPreAuth: false, logs);
+        var interceptor = MakeInterceptor(new UserContext.Background("untagged endpoint"), logs);
 
         await using var ctx = BuildContextWithInterceptor(Guid.Empty, interceptor);
-        // Force a connection open by issuing any query.
         await ctx.AccountTypes.AnyAsync();
 
-        logs.Should().Contain(l => l.Contains("Warning") && l.Contains("Guid.Empty"));
+        logs.Should().Contain(l => l.Contains("Error:") && l.Contains("Background"));
     }
 
     [Fact]
-    public async Task Interceptor_does_not_warn_when_user_is_empty_on_preauth_path()
+    public async Task Interceptor_does_not_log_Warning_or_Error_on_PreAuth_path()
     {
         var logs = new List<string>();
-        var interceptor = MakeInterceptor(Guid.Empty, isPreAuth: true, logs);
+        var interceptor = MakeInterceptor(new UserContext.PreAuth("Auth.Login"), logs);
 
         await using var ctx = BuildContextWithInterceptor(Guid.Empty, interceptor);
         await ctx.AccountTypes.AnyAsync();
 
-        logs.Should().NotContain(l => l.Contains("Warning"));
+        logs.Should().NotContain(l => l.Contains("Warning:") || l.Contains("Error:"));
     }
 
     [Fact]
@@ -112,16 +115,18 @@ public class Group4_BackstopTests
 
     // -------------- helpers --------------
 
-    private static RowLevelSecurityInterceptor MakeInterceptor(Guid userId, bool isPreAuth, List<string> logs)
+    private static RowLevelSecurityInterceptor MakeInterceptor(UserContext context, List<string> logs)
     {
-        var accessor = new FakeCurrentUserAccessor(userId);
-        var tagger = new Mock<IPreAuthCallSiteTagger>();
-        tagger.Setup(t => t.IsLegitimatePreAuth()).Returns(isPreAuth);
+        var accessor = new FakeCurrentUserAccessor(context);
 
-        var loggerFactory = LoggerFactory.Create(b => b.AddProvider(new InMemoryLoggerProvider(logs)));
+        var loggerFactory = LoggerFactory.Create(b =>
+        {
+            b.SetMinimumLevel(LogLevel.Debug);
+            b.AddProvider(new InMemoryLoggerProvider(logs));
+        });
         var logger = loggerFactory.CreateLogger<RowLevelSecurityInterceptor>();
 
-        return new RowLevelSecurityInterceptor(accessor, tagger.Object, logger);
+        return new RowLevelSecurityInterceptor(accessor, logger);
     }
 
     private static AppDbContext BuildContextWithInterceptor(Guid userId, RowLevelSecurityInterceptor interceptor)

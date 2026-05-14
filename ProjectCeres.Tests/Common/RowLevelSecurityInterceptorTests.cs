@@ -3,19 +3,24 @@ using System.Data.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Moq;
 using ProjectCeres.Common;
 using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Common;
 
+/// <summary>
+/// Stage 7.6.7 / ADR-0073: tests now construct <see cref="UserContext"/> cases directly
+/// instead of mocking the deleted <c>IPreAuthCallSiteTagger</c>. Each case has a distinct
+/// observable: command issued (<c>set_config</c> vs <c>RESET</c>) and log signature
+/// (Debug for PreAuth, Error for Background, silent for Resolved/Uninitialized).
+/// </summary>
 public class RowLevelSecurityInterceptorTests
 {
     [Fact]
-    public async Task ConnectionOpenedAsync_issues_set_config_with_resolved_user_id()
+    public async Task ConnectionOpenedAsync_with_Resolved_issues_set_config_with_user_id()
     {
         var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var (sut, _) = MakeSut(userId);
+        var (sut, _) = MakeSut(new UserContext.Resolved(userId));
         var conn = new RecordingConnection();
 
         await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
@@ -25,10 +30,10 @@ public class RowLevelSecurityInterceptorTests
     }
 
     [Fact]
-    public void ConnectionOpened_sync_issues_set_config_with_resolved_user_id()
+    public void ConnectionOpened_sync_with_Resolved_issues_set_config_with_user_id()
     {
         var userId = Guid.NewGuid();
-        var (sut, _) = MakeSut(userId);
+        var (sut, _) = MakeSut(new UserContext.Resolved(userId));
         var conn = new RecordingConnection();
 
         sut.ConnectionOpened(conn, FakeEventData());
@@ -38,59 +43,85 @@ public class RowLevelSecurityInterceptorTests
     }
 
     [Fact]
-    public async Task ConnectionOpenedAsync_resets_GUC_on_pre_auth_path_without_warning()
+    public async Task ConnectionOpenedAsync_with_PreAuth_resets_GUC_and_logs_Debug_only()
     {
-        var (sut, logs) = MakeSut(Guid.Empty, isPreAuth: true);
+        var (sut, logs) = MakeSut(new UserContext.PreAuth("Auth.Login"));
         var conn = new RecordingConnection();
 
         await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
         conn.ExecutedCommands.Should().ContainSingle()
             .Which.Should().Be("RESET \"app.current_user_ref\"");
-        logs.Should().NotContain(l => l.Contains("Warning"));
+        // Debug log carries the call-site name; no Error / Warning above Debug.
+        logs.Should().NotContain(l => l.Contains("Error:") || l.Contains("Warning:"));
+        logs.Should().Contain(l => l.Contains("Auth.Login"));
     }
 
     [Fact]
-    public async Task ConnectionOpenedAsync_resets_GUC_outside_pre_auth_with_warning()
+    public async Task ConnectionOpenedAsync_with_Background_resets_GUC_and_logs_Error_with_reason()
     {
-        var (sut, logs) = MakeSut(Guid.Empty, isPreAuth: false);
+        var reason = "HTTP request reached the DB without auth or [PreAuthCallSite]. Endpoint: /api/foo";
+        var (sut, logs) = MakeSut(new UserContext.Background(reason));
         var conn = new RecordingConnection();
 
         await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
         conn.ExecutedCommands.Should().ContainSingle()
             .Which.Should().Be("RESET \"app.current_user_ref\"");
-        logs.Should().Contain(l => l.Contains("Warning") && l.Contains("Guid.Empty"));
+        logs.Should().Contain(l => l.Contains("Error:") && l.Contains(reason));
     }
 
     [Fact]
-    public async Task ConnectionOpenedAsync_never_throws_on_Guid_Empty()
+    public async Task ConnectionOpenedAsync_with_Uninitialized_resets_GUC_silently()
     {
-        // Pins option A: the interceptor is the safety-net, not the doorway.
-        // Doorway refusal lives in BackgroundJobScope (Commit 6).
-        var (sut, _) = MakeSut(Guid.Empty, isPreAuth: false);
+        // EF model-creation case: logging here would be noise — the model creator is
+        // supposed to fire eagerly with no ambient context. RESET still happens to
+        // prevent leaked GUC bleeding through pooled connections.
+        var (sut, logs) = MakeSut(UserContext.Uninitialized.Instance);
         var conn = new RecordingConnection();
 
-        Func<Task> act = () => sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
+        await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
-        await act.Should().NotThrowAsync();
+        conn.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().Be("RESET \"app.current_user_ref\"");
+        logs.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConnectionOpenedAsync_never_throws_for_any_UserContext_case()
+    {
+        // Pins option A: the interceptor is the safety-net, not the doorway. Doorway
+        // refusal lives in BackgroundJobScope.
+        UserContext[] cases =
+        {
+            new UserContext.Resolved(Guid.NewGuid()),
+            new UserContext.PreAuth("Some.CallSite"),
+            new UserContext.Background("some reason"),
+            UserContext.Uninitialized.Instance,
+        };
+
+        foreach (var ctx in cases)
+        {
+            var (sut, _) = MakeSut(ctx);
+            var conn = new RecordingConnection();
+            Func<Task> act = () => sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
+            await act.Should().NotThrowAsync($"the interceptor must never throw for {ctx.GetType().Name}");
+        }
     }
 
     // --- helpers ---------------------------------------------------------
 
-    private static (RowLevelSecurityInterceptor Sut, List<string> Logs) MakeSut(
-        Guid userId, bool isPreAuth = false)
+    private static (RowLevelSecurityInterceptor Sut, List<string> Logs) MakeSut(UserContext context)
     {
-        var user = new FakeCurrentUserAccessor(userId);
-
-        var tagger = new Mock<IPreAuthCallSiteTagger>();
-        tagger.Setup(t => t.IsLegitimatePreAuth()).Returns(isPreAuth);
-
+        var user = new FakeCurrentUserAccessor(context);
         var logs = new List<string>();
-        using var lf = LoggerFactory.Create(b => b.AddProvider(new InMemoryLoggerProvider(logs)));
+        var lf = LoggerFactory.Create(b =>
+        {
+            b.SetMinimumLevel(LogLevel.Debug);
+            b.AddProvider(new InMemoryLoggerProvider(logs));
+        });
         var logger = lf.CreateLogger<RowLevelSecurityInterceptor>();
-
-        return (new RowLevelSecurityInterceptor(user, tagger.Object, logger), logs);
+        return (new RowLevelSecurityInterceptor(user, logger), logs);
     }
 
     private static ConnectionEndEventData FakeEventData() =>

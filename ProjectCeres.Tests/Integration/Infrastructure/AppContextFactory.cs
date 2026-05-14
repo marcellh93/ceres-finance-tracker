@@ -21,22 +21,16 @@ internal static class AppContextFactory
 {
     public static AppDbContext Create(ICurrentUserAccessor user)
     {
+        // Stage 7.6.7 / ADR-0073: the interceptor switches on UserContext directly. The
+        // base fixture binds tests to a real user (FakeCurrentUserAccessor wraps in
+        // UserContext.Resolved), so the interceptor sees Resolved and issues set_config.
+        // Tests that exercise other UserContext cases use the dedicated RLS fixture.
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestDbFixture.AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(user))
             .AddInterceptors(new RowLevelSecurityInterceptor(
-                user, new StubPreAuthTagger(), NullLogger<RowLevelSecurityInterceptor>.Instance))
+                user, NullLogger<RowLevelSecurityInterceptor>.Instance))
             .Options;
         return new AppDbContext(options, user);
-    }
-
-    /// <summary>
-    /// Stub tagger that never reports pre-auth — fine for the base fixture where every
-    /// test has a real user. The dedicated RLS test fixture (Group 4 backstop tests)
-    /// uses a richer fake that flips the return value.
-    /// </summary>
-    private sealed class StubPreAuthTagger : IPreAuthCallSiteTagger
-    {
-        public bool IsLegitimatePreAuth() => false;
     }
 }

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -68,7 +69,7 @@ public sealed class AuthController : ControllerBase
         (HttpContext.Connection.RemoteIpAddress?.ToString() ?? "",
          Request.Headers.UserAgent.ToString());
 
-    [HttpPost("register"), AllowAnonymous]
+    [HttpPost("register"), AllowAnonymous, PreAuthCallSite("Auth.Register")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
@@ -108,7 +109,7 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
-    [HttpPost("login"), AllowAnonymous]
+    [HttpPost("login"), AllowAnonymous, PreAuthCallSite("Auth.Login")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -223,7 +224,7 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
-    [HttpPost("login/totp"), AllowAnonymous]
+    [HttpPost("login/totp"), AllowAnonymous, PreAuthCallSite("Auth.LoginTotp")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthTotpByUser)]
     public async Task<IActionResult> LoginTotp(
         [FromBody] LoginTotpRequest request,

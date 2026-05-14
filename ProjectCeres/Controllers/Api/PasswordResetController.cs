@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.ViewModels.Auth;
 using System.Linq;
@@ -15,7 +16,7 @@ public sealed class PasswordResetController : ControllerBase
 
     public PasswordResetController(PasswordResetService service) => _service = service;
 
-    [HttpPost("request"), AllowAnonymous]
+    [HttpPost("request"), AllowAnonymous, PreAuthCallSite("PasswordReset.RequestReset")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> RequestReset([FromBody] PasswordResetRequest request)
     {
@@ -41,7 +42,7 @@ public sealed class PasswordResetController : ControllerBase
         return NoContent();
     }
 
-    [HttpPost("confirm"), AllowAnonymous]
+    [HttpPost("confirm"), AllowAnonymous, PreAuthCallSite("PasswordReset.Confirm")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Confirm([FromBody] PasswordResetConfirmRequest request)
     {

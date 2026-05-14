@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.ViewModels.Auth;
 
@@ -76,7 +77,7 @@ public sealed class EmailChangeController : ControllerBase
         }
     }
 
-    [HttpPost("confirm"), AllowAnonymous]
+    [HttpPost("confirm"), AllowAnonymous, PreAuthCallSite("EmailChange.ConfirmChange")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> ConfirmChange([FromBody] EmailChangeConfirmRequest body)
     {
@@ -108,7 +109,7 @@ public sealed class EmailChangeController : ControllerBase
         };
     }
 
-    [HttpPost("revoke"), AllowAnonymous]
+    [HttpPost("revoke"), AllowAnonymous, PreAuthCallSite("EmailChange.RevokeChange")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> RevokeChange([FromBody] EmailChangeRevokeRequest body)
     {

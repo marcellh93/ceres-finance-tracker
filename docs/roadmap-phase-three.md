@@ -782,7 +782,7 @@ Follow-ups recorded for future stages:
 
 ## Stage 7.6 — Error legibility + OCP cleanup (Batch 3c continued)
 
-**Status: ⚠️ In progress (started 2026-05-14).** Closes seven diagnostic + OCP gaps surfaced during Stage 7.5. Infrastructure-only — no user-facing behaviour changes, no schema changes. Lands before Stage 8 so the cleanups apply while the RLS pattern is fresh. **Six of seven sub-stages shipped on `main`; resume from 7.6.7.** See [`docs/superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md` § Session state](superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md) for what's done, what's pending, and the five implementation lessons (7.6.2 mechanism correction, 7.6.2 message-parsing fallback, 7.6.4 closure-capture pitfall, 7.6.3 call-site-audit narrowing, 7.6.5 SettingsService catch-rewrite).
+**Status: ✅ Done (shipped 2026-05-14).** Closed seven diagnostic + OCP gaps surfaced during Stage 7.5. Infrastructure-only — no user-facing behaviour changes, no schema changes. Lands before Stage 8 so the cleanups apply while the RLS pattern is fresh. All seven sub-stages shipped on `main`. See [`docs/superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md` § Session state](superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md) for the seven implementation lessons (7.6.2 mechanism correction, 7.6.2 message-parsing fallback, 7.6.4 closure-capture pitfall, 7.6.3 call-site-audit narrowing, 7.6.5 SettingsService catch-rewrite, 7.6.6 thin-coordinator pattern, 7.6.7 stale-registry-drift catch + 6→8 endpoint surface correction).
 
 > **Goal:** every test failure shows the production stack trace on first run; every silent-zero-row failure mode is converted to a loud exception; `UserOwnedTables.All` becomes the single source of truth for the EF filter registration; the four meanings of `Guid.Empty` are replaced by a typed `UserContext` discriminated union.
 
@@ -800,7 +800,7 @@ Brainstorm spec: [`docs/superpowers/specs/2026-05-14-stage-7-6-error-legibility-
 | 7.6.3 | `AffectedRowCount` enforcement helper — `ExecuteUpdateExactlyAsync` / `ExecuteDeleteExactlyAsync` throw `AffectedRowCountMismatchException` when row count != expected. **Call-site audit correction**: the spec named 8 sites with exactly-one-row semantics; reading the code showed only 2 (`LockoutUnlockService.ConfirmAsync` token-consume L161 and `EmailChangeService.ConfirmAsync` verify-token-consume L287). The other 6 are 0-or-1 supersede sweeps, 0-or-many session-revoke calls, or retention sweeps where wrapping in `Exactly` would convert correct silent-zero behaviour into spurious crashes. Helper supports `[CallerMemberName]` and a custom `expectedRows`; 8 unit tests cover update + delete parity. | ~155 LOC | ✅ Done | (this commit) | § 2.3 |
 | 7.6.5 | `DbExceptionTranslator` mapping SqlState codes (23505, 23503, 23502) to typed exceptions. **Apply the 7.6.2 lessons**: catch in `SaveChanges{Async}` override (not via interceptor); verify which `PostgresException` structured fields populate for each SqlState before writing the matcher. **Empirical PG 18.3 probe** (against `project_ceres_test` via `psql VERBOSITY verbose`) confirmed `TableName`, `ConstraintName`, and `ColumnName` populate cleanly for all three codes — no message-parsing fallback needed (unlike RLS 42501). Translator chains after `RlsExceptionTranslator` in both `SaveChanges` overrides. **`SettingsService` catch-rewrite**: the existing `catch (DbUpdateException ex) when (IsUniqueViolation(ex))` first-touch handler now catches `UniqueConstraintViolationException` instead — the only existing in-tree `DbUpdateException` catch on these SqlStates. | ~210 LOC | ✅ Done | (this commit) | § 2.5 |
 | 7.6.6 | Split `TestDbFixture` into three single-responsibility fixtures: `MigrationFixture`, `AppContextFactory`, `AdminContextFactory`. **`TestDbFixture` retains its full public surface** (`Db`, `InitAsync`, `CreateAppContext`, `CreateAdminContext`, `DisposeAsync`, the three connection-string constants, `SentinelUserId`) because 26 test files + 4 fixture-internal callers depend on it; the refactor is internal composition only. | ~90 LOC | ✅ Done | (this commit) | § 2.6 |
-| 7.6.7 | `UserContext` discriminated union + `[PreAuthCallSite]` attribute + `UserContextRequiredException`. Deletes `IPreAuthCallSiteTagger`. ADR-0073 is the design record. | ~200 LOC | ❌ Pending | — | § 2.7 |
+| 7.6.7 | `UserContext` discriminated union + `[PreAuthCallSite]` attribute + `UserContextRequiredException`. Deletes `IPreAuthCallSiteTagger`. ADR-0073 is the design record. **Stale-registry catch**: the prior `IPreAuthCallSiteTagger` registry held `"Auth.PasswordResetRequest"` — a key that never matched any real MVC endpoint (the actual method is `PasswordReset.RequestReset`), so the warning-log had been firing on every password-reset-request in production. The new `[PreAuthCallSite]` attribute on the action method eliminates this drift class entirely. **6 → 8 endpoints**: spec listed 5; reading the code revealed 6 (`PasswordReset.Confirm` was missed), and the new architecture test caught 2 more (`EmailChange.ConfirmChange` + `EmailChange.RevokeChange`). Final: 8 attribute decorations + 3 explicit no-DB allow-list entries (`HealthApiController.Get`, `Validate`, `AuthController.Csrf`). | ~280 LOC | ✅ Done | (this commit) | § 2.7 |
 
 ### Verification checklist
 
@@ -810,8 +810,8 @@ Diagnostic improvements:
 - [x] `RlsPolicyViolationException` is thrown (not `PostgresException`) when a write hits a user-owned table under the wrong user. *(7.6.2 — wired via `AppDbContext.SaveChanges{Async}` override calling `RlsExceptionTranslator.TryTranslate(...)`. 6 unit tests + 4 integration tests assert the typed exception with `TableName` and `GucUserId` payload.)*
 - [x] `AffectedRowCountMismatchException` fires when a `ExecuteUpdateExactlyAsync` or `ExecuteDeleteExactlyAsync` call affects 0 rows where 1 was expected. *(7.6.3 — `BulkOperationExtensions` ships in `ProjectCeres/Common/`; 8 unit tests in `BulkOperationExtensionsTests` cover happy path + less-than + greater-than + custom `expectedRows` + `[CallerMemberName]` + message format, for both update and delete. Migrated to `LockoutUnlockService.ConfirmAsync` L161 and `EmailChangeService.ConfirmAsync` L287; the other 6 spec-named sites were re-classified as 0-or-1 / 0-or-many — see spec § Session state for the audit.)*
 - [x] `UniqueConstraintViolationException` / `ForeignKeyViolationException` / `NullConstraintViolationException` are thrown (not generic `DbUpdateException`) for the three documented `SqlState` codes. *(7.6.5 — `DbExceptionTranslator` ships in `ProjectCeres/Common/`; chained after `RlsExceptionTranslator` in `AppDbContext.SaveChanges{Async}`. 7 unit tests in `DbExceptionTranslatorTests` cover each SqlState's typed-exception output, the 42501 pass-through (handled by RLS), unmatched SqlState pass-through, `DbUpdateException` without `PostgresException` inner pass-through, and the defensive empty-`ConstraintName` case. `SettingsService.GetAsync` first-touch race handler updated to `catch (UniqueConstraintViolationException)`.)*
-- [ ] `BackgroundJobScope.RunAsync` exception message names the rejected `UserContext` case.
-- [ ] `UserContextRequiredException` is thrown by `_currentUser.Require()` when the context is not `Resolved`.
+- [x] `BackgroundJobScope.RunAsync` exception message names the rejected `UserContext` case. *(7.6.7 — the constructor now takes `ICurrentUserAccessor`; the doorway-refusal exception message includes `currentUser.Context.GetType().Name`. `BackgroundJobScopeTests.RunAsync_refuses_when_userId_is_Guid_Empty_before_work_runs` asserts the message contains the case name.)*
+- [x] `UserContextRequiredException` is thrown by `_currentUser.Require()` when the context is not `Resolved`. *(7.6.7 — `CurrentUserAccessorExtensions.Require()` ships in `ProjectCeres/Common/`; 5 unit tests cover happy path + each non-`Resolved` case + message format.)*
 
 OCP improvements:
 
@@ -821,24 +821,24 @@ OCP improvements:
 Architecture tests:
 
 - [x] `IUserScope.EnterAs` allow-list test from Stage 7.5 continues to pass.
-- [ ] **New** `Every_anonymous_endpoint_that_hits_the_db_carries_a_PreAuthCallSite_attribute` — Roslyn-free scan of `Assembly.GetTypes()` for `[AllowAnonymous]` actions that touch `AppDbContext`; each must have `[PreAuthCallSite]`. *(Ships in 7.6.7 alongside the `[PreAuthCallSite]` attribute.)*
+- [x] **New** `Every_anonymous_api_action_carries_a_PreAuthCallSite_attribute_or_is_in_the_no_db_allow_list` — Roslyn-free `Assembly.GetTypes()` scan of `[ApiController]` types for every `[AllowAnonymous]` action; each must carry `[PreAuthCallSite]` or be in an explicit no-DB allow-list. *(7.6.7 — caught two pre-auth endpoints the spec missed (`EmailChange.ConfirmChange` + `EmailChange.RevokeChange`) on first run, plus `AuthController.Csrf` (added to the no-DB allow-list because antiforgery doesn't open a DB connection).)*
 - [x] `IgnoreQueryFilters()` allow-list test from Stage 7 continues to pass.
 
 Removals:
 
-- [ ] `ProjectCeres/Common/IPreAuthCallSiteTagger.cs` + `PreAuthCallSiteTagger.cs` deleted.
-- [ ] `ProjectCeres.Tests/Common/PreAuthCallSiteTaggerTests.cs` deleted. Replacement coverage in the rewritten `CurrentUserAccessorResolutionTests.cs` + the new architecture test.
+- [x] `ProjectCeres/Common/IPreAuthCallSiteTagger.cs` + `PreAuthCallSiteTagger.cs` deleted. *(7.6.7 — DI registration in `Program.cs` removed alongside.)*
+- [x] `ProjectCeres.Tests/Common/PreAuthCallSiteTaggerTests.cs` deleted. Replacement coverage in the rewritten `CurrentUserAccessorResolutionTests.cs` + the new architecture test. *(7.6.7 — the test had 4 cases (3× `[Theory]` + `[Fact]`); the rewritten resolution suite covers `Resolved` × 3, `PreAuth` × 1, `Background` × 1, `Uninitialized` × 1, plus the new architecture test enforces the boundary at the route layer.)*
 
 Doc supersession (per ADR-0073 § Consequences):
 
-- [ ] `docs/multi-tenancy-strategy.md` § Background processes — the "`Guid.Empty` as safe default" amendment line is annotated, not deleted, with the supersession note.
-- [ ] `docs/planning-resolved.md` — Stage 7 entry's `Guid.Empty` reference is annotated.
-- [ ] ADR-0073 status flipped from "proposed" to "Accepted" at close-out.
-- [ ] ADR-0067's "`Guid.Empty` safe default" amendment cross-referenced from ADR-0073.
+- [x] `docs/multi-tenancy-strategy.md` § Background processes — the "`Guid.Empty` as safe default" amendment line is annotated, not deleted, with the supersession note.
+- [x] `docs/planning-resolved.md` — Stage 7 entry's `Guid.Empty` reference is annotated.
+- [x] ADR-0073 status flipped from "proposed" to "Accepted" at close-out.
+- [x] ADR-0067's "`Guid.Empty` safe default" amendment cross-referenced from ADR-0073 (annotation lives in ADR-0067's Status line so any reader of that ADR sees the supersession immediately).
 
 Test count:
 
-- [ ] Full suite ≥1024 passed, 0 failed. Per `feedback_test_edge_cases_as_ship_gate`: every typed exception added has a unit test pinning what triggers it.
+- [x] Full suite ≥1024 passed, 0 failed. *(1038/1038 green at close-out — exceeded the floor by 14. Per `feedback_test_edge_cases_as_ship_gate`, each new typed exception has unit tests pinning what triggers it: `RlsPolicyViolationException` × 6, `AffectedRowCountMismatchException` × 8, `Unique/ForeignKey/NullConstraintViolationException` × 7 (combined), `UserContextRequiredException` × 5.)*
 
 ---
 

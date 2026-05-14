@@ -809,4 +809,55 @@ public class ArchitectureTests
             factory.Dispose();
         }
     }
+
+    // Stage 7.6.7 / ADR-0073: every [AllowAnonymous] action on an [ApiController] type
+    // either carries a [PreAuthCallSite] tag (so HttpContextCurrentUserAccessor can resolve
+    // it as UserContext.PreAuth) or appears in the explicit no-DB allow-list. Replaces the
+    // prior IPreAuthCallSiteTagger string registry; new pre-auth routes become a
+    // compile-time addition (one attribute on the action), not a registry edit elsewhere.
+    [Fact]
+    public void Every_anonymous_api_action_carries_a_PreAuthCallSite_attribute_or_is_in_the_no_db_allow_list()
+    {
+        // Allow-list: actions that are [AllowAnonymous] but never touch the DB. These don't
+        // need a UserContext.PreAuth tag because the RowLevelSecurityInterceptor never
+        // fires for them (no AppDbContext in the request pipeline). Adding to this list
+        // requires the action's body to genuinely not open a DB connection.
+        var noDbAllowList = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "ProjectCeres.Controllers.Api.HealthApiController.Get",
+            "ProjectCeres.Controllers.Api.HealthApiController.Validate",
+            // AuthController.Csrf issues an antiforgery cookie — IAntiforgery.GetAndStoreTokens
+            // doesn't open a DB connection.
+            "ProjectCeres.Controllers.Api.AuthController.Csrf",
+        };
+
+        var controllers = App.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract)
+            .Where(t => typeof(Microsoft.AspNetCore.Mvc.ControllerBase).IsAssignableFrom(t))
+            .Where(t => t.GetCustomAttribute<Microsoft.AspNetCore.Mvc.ApiControllerAttribute>() is not null);
+
+        var violations = new List<string>();
+
+        foreach (var controller in controllers)
+        {
+            foreach (var method in controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                if (method.GetCustomAttribute<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>() is null)
+                    continue;
+
+                var fullName = $"{controller.FullName}.{method.Name}";
+                if (noDbAllowList.Contains(fullName))
+                    continue;
+
+                if (method.GetCustomAttribute<ProjectCeres.Common.PreAuthCallSiteAttribute>() is null)
+                    violations.Add(fullName);
+            }
+        }
+
+        violations.Should().BeEmpty(
+            "every [AllowAnonymous] action on an [ApiController] must carry [PreAuthCallSite(\"<name>\")] " +
+            "(or be added to the explicit no-DB allow-list inside this test). The attribute lets " +
+            "HttpContextCurrentUserAccessor resolve the request as UserContext.PreAuth instead of " +
+            "Background, which keeps the RowLevelSecurityInterceptor's diagnostic clean.");
+    }
 }

@@ -1,6 +1,6 @@
 # ADR-0067 — Background-Process User Resolution via `IUserScope` and `IUserJobRunner`
 
-**Status:** Accepted (Phase 3, Batch 3 — Auth)
+**Status:** Accepted (Phase 3, Batch 3 — Auth). **Amended Stage 7 Task 9 (2026-05-12):** the "throw `InvalidOperationException`; silent fallback to `Guid.Empty` is forbidden" rule was softened to "return `Guid.Empty` as the safe default" because EF Core eagerly evaluates global query filter expressions at model creation time. **Superseded in part Stage 7.6.7 (2026-05-14) by [ADR-0073](ADR-0073-user-context-as-discriminated-union.md):** the way "no user resolved yet" is represented in the type system has moved from `Guid.Empty` to a typed `UserContext` discriminated union (`Resolved` / `PreAuth` / `Background` / `Uninitialized`). The broader background-process design — `IUserScope` + `IUserJobRunner` + `BackgroundJobScope` doorway refusal — is unchanged; only the diagnostic representation moved.
 
 **Date:** 2026-05-07
 
