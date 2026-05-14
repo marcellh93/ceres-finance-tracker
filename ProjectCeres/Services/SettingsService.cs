@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Common.Exceptions;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
@@ -21,13 +22,17 @@ public class SettingsService(AppDbContext db, ICurrentUserAccessor user) : ISett
         // requests on first login) both reach this branch; UNIQUE(UserId) makes one
         // win and the other surface a unique-violation. The loser detaches its
         // attempted entity and re-fetches the winner's row.
+        //
+        // Stage 7.6.5: AppDbContext.SaveChangesAsync wraps Postgres 23505 in
+        // UniqueConstraintViolationException, so the catch matches the typed
+        // exception, not raw DbUpdateException.
         var draft = CreateDefaults(user.UserId);
         db.Settings.Add(draft);
         try
         {
             await db.SaveChangesAsync();
         }
-        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        catch (UniqueConstraintViolationException)
         {
             db.Entry(draft).State = EntityState.Detached;
         }
@@ -37,9 +42,6 @@ public class SettingsService(AppDbContext db, ICurrentUserAccessor user) : ISett
             .Owned(user)
             .FirstAsync();
     }
-
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is Npgsql.PostgresException { SqlState: "23505" };
 
     public async Task<Result> TryUpdateAsync(UpdateSettingsRequest request)
     {

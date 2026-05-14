@@ -23,6 +23,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     // observational only — they don't let you replace the exception that bubbles out
     // of SaveChanges. Overriding SaveChangesAsync here is the documented mechanism
     // for transforming exceptions at the EF boundary.
+    //
+    // Stage 7.6.5: chain DbExceptionTranslator after RLS to map 23505 / 23503 / 23502
+    // into typed exceptions. RLS runs first because 42501 must always route through
+    // the RLS path; the second catch handles the constraint-violation codes.
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         try
@@ -32,6 +36,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, out var rls))
         {
             throw rls!;
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (DbExceptionTranslator.TryTranslate(ex, out var typed))
+        {
+            throw typed!;
         }
     }
 
@@ -44,6 +52,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, out var rls))
         {
             throw rls!;
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (DbExceptionTranslator.TryTranslate(ex, out var typed))
+        {
+            throw typed!;
         }
     }
 

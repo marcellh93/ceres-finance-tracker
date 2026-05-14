@@ -9,19 +9,19 @@
 
 ## Session state (last updated 2026-05-14, mid-stage)
 
-**Four of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.5.
+**Five of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.6.
 
 | # | Sub-stage | Status | Commit |
 |---|---|---|---|
 | 7.6.1 | WAF test-mode exception bodies | ✅ Done | `33e00cd` |
 | 7.6.2 | `RlsPolicyViolationException` + `RlsExceptionTranslator` | ✅ Done | (commit landed; see `RlsPolicyViolationException` & `RlsExceptionTranslator` files) |
-| 7.6.3 | `AffectedRowCount` enforcement helper | ✅ Done | (this commit; see `BulkOperationExtensions` + `AffectedRowCountMismatchException` files) |
+| 7.6.3 | `AffectedRowCount` enforcement helper | ✅ Done | `07283f3` |
 | 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext` | ✅ Done | `fdbf960` |
-| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ❌ Pending — START HERE | — |
-| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ❌ Pending | — |
+| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ✅ Done | (this commit; see `DbExceptionTranslator` + 3 typed exceptions + `AppDbContext` chain + `SettingsService` catch rewrite) |
+| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ❌ Pending — START HERE | — |
 | 7.6.7 | `UserContext` discriminated union (ADR-0073) | ❌ Pending | — |
 
-**Lessons baked in from the four shipped sub-stages** (read before starting 7.6.5):
+**Lessons baked in from the five shipped sub-stages** (read before starting 7.6.6):
 
 1. **7.6.2 mechanism correction.** The spec originally said `IDbCommandInterceptor.CommandFailed` for translating Postgres 42501. **That hook is observational only — it cannot replace the propagating exception**, and `ISaveChangesInterceptor.SaveChangesFailed` is the same. The shipped implementation overrides `SaveChanges` / `SaveChangesAsync` on `AppDbContext` and calls a static `RlsExceptionTranslator.TryTranslate(...)` helper in a `catch` block. Same pattern likely applies to 7.6.5's `DbExceptionTranslator` — plan accordingly.
 
@@ -47,7 +47,16 @@
 
    Wrapping any of the latter 6 in `ExecuteUpdate/DeleteExactlyAsync` would convert correct silent-zero behaviour into spurious crashes. The audit lesson generalizes: **before wrapping a bulk operation in an Exactly helper, name the invariant that makes 0 a regression** — "the row was just verified to exist by Id inside the lock" qualifies; "we expect some rows to exist" does not.
 
-6. **Test counts.** Full suite green at 1029/1029 in 3m13s after 7.6.3 ships (1021 pause baseline + 8 new `BulkOperationExtensionsTests`; the spec § 4 table predicted 6 — the 2 extra cover `ExecuteDeleteExactlyAsync` parity with the update helper).
+6. **Test counts.** Full suite green at 1029/1029 in 3m13s after 7.6.3 ships (1021 pause baseline + 8 new `BulkOperationExtensionsTests`; the spec § 4 table predicted 6 — the 2 extra cover `ExecuteDeleteExactlyAsync` parity with the update helper). After 7.6.5: 1036/1036 in 3m28s (+7 new `DbExceptionTranslatorTests`; the spec § 4 table predicted 5 — the 2 extra cover the structured-field-empty defensive path and the `DbUpdateException`-without-`PostgresException`-inner safety net).
+
+7. **7.6.5 SqlState-field-population probe.** Before writing the matcher, ran `psql -U ceres_admin -d project_ceres_test` with `\set VERBOSITY verbose` and triggered each violation in a temp transaction (PG 18.3, the actual dev/test version — the spec said PG 16). Result: all three SqlStates populate the structured fields cleanly:
+   - `23505` (unique): `TableName`, `ConstraintName` populated (e.g. `t1`, `t1_pkey`).
+   - `23503` (foreign key): `TableName`, `ConstraintName` populated (e.g. `child`, `child_parent_id_fkey`).
+   - `23502` (NOT NULL): `TableName`, `ColumnName` populated (e.g. `t2`, `a`).
+
+   Unlike RLS 42501 (lesson #2) which leaves `TableName` empty for WITH CHECK violations and required regex parsing of `MessageText`, these three need no message-parsing fallback. The translator reads structured fields with a defensive `NullIfEmpty` guard so a future code path that emits these SqlStates without populating the structured fields still gets the typed exception (per Postgres protocol-docs warning that frontends should not assume field presence).
+
+8. **7.6.5 SettingsService catch-rewrite.** Wiring the translator into `AppDbContext.SaveChanges{Async}` re-throws 23505 as `UniqueConstraintViolationException` (which is `InvalidOperationException`, NOT `DbUpdateException`). One existing in-tree handler — `SettingsService.GetAsync` first-touch race — caught raw `DbUpdateException` and would have silently broken (the catch wouldn't match, the exception would surface to the caller, and the SPA's first request-after-login would 500). Generalizable rule: **before wiring an exception-translation layer, grep for every existing `catch (DbUpdateException ...)` AND any `Throw<DbUpdateException>()` test assertion in the affected SqlState space, and rewrite or update each in the same commit.** The grep here found exactly one site; result was a one-line catch-type swap.
 
 ---
 
