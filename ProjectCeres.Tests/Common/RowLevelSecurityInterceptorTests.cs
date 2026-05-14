@@ -11,111 +11,69 @@ namespace ProjectCeres.Tests.Common;
 
 public class RowLevelSecurityInterceptorTests
 {
-    private const string OriginalSql = "SELECT * FROM \"Transactions\"";
-
     [Fact]
-    public void ReaderExecuting_runs_SET_LOCAL_as_a_separate_command_on_the_same_connection()
+    public async Task ConnectionOpenedAsync_issues_set_config_with_resolved_user_id()
     {
         var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var (sut, _) = MakeSut(userId);
-        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
+        var conn = new RecordingConnection();
 
-        sut.ReaderExecuting(cmd, FakeEventData(), default);
+        await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
-        cmd.CommandText.Should().Be(OriginalSql, "the original command must be untouched");
-        connection.ExecutedCommands.Should().ContainSingle()
-            .Which.Should().Be($"SET LOCAL \"app.current_user_ref\" = '{userId:D}'");
+        conn.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().Be($"SELECT set_config('app.current_user_ref', '{userId:D}', false)");
     }
 
     [Fact]
-    public async Task ReaderExecutingAsync_runs_SET_LOCAL_as_a_separate_command()
+    public void ConnectionOpened_sync_issues_set_config_with_resolved_user_id()
     {
         var userId = Guid.NewGuid();
         var (sut, _) = MakeSut(userId);
-        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
+        var conn = new RecordingConnection();
 
-        await sut.ReaderExecutingAsync(cmd, FakeEventData(), default);
+        sut.ConnectionOpened(conn, FakeEventData());
 
-        connection.ExecutedCommands.Should().ContainSingle()
-            .Which.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
+        conn.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().StartWith("SELECT set_config('app.current_user_ref', ");
     }
 
     [Fact]
-    public void NonQueryExecuting_runs_SET_LOCAL_as_a_separate_command()
-    {
-        var userId = Guid.NewGuid();
-        var (sut, _) = MakeSut(userId);
-        var (cmd, connection) = MakeCommandWithConnection("UPDATE \"Transactions\" SET \"Amount\" = 1");
-
-        sut.NonQueryExecuting(cmd, FakeEventData(), default);
-
-        connection.ExecutedCommands.Should().ContainSingle()
-            .Which.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
-    }
-
-    [Fact]
-    public void ScalarExecuting_runs_SET_LOCAL_as_a_separate_command()
-    {
-        var userId = Guid.NewGuid();
-        var (sut, _) = MakeSut(userId);
-        var (cmd, connection) = MakeCommandWithConnection("SELECT COUNT(*) FROM \"Transactions\"");
-
-        sut.ScalarExecuting(cmd, FakeEventData(), default);
-
-        connection.ExecutedCommands.Should().ContainSingle()
-            .Which.Should().StartWith("SET LOCAL \"app.current_user_ref\" = ");
-    }
-
-    [Fact]
-    public void Skips_SET_LOCAL_when_user_is_empty_and_preauth_is_tagged_and_does_not_warn()
+    public async Task ConnectionOpenedAsync_resets_GUC_on_pre_auth_path_without_warning()
     {
         var (sut, logs) = MakeSut(Guid.Empty, isPreAuth: true);
-        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
+        var conn = new RecordingConnection();
 
-        sut.ReaderExecuting(cmd, FakeEventData(), default);
+        await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
-        cmd.CommandText.Should().Be(OriginalSql);
-        connection.ExecutedCommands.Should().BeEmpty("pre-auth path issues no SET LOCAL");
+        conn.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().Be("RESET \"app.current_user_ref\"");
         logs.Should().NotContain(l => l.Contains("Warning"));
     }
 
     [Fact]
-    public void Logs_warning_when_user_is_empty_outside_preauth_paths()
+    public async Task ConnectionOpenedAsync_resets_GUC_outside_pre_auth_with_warning()
     {
         var (sut, logs) = MakeSut(Guid.Empty, isPreAuth: false);
-        var (cmd, connection) = MakeCommandWithConnection(OriginalSql);
+        var conn = new RecordingConnection();
 
-        sut.ReaderExecuting(cmd, FakeEventData(), default);
+        await sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
-        cmd.CommandText.Should().Be(OriginalSql);
-        connection.ExecutedCommands.Should().BeEmpty("no SET LOCAL when user is empty");
+        conn.ExecutedCommands.Should().ContainSingle()
+            .Which.Should().Be("RESET \"app.current_user_ref\"");
         logs.Should().Contain(l => l.Contains("Warning") && l.Contains("Guid.Empty"));
     }
 
     [Fact]
-    public void Never_throws_on_Guid_Empty()
+    public async Task ConnectionOpenedAsync_never_throws_on_Guid_Empty()
     {
         // Pins option A: the interceptor is the safety-net, not the doorway.
         // Doorway refusal lives in BackgroundJobScope (Commit 6).
         var (sut, _) = MakeSut(Guid.Empty, isPreAuth: false);
-        var (cmd, _) = MakeCommandWithConnection(OriginalSql);
+        var conn = new RecordingConnection();
 
-        var act = () => sut.ReaderExecuting(cmd, FakeEventData(), default);
+        Func<Task> act = () => sut.ConnectionOpenedAsync(conn, FakeEventData(), default);
 
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void Returns_base_interception_result_unchanged()
-    {
-        // The interceptor's job is to issue SET LOCAL, not short-circuit EF.
-        // Returning InterceptionResult.SuppressWithResult would cancel the real query.
-        var (sut, _) = MakeSut(Guid.NewGuid());
-        var (cmd, _) = MakeCommandWithConnection(OriginalSql);
-
-        var result = sut.ReaderExecuting(cmd, FakeEventData(), default);
-
-        result.HasResult.Should().BeFalse("EF must run the underlying command, not be suppressed");
+        await act.Should().NotThrowAsync();
     }
 
     // --- helpers ---------------------------------------------------------
@@ -135,32 +93,18 @@ public class RowLevelSecurityInterceptorTests
         return (new RowLevelSecurityInterceptor(user, tagger.Object, logger), logs);
     }
 
-    private static (FakeDbCommand Command, RecordingConnection Connection) MakeCommandWithConnection(
-        string commandText)
-    {
-        var connection = new RecordingConnection();
-        var cmd = new FakeDbCommand(connection) { CommandText = commandText };
-        return (cmd, connection);
-    }
-
-    private static CommandEventData FakeEventData() =>
+    private static ConnectionEndEventData FakeEventData() =>
         new(
             eventDefinition: null!,
             messageGenerator: (d, _) => d.ToString() ?? string.Empty,
             connection: null!,
-            command: null!,
-            logCommandText: string.Empty,
             context: null,
-            executeMethod: DbCommandMethod.ExecuteReader,
-            commandId: Guid.NewGuid(),
             connectionId: Guid.NewGuid(),
             async: false,
-            logParameterValues: false,
             startTime: DateTimeOffset.UtcNow,
-            commandSource: CommandSource.Unknown);
+            duration: TimeSpan.Zero);
 
     // Minimal DbConnection that records every CommandText executed against it.
-    // No real database — ExecuteNonQuery returns 0; we assert only on the captured text.
     private sealed class RecordingConnection : DbConnection
     {
         public List<string> ExecutedCommands { get; } = new();
@@ -176,11 +120,7 @@ public class RowLevelSecurityInterceptorTests
         public override void Open() { }
         protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) =>
             throw new NotSupportedException();
-        protected override DbCommand CreateDbCommand()
-        {
-            var cmd = new FakeDbCommand(this);
-            return cmd;
-        }
+        protected override DbCommand CreateDbCommand() => new FakeDbCommand(this);
     }
 
     private sealed class FakeDbCommand : DbCommand
@@ -207,6 +147,11 @@ public class RowLevelSecurityInterceptorTests
         {
             _connection.ExecutedCommands.Add(CommandText);
             return 0;
+        }
+        public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken)
+        {
+            _connection.ExecutedCommands.Add(CommandText);
+            return Task.FromResult(0);
         }
         public override object? ExecuteScalar() => null;
         public override void Prepare() { }

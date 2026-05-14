@@ -239,6 +239,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         // the filter must live on the root entity.
         modelBuilder.Entity<Movement>()               .HasQueryFilter(e => e.UserId == _currentUser.UserId);
 
+        // Attachments (2, promoted to IUserOwned in Stage 7.5 Commit 5). UserId column is
+        // added to both tables in the AddRowLevelSecurityPolicies migration's Phase A
+        // and backfilled from the parent movement.
+        modelBuilder.Entity<TransactionAttachment>()  .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+        modelBuilder.Entity<TransferAttachment>()     .HasQueryFilter(e => e.UserId == _currentUser.UserId);
+
         // Auth-internal (8, promoted to IUserOwned in Task 4)
         modelBuilder.Entity<UserSession>()            .HasQueryFilter(e => e.UserId == _currentUser.UserId);
         modelBuilder.Entity<UserBlockedIp>()          .HasQueryFilter(e => e.UserId == _currentUser.UserId);

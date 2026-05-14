@@ -5,137 +5,123 @@ using Microsoft.Extensions.Logging;
 namespace ProjectCeres.Common;
 
 /// <summary>
-/// Sets the per-command PostgreSQL GUC <c>app.current_user_ref</c> from
-/// <see cref="ICurrentUserAccessor"/> immediately before each EF command runs.
+/// Sets the PostgreSQL session GUC <c>app.current_user_ref</c> from
+/// <see cref="ICurrentUserAccessor"/> every time a database connection is opened.
 /// PostgreSQL RLS policies (Stage 7.5, ADR-0068) read that GUC to filter rows
 /// per-user.
 ///
 /// <para>
-/// SET LOCAL is transaction-scoped, so it does not leak across pooled connections.
-/// On Guid.Empty (pre-auth) the interceptor never throws — it silently skips the
-/// SET LOCAL (RLS policies treat an unset GUC as zero rows via current_setting(..., true)).
-/// On Guid.Empty outside the documented pre-auth call sites it logs a warning so
-/// regressions are loud in dev/log scanning.
+/// <b>Why connection-open, not per-command.</b> EF Core's bulk operations
+/// <c>ExecuteDeleteAsync</c> and <c>ExecuteUpdateAsync</c> do not open an EF
+/// transaction by default. <c>SET LOCAL</c> outside a transaction is a NOTICE and
+/// a no-op (PostgreSQL silently ignores it). A per-command interceptor would
+/// silently miss every bulk operation in production — token-consumption updates,
+/// MFA cleanup, IP-block revocations — leaving them to run with the GUC unset
+/// and the RLS policy filtering all rows. The connection-open hook fires once
+/// per pooled-connection acquisition, before any command (bulk or otherwise) runs.
 /// </para>
 ///
 /// <para>
-/// SET LOCAL runs as a separate command via <c>connection.CreateCommand()</c> sharing
-/// the EF command's transaction, NOT prepended into <c>command.CommandText</c> — the
-/// prepend pattern misaligns Npgsql's per-statement rows-affected array on writes and
-/// raises <c>DbUpdateConcurrencyException</c>. See Npgsql/efcore.pg #2412.
+/// <b>Cross-request leak prevention.</b> The interceptor uses
+/// <c>set_config(name, value, is_local=false)</c> for session scope. Npgsql's
+/// default reset behavior (<c>DISCARD ALL</c> on connection return to the pool)
+/// would clear the GUC anyway, but we explicitly <c>RESET</c> when no user is
+/// resolved as belt-and-braces — and so the property holds even if a future
+/// deployment disables Npgsql's reset (required for pgBouncer transaction mode).
 /// </para>
 ///
 /// <para>
-/// Async interception methods <c>await ExecuteNonQueryAsync</c>; sync paths call the
-/// sync variant. Mixing sync IO into async EF pipelines starves the thread pool under
-/// any request load.
+/// <b>Failure mode.</b> When <c>ICurrentUserAccessor.UserId == Guid.Empty</c>
+/// (pre-auth requests: login, register, password-reset request, etc.), the
+/// interceptor RESETs the GUC to its default (empty string in Postgres for
+/// custom GUCs). The RLS policy uses <c>NULLIF(current_setting(...), '')</c> to
+/// collapse both unset and reset-to-empty into NULL, then casts to uuid. NULL
+/// comparisons evaluate to NULL/false in policy USING/WITH CHECK clauses, so
+/// every row is filtered — the fail-closed property holds.
 /// </para>
 ///
 /// Registered only on AppDbContext (the runtime, RLS-bound context). AdminDbContext
-/// uses the ceres_admin role which has BYPASSRLS — the SET LOCAL would be redundant
-/// there and is intentionally not registered.
+/// uses the ceres_admin role which has BYPASSRLS — the GUC is irrelevant there
+/// and is intentionally not registered.
 /// </summary>
 public sealed class RowLevelSecurityInterceptor(
     ICurrentUserAccessor user,
     IPreAuthCallSiteTagger preAuth,
     ILogger<RowLevelSecurityInterceptor> logger)
-    : DbCommandInterceptor
+    : DbConnectionInterceptor
 {
     private const string GucName = "app.current_user_ref";
 
-    public override InterceptionResult<DbDataReader> ReaderExecuting(
-        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+    public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
-        SetUserGuc(command);
-        return base.ReaderExecuting(command, eventData, result);
+        SetUserGuc(connection);
+        base.ConnectionOpened(connection, eventData);
     }
 
-    public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
-        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
-        CancellationToken cancellationToken = default)
+    public override async Task ConnectionOpenedAsync(
+        DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
     {
-        await SetUserGucAsync(command, cancellationToken).ConfigureAwait(false);
-        return await base.ReaderExecutingAsync(command, eventData, result, cancellationToken).ConfigureAwait(false);
+        await SetUserGucAsync(connection, cancellationToken).ConfigureAwait(false);
+        await base.ConnectionOpenedAsync(connection, eventData, cancellationToken).ConfigureAwait(false);
     }
 
-    public override InterceptionResult<int> NonQueryExecuting(
-        DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
-    {
-        SetUserGuc(command);
-        return base.NonQueryExecuting(command, eventData, result);
-    }
-
-    public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-        DbCommand command, CommandEventData eventData, InterceptionResult<int> result,
-        CancellationToken cancellationToken = default)
-    {
-        await SetUserGucAsync(command, cancellationToken).ConfigureAwait(false);
-        return await base.NonQueryExecutingAsync(command, eventData, result, cancellationToken).ConfigureAwait(false);
-    }
-
-    public override InterceptionResult<object> ScalarExecuting(
-        DbCommand command, CommandEventData eventData, InterceptionResult<object> result)
-    {
-        SetUserGuc(command);
-        return base.ScalarExecuting(command, eventData, result);
-    }
-
-    public override async ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
-        DbCommand command, CommandEventData eventData, InterceptionResult<object> result,
-        CancellationToken cancellationToken = default)
-    {
-        await SetUserGucAsync(command, cancellationToken).ConfigureAwait(false);
-        return await base.ScalarExecutingAsync(command, eventData, result, cancellationToken).ConfigureAwait(false);
-    }
-
-    private void SetUserGuc(DbCommand command)
-    {
-        if (!TryBuildSetLocalCommand(command, out var setLocal))
-            return;
-
-        using (setLocal)
-        {
-            setLocal.ExecuteNonQuery();
-        }
-    }
-
-    private async ValueTask SetUserGucAsync(DbCommand command, CancellationToken cancellationToken)
-    {
-        if (!TryBuildSetLocalCommand(command, out var setLocal))
-            return;
-
-#if NET8_0_OR_GREATER
-        await using (setLocal.ConfigureAwait(false))
-#else
-        using (setLocal)
-#endif
-        {
-            await setLocal.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    private bool TryBuildSetLocalCommand(DbCommand command, out DbCommand setLocal)
+    private void SetUserGuc(DbConnection connection)
     {
         var userId = user.UserId;
         if (userId == Guid.Empty)
         {
-            if (!preAuth.IsLegitimatePreAuth())
-            {
-                logger.LogWarning(
-                    "DB command issued with no resolved user (Guid.Empty) outside a tagged pre-auth call site. " +
-                    "RLS policies will evaluate to zero rows. Command: {CommandText}",
-                    command.CommandText);
-            }
-            setLocal = null!;
-            return false;
+            HandleEmptyUser(connection, async: false).GetAwaiter().GetResult();
+            return;
         }
 
-        var connection = command.Connection
-            ?? throw new InvalidOperationException("DbCommand has no Connection when interceptor fired.");
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT set_config('{GucName}', '{userId:D}', false)";
+        cmd.ExecuteNonQuery();
+    }
 
-        setLocal = connection.CreateCommand();
-        setLocal.Transaction = command.Transaction;
-        setLocal.CommandText = $"SET LOCAL \"{GucName}\" = '{userId:D}'";
-        return true;
+    private async ValueTask SetUserGucAsync(DbConnection connection, CancellationToken cancellationToken)
+    {
+        var userId = user.UserId;
+        if (userId == Guid.Empty)
+        {
+            await HandleEmptyUser(connection, async: true, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"SELECT set_config('{GucName}', '{userId:D}', false)";
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// On Guid.Empty (pre-auth requests, or the rare background path with no user
+    /// resolved yet) we still issue <c>RESET</c> to clear any leaked GUC from a
+    /// previous pool user. Npgsql's default <c>DISCARD ALL</c> on connection return
+    /// would handle this, but RESET is belt-and-braces: the property still holds if
+    /// someone ever sets <c>No Reset On Close=true</c> (required for pgBouncer
+    /// transaction mode). Logs a warning when the call site isn't tagged pre-auth.
+    /// </summary>
+    private async ValueTask HandleEmptyUser(
+        DbConnection connection, bool async, CancellationToken cancellationToken = default)
+    {
+        if (!preAuth.IsLegitimatePreAuth())
+        {
+            logger.LogWarning(
+                "DB connection opened with no resolved user (Guid.Empty) outside a tagged pre-auth call site. " +
+                "RLS policies will evaluate to zero rows for every command on this connection.");
+        }
+
+        if (async)
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"RESET \"{GucName}\"";
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"RESET \"{GucName}\"";
+            cmd.ExecuteNonQuery();
+        }
     }
 }

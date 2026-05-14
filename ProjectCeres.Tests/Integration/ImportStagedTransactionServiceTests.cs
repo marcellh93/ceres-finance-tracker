@@ -1,4 +1,6 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ProjectCeres.Common;
 using ProjectCeres.Tests.Common;
 using ProjectCeres.Models;
@@ -262,52 +264,106 @@ public class ImportStagedTransactionServiceTests : IAsyncLifetime
         rPending.ResolvedAt.Should().NotBe(fixedResolvedAt);
     }
 
+    /// <summary>
+    /// Stage 7.5 / ADR-0068 property 1: the runtime app role (ceres_app, NOBYPASSRLS)
+    /// CANNOT insert a staged-transaction row stamped to a foreign UserId. The RLS
+    /// WITH CHECK policy rejects the write with SqlState 42501.
+    /// </summary>
     [Fact]
-    public async Task TryConfirmAllAsync_DoesNotConfirmOtherUsersPendingRows()
+    public async Task RuntimeApp_role_cannot_insert_staged_transaction_with_foreign_UserId()
     {
-        // Own user (sentinel) seeds a Pending row through the standard helper.
+        var intruderUserId = Guid.NewGuid();
+        _fixture.Db.ImportStagedTransactions.Add(new ImportStagedTransaction
+        {
+            Id              = Guid.NewGuid(),
+            UserId          = intruderUserId,
+            ImportedAt      = DateTime.UtcNow,
+            AccountId       = _accountId,
+            RawDate         = DateOnly.FromDateTime(DateTime.Today),
+            RawAmount       = 100m,
+            RawDescription  = "Foreign-UserId insert attempt",
+        });
+
+        var act = async () => await _fixture.Db.SaveChangesAsync();
+
+        var ex = await act.Should().ThrowAsync<DbUpdateException>();
+        ex.Which.InnerException.Should().BeOfType<PostgresException>()
+            .Which.SqlState.Should().Be("42501");
+    }
+
+    /// <summary>
+    /// Stage 7.5 / ADR-0068 property 2: even if a foreign-UserId row has somehow
+    /// landed in the table (via the admin role, migrator, or a future regression),
+    /// <see cref="ImportStagedTransactionService.TryConfirmAllAsync"/> run under the
+    /// sentinel user does NOT confirm it. The service-layer filter pre-dates RLS
+    /// (Stage 7) and stays as defence-in-depth (ADR-0065).
+    ///
+    /// The intruder account + staged row are seeded via the admin context (BYPASSRLS)
+    /// so the FK target is visible across connections.
+    /// </summary>
+    [Fact]
+    public async Task TryConfirmAllAsync_skips_foreign_UserId_rows_seeded_via_admin_path()
+    {
         var ownTxId    = await CreateTransactionAsync(DateOnly.FromDateTime(DateTime.Today), 100m);
         var ownStaged  = await CreateStagedAsync(ownTxId, StagedTransactionStatus.Pending);
 
-        // Sanity: the helper stamped UserId to the sentinel via the SaveChanges interceptor.
-        ownStaged.UserId.Should().Be(new Guid("00000000-0000-0000-0000-000000000001"));
-
-        // Intruder row: same MatchedTransactionId FK (FK is to Transactions, not user-scoped),
-        // but stamped to a different user. Must bypass the helper to override the auto-stamp.
-        var intruderUserId = Guid.NewGuid();
-        var intruderStaged = new ImportStagedTransaction
+        var intruderUserId    = Guid.NewGuid();
+        var intruderAccountId = Guid.NewGuid();
+        var intruderStagedId  = Guid.NewGuid();
+        await using (var admin = _fixture.CreateAdminContext())
         {
-            Id                   = Guid.NewGuid(),
-            UserId               = intruderUserId,
-            ImportedAt           = DateTime.UtcNow,
-            AccountId            = _accountId,
-            RawDate              = DateOnly.FromDateTime(DateTime.Today),
-            RawAmount            = 100m,
-            RawDescription       = "Intruder CSV row",
-            MatchedTransactionId = ownTxId,
-            Status               = StagedTransactionStatus.Pending
-        };
-        _fixture.Db.ImportStagedTransactions.Add(intruderStaged);
-        await _fixture.Db.SaveChangesAsync();
+            admin.Accounts.Add(new Account
+            {
+                Id            = intruderAccountId,
+                UserId        = intruderUserId,
+                Name          = $"Intruder Account {Guid.NewGuid():N}",
+                AccountTypeId = 1,
+                CurrencyId    = 1,
+                IsActive      = true,
+            });
+            admin.ImportStagedTransactions.Add(new ImportStagedTransaction
+            {
+                Id              = intruderStagedId,
+                UserId          = intruderUserId,
+                ImportedAt      = DateTime.UtcNow,
+                AccountId       = intruderAccountId,
+                RawDate         = DateOnly.FromDateTime(DateTime.Today),
+                RawAmount       = 100m,
+                RawDescription  = "Intruder CSV row (admin-seeded)",
+                Status          = StagedTransactionStatus.Pending,
+            });
+            await admin.SaveChangesAsync();
+        }
 
-        // Re-load to confirm the auto-stamp interceptor did NOT overwrite the intruder UserId.
-        var intruderReloadedBefore = await _fixture.Db.ImportStagedTransactions.FindAsync(intruderStaged.Id);
-        intruderReloadedBefore!.UserId.Should().Be(intruderUserId,
-            "test setup requires the intruder row to remain stamped to a foreign user");
+        try
+        {
+            var result = await _service.TryConfirmAllAsync();
+            result.IsSuccess.Should().BeTrue();
 
-        var result = await _service.TryConfirmAllAsync();
+            var ownReloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(ownStaged.Id);
+            ownReloaded!.Status.Should().Be(StagedTransactionStatus.Confirmed);
+            ownReloaded.ResolvedAt.Should().NotBeNull();
 
-        result.IsSuccess.Should().BeTrue();
-
-        var ownReloaded      = await _fixture.Db.ImportStagedTransactions.FindAsync(ownStaged.Id);
-        var intruderReloaded = await _fixture.Db.ImportStagedTransactions.FindAsync(intruderStaged.Id);
-
-        ownReloaded!.Status.Should().Be(StagedTransactionStatus.Confirmed);
-        ownReloaded.ResolvedAt.Should().NotBeNull();
-
-        intruderReloaded!.Status.Should().Be(StagedTransactionStatus.Pending);
-        intruderReloaded.ResolvedAt.Should().BeNull();
-        intruderReloaded.UserId.Should().Be(intruderUserId);
+            await using var verify = _fixture.CreateAdminContext();
+            var intruder = await verify.ImportStagedTransactions
+                .IgnoreQueryFilters()
+                .SingleAsync(s => s.Id == intruderStagedId);
+            intruder.Status.Should().Be(StagedTransactionStatus.Pending);
+            intruder.ResolvedAt.Should().BeNull();
+        }
+        finally
+        {
+            // Admin-seeded rows live outside the fixture's per-test transaction; clean them up.
+            await using var cleanup = _fixture.CreateAdminContext();
+            await cleanup.ImportStagedTransactions
+                .IgnoreQueryFilters()
+                .Where(s => s.Id == intruderStagedId)
+                .ExecuteDeleteAsync();
+            await cleanup.Accounts
+                .IgnoreQueryFilters()
+                .Where(a => a.Id == intruderAccountId)
+                .ExecuteDeleteAsync();
+        }
     }
 
     // -------------------------------------------------------------------------

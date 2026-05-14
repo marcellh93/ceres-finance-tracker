@@ -136,7 +136,14 @@ public class SettingsServiceTests : IAsyncLifetime
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestDbFixture.AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(user))
+            .AddInterceptors(new RowLevelSecurityInterceptor(
+                user, new NeverPreAuthTagger(), Microsoft.Extensions.Logging.Abstractions.NullLogger<RowLevelSecurityInterceptor>.Instance))
             .Options;
         return new AppDbContext(options, user);
+    }
+
+    private sealed class NeverPreAuthTagger : IPreAuthCallSiteTagger
+    {
+        public bool IsLegitimatePreAuth() => false;
     }
 }

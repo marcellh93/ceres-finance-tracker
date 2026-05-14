@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Tests.Common;
@@ -80,15 +81,26 @@ public class TestDbFixture : IAsyncDisposable
 
     private static DbContextOptions<AppDbContext> BuildAppOptions(ICurrentUserAccessor user)
     {
-        // NOTE: RowLevelSecurityInterceptor requires IPreAuthCallSiteTagger + ILogger.
-        // The Stage 7.5 wall (Commit 5) ships a full RlsTestFixture under
-        // ProjectCeres.Tests/Integration/Rls/ that wires the interceptor properly.
-        // This base fixture pre-dates the wall and is unchanged in its data semantics —
-        // it remains the foundation for everything except the dedicated RLS suite.
+        // Stage 7.5 / ADR-0068 — the AppDbContext talks to Postgres as ceres_app
+        // (NOBYPASSRLS). Without the RowLevelSecurityInterceptor, every WRITE against
+        // an RLS-bound table fails with "new row violates row-level security policy"
+        // because the GUC app.current_user_ref is unset.
         return new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(user))
+            .AddInterceptors(new RowLevelSecurityInterceptor(
+                user, new StubPreAuthTagger(), NullLogger<RowLevelSecurityInterceptor>.Instance))
             .Options;
+    }
+
+    /// <summary>
+    /// Stub tagger that never reports pre-auth — fine for the base fixture where every
+    /// test has a real user. The dedicated RLS test fixture (Group 4 backstop tests)
+    /// uses a richer fake that flips the return value.
+    /// </summary>
+    private sealed class StubPreAuthTagger : IPreAuthCallSiteTagger
+    {
+        public bool IsLegitimatePreAuth() => false;
     }
 
     private static AppDbContext CreateMigratorContext()

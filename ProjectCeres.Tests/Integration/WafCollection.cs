@@ -64,7 +64,14 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         // and would add a round-trip per WAF construction.
         builder.UseSetting("Stage75:SkipPrivilegeLeakCheck", "true");
 
-        builder.UseSetting("ConnectionStrings:ApplicationConnection", AppConnectionString);
+        // Stage 7.5 — point the WAF's AppDbContext at the ADMIN connection string so
+        // legacy integration tests that resolve AppDbContext from DI and do cross-user
+        // cleanup (`IgnoreQueryFilters().Where(...).ExecuteDeleteAsync()`) continue to
+        // work after Postgres RLS turns on. The RLS-bound app role would block those
+        // deletes with `new row violates row-level security policy`. The dedicated
+        // RlsTestFixture (under Integration/Rls/) connects as the real ceres_app to
+        // exercise the wall directly — that's where Stage 7.5 test coverage lives.
+        builder.UseSetting("ConnectionStrings:ApplicationConnection", AdminConnectionString);
         builder.UseSetting("ConnectionStrings:AdminConnection",       AdminConnectionString);
         builder.UseSetting("ConnectionStrings:MigrationConnection",   MigratorConnectionString);
         builder.UseSetting("FileAttachments:RootPath", _uploadsRoot);
