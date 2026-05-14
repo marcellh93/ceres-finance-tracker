@@ -208,7 +208,7 @@ public sealed class PasswordResetService
             <p>This link expires in {(int)TokenLifetime.TotalMinutes} minutes and can only be used once.</p>
             <p>If you did not request a reset, you can ignore this email.</p>
             """;
-        return new EmailMessage(to, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
     }
 
     public async Task<PasswordResetConfirmOutcome> ConfirmAsync(
@@ -420,7 +420,7 @@ public sealed class PasswordResetService
             <p>Your account email address is unchanged.</p>
             <p>If you did not reset your password, contact support immediately.</p>
             """;
-        return new EmailMessage(to, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
     }
 
     private static EmailMessage BuildChangedEmail(string to)
@@ -440,6 +440,6 @@ public sealed class PasswordResetService
             sessions have been signed out as a precaution.</p>
             <p>If you did not change your password, contact support immediately.</p>
             """;
-        return new EmailMessage(to, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
     }
 }

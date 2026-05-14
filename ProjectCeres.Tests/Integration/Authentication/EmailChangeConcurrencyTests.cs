@@ -53,8 +53,8 @@ public class EmailChangeConcurrencyTests : IClassFixture<AuthTestWebApplicationF
         var resp = await client.SendAsync(req);
         resp.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == newEmail));
-        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == oldEmail));
+        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == newEmail));
+        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == oldEmail));
         captured.Clear();
         return (factory, user, oldEmail, newEmail, verifyToken, revokeToken);
     }

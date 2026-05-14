@@ -61,8 +61,8 @@ public class EmailChangeCrossFeatureTests : IClassFixture<AuthTestWebApplication
         var changeResp = await clientForChange.SendAsync(changeReq);
         changeResp.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == newEmail));
-        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == oldEmail));
+        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == newEmail));
+        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == oldEmail));
         captured.Clear();
 
         // Step 2: run password-reset request → confirm.
@@ -71,7 +71,7 @@ public class EmailChangeCrossFeatureTests : IClassFixture<AuthTestWebApplication
             factory, clientForReset, "/api/auth/password-reset/request", new { email = oldEmail });
         resetReqResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var resetMsg = captured.Single(m => m.To == oldEmail && m.Subject.Contains("Reset"));
+        var resetMsg = captured.Single(m => m.To.Address == oldEmail && m.Subject.Contains("Reset"));
         var resetToken = AuthTestFixture.ExtractResetTokenFromMessage(resetMsg);
 
         var confirmResp = await AuthTestFixture.PostJsonWithCsrfAsync(
@@ -141,7 +141,7 @@ public class EmailChangeCrossFeatureTests : IClassFixture<AuthTestWebApplication
         await using var factory = arr.Factory;
 
         arr.Captured.Should().Contain(m =>
-            m.To == arr.OldEmail && m.Subject.Contains("Pending email change cancelled"),
+            m.To.Address == arr.OldEmail && m.Subject.Contains("Pending email change cancelled"),
             "the cancellation notification must land at the old address-of-record");
     }
 

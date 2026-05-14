@@ -153,6 +153,8 @@ if (builder.Environment.IsDevelopment())
 // Production deliberately has no IEmailService implementation registered.
 // DI will throw at startup until Stage 8 wires the real provider.
 
+builder.Services.AddScoped<IEmailRecipientResolver, EmailRecipientResolver>();
+
 builder.Services.AddScoped<MfaBackupCodeService>();
 builder.Services.AddScoped<TotpReplayGuard>();
 builder.Services.AddScoped<FailedLoginRecorder>();

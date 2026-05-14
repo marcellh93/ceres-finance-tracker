@@ -387,7 +387,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
                 CancellationToken.None);
         }
 
-        var verifyMsg = captured.Single(m => m.To == newEmail);
+        var verifyMsg = captured.Single(m => m.To.Address == newEmail);
         var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(verifyMsg);
 
         await ClearAuditAsync(factory, user.Id);
@@ -420,7 +420,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
                 CancellationToken.None);
         }
 
-        var revokeMsg = captured.Single(m => m.To == oldEmail);
+        var revokeMsg = captured.Single(m => m.To.Address == oldEmail);
         var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(revokeMsg);
 
         await ClearAuditAsync(factory, user.Id);

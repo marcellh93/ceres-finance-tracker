@@ -471,7 +471,7 @@ public sealed class EmailChangeService
             <p>This link expires in {(int)VerifyTokenLifetime.TotalMinutes} minutes and can only be used once.</p>
             <p>If you did not request this change, ignore this email.</p>
             """;
-        return new EmailMessage(newEmail, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.OverrideForEmailChange(newEmail), subject, bodyHtml, bodyText);
     }
 
     private static EmailMessage BuildRevokeOldEmail(string oldEmail, string newEmail, string revokeUrl)
@@ -494,7 +494,7 @@ public sealed class EmailChangeService
             <p>If this was NOT you, <a href="{revokeUrl}">cancel the change</a>.</p>
             <p>This cancellation link is valid for {(int)RevokeTokenLifetime.TotalDays} days.</p>
             """;
-        return new EmailMessage(oldEmail, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.OverrideForEmailChange(oldEmail), subject, bodyHtml, bodyText);
     }
 
     private static EmailMessage BuildChangeConfirmedEmail(string newEmail)
@@ -512,7 +512,7 @@ public sealed class EmailChangeService
             <p>All other active sessions have been signed out as a precaution.</p>
             <p>If this was NOT you, contact support immediately.</p>
             """;
-        return new EmailMessage(newEmail, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.OverrideForEmailChange(newEmail), subject, bodyHtml, bodyText);
     }
 
     private static EmailMessage BuildChangeConfirmedToOldEmail(string oldEmail, string newEmail)
@@ -532,7 +532,7 @@ public sealed class EmailChangeService
             <p>All other active sessions have been signed out as a precaution.</p>
             <p>If this was NOT you, contact support immediately — you may still be able to recover the account.</p>
             """;
-        return new EmailMessage(oldEmail, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.OverrideForEmailChange(oldEmail), subject, bodyHtml, bodyText);
     }
 
     private static EmailMessage BuildRevokeNotificationToOldEmail(string oldEmail)
@@ -550,6 +550,6 @@ public sealed class EmailChangeService
             <p>Your account email address is unchanged.</p>
             <p>If you did not initiate this cancellation, contact support immediately.</p>
             """;
-        return new EmailMessage(oldEmail, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.OverrideForEmailChange(oldEmail), subject, bodyHtml, bodyText);
     }
 }

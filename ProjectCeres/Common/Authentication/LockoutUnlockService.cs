@@ -198,6 +198,6 @@ public class LockoutUnlockService
             <p>If you did not attempt to sign in, your password may have been guessed.
             We recommend resetting your password from the sign-in page.</p>
             """;
-        return new EmailMessage(to, subject, bodyHtml, bodyText);
+        return new EmailMessage(EmailRecipient.FromVerifiedUser(to), subject, bodyHtml, bodyText);
     }
 }

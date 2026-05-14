@@ -102,11 +102,11 @@ public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFacto
             "VerifyNew and RevokeOld must have distinct lookups so a raw token cannot match across purposes");
 
         captured.Should().HaveCount(2, "one verify email to new address + one revoke email to old address");
-        captured.Should().Contain(m => m.To == newEmail && m.Subject.Contains("Confirm"));
-        captured.Should().Contain(m => m.To == oldEmail && m.Subject.Contains("change was requested"));
+        captured.Should().Contain(m => m.To.Address == newEmail && m.Subject.Contains("Confirm"));
+        captured.Should().Contain(m => m.To.Address == oldEmail && m.Subject.Contains("change was requested"));
 
-        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == newEmail));
-        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == oldEmail));
+        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == newEmail));
+        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == oldEmail));
         verifyToken.Should().NotBe(revokeToken, "verify and revoke tokens are independent 256-bit values");
     }
 

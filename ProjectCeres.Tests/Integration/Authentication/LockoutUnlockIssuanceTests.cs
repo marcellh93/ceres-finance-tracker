@@ -87,7 +87,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
             tokens[0].ExpiresAt.Should().BeAfter(DateTime.UtcNow);
         }
 
-        var unlockEmails = captured.Where(m => m.To == email).ToList();
+        var unlockEmails = captured.Where(m => m.To.Address == email).ToList();
         unlockEmails.Should().ContainSingle();
         unlockEmails[0].Subject.Should().Contain("locked");
         unlockEmails[0].BodyText.Should().Contain("#token=");
@@ -119,7 +119,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         var db = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.LockoutUnlockTokens.IgnoreQueryFilters().AnyAsync(t => t.UserId == user.Id)).Should().BeFalse(
             "no transition occurred (account was already locked), so no token should be issued");
-        captured.Should().NotContain(m => m.To == email,
+        captured.Should().NotContain(m => m.To.Address == email,
             "no transition → no email");
     }
 

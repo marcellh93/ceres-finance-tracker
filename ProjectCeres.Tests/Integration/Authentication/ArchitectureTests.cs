@@ -673,6 +673,7 @@ public class ArchitectureTests
             "ProjectCeres/Common/Authentication/SessionRevocationValidator.cs",       // runs during cookie validation, before HTTP principal is committed
             "ProjectCeres/Common/Authentication/PersistentCookieRotationMiddleware.cs", // runs before UseAuthentication; resolves session by cookie-embedded id
             "ProjectCeres/Common/Authentication/TotpReplayGuard.cs",                  // MFA-pending step + cross-tenant retention purge of expired entries
+            "ProjectCeres/Common/Email/EmailRecipientResolver.cs",                    // Stage 8a: resolves To: from ApplicationUser.Email; callers include pre-auth flows (password reset, lockout) where the user is not yet signed in
         };
 
         var repoRoot = FindRepoRoot();

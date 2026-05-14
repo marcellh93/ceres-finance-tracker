@@ -17,7 +17,7 @@ public sealed class LogOnlyEmailService : IEmailService
     {
         _logger.LogInformation(
             "[email/dev] To={To} Subject={Subject} BodyText={BodyText}",
-            message.To, message.Subject, message.BodyText);
+            message.To.Address, message.Subject, message.BodyText);
         return Task.CompletedTask;
     }
 }

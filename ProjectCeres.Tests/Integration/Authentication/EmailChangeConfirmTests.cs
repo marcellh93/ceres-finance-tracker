@@ -58,8 +58,8 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         var resp = await client.SendAsync(req);
         resp.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var verifyMsg = captured.Single(m => m.To == newEmail);
-        var revokeMsg = captured.Single(m => m.To == oldEmail);
+        var verifyMsg = captured.Single(m => m.To.Address == newEmail);
+        var revokeMsg = captured.Single(m => m.To.Address == oldEmail);
         var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(verifyMsg);
         var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(revokeMsg);
 
@@ -319,9 +319,9 @@ public class EmailChangeConfirmTests : IClassFixture<AuthTestWebApplicationFacto
         var resp = await PostConfirmAsync(factory, _factory, arr.VerifyToken);
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        captured.Should().Contain(m => m.To == arr.NewEmail && m.Subject.Contains("was changed"),
+        captured.Should().Contain(m => m.To.Address == arr.NewEmail && m.Subject.Contains("was changed"),
             "a change-confirmed notification must be sent to the new (now address-of-record) address");
-        captured.Should().Contain(m => m.To == arr.OldEmail && m.Subject.Contains("was changed"),
+        captured.Should().Contain(m => m.To.Address == arr.OldEmail && m.Subject.Contains("was changed"),
             "a change-confirmed notification must also be sent to the old address per security-model.md");
     }
 }

@@ -55,8 +55,8 @@ public class EmailChangeRevokeTests : IClassFixture<AuthTestWebApplicationFactor
         var resp = await client.SendAsync(req);
         resp.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == newEmail));
-        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To == oldEmail));
+        var verifyToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == newEmail));
+        var revokeToken = AuthTestFixture.ExtractResetTokenFromMessage(captured.Single(m => m.To.Address == oldEmail));
 
         captured.Clear();
         return (factory, user, oldEmail, newEmail, verifyToken, revokeToken);
@@ -245,7 +245,7 @@ public class EmailChangeRevokeTests : IClassFixture<AuthTestWebApplicationFactor
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         captured.Should().HaveCount(1, "exactly one notification, addressed to the old address");
-        captured.Single().To.Should().Be(arr.OldEmail);
+        captured.Single().To.Address.Should().Be(arr.OldEmail);
         captured.Single().Subject.Should().Contain("cancelled");
     }
 }

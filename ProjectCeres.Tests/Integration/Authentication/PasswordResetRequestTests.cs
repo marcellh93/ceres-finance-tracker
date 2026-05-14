@@ -60,7 +60,7 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         token.TokenLookup.Should().NotBeNull().And.HaveCount(32);
 
         emailMock.Verify(e => e.SendAsync(
-            It.Is<EmailMessage>(m => m.To == email && m.Subject.Contains("Reset")),
+            It.Is<EmailMessage>(m => m.To.Address == email && m.Subject.Contains("Reset")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
