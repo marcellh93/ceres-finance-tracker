@@ -231,13 +231,14 @@ public class ArchitectureTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void IEmailService_dev_impl_is_LogOnly()
+    public void IEmailService_impls_are_LogOnly_Noop_or_Resend()
     {
-        // LogOnlyEmailService is the sole dev/production implementation.
-        // NoopEmailService ships in the production assembly (test-helper role)
-        // but must never be registered in production DI.
-        // This test guards against accidental addition of a third implementation
-        // (e.g. a real SMTP sender) before Stage 8 intentionally wires one.
+        // LogOnlyEmailService is the dev fallback (registered when Email:Resend:ApiKey
+        // is unbound and Environment != Production). ResendEmailService is the production
+        // impl (registered when Email:Resend:ApiKey is bound) — wired in Stage 8c.
+        // NoopEmailService ships in the production assembly (test-helper role) but must
+        // never be registered in production DI. Any FOURTH implementation must be
+        // explicitly added here, with the same gating rigor Stage 8 applied.
         var asm = typeof(IEmailService).Assembly;
         var impls = asm.GetTypes()
             .Where(t => typeof(IEmailService).IsAssignableFrom(t)
@@ -249,14 +250,19 @@ public class ArchitectureTests
         {
             typeof(LogOnlyEmailService),
             typeof(NoopEmailService),
+            typeof(ResendEmailService),
         };
 
         impls.Should().OnlyContain(t => knownImpls.Contains(t),
-            "only LogOnlyEmailService and NoopEmailService may exist in the production assembly — " +
-            "any new implementation (real SMTP, etc.) must be gated by Stage 8");
+            "only LogOnlyEmailService, NoopEmailService, and ResendEmailService may exist " +
+            "in the production assembly — any new implementation must be added to knownImpls " +
+            "explicitly so the addition is reviewed.");
 
         impls.Should().Contain(typeof(LogOnlyEmailService),
             "LogOnlyEmailService must be present as the dev IEmailService implementation");
+
+        impls.Should().Contain(typeof(ResendEmailService),
+            "ResendEmailService must be present as the production IEmailService implementation (Stage 8c)");
     }
 
     // -----------------------------------------------------------------------

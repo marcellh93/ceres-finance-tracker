@@ -19,6 +19,7 @@ using ProjectCeres.ModelBinders;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Services.Reports;
+using Resend;
 using Vite.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -146,12 +147,29 @@ builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
 builder.Services.AddScoped<LockoutUnlockService>();
 builder.Services.AddMemoryCache();
 
-if (builder.Environment.IsDevelopment())
+// === Email service registration (Stage 8c) ===
+// Production must fail loud if Email:Resend:ApiKey is unbound — silently
+// falling back to LogOnlyEmailService would drop every transactional email
+// with no signal. Dev/Test without a key keeps using LogOnlyEmailService.
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+
+var resendApiKey = builder.Configuration["Email:Resend:ApiKey"];
+if (string.IsNullOrWhiteSpace(resendApiKey))
 {
+    if (builder.Environment.IsProduction())
+    {
+        throw new InvalidOperationException(
+            "Email:Resend:ApiKey is required in Production. " +
+            "Set the Email__Resend__ApiKey environment variable.");
+    }
     builder.Services.AddSingleton<IEmailService, LogOnlyEmailService>();
 }
-// Production deliberately has no IEmailService implementation registered.
-// DI will throw at startup until Stage 8 wires the real provider.
+else
+{
+    builder.Services.AddHttpClient<IResend, ResendClient>(c =>
+        c.DefaultRequestHeaders.Authorization = new("Bearer", resendApiKey));
+    builder.Services.AddScoped<IEmailService, ResendEmailService>();
+}
 
 builder.Services.AddScoped<IEmailRecipientResolver, EmailRecipientResolver>();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
