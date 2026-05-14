@@ -782,7 +782,7 @@ Follow-ups recorded for future stages:
 
 ## Stage 7.6 — Error legibility + OCP cleanup (Batch 3c continued)
 
-**Status: ❌ Pending.** Closes seven diagnostic + OCP gaps surfaced during Stage 7.5. Infrastructure-only — no user-facing behaviour changes, no schema changes. Lands before Stage 8 so the cleanups apply while the RLS pattern is fresh.
+**Status: ⚠️ In progress (started 2026-05-14).** Closes seven diagnostic + OCP gaps surfaced during Stage 7.5. Infrastructure-only — no user-facing behaviour changes, no schema changes. Lands before Stage 8 so the cleanups apply while the RLS pattern is fresh. **Three of seven sub-stages shipped on `main`; resume from 7.6.3.** See [`docs/superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md` § Session state](superpowers/specs/2026-05-14-stage-7-6-error-legibility-and-ocp-cleanup.md) for what's done, what's pending, and the three implementation lessons (7.6.2 mechanism correction, 7.6.2 message-parsing fallback, 7.6.4 closure-capture pitfall).
 
 > **Goal:** every test failure shows the production stack trace on first run; every silent-zero-row failure mode is converted to a loud exception; `UserOwnedTables.All` becomes the single source of truth for the EF filter registration; the four meanings of `Guid.Empty` are replaced by a typed `UserContext` discriminated union.
 
@@ -792,22 +792,22 @@ Brainstorm spec: [`docs/superpowers/specs/2026-05-14-stage-7-6-error-legibility-
 
 ### Sub-stages
 
-| # | Sub-stage | Effort | Spec § |
-|---|---|---|---|
-| 7.6.1 | WAF test-mode returns exception bodies — `app.UseExceptionHandler` writes the full exception text to the response body inside the WAF; no more "InternalServerError" with no stack. | ~50 LOC | § 2.1 |
-| 7.6.2 | `RlsPolicyViolationException` wrapping `SqlState 42501` on user-owned tables — typed exception carrying `TableName`, `AttemptedUserId`, `GucUserId`. | ~110 LOC | § 2.2 |
-| 7.6.3 | `AffectedRowCount` enforcement helper — `ExecuteUpdateExactlyAsync` / `ExecuteDeleteExactlyAsync` throw `AffectedRowCountMismatchException` when row count != expected. Migrates 8 production call sites with exactly-one-row semantics. | ~145 LOC | § 2.3 |
-| 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext.OnModelCreating` — replaces 22 hand-written `HasQueryFilter` registrations with a loop. | ~25 LOC | § 2.4 |
-| 7.6.5 | `DbExceptionTranslator` mapping SqlState codes (23505, 23503, 23502) to typed exceptions. | ~150 LOC | § 2.5 |
-| 7.6.6 | Split `TestDbFixture` into three single-responsibility fixtures: `MigrationFixture`, `AppContextFactory`, `AdminContextFactory`. | ~90 LOC | § 2.6 |
-| 7.6.7 | `UserContext` discriminated union + `[PreAuthCallSite]` attribute + `UserContextRequiredException`. Deletes `IPreAuthCallSiteTagger`. ADR-0073 is the design record. | ~200 LOC | § 2.7 |
+| # | Sub-stage | Effort | Status | Commit | Spec § |
+|---|---|---|---|---|---|
+| 7.6.1 | WAF test-mode returns exception bodies — `HttpAssertions.HaveStatusCodeAsync` includes the response body in failure messages so a 500 surfaces the production stack on first run. | ~170 LOC | ✅ Done | `33e00cd` | § 2.1 |
+| 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext.OnModelCreating` — replaces 22 hand-written `HasQueryFilter` registrations with a reflection-driven generic-method invoke. **First attempt used raw `Expression.Lambda` and broke ~162 tests** (closure-capture pitfall, dotnet/efcore #14740); shipped version dispatches to `RegisterUserOwnedFilter<TEntity>` whose C# lambda the compiler emits with the right `this`-closure semantics. | ~80 LOC | ✅ Done | `fdbf960` | § 2.4 |
+| 7.6.2 | `RlsPolicyViolationException` wrapping `SqlState 42501` on user-owned tables — typed exception carrying `TableName`, `GucUserId`, and the original `PostgresException`. Service code can now `catch (RlsPolicyViolationException)`. **Mechanism correction**: the spec originally said `IDbCommandInterceptor.CommandFailed`; that hook is observational only. Shipped version overrides `AppDbContext.SaveChanges{Async}` and calls a static `RlsExceptionTranslator.TryTranslate(...)` in a catch block. **Message-parsing fallback**: Postgres doesn't populate the structured `TableName` field for RLS violations, so the translator parses the table name from the message text. | ~330 LOC | ✅ Done | (see `RlsPolicyViolationException.cs` + `RlsExceptionTranslator.cs`) | § 2.2 |
+| 7.6.3 | `AffectedRowCount` enforcement helper — `ExecuteUpdateExactlyAsync` / `ExecuteDeleteExactlyAsync` throw `AffectedRowCountMismatchException` when row count != expected. Migrates 8 production call sites with exactly-one-row semantics. | ~145 LOC | ❌ Pending — **resume here** | — | § 2.3 |
+| 7.6.5 | `DbExceptionTranslator` mapping SqlState codes (23505, 23503, 23502) to typed exceptions. **Apply the 7.6.2 lessons**: catch in `SaveChanges{Async}` override (not via interceptor); verify which `PostgresException` structured fields populate for each SqlState before writing the matcher. | ~150 LOC | ❌ Pending | — | § 2.5 |
+| 7.6.6 | Split `TestDbFixture` into three single-responsibility fixtures: `MigrationFixture`, `AppContextFactory`, `AdminContextFactory`. | ~90 LOC | ❌ Pending | — | § 2.6 |
+| 7.6.7 | `UserContext` discriminated union + `[PreAuthCallSite]` attribute + `UserContextRequiredException`. Deletes `IPreAuthCallSiteTagger`. ADR-0073 is the design record. | ~200 LOC | ❌ Pending | — | § 2.7 |
 
 ### Verification checklist
 
 Diagnostic improvements:
 
-- [ ] WAF integration test failures show the full server-side exception body. Verified by a deliberate-throw probe test.
-- [ ] `RlsPolicyViolationException` is thrown (not `PostgresException`) when a write hits a user-owned table under the wrong user.
+- [x] WAF integration test failures show the full server-side exception body. *(7.6.1 — `HttpAssertions.HaveStatusCodeAsync` + `BeSuccessfulAsync` ship in `ProjectCeres.Tests/Integration/Infrastructure/`; 5 unit tests verify the body-on-failure contract.)*
+- [x] `RlsPolicyViolationException` is thrown (not `PostgresException`) when a write hits a user-owned table under the wrong user. *(7.6.2 — wired via `AppDbContext.SaveChanges{Async}` override calling `RlsExceptionTranslator.TryTranslate(...)`. 6 unit tests + 4 integration tests assert the typed exception with `TableName` and `GucUserId` payload.)*
 - [ ] `AffectedRowCountMismatchException` fires when a `ExecuteUpdateExactlyAsync` or `ExecuteDeleteExactlyAsync` call affects 0 rows where 1 was expected.
 - [ ] `UniqueConstraintViolationException` / `ForeignKeyViolationException` / `NullConstraintViolationException` are thrown (not generic `DbUpdateException`) for the three documented `SqlState` codes.
 - [ ] `BackgroundJobScope.RunAsync` exception message names the rejected `UserContext` case.
@@ -815,14 +815,14 @@ Diagnostic improvements:
 
 OCP improvements:
 
-- [ ] `AppDbContext.OnModelCreating` references `UserOwnedTables.All` and contains no hand-written `HasQueryFilter` registrations except `Movement` (TPC root).
-- [ ] Adding a new user-owned entity is one append to `UserOwnedTables.All`. The Stage 7.5 parity test still catches RLS-policy drift.
+- [x] `AppDbContext.OnModelCreating` references `UserOwnedTables.All` and contains no hand-written `HasQueryFilter` registrations except `Movement` (TPC root). *(7.6.4 — uses `MethodInfo.MakeGenericMethod` + `RegisterUserOwnedFilter<TEntity>` to dispatch to a generic helper whose C# lambda closes over `this._currentUser` correctly. New architecture test `UserOwnedTables_All_matches_HasQueryFilter_registrations` walks `IEntityType.BaseType` for TPC inheritance.)*
+- [x] Adding a new user-owned entity is one append to `UserOwnedTables.All`. The Stage 7.5 parity test still catches RLS-policy drift. *(7.6.4 — covered by the new architecture test above + the existing parity test.)*
 
 Architecture tests:
 
-- [ ] `IUserScope.EnterAs` allow-list test from Stage 7.5 continues to pass.
-- [ ] **New** `Every_anonymous_endpoint_that_hits_the_db_carries_a_PreAuthCallSite_attribute` — Roslyn-free scan of `Assembly.GetTypes()` for `[AllowAnonymous]` actions that touch `AppDbContext`; each must have `[PreAuthCallSite]`.
-- [ ] `IgnoreQueryFilters()` allow-list test from Stage 7 continues to pass.
+- [x] `IUserScope.EnterAs` allow-list test from Stage 7.5 continues to pass.
+- [ ] **New** `Every_anonymous_endpoint_that_hits_the_db_carries_a_PreAuthCallSite_attribute` — Roslyn-free scan of `Assembly.GetTypes()` for `[AllowAnonymous]` actions that touch `AppDbContext`; each must have `[PreAuthCallSite]`. *(Ships in 7.6.7 alongside the `[PreAuthCallSite]` attribute.)*
+- [x] `IgnoreQueryFilters()` allow-list test from Stage 7 continues to pass.
 
 Removals:
 

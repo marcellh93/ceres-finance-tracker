@@ -7,6 +7,34 @@
 
 ---
 
+## Session state (last updated 2026-05-14, mid-stage)
+
+**Three of seven sub-stages shipped on `main`.** Resume implementation from sub-stage 7.6.3.
+
+| # | Sub-stage | Status | Commit |
+|---|---|---|---|
+| 7.6.1 | WAF test-mode exception bodies | ✅ Done | `33e00cd` |
+| 7.6.2 | `RlsPolicyViolationException` + `RlsExceptionTranslator` | ✅ Done | (commit landed; see `RlsPolicyViolationException` & `RlsExceptionTranslator` files) |
+| 7.6.3 | `AffectedRowCount` enforcement helper | ❌ Pending — START HERE | — |
+| 7.6.4 | Iterate `UserOwnedTables.All` in `AppDbContext` | ✅ Done | `fdbf960` |
+| 7.6.5 | `DbExceptionTranslator` for 23505 / 23503 / 23502 | ❌ Pending | — |
+| 7.6.6 | Split `TestDbFixture` into three focused fixtures | ❌ Pending | — |
+| 7.6.7 | `UserContext` discriminated union (ADR-0073) | ❌ Pending | — |
+
+**Lessons baked in from the three shipped sub-stages** (read before starting 7.6.3):
+
+1. **7.6.2 mechanism correction.** The spec originally said `IDbCommandInterceptor.CommandFailed` for translating Postgres 42501. **That hook is observational only — it cannot replace the propagating exception**, and `ISaveChangesInterceptor.SaveChangesFailed` is the same. The shipped implementation overrides `SaveChanges` / `SaveChangesAsync` on `AppDbContext` and calls a static `RlsExceptionTranslator.TryTranslate(...)` helper in a `catch` block. Same pattern likely applies to 7.6.5's `DbExceptionTranslator` — plan accordingly.
+
+2. **7.6.2 message-parsing fallback.** Postgres does NOT populate the structured `TableName` field on RLS WITH CHECK violations (verified against PG 16). The translator parses the table name from the message text. Sub-stage 7.6.5's `DbExceptionTranslator` will likely face similar gaps for 23505/23503/23502 — verify which structured fields Npgsql populates for each before writing the matcher.
+
+3. **7.6.4 closure-capture pitfall.** First attempt built filter lambdas via `Expression.Lambda` with `Expression.Constant(_currentUser, ...)` — baked the specific accessor instance into EF's cached model, breaking ~162 tests. The shipped version uses `MethodInfo.MakeGenericMethod(t.EntityType).Invoke(this, new[] { modelBuilder })` to dispatch to a generic helper `RegisterUserOwnedFilter<TEntity>` whose body is a regular C# lambda. The compiler emits the right `this`-closure semantics; EF parameterizes the filter correctly. See dotnet/efcore #14740 for the documented pitfall.
+
+4. **Order-of-operations adjustment.** 7.6.4 lands BEFORE 7.6.2 in the as-shipped order (not after, as the original spec implied) because 7.6.2's `RlsExceptionTranslator` reads from `UserOwnedTables.All` directly — same source of truth. The remaining sub-stages have no such inter-dependency; 7.6.3 → 7.6.5 → 7.6.6 → 7.6.7 is the right order from here.
+
+5. **Test counts at session pause.** Full suite green at 1021/1021 in 3m55s. Each remaining sub-stage adds tests per the table in § 4.
+
+---
+
 ## 1. Context — why this stage exists
 
 Two patterns of pain across Stages 6, 7, and 7.5:
