@@ -438,7 +438,7 @@ public sealed class AuthController : ControllerBase
         // it's always false — the banner that consumes it doesn't ship until Phase 4.
         var usedBackupCodeAtLastLogin = false;
 
-        Response.Headers.CacheControl = "no-store";
+        Response.ApplyNoStore();
 
         return Ok(new MeResponse(
             UserId: user.Id,

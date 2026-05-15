@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels.Auth;
@@ -43,7 +44,7 @@ public sealed class MfaController : ControllerBase
         var otpAuthUri = $"otpauth://totp/{encodedIssuer}:{encodedEmail}?secret={key}&issuer={encodedIssuer}&algorithm=SHA1&digits=6&period=30";
         var manualEntryKey = FormatManualKey(key);
 
-        ApplyNoStoreHeaders();
+        Response.ApplyNoStore();
         return Ok(new { otpAuthUri, manualEntryKey });
     }
 
@@ -77,7 +78,7 @@ public sealed class MfaController : ControllerBase
 
         await _auditLog.RecordAsync(user.Id, AuditLogAction.MfaEnrolled, ct: HttpContext.RequestAborted);
 
-        ApplyNoStoreHeaders();
+        Response.ApplyNoStore();
         return Ok(new { backupCodes = codes });
     }
 
@@ -97,7 +98,7 @@ public sealed class MfaController : ControllerBase
 
         await _auditLog.RecordAsync(user.Id, AuditLogAction.BackupCodesRegenerated, ct: HttpContext.RequestAborted);
 
-        ApplyNoStoreHeaders();
+        Response.ApplyNoStore();
         return Ok(new { backupCodes = codes });
     }
 
@@ -118,9 +119,4 @@ public sealed class MfaController : ControllerBase
         return sb.ToString();
     }
 
-    private void ApplyNoStoreHeaders()
-    {
-        Response.Headers.CacheControl = "no-store, no-cache";
-        Response.Headers.Pragma = "no-cache";
-    }
 }

@@ -55,6 +55,7 @@ public class MeEndpointTests : IAsyncLifetime
         body.TwoFactorEnabled.Should().BeFalse();
         body.BackupCodesRemaining.Should().Be(0);
         body.UsedBackupCodeAtLastLogin.Should().BeFalse();
+        body.LastReauthAt.Should().BeNull();
     }
 
     [Fact]
