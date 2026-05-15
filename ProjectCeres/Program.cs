@@ -345,6 +345,79 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0,
         });
     });
+
+    options.AddPolicy(AuthRateLimitPolicies.EmailByUser, httpContext =>
+    {
+        // Stage 8d. Partition by the NORMALIZED email from the JSON body when present,
+        // so unknown and known emails go through the same limiter path on
+        // /password-reset/request — preserving the Stage 6.16 timing-channel fix.
+        // Fallbacks: authenticated NameIdentifier (for /email-change/request whose body
+        // carries "newEmail", not "email"), then client IP, then a fixed constant.
+        var key = EmailPartitionHelpers.TryReadEmailFromBody(httpContext)
+                  ?? AuthenticateAndGetUserId(httpContext)
+                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "anonymous-email";
+        return RateLimitPartition.GetSlidingWindowLimiter(key, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(60),
+            SegmentsPerWindow = 6,
+            QueueLimit = 0,
+        });
+
+        static string? AuthenticateAndGetUserId(HttpContext ctx)
+        {
+            // Mirrors AuthReauthByUser / AuthMfaByUser. Rate limiter middleware runs
+            // before UseAuthentication, so ctx.User is empty here — explicitly decode
+            // the application cookie to pick up the NameIdentifier claim.
+            var task = ctx.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+            task.Wait();
+            return task.Result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+    });
+
+    // Stage 8d. Per-IP backstop on email-triggering endpoints — 10/hr/IP. Catches an
+    // attacker that rotates the "email" payload across many addresses from a single
+    // source to dodge the per-email EmailByUser bucket above. Registered as the
+    // GlobalLimiter (gated by [ApplyEmailIpRateLimit] endpoint metadata) because
+    // EnableRateLimitingAttribute is declared AllowMultiple=false, so we cannot
+    // stack a second [EnableRateLimiting] on the same action to run the IP bucket
+    // alongside EmailByUser. Endpoints without the marker return GetNoLimiter and
+    // skip the bucket entirely. The named policy AuthRateLimitPolicies.EmailByIp is
+    // also registered below so test infrastructure can reference it by name.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var marker = httpContext.GetEndpoint()?.Metadata.GetMetadata<ApplyEmailIpRateLimitAttribute>();
+        if (marker is null)
+            return RateLimitPartition.GetNoLimiter<string>("no-email-ip-limit");
+
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter($"email-by-ip:{ip}",
+            _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(60),
+                SegmentsPerWindow = 6,
+                QueueLimit = 0,
+            });
+    });
+
+    // EmailByIp is also addressable by name (e.g. for tests that want to query the
+    // policy registry by AuthRateLimitPolicies.EmailByIp) although in production it
+    // is enforced via GlobalLimiter above — endpoints do NOT attach this via
+    // [EnableRateLimiting]. The named policy uses the same parameters so semantics
+    // line up exactly with the global limiter.
+    options.AddPolicy(AuthRateLimitPolicies.EmailByIp, httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(60),
+            SegmentsPerWindow = 6,
+            QueueLimit = 0,
+        });
+    });
 });
 
 // === End Stage 6a wiring ===
@@ -438,6 +511,64 @@ app.MapControllerRoute(
 app.Run();
 
 public partial class Program { }
+
+internal static class EmailPartitionHelpers
+{
+    /// <summary>
+    /// Reads the lowercase, trimmed "email" property from a JSON request body for
+    /// EmailByUser limiter partitioning. Returns null if the body has no top-level
+    /// "email" string property (e.g. /email-change/request whose body carries
+    /// "newEmail" — the EmailByUser policy then falls through to the UserId claim).
+    ///
+    /// Body buffering is required: the rate limiter middleware runs before model
+    /// binding, so the body stream has not yet been buffered. We call
+    /// <see cref="Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpRequest)"/>
+    /// to allow the position to be reset; the body is rewound before returning so
+    /// the model binder downstream sees the full payload.
+    /// </summary>
+    public static string? TryReadEmailFromBody(HttpContext ctx)
+    {
+        if (ctx.Request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) != true)
+            return null;
+
+        ctx.Request.EnableBuffering();
+        ctx.Request.Body.Position = 0;
+
+        // Read the body buffer asynchronously — Kestrel disallows sync I/O by default
+        // and StreamReader.ReadToEnd() trips InvalidOperationException. We block on
+        // the async read because the limiter-policy callback itself is synchronous.
+        var body = ReadBodyAsync(ctx.Request.Body, ctx.RequestAborted).GetAwaiter().GetResult();
+        ctx.Request.Body.Position = 0;
+
+        if (string.IsNullOrWhiteSpace(body)) return null;
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("email", out var emailEl) &&
+                emailEl.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                return emailEl.GetString()?.Trim().ToLowerInvariant();
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Malformed body — let the model binder produce the 400. We deliberately
+            // do not fall back to IP/user here: the limiter would then partition
+            // differently for malformed-vs-well-formed requests, which an attacker
+            // could exploit to dodge the per-email bucket.
+        }
+
+        return null;
+    }
+
+    private static async Task<string> ReadBodyAsync(Stream body, CancellationToken ct)
+    {
+        using var reader = new StreamReader(body, leaveOpen: true);
+        return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    }
+}
 
 internal sealed class TotpByUserPartitioner : IRateLimiterPolicy<string>
 {

@@ -17,7 +17,8 @@ public sealed class PasswordResetController : ControllerBase
     public PasswordResetController(PasswordResetService service) => _service = service;
 
     [HttpPost("request"), AllowAnonymous, PreAuthCallSite("PasswordReset.RequestReset")]
-    [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
+    [EnableRateLimiting(AuthRateLimitPolicies.EmailByUser)]
+    [ApplyEmailIpRateLimit]
     public async Task<IActionResult> RequestReset([FromBody] PasswordResetRequest request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);

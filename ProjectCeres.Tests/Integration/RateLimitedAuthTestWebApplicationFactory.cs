@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
@@ -166,6 +167,8 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     AuthRateLimitPolicies.AuthCsrfByIp,
                     AuthRateLimitPolicies.AuthMfaByUser,
                     AuthRateLimitPolicies.AuthReauthByUser,
+                    AuthRateLimitPolicies.EmailByUser,
+                    AuthRateLimitPolicies.EmailByIp,
                 })
                 {
                     removeFromPolicy.Invoke(policyMap, new object[] { name });
@@ -253,8 +256,103 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                         QueueLimit = 0,
                     });
                 });
+
+                // Stage 8d. Re-register the EmailByUser policy with parameters matching
+                // production (5/hr partitioned by body-email → NameIdentifier → IP).
+                opts.AddPolicy(AuthRateLimitPolicies.EmailByUser, httpContext =>
+                {
+                    var key = ReadEmailFromBody(httpContext)
+                              ?? AuthenticateAndGetUserId(httpContext)
+                              ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                              ?? "anonymous-email";
+                    return RateLimitPartition.GetSlidingWindowLimiter(key,
+                        _ => new SlidingWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5,
+                            Window = TimeSpan.FromMinutes(60),
+                            SegmentsPerWindow = 6,
+                            QueueLimit = 0,
+                        });
+
+                    static string? AuthenticateAndGetUserId(Microsoft.AspNetCore.Http.HttpContext ctx)
+                    {
+                        var t = ctx.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+                        t.Wait();
+                        return t.Result.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    }
+                });
+
+                // Stage 8d. Re-register the named EmailByIp policy plus the GlobalLimiter
+                // that production uses to apply 10/hr/IP to actions decorated with
+                // [ApplyEmailIpRateLimit]. The named policy is kept for symmetry with the
+                // production registry; the actual enforcement is via GlobalLimiter.
+                opts.AddPolicy(AuthRateLimitPolicies.EmailByIp, httpContext =>
+                {
+                    var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    return RateLimitPartition.GetSlidingWindowLimiter(ip,
+                        _ => new SlidingWindowRateLimiterOptions
+                        {
+                            PermitLimit = 10,
+                            Window = TimeSpan.FromMinutes(60),
+                            SegmentsPerWindow = 6,
+                            QueueLimit = 0,
+                        });
+                });
+
+                opts.GlobalLimiter = System.Threading.RateLimiting.PartitionedRateLimiter
+                    .Create<Microsoft.AspNetCore.Http.HttpContext, string>(httpContext =>
+                    {
+                        var marker = httpContext.GetEndpoint()?.Metadata
+                            .GetMetadata<ApplyEmailIpRateLimitAttribute>();
+                        if (marker is null)
+                            return RateLimitPartition.GetNoLimiter<string>("no-email-ip-limit");
+
+                        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                        return RateLimitPartition.GetSlidingWindowLimiter($"email-by-ip:{ip}",
+                            _ => new SlidingWindowRateLimiterOptions
+                            {
+                                PermitLimit = 10,
+                                Window = TimeSpan.FromMinutes(60),
+                                SegmentsPerWindow = 6,
+                                QueueLimit = 0,
+                            });
+                    });
             });
         });
+    }
+
+    /// <summary>
+    /// Test-side mirror of <c>EmailPartitionHelpers.TryReadEmailFromBody</c> from
+    /// production. Lives here because the production helper is <c>internal</c> to
+    /// the SUT and the test assembly does not have InternalsVisibleTo. Stage 8d.
+    /// </summary>
+    private static string? ReadEmailFromBody(Microsoft.AspNetCore.Http.HttpContext ctx)
+    {
+        if (ctx.Request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) != true)
+            return null;
+        ctx.Request.EnableBuffering();
+        ctx.Request.Body.Position = 0;
+        var body = ReadBodyAsync(ctx.Request.Body, ctx.RequestAborted).GetAwaiter().GetResult();
+        ctx.Request.Body.Position = 0;
+        if (string.IsNullOrWhiteSpace(body)) return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                doc.RootElement.TryGetProperty("email", out var emailEl) &&
+                emailEl.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                return emailEl.GetString()?.Trim().ToLowerInvariant();
+            }
+        }
+        catch (System.Text.Json.JsonException) { }
+        return null;
+    }
+
+    private static async Task<string> ReadBodyAsync(System.IO.Stream body, CancellationToken ct)
+    {
+        using var reader = new System.IO.StreamReader(body, leaveOpen: true);
+        return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
     }
 }
 

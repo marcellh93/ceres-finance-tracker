@@ -35,4 +35,19 @@ public static class AuthRateLimitPolicies
     /// <summary>10/min/user sliding window keyed off authenticated NameIdentifier claim.
     /// Applied to POST /api/auth/reauth. Stage 6c.2.</summary>
     public const string AuthReauthByUser = "auth-reauth-by-user";
+
+    /// <summary>5/hour sliding-window middleware policy for email-triggering endpoints.
+    /// Partition key order: normalized email from the JSON body → NameIdentifier of an
+    /// authenticated caller (fallback for /email-change/request whose body has no
+    /// "email" field) → client IP → "anonymous-email" constant. Stage 8d. Partitioning
+    /// by the body email (not UserId) on unauthenticated paths preserves the Stage 6.16
+    /// fix: unknown and known emails go through the same limiter path so the
+    /// Argon2id-call-count timing channel stays closed.</summary>
+    public const string EmailByUser = "email-by-user";
+
+    /// <summary>10/hour/IP sliding-window middleware policy applied alongside
+    /// <see cref="EmailByUser"/> on email-triggering endpoints. Backstops the per-email
+    /// policy against an attacker who rotates the "email" payload across many addresses
+    /// from a single source. Stage 8d.</summary>
+    public const string EmailByIp = "email-by-ip";
 }

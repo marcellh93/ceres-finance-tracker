@@ -115,6 +115,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     AuthRateLimitPolicies.AuthCsrfByIp,
                     AuthRateLimitPolicies.AuthMfaByUser,
                     AuthRateLimitPolicies.AuthReauthByUser,
+                    AuthRateLimitPolicies.EmailByUser,
+                    AuthRateLimitPolicies.EmailByIp,
                 })
                 {
                     removeFromPolicy.Invoke(policyMap,         new object[] { name });
@@ -122,6 +124,14 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     opts.AddPolicy(name,
                         _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter("test"));
                 }
+
+                // Stage 8d. The production EmailByIp bucket is wired as the
+                // RateLimiterOptions.GlobalLimiter (gated by [ApplyEmailIpRateLimit])
+                // because EnableRateLimitingAttribute is AllowMultiple=false. Replace it
+                // with a no-op so non-rate-limit-test classes don't trip it on burst.
+                opts.GlobalLimiter = System.Threading.RateLimiting.PartitionedRateLimiter
+                    .Create<Microsoft.AspNetCore.Http.HttpContext, string>(
+                        _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter<string>("test"));
             });
 
             if (!UseTestAuthHandler) return;

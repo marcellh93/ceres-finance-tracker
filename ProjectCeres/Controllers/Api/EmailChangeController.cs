@@ -22,6 +22,7 @@ public sealed class EmailChangeController : ControllerBase
     // ArchitectureTests.Every_controller_action_declares_authorization_intent (which
     // calls GetCustomAttribute<AuthorizeAttribute>() singularly), and is redundant.
     [HttpPost("request"), RequireRecentAuth]
+    [EnableRateLimiting(AuthRateLimitPolicies.EmailByUser)]
     public async Task<IActionResult> RequestChange([FromBody] EmailChangeRequest body)
     {
         var sid = User.FindFirstValue(ClaimTypes.NameIdentifier);

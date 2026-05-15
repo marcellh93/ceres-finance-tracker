@@ -17,7 +17,9 @@ public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebA
     // ── Test #24 ────────────────────────────────────────────────────────────
     /// <summary>
     /// Same IP, 10 reset requests with distinct emails → 10 succeed. 11th returns 429
-    /// with Retry-After. Reuses the AuthLoginByIp policy (10/min/IP).
+    /// with Retry-After. Stage 8d switched the per-IP gate here from AuthLoginByIp
+    /// (10/min/IP) to the EmailByIp GlobalLimiter (10/hr/IP) — the 11th-call assertion
+    /// still holds; only the window length changed.
     /// </summary>
     [Fact]
     public async Task Request_per_ip_limit_returns_429_at_11th_attempt()
@@ -97,11 +99,18 @@ public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebA
 
     // ── Test #27 ────────────────────────────────────────────────────────────
     /// <summary>
-    /// Fills the per-email bucket (5 requests), then resets the MemoryCache to simulate
+    /// Fills the per-email bucket (5 requests), then resets both gates to simulate
     /// an elapsed one-hour window. A 6th request after the reset must succeed.
-    /// Uses WithFreshMemoryCache() so the bucket is isolated; Compact(1.0) evicts all
-    /// entries to simulate expiry.
     /// </summary>
+    /// <remarks>
+    /// Stage 8d added a SECOND per-email gate at the middleware layer (the EmailByUser
+    /// rate-limit policy, also 5/hr/email). The service-side gate uses MemoryCache, and
+    /// the middleware gate holds state inside the RateLimitingMiddleware's partition
+    /// table — distinct from MemoryCache. To simulate "the window elapsed for BOTH
+    /// gates", we Compact() the MemoryCache (service-side reset) AND build a new inner
+    /// host for subsequent calls (middleware partition state lives on the WebHost, so
+    /// a fresh host gives a fresh middleware bucket). Stage 8d-followup.
+    /// </remarks>
     [Fact]
     public async Task Request_per_email_bucket_resets_after_one_hour()
     {
@@ -119,11 +128,19 @@ public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebA
             resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
         }
 
-        // Simulate elapsed window: evict all MemoryCache entries (100% compact).
+        // Simulate elapsed window for the SERVICE-SIDE MemoryCache bucket.
         RateLimitedAuthTestWebApplicationFactory.ResetMemoryCache(factory);
 
+        // Simulate elapsed window for the MIDDLEWARE EmailByUser bucket: a fresh inner
+        // host gives a fresh RateLimitingMiddleware partition table. We need a new
+        // client + new factory because partition state is held inside the WebHost.
+        await using var freshFactory = _factory
+            .WithReplacedService<IEmailService>(new NoopEmailService())
+            .WithWebHostBuilder(_ => { });
+        var freshClient = freshFactory.CreateClient();
+
         var afterReset = await AuthTestFixture.PostJsonWithCsrfAsync(
-            factory, client, "/api/auth/password-reset/request", new { email });
+            freshFactory, freshClient, "/api/auth/password-reset/request", new { email });
         afterReset.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -181,9 +198,13 @@ public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebA
         reqResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
         var token = AuthTestFixture.ExtractResetTokenFromMessage(captured[0]);
 
-        // The /request call above consumed 1 of the 10 IP slots. Fire 9 probe calls so
-        // the total reaches 10/10. Each probe (no totpCode) returns 200 requiresTotp.
-        for (var i = 0; i < 9; i++)
+        // Stage 8d removed AuthLoginByIp from /password-reset/request — that endpoint
+        // now uses EmailByUser + EmailByIp (1/hr buckets) instead of 10/min/IP. So the
+        // /request call above does NOT consume a /confirm AuthLoginByIp slot. Fire 10
+        // probe /confirm calls to fill the per-IP bucket (each probe returns 200
+        // requiresTotp); the 11th /confirm call must 429 to pin "probe DOES count
+        // against the shared IP bucket for /confirm".
+        for (var i = 0; i < 10; i++)
         {
             var probe = await AuthTestFixture.PostJsonWithCsrfAsync(
                 factory, client, "/api/auth/password-reset/confirm",
@@ -191,7 +212,8 @@ public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebA
             probe.StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
-        // 11th total IP call returns 429 — pin: probe DOES count against the shared IP bucket.
+        // 11th /confirm call returns 429 — pin: probe DOES count against the per-IP
+        // AuthLoginByIp bucket on /confirm.
         var rejected = await AuthTestFixture.PostJsonWithCsrfAsync(
             factory, client, "/api/auth/password-reset/confirm",
             new { token, newPassword = "fresh horse battery staple" });
