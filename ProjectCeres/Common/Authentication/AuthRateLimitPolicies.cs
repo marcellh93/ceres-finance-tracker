@@ -22,16 +22,6 @@ public static class AuthRateLimitPolicies
     /// Stage 6b.3 follow-up to Gap 4.</summary>
     public const string AuthMfaByUser = "auth-mfa-by-user";
 
-    /// <summary>5/hour per email sliding window. Applied via service-side MemoryCache gate
-    /// inside PasswordResetService.RequestAsync. Keyed by lowercased trimmed email so a
-    /// single account can't be spammed with reset emails. Stage 6c.1.</summary>
-    public const string AuthPasswordResetByEmail = "auth-password-reset-by-email";
-
-    /// <summary>Fallback partition key for /password-reset/request with malformed email.
-    /// Routes them into a single shared bucket so an attacker can't dodge the limit by
-    /// sending junk. Stage 6c.1.</summary>
-    public const string AnonymousPasswordResetPartition = "anonymous-password-reset";
-
     /// <summary>10/min/user sliding window keyed off authenticated NameIdentifier claim.
     /// Applied to POST /api/auth/reauth. Stage 6c.2.</summary>
     public const string AuthReauthByUser = "auth-reauth-by-user";

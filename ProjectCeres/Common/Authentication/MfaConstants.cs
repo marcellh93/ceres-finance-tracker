@@ -4,7 +4,7 @@ namespace ProjectCeres.Common.Authentication;
 
 public static class MfaConstants
 {
-    public const string Issuer = "Project Ceres";
+    public const string Issuer = "Ceres";
 
     /// <summary>10 backup codes per batch.</summary>
     public const int BackupCodeBatchSize = 10;

@@ -47,7 +47,7 @@ public class MfaEnrollmentTests : IAsyncLifetime
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("otpAuthUri").GetString().Should()
-            .StartWith("otpauth://totp/Project%20Ceres:e%40mfa-enroll-test.local?secret=");
+            .StartWith("otpauth://totp/Ceres:e%40mfa-enroll-test.local?secret=");
         body.GetProperty("manualEntryKey").GetString().Should().NotBeNullOrEmpty();
     }
 
