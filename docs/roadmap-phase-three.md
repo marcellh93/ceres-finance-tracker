@@ -1073,6 +1073,14 @@ Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
 
 - [ ] **Manual browser DevTools verification of the auth cookie after a real login** — open DevTools → Application → Cookies on `/login` success and confirm the `__Host-Session` cookie carries all four attributes: `HttpOnly`, `Secure`, `SameSite=Lax`, no `Domain`, `Path=/`. Deferred from Stage 6 because no login UI existed there. The cookie configuration itself is wired and tested in 6a (see `CookieAttributesTests`); this is a final eyes-on check in production-like browser before opening to invited beta testers. *Anchor: Stage 6 § Cookie configuration carry-forward.*
 
+Stage 8 deferred items (carry-forward from Stage 8 — security-event email call-sites):
+
+- [ ] **Wire registration-confirmation email at `POST /api/auth/register`** — the SPA register flow must call `IEmailComposer.Compose(EmailTemplateKey.RegistrationConfirmation, ...)` with a single-use 256-bit Argon2id-hashed token (30-min expiry) and send via `IEmailService`. Resx key `RegistrationConfirmation.{Subject,BodyText,BodyHtml}` does NOT yet exist in `Emails.en.resx` / `Emails.es.resx` — add EN + ES copy alongside the call-site wiring. Add `RegistrationConfirmation` to the `EmailTemplateKey` enum. *Anchor: Stage 8 § Transactional templates — Registration confirmation.*
+- [ ] **Wire TOTP-enrolled security-event email at `POST /api/auth/mfa/enroll/verify`** — on successful enrolment, send a confirmation email so the user is notified if an attacker enrols TOTP on their account. Add `TotpEnrolled` to `EmailTemplateKey` + EN/ES resx keys (`TotpEnrolled.Subject/BodyText/BodyHtml`). Body includes IP + timestamp + "this wasn't me" link per `security-model.md § Security Event Notifications`. *Anchor: Stage 8 § Transactional templates — TOTP enrolled.*
+- [ ] **Wire TOTP-disabled security-event email** — when a TOTP-disable endpoint ships in Stage 9 (or whenever the user can turn MFA off), send a notification email. Add `TotpDisabled` to `EmailTemplateKey` + EN/ES resx keys. Includes "re-enable + revoke all sessions" link. The disable endpoint itself does not exist today; the email wires alongside it. *Anchor: Stage 8 § Transactional templates — TOTP disabled.*
+- [ ] **Wire backup-codes-regenerated email at `POST /api/auth/mfa/backup-codes/regenerate`** — the regeneration endpoint already exists (Stage 6) but currently sends no notification. Add `BackupCodesRegenerated` to `EmailTemplateKey` + EN/ES resx keys, then wire the call into `MfaController.RegenerateBackupCodes`. *Anchor: Stage 8 § Transactional templates — Backup codes regenerated.*
+- [ ] **Wire TOTP-re-enrolled email** — when a user re-enrols TOTP from settings (the existing `/api/auth/mfa/enroll/verify` endpoint, but distinct from first-time enrolment), send the re-enrolled variant. Whether this reuses `TotpEnrolled` or gets its own `TotpReEnrolled` key is a Stage 9 design call. *Anchor: Stage 8 § Transactional templates — TOTP re-enrolled.*
+
 ---
 
 ## Stage 10 — Onboarding wizard (Batch 3f)
@@ -1366,6 +1374,10 @@ Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
 
 - [ ] **Per-session IP enforcement UI** — per-row "anchor this session to its creation IP" toggle on `/settings/sessions`. Server-side enforcement is wired in 6a with `default-off` (each `UserSession` has the field; when enabled, requests from a different IP are rejected). This stage exposes the toggle so users can opt in per session. Confirm the entity field name (`IsIpAnchored` or similar) when wiring; pin with an integration test that flips the toggle on, simulates a request from a different IP, and asserts 401. *Anchor: Stage 6 § UserSession table + token rotation carry-forward.*
 
+Stage 8 deferred items (carry-forward from Stage 8 — security-event email call-sites):
+
+- [ ] **Wire new-session/new-device alert email** — when a new `UserSession` is created from an IP not previously seen for that user, send a notification with IP + UA summary + "this wasn't me" link revoking that session. The session-novelty-detection call site lands here (compare new session IP against the user's prior `UserSession.CreatedFromIp` history; first occurrence → fire email). Opt-out by default-enabled, disable from notification preferences in Settings per `planning-phase3.md`. Add `NewSessionAlert` to `EmailTemplateKey` + EN/ES resx keys (`NewSessionAlert.Subject/BodyText/BodyHtml`). *Anchor: Stage 8 § Transactional templates — New-session alert + Stage 8 § Security event notifications — New-device/session login.*
+
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory):
 
 - [ ] `/settings/sessions` mobile: session rows render as cards (not table); per-row revoke + IP-block actions reachable
@@ -1436,7 +1448,7 @@ Full data export:
 - [ ] ZIP contents: one CSV per entity (accounts, transactions, transfers, liability_payments, budgets, category_budgets, categories, recurring_transactions, saved_reports, support_tickets, settings); one folder per attachment type with original files
 - [ ] Each CSV uses UTF-8 BOM for Excel compatibility
 - [ ] Generation logs an `AuditLog` entry
-- [ ] When done, sends email with authenticated download link (Stage 8 template)
+- [ ] When done, sends email with authenticated download link — adds `GdprExportReady` to `EmailTemplateKey` + EN/ES resx keys (`GdprExportReady.Subject/BodyText/BodyHtml`), then calls `IEmailComposer.Compose(...)` from the export-job completion handler. Resx keys do NOT yet exist (deferred from Stage 8 because the call site lands here).
 - [ ] Download link 24-hour expiry; tied to a single signed token, single-use
 - [ ] Rate limit: max 1 export request / 24 hours / user
 - [ ] Synchronous fallback rejected (see `planning-phase3.md` warning about HTTP worker exhaustion)
@@ -1446,7 +1458,7 @@ Right-to-erasure:
 - [ ] `/settings/account/erasure` page describes what will be deleted, when, what is retained (legal-basis-required records like audit log), and confirms intent
 - [ ] Reauthentication-gated initiation
 - [ ] Audit log entry created at request time
-- [ ] Confirmation email sent (Stage 8 template)
+- [ ] Confirmation email sent — adds `GdprErasureInitiated` to `EmailTemplateKey` + EN/ES resx keys (`GdprErasureInitiated.Subject/BodyText/BodyHtml`), then calls `IEmailComposer.Compose(...)` from the erasure-request handler. Resx keys do NOT yet exist (deferred from Stage 8 because the call site lands here).
 - [ ] Erasure runs as background job (`IUserScope.EnterAs`); deletes all user-owned data per the documented retention policy
 - [ ] Audit-log record of the erasure ITSELF retained (per legal basis) but pseudonymized (user id hashed via `UserRef`, see Stage 15)
 - [ ] After erasure: account row marked `ErasedAt`; no future logins possible; email address freed for re-registration after a documented cooling period
@@ -1461,8 +1473,8 @@ Breach notification + DPIA:
 Localization:
 
 - [ ] Privacy policy + cookie consent banner translated EN + ES
-- [ ] Erasure confirmation email template EN + ES (Stage 8)
-- [ ] Data export ready email template EN + ES (Stage 8)
+- [ ] Erasure confirmation email template EN + ES — see "Right-to-erasure → Confirmation email sent" above; the resx keys are added in this stage (deferred from Stage 8 because the call site is here).
+- [ ] Data export ready email template EN + ES — see "Full data export → When done, sends email" above; the resx keys are added in this stage (deferred from Stage 8 because the call site is here).
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)):
 
