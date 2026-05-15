@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
+import { AuthLayout } from './layout/AuthLayout';
+import { RequireAuth } from './auth/RequireAuth';
 import { Accounts } from './pages/Accounts';
 import { Budgets } from './pages/Budgets';
 import { Categories } from './pages/Categories';
@@ -51,7 +53,20 @@ function RecurringEditBridge() {
 export function App() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
+      {/* Public branch — auth pages with the centered-card layout, no app shell. */}
+      <Route element={<AuthLayout />}>
+        {/* Login lands in Task 6 of this phase; the route is registered
+            here so the routing split lands first as its own commit. */}
+      </Route>
+
+      {/* Protected branch — everything that exists today, gated by RequireAuth. */}
+      <Route
+        element={
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        }
+      >
         <Route index element={<Dashboard />} />
         <Route path="movements" element={<MovementsLayout />}>
           <Route path="new" element={<MovementCreate />} />

@@ -118,9 +118,14 @@ The SPA migration and auth are tightly coupled. The migration plan must sequence
 /login                      → Login (outside app shell) *
 /login/totp                 → TOTP verification step *
 /register                   → Registration *
-/password-reset             → Password reset flow *
+/email-verify               → Email verification landing *
+/password-reset             → Password reset request *
+/password-reset/confirm     → Password reset confirmation (token in URL) *
+/account/unlock             → Account unlock landing (token in URL) *
 /onboarding                 → First-run wizard *
 ```
+
+> **Stage 9 routing split (2026-05-16):** The seven public auth routes above (`/login`, `/login/totp`, `/register`, `/email-verify`, `/password-reset`, `/password-reset/confirm`, `/account/unlock`) are all served by the `<AuthLayout>` branch — scaffolded in Stage 9 commit 3. Stage 9 Phase 1 ships only `/login`; the remaining six pages land in Phases 2 and 3 of Stage 9. All protected routes continue to pass through `<RequireAuth><AppLayout>` unchanged.
 
 ---
 

@@ -64,3 +64,15 @@ describe('App routes', () => {
     expect(screen.getByText(/loading…/i)).toBeDefined();
   });
 });
+
+describe('App routing structure', () => {
+  it('still routes existing protected pages through RequireAuth', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    // RequireAuth is a passthrough in Phase 1 — Dashboard renders.
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined();
+  });
+});
