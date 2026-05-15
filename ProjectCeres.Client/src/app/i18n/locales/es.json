@@ -9,11 +9,11 @@
       "submitting": "Iniciando sesión…",
       "forgotPasswordLink": "¿Olvidaste tu contraseña?",
       "createAccountLink": "Crear una cuenta",
+      "resendVerification": "Reenviar correo de verificación",
       "errors": {
         "invalidCredentials": "El correo electrónico o la contraseña no son correctos.",
         "accountLocked": "Cuenta bloqueada. Consulta tu correo para un enlace de desbloqueo.",
-        "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada.",
-        "resendVerification": "Reenviar correo de verificación"
+        "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada."
       }
     },
     "languageToggle": {

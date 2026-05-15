@@ -9,11 +9,11 @@
       "submitting": "Signing in…",
       "forgotPasswordLink": "Forgot password?",
       "createAccountLink": "Create an account",
+      "resendVerification": "Resend verification email",
       "errors": {
         "invalidCredentials": "Email or password is incorrect.",
         "accountLocked": "Account locked. Check your email for an unlock link.",
-        "emailNotConfirmed": "Verify your email first. Check your inbox.",
-        "resendVerification": "Resend verification email"
+        "emailNotConfirmed": "Verify your email first. Check your inbox."
       }
     },
     "languageToggle": {
