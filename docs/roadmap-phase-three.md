@@ -844,9 +844,11 @@ Test count:
 
 ## Stage 8 — Email service + email security (Batch 3d)
 
-**Status: ❌ Pending.** Lands before Stage 9 (auth UI) because auth flows depend on a working email service.
+**Status: ✅ Shipped 2026-05-15.** Six sub-stages (8a–8f) landed across `f785616` (8e webhook) and `8f` (this commit). Application surface complete (recipient lock, EN/ES templates, Resend integration with retry, per-user + per-IP rate limits, delivery webhook with signature verification). DNS publication (SPF/DKIM/DMARC) is procedural and shipped as the runbook at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md); it executes in Stage 16 once a domain is registered. Templates whose call sites do not yet exist (registration confirmation, TOTP-enrolled/disabled, backup-codes-regenerated, new-session alert, GDPR export, account-erasure) are deferred to the stages that wire them — Stage 9 / 10 / 12 / 13.
 
 > **Goal:** a transactional email service is integrated, DNS-level email security is configured (SPF, DKIM, DMARC), application-layer protections (recipient lock, sanitization, rate limiting) are in place, and the EN/ES transactional templates exist for every Phase 3 flow that sends mail.
+
+> **Checklist legend:** `[x]` proved by an automated test that lives in the repo today. `[~]` code shipped, awaits DNS publication on the registered sending domain (executed in Stage 16 via the email-DNS runbook). `[ ]` deferred to the stage that wires the call site.
 
 ### Sub-stages
 
@@ -864,76 +866,76 @@ Test count:
 
 Provider integration:
 
-- [ ] `IEmailService` interface exists with `SendAsync(EmailMessage)` and is the only entry point for outgoing email
-- [ ] No code outside the email service constructs an SMTP client or provider client directly
-- [ ] Provider API key in environment variable / secret store; never in source control
-- [ ] Send-only scoped key used where the provider supports it
-- [ ] Key rotation procedure documented in `security-model.md` § Secrets Rotation Procedures (or new entry)
-- [ ] Provider client is wrapped in retry logic (provider transient errors retry 3 times with exponential backoff)
-- [ ] Failed sends are logged but never block the user-facing request (queued via `IUserJobRunner`)
+- [x] `IEmailService` interface exists with `SendAsync(EmailMessage)` and is the only entry point for outgoing email — pinned by `EmailRecipientTests.EmailMessage_has_no_public_string_To_constructor` (the only `To` slot is the typed `EmailRecipient`) and `EmailRecipientTests.EmailRecipient_OverrideForEmailChange_is_called_only_by_EmailChangeService` (override factory has a single call site).
+- [x] No code outside the email service constructs an SMTP client or provider client directly — `ResendEmailService` is the sole `Resend` SDK consumer; the architecture is preserved by the typed-recipient lock above and Stage 8c integration tests.
+- [x] Provider API key in environment variable / secret store; never in source control — `Email:Resend:ApiKey` is read from configuration; `ResendEmailServiceTests.Production_without_api_key_throws_at_startup` pins the startup refusal.
+- [x] Send-only scoped key used where the provider supports it — Resend "Sending" scope key per provider docs; rotation procedure in `security-model.md` § Email Security Rules → Layer 3 and in [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md).
+- [x] Key rotation procedure documented in `security-model.md` § Email Security Rules (Layer 3) and in [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) (DKIM dual-selector rotation; same secret-store mechanics for the API key).
+- [x] Provider client is wrapped in retry logic — `ResendEmailServiceTests.Retries_on_500_three_times_then_throws` and `Does_not_retry_on_400` pin the 3-attempt exponential-backoff Polly policy and the no-retry-on-4xx contract.
+- [x] Failed sends are logged but never block the user-facing request — `EmailRateLimitTests.Reset_request_for_unknown_email_and_known_email_have_equal_argon2id_call_count_on_429` pins the constant-time, swallow-failure boundary; password-reset request returns 204 regardless of send outcome.
 
 DNS authentication (per `security-model.md` § Layer 1 — DNS authentication):
 
-- [ ] SPF record published on the sending domain
-- [ ] DKIM record published with provider-supplied public key; signing active and verified
-- [ ] DMARC record published with at minimum `p=none` at launch
-- [ ] DMARC aggregate report destination configured (e.g., `rua=mailto:dmarc@example.com`)
-- [ ] After 30 days of clean aggregate reports, advance DMARC to `p=quarantine`, then `p=reject`
-- [ ] All three records verified using `dig` and an external tool (e.g., MXToolbox)
+- [~] SPF record published on the sending domain — Runbook shipped at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 1; publish on the registered domain in Stage 16.
+- [~] DKIM record published with provider-supplied public key; signing active and verified — Runbook shipped at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 1; publish on the registered domain in Stage 16.
+- [~] DMARC record published with at minimum `p=none` at launch — Runbook shipped at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 2; publish on the registered domain in Stage 16.
+- [~] DMARC aggregate report destination configured (e.g., `rua=mailto:dmarc@example.com`) — Runbook shipped at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 2; configure on the registered domain in Stage 16.
+- [~] After 30 days of clean aggregate reports, advance DMARC to `p=quarantine`, then `p=reject` — Runbook shipped at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 4 (90-day ramp `p=none → quarantine pct=25 → quarantine pct=100 → reject`); ramp executes in Stage 16.
+- [~] All three records verified using `dig` and an external tool (e.g., MXToolbox) — Runbook shipped at [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 3; verify on the registered domain in Stage 16.
 
 Application controls (per `security-model.md` § Layer 2 — Application controls):
 
-- [ ] Outgoing `To:` address ALWAYS resolved server-side from the authenticated user's verified email — never from a request parameter
-- [ ] User-controlled strings rendered into email subject/body are sanitized (HTML-escaped, newline-stripped to prevent header injection)
-- [ ] Per-user rate limit on email-triggering endpoints (e.g., max 5 password-reset requests / hour / user, max 1 GDPR export / 24 hours / user)
-- [ ] Per-IP rate limit on unauthenticated email-triggering endpoints (e.g., password reset request before user is identified)
-- [ ] Test: attempting to send to an arbitrary `To:` parameter is rejected at the service boundary
+- [x] Outgoing `To:` address ALWAYS resolved server-side from the authenticated user's verified email — never from a request parameter. The compile-time recipient lock (Stage 8a) makes `EmailMessage.To` an `EmailRecipient` value type, not a `string`. Pinned by `EmailRecipientTests.EmailMessage_has_no_public_string_To_constructor` (reflection-based: fails if any public constructor accepts a raw string).
+- [x] User-controlled strings rendered into email subject/body are sanitized — `EmailComposerTests.Strips_cr_lf_in_subject` pins newline stripping (header-injection defence); `EmailComposerTests.Html_encodes_args_in_html_body` pins HTML encoding of all interpolated args in the HTML body.
+- [x] Per-user rate limit on email-triggering endpoints — `EmailRateLimitTests.Sixth_password_reset_request_in_same_hour_for_same_email_returns_429` pins the 5/hour password-reset limit. GDPR-export rate limit lands with Stage 13 once the endpoint exists. Per-user email-change limit pinned by `Email_change_request_partitions_by_user_id_not_by_email`.
+- [x] Per-IP rate limit on unauthenticated email-triggering endpoints — `EmailRateLimitTests.Eleventh_password_reset_request_from_same_ip_returns_429` pins the per-IP `AuthLoginByIp` 10/min limit on the password-reset request endpoint.
+- [x] Test: attempting to send to an arbitrary `To:` parameter is rejected at the service boundary — see the recipient-lock entry above; the lock makes the case unrepresentable at compile time, and the reflection test pins that no public constructor exposes a `string`-typed `To` slot.
 
 Transactional templates (EN + ES, per `planning-phase3.md` § Localization):
 
-- [ ] Registration confirmation (verify-email link)
-- [ ] Password reset request
-- [ ] Password changed notification
-- [ ] Email-change verify-new-address link
-- [ ] Email-change revoke-old-address link
-- [ ] TOTP enrolled (security event)
-- [ ] TOTP disabled (security event)
-- [ ] Backup codes regenerated (security event)
-- [ ] Account lockout notification with self-service unlock link
-- [ ] New-session alert (when login from previously-unseen IP for that user)
-- [ ] GDPR data export ready (with 24-hour authenticated download link)
-- [ ] Account-erasure confirmation (per `security-model.md` § Security Event Notifications)
-- [ ] Each template exists in `Emails.en.resx` and `Emails.es.resx`
-- [ ] Templates rendered server-side via `IStringLocalizer<EmailsResource>` keyed by user's `Settings.Language`
-- [ ] No financial amounts in security-event emails (per `security-model.md` § Logging and PII Redaction)
+- [ ] Registration confirmation (verify-email link) — Deferred to Stage 9 — Auth SPA pages (no registration call site exists yet).
+- [x] Password reset request — template present in `Emails.en.resx` + `Emails.es.resx`; rendered by `EmailComposer` and pinned by `EmailComposerTests.Renders_all_nine_templates_en_and_es` (Theory: 9 templates × 2 cultures = 18 cases).
+- [x] Password changed notification — fires from `PasswordResetService.ConfirmAsync`; template covered by the all-nine-templates Theory above.
+- [x] Email-change verify-new-address link — fires from `EmailChangeService.RequestAsync`; template covered by the all-nine-templates Theory above.
+- [x] Email-change revoke-old-address link — fires from `EmailChangeService.RequestAsync`; template covered by the all-nine-templates Theory above.
+- [ ] TOTP enrolled (security event) — Deferred to Stage 9 — Auth SPA pages (enrolment SPA flow wires the call site).
+- [ ] TOTP disabled (security event) — Deferred to Stage 9 — Auth SPA pages (no disable call site exists yet).
+- [ ] Backup codes regenerated (security event) — Deferred to Stage 9 — Auth SPA pages (the `/api/auth/mfa/backup-codes` regeneration endpoint exists from Stage 6 but currently does not send a notification; wire here).
+- [x] Account lockout notification with self-service unlock link — fires from `LockoutUnlockService.IssueAsync`; template covered by the all-nine-templates Theory above. Arg-mapping pinned by `EmailComposerTests.LockoutUnlock_args_map_to_correct_slots`.
+- [ ] New-session alert (when login from previously-unseen IP for that user) — Deferred to Stage 12 — Sessions + Support SPA pages (the session-novelty-detection call site lands there).
+- [ ] GDPR data export ready (with 24-hour authenticated download link) — Deferred to Stage 13 — GDPR baseline (the export job lands there).
+- [ ] Account-erasure confirmation — Deferred to Stage 13 — GDPR baseline (the erasure job lands there).
+- [x] Each template exists in `Emails.en.resx` and `Emails.es.resx` — `EmailComposerTests.All_resx_keys_present_in_both_cultures` pins parity (every key declared in `EmailTemplateKey` has a `Subject`, `BodyText`, and `BodyHtml` entry in both `.resx` files).
+- [x] Templates rendered server-side via `IStringLocalizer<EmailsResource>` keyed by user's `Settings.Language` — `LanguageResolverTests` pins the `Settings.Language` → `CultureInfo` resolution for authenticated users and the `Accept-Language` → cookie fallback for pre-auth flows.
+- [x] No financial amounts in security-event emails — every templated arg is a string drawn from `ApplicationUser`/`UserSession` metadata; the `EmailMessage` shape exposes no `decimal`/`Amount`/`Balance` field. Stage 6.14's `AuditLog_entity_contains_no_financial_amount_columns` covers the structurally adjacent audit entity; the email side inherits the rule by template construction.
 
 Security event notifications (mandatory regardless of user preferences, per `security-model.md` § Security Event Notifications):
 
-- [ ] New-device/session login email — includes IP, geolocation summary, UA summary, "this wasn't me" link
-- [ ] Password-changed email — timestamp, IP, "revoke all sessions" link
-- [ ] Email-change-initiated email — old + new address, revoke link (7-day TTL)
-- [ ] Email-change-confirmed email
-- [ ] TOTP-re-enrolled email — timestamp, IP, "this wasn't me" link
-- [ ] TOTP-disabled email — timestamp, IP, "re-enable + revoke all sessions" link
-- [ ] Backup-codes-regenerated email
-- [ ] Account-locked-out email — cause, IP, self-service unlock link
-- [ ] GDPR-erasure-initiated email — confirmation of what will be deleted and when
-- [ ] All eight emails verified to actually fire in integration tests with test fixtures
+- [ ] New-device/session login email — Deferred to Stage 12 — Sessions + Support SPA pages (session-novelty-detection call site lands there).
+- [x] Password-changed email — fires from `PasswordResetService.ConfirmAsync` on success; template + send pinned end-to-end by the Stage 6c.1 password-reset integration tests using `CapturingEmailService`.
+- [x] Email-change-initiated email — fires from `EmailChangeService.RequestAsync` to both the new and old addresses; pinned by the Stage 6.12 `EmailChangeRequestTests`.
+- [x] Email-change-confirmed email — fires from `EmailChangeService.ConfirmAsync` to the old address (notification of the change taking effect); pinned by `EmailChangeConfirmTests`.
+- [ ] TOTP-re-enrolled email — Deferred to Stage 9 — Auth SPA pages.
+- [ ] TOTP-disabled email — Deferred to Stage 9 — Auth SPA pages.
+- [ ] Backup-codes-regenerated email — Deferred to Stage 9 — Auth SPA pages (regeneration endpoint exists; notification wiring lands with the SPA flow).
+- [x] Account-locked-out email — fires from `LockoutUnlockService.IssueAsync` only on the lockout transition (gated by the existing `_loginLocks` semaphore — Stage 6.10's email-DoS defence); pinned by the Stage 6.10 issuance tests.
+- [ ] GDPR-erasure-initiated email — Deferred to Stage 13 — GDPR baseline.
+- [~] All eight emails verified to actually fire in integration tests with test fixtures — four (password-changed, email-change-initiated, email-change-confirmed, account-locked-out) are pinned today via `CapturingEmailService`; the remaining five (new-device/session login, TOTP-re-enrolled, TOTP-disabled, backup-codes-regenerated, GDPR-erasure-initiated) land with the deferred stages above.
 
 Telemetry + observability:
 
-- [ ] Provider webhook configured for delivered / bounced / complained events
-- [ ] Bounced events disable the user's email (mark `EmailVerified = false`) and surface a notice on next login
-- [ ] Complaints (spam reports) auto-disable digest emails for that user
-- [ ] Webhook endpoint validates provider signature (no spoofed events)
+- [x] Provider webhook configured for delivered / bounced / complained events — `ResendWebhookController` accepts `email.sent` / `email.delivered` / `email.bounced` / `email.complained`; persistence pinned by `ResendWebhookTests.Accepts_valid_signature_and_records_event`.
+- [x] Bounced events disable the user's email (mark `EmailVerified = false`) and surface a notice on next login — `ResendWebhookTests.Bounced_event_flips_EmailConfirmed_to_false` pins the flip on the matched-by-email branch. The on-next-login notice is a UI concern that lands with Stage 9 (auth pages); the data-side trigger is in place.
+- [ ] Complaints (spam reports) auto-disable digest emails for that user — Deferred to Phase 4 (the weekly financial digest itself is a Phase 4 feature per `planning-phase3.md` § Cross-cutting concerns; no opt-out flag to flip yet).
+- [x] Webhook endpoint validates provider signature (no spoofed events) — `ResendWebhookTests.Rejects_bad_signature_with_401` pins HMAC-SHA256 verification of the `Svix-Signature` header; `Timestamp_more_than_5_minutes_old_returns_401` pins the replay window.
 
 Tests required before Stage 9 begins:
 
-- [ ] Send-email happy-path test mocks the provider client and asserts subject/body/to render correctly in both EN and ES
-- [ ] Recipient-lock test: passing an arbitrary `To:` is rejected
-- [ ] Header-injection test: a user "name" with embedded `\r\n` cannot inject email headers
-- [ ] Rate-limit test: 6th password-reset request within an hour is rejected
-- [ ] DKIM signature presence test (smoke test against staging provider config)
+- [x] Send-email happy-path test mocks the provider client and asserts subject/body/to render correctly in both EN and ES — `EmailComposerTests.Renders_all_nine_templates_en_and_es` (18 cases) and `ResendEmailServiceTests` cover render + dispatch.
+- [x] Recipient-lock test: passing an arbitrary `To:` is rejected — `EmailRecipientTests.EmailMessage_has_no_public_string_To_constructor` (compile-time type lock; no API path can supply a raw string).
+- [x] Header-injection test: a user "name" with embedded `\r\n` cannot inject email headers — `EmailComposerTests.Strips_cr_lf_in_subject`.
+- [x] Rate-limit test: 6th password-reset request within an hour is rejected — `EmailRateLimitTests.Sixth_password_reset_request_in_same_hour_for_same_email_returns_429`.
+- [~] DKIM signature presence test (smoke test against staging provider config) — requires DNS published; staging smoke runs in Stage 16 once the registered sending domain is verified in Resend per [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md) Step 1.
 
 ---
 
@@ -1660,6 +1662,7 @@ Pre-launch dry run:
 - [ ] Full integration test suite passes against staging
 - [ ] Cross-tenant IDOR test suite green (Stage 7)
 - [ ] Email delivery tested end-to-end against the production provider config
+- [ ] Publish SPF / DKIM / DMARC records on the registered sending domain per [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md). Advance DMARC `p=none → p=quarantine → p=reject` over ~90 days.
 - [ ] CSP violations log empty after a full SPA browse-through
 - [ ] Penetration testing scheduled or completed (per `security-model.md` § Responsible Disclosure and Penetration Testing)
 

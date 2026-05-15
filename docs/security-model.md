@@ -1152,6 +1152,10 @@ The app holds an API key for the email service provider. A leaked key allows an 
 - Use a **send-only API key** if the provider supports permission scoping (Postmark, Resend, and SendGrid all support this). A send-only key cannot read inboxes, manage lists, or change account settings even if compromised.
 - Rotate the key immediately on any suspected exposure. Document the rotation procedure before Phase 3 launch.
 
+**Operational runbook for DNS configuration:** [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md).
+
+**Compile-time recipient lock (Stage 8a):** `ProjectCeres.Common.Email.EmailMessage.To` is of type `EmailRecipient`, not `string`. There is no public constructor accepting a raw string for the `To` slot. The two legitimate factories are `EmailRecipient.FromVerifiedUser` (reads `ApplicationUser.Email` by server-context `UserId`) and `EmailRecipient.OverrideForEmailChange` (used only by `EmailChangeService` to send notifications to the OLD address during an email change). Pinned by reflection tests in `ProjectCeres.Tests/Integration/Email/EmailRecipientTests.cs`.
+
 ---
 
 ## SSRF Prevention

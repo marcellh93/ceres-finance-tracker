@@ -1201,6 +1201,30 @@ One row per active or recently-consumed lockout-unlock token. Issued by `AuthCon
 
 **Retention:** the `(ExpiresAt)` index supports a future Stage 7+ flat cleanup sweep (`DELETE WHERE ConsumedAt IS NOT NULL OR ExpiresAt < now() - interval '1 day'`); not in 6.10 (no background-runner abstraction until Stage 7).
 
+### EmailDeliveryEvent (Phase 3, Stage 8e)
+
+Records every event Resend's webhook reports about an outgoing email (`sent`, `delivered`, `bounced`, `complained`). On `email.bounced`, the receiving handler flips `ApplicationUser.EmailConfirmed = false` for the affected address — so a hard-bounced address stops receiving further mail until the user re-verifies. Intentionally **cross-tenant** — bounces from addresses that no longer resolve to any `ApplicationUser` (e.g. after an email-change away from the bounced address) are still recorded.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid? | nullable | Resolved by lower-cased `EmailAddress` lookup against `AspNetUsers.NormalizedEmail` at write time. NULL when no user currently owns the address. No FK — webhook events must persist even when no matching user exists. |
+| MessageId | varchar | NOT NULL | Resend's `email_id` from the webhook payload. Correlates an `email.sent` row with later `delivered` / `bounced` / `complained` rows for the same send. |
+| Type | text (enum-as-string) | NOT NULL | One of `email.sent`, `email.delivered`, `email.bounced`, `email.complained`. Stored as string via `HasConversion<string>()` per project enum convention. |
+| EmailAddress | varchar(256) | NOT NULL | The recipient address Resend reported, lower-cased + trimmed. Matches `ApplicationUser.NormalizedEmail` shape so the `UserId` resolution lookup is a direct equality match. |
+| Payload | jsonb | NOT NULL | Raw event JSON. Kept verbatim for incident diagnostics — provider field shapes drift over time and we never want to be parsing-bound on a bounce investigation. |
+| OccurredAt | datetimeoffset | NOT NULL | When Ceres recorded the event (server clock at controller entry — not the timestamp inside the provider payload). |
+
+**Indexes:** `(EmailAddress, OccurredAt DESC)` — supports "what's the bounce history for this address" queries on user support paths and the future bounce-aware retry suppression.
+
+**Multi-tenancy exemption:** intentionally NO global query filter. Webhook events arrive from Resend with no session context — `ICurrentUserAccessor` would throw if consulted. The `UserId` column is the result of a best-effort address-lookup, not a tenancy boundary. Does NOT implement `IUserOwned` (the project's tenancy-marker interface) — `IUserOwned.UserId` is non-nullable, and bounces from unknown addresses must still record. Follows the `FailedLoginAttempt` precedent (Stage 6b.2). See ADR-0065 § Decision-1 enumeration of cross-tenant exempt entities.
+
+**Writer:** `ResendWebhookController` (controller, not a Scoped service) accepts the webhook POST, validates the Svix HMAC signature, persists the row, and on `email.bounced` calls `UserManager.SetEmailConfirmedAsync(user, false)` if the address resolved. Per `security-model.md` § Email Security Rules, the webhook is the only inbound surface Resend can hit; the request is anonymous but signature-locked.
+
+**Deletion rule:** **hard-deletes allowed.** Operational records, not user-owned data — no soft-delete retention obligation. A future retention sweep can delete by `OccurredAt` (cadence not set in Stage 8; revisit alongside the broader Stage 7+ retention purge work).
+
+**GDPR:** on right-to-erasure (Stage 13), rows where `UserId` matches the erased user are deleted outright. The `Payload` JSONB contains the recipient's email address verbatim — keeping the row would leak the erased user's address back into ops queries.
+
 ### CustomerArchive (Phase 3)
 
 Created when a user account is closed. Records the closure type and manages the archive lifecycle. See ADR-0029 for the full lifecycle specification.
