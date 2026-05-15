@@ -5,9 +5,8 @@ import { BrandMark } from './BrandMark';
 /**
  * Layout for unauthenticated auth pages: centered card on a soft
  * neutral background, no sidebar, no top bar. Brand wordmark inside
- * the card; the language toggle slot in the footer is filled by
- * <LanguageToggle /> which is mounted in the Outlet's siblings —
- * see Task 6 for the full mounting.
+ * the card; the language toggle is mounted as a child of the <footer>
+ * element below the Outlet — see Task 6 for the wiring.
  *
  * Responsive: identical at mobile / tablet / desktop per
  * docs/planning-phase3-responsive.md (single-column centered card on
@@ -23,8 +22,8 @@ export function AuthLayout() {
         <div>
           <Outlet />
         </div>
-        {/* Footer slot for <LanguageToggle /> — filled in Task 6.
-            Empty <footer> kept here so axe sees a landmark. */}
+        {/* Footer slot for <LanguageToggle /> — Task 6 adds it as a child of this element.
+            The element is kept empty here so Task 6 only needs to add children, not restructure the layout. */}
         <footer className="flex justify-center" data-slot="auth-footer" />
       </Card>
     </div>

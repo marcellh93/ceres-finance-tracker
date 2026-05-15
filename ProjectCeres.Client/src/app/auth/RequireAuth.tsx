@@ -9,6 +9,6 @@ import type { ReactNode } from 'react';
  * Real behaviour after Task 4: reads useAuth(); if status === 'anon',
  * navigates to /login?redirect=<currentPath>; otherwise renders children.
  */
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({ children }: { children: NonNullable<ReactNode> }) {
   return <>{children}</>;
 }
