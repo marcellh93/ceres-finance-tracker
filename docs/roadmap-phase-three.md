@@ -951,7 +951,7 @@ Tests required before Stage 9 begins:
 |---|---|---|
 | 9.1 | `/login` page (email + password form) | `planning-phase3.md` § 10 Auth screen design |
 | 9.2 | `/login/totp` page (6-digit TOTP step) | (above) |
-| 9.3 | `/register` page + email-verification interstitial | (above) |
+| 9.3 | `/register` page + email-verification interstitial | `planning-phase3.md` § 10 Auth screen design. **Origin:** completes a 6a-deferred slice — `RequireConfirmedEmail = true` was set deliberately in 6a for security correctness with the email-send + `ConfirmEmail` handler scheduled for 6c; 6c.1/6c.2 shipped password-reset + reauth instead and email verification slid here. See [Stage 6a spec § Why no auto-sign-in?](superpowers/specs/2026-05-09-stage-6a-identity-foundation-design.md) lines 463–480 for the rationale + the test-fixture cleanup decision deferred to this stage. |
 | 9.4 | `/password-reset` request page + `/password-reset/confirm` (with TOTP) | `security-model.md` § Password Reset |
 | 9.5 | Lockout / self-service unlock screen | `security-model.md` § Login → Account lockout self-service unlock |
 | 9.6 | TOTP setup flow (QR + manual-entry fallback + backup-codes download) | `planning-phase3.md` § 10 Auth screen design |
