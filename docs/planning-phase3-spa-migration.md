@@ -158,6 +158,8 @@ Do not delete Razor in a single "big bang" PR. Port feature area by feature area
 4. Repeat for each feature area, following the design system implementation order in `planning-phase3.md`
 5. Remove MVC infrastructure from `Program.cs` last, once no Razor views remain
 
+**Bilingual middleware (Stage 9):** `LanguagePreferenceMiddleware` (`ProjectCeres/Common/Localization/`) was added in Stage 9 and registered in `Program.cs` before `UseRouting`. It reads the `lang` cookie written by the SPA's language toggle and sets `CultureInfo.CurrentUICulture` so the remaining `Views/Account/*` Razor pages render in the user's chosen language. This middleware stays until Stage 11.8 deletes those last Razor views; at that point the middleware becomes a no-op and can be removed alongside the Razor infrastructure cleanup.
+
 **Feature area porting order** (mirrors the design system implementation order):
 
 1. Auth screens (login, TOTP, register, password reset) — no Razor equivalent; built fresh

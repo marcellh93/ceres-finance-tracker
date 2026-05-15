@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": {
+      "title": "Iniciar sesión",
+      "emailLabel": "Correo electrónico",
+      "passwordLabel": "Contraseña",
+      "rememberMeLabel": "Recordarme en este dispositivo",
+      "submit": "Iniciar sesión",
+      "submitting": "Iniciando sesión…",
+      "forgotPasswordLink": "¿Olvidaste tu contraseña?",
+      "createAccountLink": "Crear una cuenta",
+      "errors": {
+        "invalidCredentials": "El correo electrónico o la contraseña no son correctos.",
+        "accountLocked": "Cuenta bloqueada. Consulta tu correo para un enlace de desbloqueo.",
+        "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada.",
+        "resendVerification": "Reenviar correo de verificación"
+      }
+    },
+    "languageToggle": {
+      "ariaLabel": "Cambiar idioma",
+      "english": "English",
+      "spanish": "Español"
+    }
+  }
+}

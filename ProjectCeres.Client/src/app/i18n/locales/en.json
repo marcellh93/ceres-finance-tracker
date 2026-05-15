@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "rememberMeLabel": "Remember me on this device",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "forgotPasswordLink": "Forgot password?",
+      "createAccountLink": "Create an account",
+      "errors": {
+        "invalidCredentials": "Email or password is incorrect.",
+        "accountLocked": "Account locked. Check your email for an unlock link.",
+        "emailNotConfirmed": "Verify your email first. Check your inbox.",
+        "resendVerification": "Resend verification email"
+      }
+    },
+    "languageToggle": {
+      "ariaLabel": "Change language",
+      "english": "English",
+      "spanish": "Español"
+    }
+  }
+}

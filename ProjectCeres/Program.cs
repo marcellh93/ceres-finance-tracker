@@ -486,6 +486,8 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+app.UseMiddleware<ProjectCeres.Common.Localization.LanguagePreferenceMiddleware>();
+
 app.UseRouting();
 
 app.UseRateLimiter();
