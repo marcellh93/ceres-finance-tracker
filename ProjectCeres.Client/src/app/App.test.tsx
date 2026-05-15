@@ -1,7 +1,38 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from './App';
+import { AuthProvider } from './auth/auth-context';
+
+// Mock /api/auth/me to return an authenticated user so RequireAuth
+// resolves to 'authed' and renders protected children. All App.test.tsx
+// tests exercise the route table, not auth behaviour — auth is covered
+// by RequireAuth.test.tsx and auth-context.test.tsx.
+function mockAuthedMe() {
+  vi.spyOn(global, 'fetch').mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'user@example.test',
+        twoFactorEnabled: false,
+        lastReauthAt: null,
+        backupCodesRemaining: 0,
+        usedBackupCodeAtLastLogin: false,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ),
+  );
+}
+
+function renderApp(path: string) {
+  return render(
+    <AuthProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </AuthProvider>,
+  );
+}
 
 const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/',             expectedHeading: 'Dashboard' },
@@ -20,59 +51,71 @@ const routes: Array<{ path: string; expectedHeading: string }> = [
 ];
 
 describe('App routes', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   for (const { path, expectedHeading } of routes) {
-    it(`renders the heading "${expectedHeading}" at ${path}`, () => {
-      render(
-        <MemoryRouter initialEntries={[path]}>
-          <App />
-        </MemoryRouter>,
+    it(`renders the heading "${expectedHeading}" at ${path}`, async () => {
+      mockAuthedMe();
+      renderApp(path);
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { level: 1, name: expectedHeading })).toBeDefined()
       );
-      const heading = screen.getByRole('heading', { level: 1, name: expectedHeading });
-      expect(heading).toBeDefined();
     });
   }
 
   it('renders recurring list page at /recurring', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
-    render(
-      <MemoryRouter initialEntries={['/recurring']}>
-        <App />
-      </MemoryRouter>,
-    );
+    // First mock is /api/auth/me (authed); subsequent calls are the recurring fetch.
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            userId: '00000000-0000-0000-0000-000000000001',
+            email: 'user@example.test',
+            twoFactorEnabled: false,
+            lastReauthAt: null,
+            backupCodesRemaining: 0,
+            usedBackupCodeAtLastLogin: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValue(new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    renderApp('/recurring');
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Recurring transactions' })).toBeInTheDocument()
     );
   });
 
-  it('renders the Movement Create page at /movements/new?type=transaction', () => {
-    render(
-      <MemoryRouter initialEntries={['/movements/new?type=transaction']}>
-        <App />
-      </MemoryRouter>,
-    );
+  it('renders the Movement Create page at /movements/new?type=transaction', async () => {
+    mockAuthedMe();
+    renderApp('/movements/new?type=transaction');
     // MovementCreate renders the form when ?type= is set; Save is the form's primary action.
-    expect(screen.getByRole('button', { name: /save/i })).toBeDefined();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
+    );
   });
 
-  it('renders the Movement Edit page at /movements/:id/edit', () => {
-    render(
-      <MemoryRouter initialEntries={['/movements/some-id/edit']}>
-        <App />
-      </MemoryRouter>,
-    );
+  it('renders the Movement Edit page at /movements/:id/edit', async () => {
+    mockAuthedMe();
+    renderApp('/movements/some-id/edit');
     // MovementEdit fetches the discriminator on mount; the loading state renders first
-    expect(screen.getByText(/loading…/i)).toBeDefined();
+    await waitFor(() =>
+      expect(screen.getByText(/loading…/i)).toBeDefined()
+    );
   });
 });
 
 describe('App routing structure', () => {
-  it('still routes existing protected pages through RequireAuth', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <App />
-      </MemoryRouter>,
+  afterEach(() => vi.restoreAllMocks());
+
+  it('still routes existing protected pages through RequireAuth', async () => {
+    mockAuthedMe();
+    renderApp('/');
+    // RequireAuth now reads useAuth(); it renders null while loading, then
+    // renders children once authed. Wait for the heading.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined()
     );
-    // RequireAuth is a passthrough in Phase 1 — Dashboard renders.
-    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined();
   });
 });

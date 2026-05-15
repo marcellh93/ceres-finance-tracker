@@ -1,14 +1,27 @@
 import type { ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from './auth-context';
 
 /**
- * Phase 1 stub: always allows the children through. The real auth-state
- * gate arrives in Task 4 once <AuthProvider> exists. Splitting the layout
- * commit (this one) from the auth-context commit (Task 4) keeps each
- * commit reviewable and testable in isolation.
+ * Guards protected routes. Reads the auth context:
+ * - 'loading' → renders null (brief, no skeleton needed; /api/auth/me is fast)
+ * - 'anon'    → redirects to /login?redirect=<currentPath>
+ * - 'authed'  → renders children
  *
- * Real behaviour after Task 4: reads useAuth(); if status === 'anon',
- * navigates to /login?redirect=<currentPath>; otherwise renders children.
+ * Must be rendered inside <AuthProvider>. useAuth() throws loudly at dev time
+ * if the provider is missing so misuse surfaces immediately.
  */
 export function RequireAuth({ children }: { children: NonNullable<ReactNode> }) {
+  const auth = useAuth();
+  const location = useLocation();
+
+  if (auth.status === 'loading') {
+    return null;
+  }
+
+  if (auth.status === 'anon') {
+    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+
   return <>{children}</>;
 }

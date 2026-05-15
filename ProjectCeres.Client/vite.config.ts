@@ -62,6 +62,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    environmentOptions: {
+      jsdom: {
+        // __Host- prefixed cookies require a secure context (HTTPS). Setting
+        // the JSDOM URL to https://localhost lets the test environment accept
+        // document.cookie writes with the __Host-XSRF name so api-client tests
+        // can simulate the CSRF handshake without special-casing cookie logic.
+        url: 'https://localhost',
+      },
+    },
     setupFiles: ['./src/test-setup.ts'],
   },
 })

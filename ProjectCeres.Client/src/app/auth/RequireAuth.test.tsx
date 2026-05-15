@@ -1,20 +1,79 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RequireAuth } from './RequireAuth';
+import { AuthProvider } from './auth-context';
 
-describe('RequireAuth', () => {
-  it('renders children when allowed (Phase 1 stub: always allow)', () => {
+// Helper: mock /api/auth/me to resolve as an authenticated user.
+function mockAuthedMe() {
+  vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+    new Response(
+      JSON.stringify({
+        userId: '00000000-0000-0000-0000-000000000001',
+        email: 'user@example.test',
+        twoFactorEnabled: false,
+        lastReauthAt: null,
+        backupCodesRemaining: 0,
+        usedBackupCodeAtLastLogin: false,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ),
+  );
+}
+
+describe('RequireAuth — authenticated passthrough', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('renders children when the user is authenticated', async () => {
+    mockAuthedMe();
     render(
-      <MemoryRouter>
-        <RequireAuth>
-          <div>protected</div>
-        </RequireAuth>
-      </MemoryRouter>,
+      <AuthProvider>
+        <MemoryRouter>
+          <RequireAuth>
+            <div>protected</div>
+          </RequireAuth>
+        </MemoryRouter>
+      </AuthProvider>,
     );
-    expect(screen.getByText('protected')).toBeDefined();
+    // While /api/auth/me is in-flight, RequireAuth renders null (not the
+    // children). Wait for the authed transition before asserting.
+    await waitFor(() => expect(screen.getByText('protected')).toBeDefined());
+  });
+});
+
+describe('RequireAuth — anonymous redirect', () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(global, 'fetch');
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
   });
 
-  // Note: the "redirect to /login when anon" assertion lives in Task 4's
-  // auth-context tests, since RequireAuth gains its real gate then.
+  afterEach(() => vi.restoreAllMocks());
+
+  it('redirects anon visitors to /login with the redirect param', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <Routes>
+            <Route path="/login" element={<div>login page</div>} />
+            <Route
+              path="/dashboard"
+              element={
+                <RequireAuth>
+                  <div>protected</div>
+                </RequireAuth>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('login page')).toBeDefined());
+  });
 });

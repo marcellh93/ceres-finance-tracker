@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import '../index.css';
 import './i18n/i18n';
 import { App } from './App';
+import { AuthProvider } from './auth/auth-context';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('app root element missing');
@@ -18,7 +19,9 @@ createRoot(root).render(
       disableTransitionOnChange
     >
       <BrowserRouter basename="/app">
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
   </StrictMode>,
