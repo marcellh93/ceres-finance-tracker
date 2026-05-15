@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Data;
@@ -89,6 +90,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
     public DbSet<LockoutUnlockToken> LockoutUnlockTokens => Set<LockoutUnlockToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<EmailDeliveryEvent> EmailDeliveryEvents => Set<EmailDeliveryEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -102,6 +104,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureEmailChangeEntities(modelBuilder);
         ConfigureLockoutUnlockEntities(modelBuilder);
         ConfigureAuditLogEntities(modelBuilder);
+        ConfigureEmailDeliveryEventEntities(modelBuilder);
         SeedData(modelBuilder);
     }
 
@@ -216,6 +219,27 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.ToTable(t => t.HasCheckConstraint(
                 "CK_AuditLog_EntityPair",
                 "(\"EntityType\" IS NULL AND \"EntityId\" IS NULL) OR (\"EntityType\" IS NOT NULL AND \"EntityId\" IS NOT NULL)"));
+        });
+    }
+
+    private static void ConfigureEmailDeliveryEventEntities(ModelBuilder modelBuilder)
+    {
+        // Stage 8e: Resend webhook events. Cross-tenant by design (the webhook is pre-auth;
+        // events may also arrive for addresses without a matching user). Does NOT implement
+        // IUserOwned and is intentionally NOT in UserOwnedTables.All — same precedent as
+        // FailedLoginAttempt (ADR-0067). Payload is jsonb for future ad-hoc inspection;
+        // the (EmailAddress, OccurredAt DESC) index supports the most-recent-event-by-address
+        // lookup pattern that the operational tooling will use.
+        modelBuilder.Entity<EmailDeliveryEvent>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.MessageId).HasMaxLength(128);
+            b.Property(e => e.Type).HasMaxLength(64);
+            b.Property(e => e.EmailAddress).HasMaxLength(256);
+            b.Property(e => e.Payload).HasColumnType("jsonb");
+            b.HasIndex(e => new { e.EmailAddress, e.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_EmailDeliveryEvents_EmailAddress_OccurredAt");
         });
     }
 

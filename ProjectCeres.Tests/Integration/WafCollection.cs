@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -216,6 +217,20 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
                 services.RemoveAll<TService>();
                 services.AddScoped<TService, TImpl>();
             }));
+
+    /// <summary>
+    /// Returns a derived factory whose configuration binds
+    /// <c>Email:Resend:WebhookSecret</c> to <paramref name="secret"/>. Used by the
+    /// Stage 8e Resend webhook tests to inject a deterministic signing secret without
+    /// touching user-secrets or the production environment.
+    /// </summary>
+    public WebApplicationFactory<Program> WithWebhookSecret(string secret) =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, cfg) =>
+                cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Email:Resend:WebhookSecret"] = secret,
+                })));
 
     /// <summary>
     /// Returns a derived factory that appends every log message to <paramref name="sink"/>.

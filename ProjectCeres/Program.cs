@@ -176,6 +176,9 @@ builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
 builder.Services.AddScoped<IEmailComposer, EmailComposer>();
 builder.Services.AddScoped<ILanguageResolver, LanguageResolver>();
 
+// Stage 8e: Svix HMAC verifier for the Resend webhook controller. Stateless — singleton.
+builder.Services.AddSingleton<IResendSignatureVerifier, ResendSignatureVerifier>();
+
 builder.Services.AddScoped<MfaBackupCodeService>();
 builder.Services.AddScoped<TotpReplayGuard>();
 builder.Services.AddScoped<FailedLoginRecorder>();
