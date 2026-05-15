@@ -121,5 +121,9 @@ ProjectCeres/wwwroot/css/site.css
 # Claude Code worktrees and tooling
 .worktrees/
 .superpowers/
+# Sandbox for testing the impeccable skill — local-only experiments
+impeccable-sandbox/
 # Per-process state from ScheduleWakeup — never share across machines
 .claude/scheduled_tasks.lock
+ProjectCeres/ProjectCeres.csproj.lscache
+ProjectCeres.Tests/ProjectCeres.Tests.csproj.lscache

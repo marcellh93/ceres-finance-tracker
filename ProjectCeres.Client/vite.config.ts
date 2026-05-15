@@ -55,6 +55,15 @@ export default defineConfig({
           if (id.includes('node_modules/lucide-react') || id.includes('node_modules/clsx') ||
               id.includes('node_modules/tailwind-merge') || id.includes('node_modules/class-variance-authority'))
             return 'vendor-ui'
+          // vendor-forms: react-hook-form + zod + resolvers adapter. Budget entry
+          // added in Task 6 once Login.tsx imports these libs and the chunk is emitted.
+          if (id.includes('node_modules/react-hook-form') || id.includes('node_modules/zod') ||
+              id.includes('node_modules/@hookform'))
+            return 'vendor-forms'
+          // vendor-qr: qrcode.react for Phase 4 TOTP setup. Budget entry added in
+          // Phase 4 once the TOTP setup page imports this package.
+          if (id.includes('node_modules/qrcode.react'))
+            return 'vendor-qr'
         },
       },
     },

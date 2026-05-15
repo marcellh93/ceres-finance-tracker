@@ -292,6 +292,7 @@ shadcn/ui covers the Phase 2 baseline. Phase 3 additions required:
 9. Settings + Sessions + Support — lowest frequency; includes saved searches management
    - ✓ **Settings — first SPA-pattern pilot (2026-05-02).** SPA at `/app/settings` exercising the locked `features/<area>/` template + Popover+Command pickers + `useApi` GET / hand-rolled `fetch` PATCH idiom. Razor `SettingsController` page action 302-redirects to the SPA; Razor view + view models deleted. Spec: `docs/superpowers/specs/2026-05-02-spa-page-pattern-and-settings-design.md`. Plan: `docs/superpowers/plans/2026-05-02-spa-page-pattern-and-settings.md`.
    - Pending: Sessions and Support SPA pages — both depend on Batch 3 Auth and live in [Batch 5 — Launch readiness](#batch-5--launch-readiness).
+10. ✓ **SPA form pattern established (2026-05-16, Stage 9 Phase 1).** `react-hook-form` + `zod` + `@hookform/resolvers` installed (pnpm). `qrcode.react` installed (Phase 4 TOTP setup, not yet imported). shadcn `input-otp` component added. Vite `manualChunks` wired for `vendor-forms` and `vendor-qr` (chunks emit once the libs are first imported — Task 6 for forms, Phase 4 for QR). Budget entries deferred to those tasks. See [ADR-0074](decisions/ADR-0074-react-hook-form-with-zod-for-spa-forms.md).
 
 ---
 
