@@ -303,6 +303,34 @@ public static class AuthTestFixture
         return format.Protect(ticket);
     }
 
+    /// <summary>
+    /// Creates an <see cref="HttpClient"/> that is already authenticated as the given user.
+    /// Mints an auth cookie via the production ticket-format path (same mechanism as
+    /// <see cref="MintAuthCookieWithLastReauthAt"/>) so the session is recognised by
+    /// <c>SessionRevocationValidator</c>. Cookies are disabled on the client itself so
+    /// the pre-set session cookie is not overwritten by the server's Set-Cookie responses.
+    /// </summary>
+    public static async Task<HttpClient> AuthenticatedClientAsync(
+        AuthTestWebApplicationFactory factory, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new InvalidOperationException($"User {userId} not found");
+
+        var cookieValue = await MintAuthCookieWithLastReauthAt(factory, user, null);
+
+        var client = factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                HandleCookies = false,
+            });
+        client.DefaultRequestHeaders.Add(
+            "Cookie",
+            $"{SessionConstants.SessionCookieName}={cookieValue}");
+        return client;
+    }
+
     private static byte[] DecodeBase32(string input)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";

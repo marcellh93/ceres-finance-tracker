@@ -413,6 +413,42 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Returns a snapshot of the current user's session state. Called once on mount
+    /// by the SPA auth context to decide if the user is logged in and to render
+    /// auth-aware UI (TOTP-enabled badges, the backup-code banner).
+    /// Cache-Control: no-store — the SPA must always fetch fresh session state.
+    /// </summary>
+    [HttpGet("me"), Authorize]
+    public async Task<IActionResult> Me()
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+            return UnauthorizedEnvelope("UNAUTHENTICATED", "Authentication required.");
+
+        var lastReauthClaim = User.FindFirst(SessionConstants.LastReauthAtClaim)?.Value;
+        long? lastReauthAt = long.TryParse(lastReauthClaim, out var v) ? v : null;
+
+        var backupCodesRemaining = user.TwoFactorEnabled
+            ? await _db.UserMfaBackupCodes.CountAsync(c => c.UserId == user.Id && c.UsedAt == null, HttpContext.RequestAborted)
+            : 0;
+
+        // Phase 4 wires UsedBackupCodeAtLastLogin properly (it depends on a new column
+        // on UserSession written by /login/totp on the backup-code path). For Phase 1
+        // it's always false — the banner that consumes it doesn't ship until Phase 4.
+        var usedBackupCodeAtLastLogin = false;
+
+        Response.Headers.CacheControl = "no-store";
+
+        return Ok(new MeResponse(
+            UserId: user.Id,
+            Email: user.Email!,
+            TwoFactorEnabled: user.TwoFactorEnabled,
+            LastReauthAt: lastReauthAt,
+            BackupCodesRemaining: backupCodesRemaining,
+            UsedBackupCodeAtLastLogin: usedBackupCodeAtLastLogin));
+    }
+
     [HttpPost("logout"), Authorize]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Logout()
