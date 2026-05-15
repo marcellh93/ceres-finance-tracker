@@ -311,6 +311,39 @@ Migration path: introduce `QueryClientProvider` in `src/app/main.tsx`, replace `
 
 ---
 
+### Decision Coach — affordability simulation for pending commitments
+
+**What:** A guided pre-commit decision-support feature. The user enters a pending financial obligation (e.g. "dentist's offer: €1,500 upfront + €180/month for 18 months"), a wizard walks them through need-vs-want / urgency / reversibility framing, the system projects their ledger forward 24–36 months **with and without** the commitment, runs rule-driven evaluation, and returns a **verdict + dissent** (e.g. "Verdict: Wait — but the decision is irreversible and marked urgent, so waiting has real cost"). If the user decides to proceed, one click converts the scenario into the operational artifacts (a new amortising Liability account if financed, a savings goal `Budget` if self-funded, or both).
+
+**Why it matters:** The current system solves the post-commit world well — amortising Liability accounts project payoff schedules, Spendable Balance shows today's headroom, Goal Budgets track savings. None of them help the user evaluate **whether to commit at all** against their full forward picture. The brainstorming session that produced the spec started from a real moment the user had after a dentist visit: enough cash to start, salary to cover the monthlies, no tool in the app to decide whether saying yes was financially responsible.
+
+**Design source of truth:** [`docs/superpowers/specs/2026-05-16-decision-coach-design.md`](superpowers/specs/2026-05-16-decision-coach-design.md). That document is the full spec — entities, rule architecture, projection engine, UI wizard, conversion path, testing strategy. The bullets below are a high-altitude summary so this entry is greppable without opening the spec.
+
+**Shape, in brief:**
+
+- New entities: `Scenario` (the decision artifact, with frozen verdict + dissent), `ScenarioConversion` (link from scenario to spawned Account/Budget), `ScenarioCategory` (lookup), `CoachRuleProfile` + `CoachRuleProfileEntry` (which rules fire, with what weights), `CoachRule` (lookup, one row per heuristic), and one config table per parameterised rule (`CashflowSafetyConfig`, `GoalImpactConfig`, `InterestCostConfig`, `EmergencyBufferConfig`, `DebtBurdenConfig`).
+- Rule logic stays in code (typo-proof, unit-testable); rule **parameters** live in their own typed-column tables (one per rule), tunable without a deploy. Three of the eight v1 rules read only the scenario's tags and have no config table.
+- Three separable services: `IProjectionService` (math), `ICoachAdvisor` (verdict assembly), `IScenarioConversionService` (artifact spawn). No back-pointers from existing entities to `Scenario` — FK direction is always Scenario → Account/Budget, so the feature is removable.
+- React SPA wizard at `/coach`, journal listing of all scenarios with their verdicts, verdict screen with a projection chart, conversion confirmation.
+
+**Prerequisite — Stage Coach.0:** The spec depends on two reusable engines that **do not exist in code today**:
+- `ISpendableBalanceCalculator` must be extracted out of `DashboardService.GetSpendableBalanceAsync` (currently a private 5-tuple method serving only the dashboard).
+- `ILiabilityProjectionService` must be built (despite `planning-phase2.md` documenting it as if shipped — verified missing from the codebase 2026-05-16).
+Coach.0 ships as the first sub-stage of the Coach batch. Not pulled forward into Phase 3 — Phase 3 is already long and the gap has been latent for months without harm.
+
+**Why deferred (not now):**
+- Significant new server work (~120 tests, multiple migrations, a wizard, conversion logic) sitting outside Phase 3's auth/multi-tenancy/SPA-cutover framing.
+- Depends on the SPA being stable and on Phase 3's auth + multi-tenancy being live (both already shipped through Stage 7.5, but the Coach UI fit-and-finish work assumes the SPA shell isn't still moving).
+- Coach.0 alone is a small refactor; the Coach feature itself is a full batch. Easier to scope as one batch in Phase 4 than to scatter pieces across Phase 3.
+
+**Workaround until shipped:** Open a spreadsheet, project monthly cash flow by hand, decide. (This is precisely the workflow Project Ceres exists to replace, which is what makes the Decision Coach a high-value Phase 4 candidate.)
+
+**Gate:** Phase 4. Coach.0 lands as the first sub-stage of the Coach batch. Open the implementation plan via `superpowers:writing-plans` once the user schedules the work.
+
+**Triggered by:** User brainstorm 2026-05-16 after a dentist's offer with two financing options exposed the gap in the app's pre-commit decision support.
+
+---
+
 ## Phase 5 — Business Model
 
 **Gate: Phase 4 must be stable. See [`business-model.md`](business-model.md) for full detail.**
