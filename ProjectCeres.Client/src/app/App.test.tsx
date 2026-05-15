@@ -8,12 +8,17 @@ import { AuthProvider } from './auth/auth-context';
 // resolves to 'authed' and renders protected children. All App.test.tsx
 // tests exercise the route table, not auth behaviour — auth is covered
 // by RequireAuth.test.tsx and auth-context.test.tsx.
+//
+// mockResolvedValueOnce (not mockResolvedValue): the persistent form was
+// silently answering every subsequent fetch (provider badge counts, page
+// data loads) with the /me shape, masking the real fetch contract and
+// making tests fragile as more page-level fetches arrive.
 function mockAuthedMe() {
-  vi.spyOn(global, 'fetch').mockResolvedValue(
+  vi.spyOn(global, 'fetch').mockResolvedValueOnce(
     new Response(
       JSON.stringify({
         userId: '00000000-0000-0000-0000-000000000001',
-        email: 'user@example.test',
+        email: 'a@b.test',
         twoFactorEnabled: false,
         lastReauthAt: null,
         backupCodesRemaining: 0,

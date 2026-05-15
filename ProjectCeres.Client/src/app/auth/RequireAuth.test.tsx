@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RequireAuth } from './RequireAuth';
 import { AuthProvider } from './auth-context';
@@ -41,6 +41,15 @@ describe('RequireAuth — authenticated passthrough', () => {
   });
 });
 
+// Probe component: renders the login heading + raw search string so the
+// test can assert that ?redirect=%2Fdashboard arrives correctly encoded.
+// A regression dropping encodeURIComponent or renaming the query param
+// would produce a different search string and fail the assertion below.
+function LoginProbe() {
+  const location = useLocation();
+  return <div>login page{location.search}</div>;
+}
+
 describe('RequireAuth — anonymous redirect', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
@@ -61,7 +70,7 @@ describe('RequireAuth — anonymous redirect', () => {
       <AuthProvider>
         <MemoryRouter initialEntries={['/dashboard']}>
           <Routes>
-            <Route path="/login" element={<div>login page</div>} />
+            <Route path="/login" element={<LoginProbe />} />
             <Route
               path="/dashboard"
               element={
@@ -74,6 +83,8 @@ describe('RequireAuth — anonymous redirect', () => {
         </MemoryRouter>
       </AuthProvider>,
     );
-    await waitFor(() => expect(screen.getByText('login page')).toBeDefined());
+    await waitFor(() =>
+      expect(screen.getByText('login page?redirect=%2Fdashboard')).toBeDefined(),
+    );
   });
 });

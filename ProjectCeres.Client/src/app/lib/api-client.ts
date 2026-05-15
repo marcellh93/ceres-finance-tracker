@@ -25,8 +25,27 @@ type ProjectErrorEnvelope = {
 };
 
 export type ApiSuccess<T> = { ok: true; status: number; data: T | null };
-export type ApiFailure =
-  | { ok: false; status: number; code: string; message: string; fieldErrors?: Record<string, string>; formError?: string };
+export type ApiFieldErrorsFailure = {
+  ok: false;
+  status: 422;
+  code: string;
+  message: string;
+  fieldErrors: Record<string, string>;
+};
+export type ApiFormErrorFailure = {
+  ok: false;
+  status: 422;
+  code: string;
+  message: string;
+  formError: string;
+};
+export type ApiGenericFailure = {
+  ok: false;
+  status: number;
+  code: string;
+  message: string;
+};
+export type ApiFailure = ApiFieldErrorsFailure | ApiFormErrorFailure | ApiGenericFailure;
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
 
 export type ApiFetchInit = Omit<RequestInit, 'body'> & {
