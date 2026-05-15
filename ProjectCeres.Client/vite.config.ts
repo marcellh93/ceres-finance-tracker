@@ -49,6 +49,9 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor-react'
           if (id.includes('node_modules/recharts'))    return 'vendor-charts'
+          if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next') ||
+              id.includes('node_modules/i18next-browser-languagedetector'))
+            return 'vendor-i18n'
           if (id.includes('node_modules/lucide-react') || id.includes('node_modules/clsx') ||
               id.includes('node_modules/tailwind-merge') || id.includes('node_modules/class-variance-authority'))
             return 'vendor-ui'
