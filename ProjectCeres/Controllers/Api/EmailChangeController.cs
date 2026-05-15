@@ -23,6 +23,7 @@ public sealed class EmailChangeController : ControllerBase
     // calls GetCustomAttribute<AuthorizeAttribute>() singularly), and is redundant.
     [HttpPost("request"), RequireRecentAuth]
     [EnableRateLimiting(AuthRateLimitPolicies.EmailByUser)]
+    [ApplyEmailIpRateLimit]
     public async Task<IActionResult> RequestChange([FromBody] EmailChangeRequest body)
     {
         var sid = User.FindFirstValue(ClaimTypes.NameIdentifier);

@@ -163,6 +163,47 @@ public sealed class EmailRateLimitTests : IClassFixture<RateLimitedAuthTestWebAp
             "two authenticated callers into one partition.");
     }
 
+    // ── Test 5 ──────────────────────────────────────────────────────────────
+    // Stage 8 post-review fix: /api/auth/email-change/request now has the
+    // EmailByIp global-limiter gate via [ApplyEmailIpRateLimit] (same as
+    // /password-reset/request) so an authenticated attacker with multiple
+    // accounts cannot circumvent the per-user 5/hr by rotating accounts.
+    [Fact]
+    public async Task Eleventh_email_change_request_from_same_ip_returns_429()
+    {
+        // WithReplacedService(...).WithWebHostBuilder(_ => { }) gives a fresh inner
+        // WebHost (and therefore empty rate-limit partition state) with a no-op
+        // IEmailService — mirrors the existing partition test in this file.
+        await using var factory = _factory
+            .WithReplacedService<IEmailService>(new NoopEmailService())
+            .WithWebHostBuilder(_ => { });
+
+        // Register 11 distinct users on the OUTER factory (shares the test DB) so
+        // each gets its own EmailByUser bucket — the limiter we want to hit is the
+        // per-IP one, not the per-user one.
+        var users = new List<ApplicationUser>();
+        for (var i = 0; i < 11; i++)
+        {
+            var email = $"ip-emailchange-{i}-{Guid.NewGuid():N}@example.invalid";
+            users.Add(await AuthTestFixture.RegisterUserAsync(_factory, email));
+        }
+
+        // The first 10 requests, each from a DIFFERENT user, should saturate the
+        // per-IP bucket (10/hr) without hitting any per-user bucket (each at 1/5).
+        for (var i = 0; i < 10; i++)
+        {
+            var resp = await PostEmailChangeRequest(factory, users[i],
+                $"target-{Guid.NewGuid():N}@example.invalid");
+            resp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
+                "the first 10 requests from this IP should succeed (per-IP bucket of 10/hr)");
+        }
+
+        // 11th request from the 11th account should 429 on the per-IP gate.
+        var eleventh = await PostEmailChangeRequest(factory, users[10],
+            $"target-{Guid.NewGuid():N}@example.invalid");
+        eleventh.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     /// <summary>
