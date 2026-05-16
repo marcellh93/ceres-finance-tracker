@@ -1,4 +1,4 @@
-import { readXsrfToken } from '../auth/csrf';
+import { getCachedXsrfRequestToken, setCachedXsrfRequestToken } from '../auth/csrf';
 
 export class ReauthRequiredError extends Error {
   constructor(message: string) {
@@ -57,11 +57,13 @@ const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 let csrfHandshakeInFlight: Promise<void> | null = null;
 
 async function ensureCsrfToken(): Promise<void> {
-  if (readXsrfToken()) return;
+  if (getCachedXsrfRequestToken()) return;
   if (csrfHandshakeInFlight) return csrfHandshakeInFlight;
   csrfHandshakeInFlight = (async () => {
     try {
-      await fetch('/api/auth/csrf', { method: 'GET', credentials: 'include' });
+      const response = await fetch('/api/auth/csrf', { method: 'GET', credentials: 'include' });
+      const token = response.headers.get('X-XSRF-TOKEN');
+      if (token) setCachedXsrfRequestToken(token);
     } finally {
       csrfHandshakeInFlight = null;
     }
@@ -89,7 +91,7 @@ export async function apiFetch<T = unknown>(
 
   if (STATE_CHANGING_METHODS.has(method)) {
     await ensureCsrfToken();
-    const token = readXsrfToken();
+    const token = getCachedXsrfRequestToken();
     if (token) headers['X-XSRF-TOKEN'] = token;
   }
 

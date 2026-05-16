@@ -399,17 +399,33 @@ public sealed class AuthController : ControllerBase
         => Unauthorized(new { error = new { code, message } });
 
     /// <summary>
-    /// GET endpoint that refreshes the __Host-XSRF cookie. State-changing endpoints
-    /// require a CSRF cookie + matching X-XSRF-TOKEN header; this endpoint is the
-    /// idiomatic way for the SPA (and integration tests) to ensure both are present
-    /// and bound to the current authentication context. Side-effect-free, allowed
-    /// to be GET.
+    /// GET endpoint that refreshes the __Host-XSRF cookie and surfaces the CSRF
+    /// request token for the SPA. State-changing endpoints require a CSRF cookie +
+    /// matching X-XSRF-TOKEN header; this endpoint is the idiomatic way for the SPA
+    /// (and integration tests) to ensure both are present and bound to the current
+    /// authentication context. Side-effect-free, allowed to be GET.
+    ///
+    /// Response headers:
+    ///   Set-Cookie: __Host-XSRF=&lt;cookie-token&gt; — set automatically by IAntiforgery.
+    ///   X-XSRF-TOKEN: &lt;request-token&gt; — the SPA must echo this value as the
+    ///     X-XSRF-TOKEN request header on all subsequent POST/PUT/PATCH/DELETE calls.
+    ///
+    /// ASP.NET's IAntiforgery validates a cryptographic pair (cookie token + request
+    /// token). The two are distinct values; sending the cookie value as the header
+    /// would be a mismatch and trigger a 400. The cookie token travels via Set-Cookie;
+    /// the request token is emitted here so the SPA has an explicit exit channel.
     /// </summary>
     [HttpGet("csrf"), AllowAnonymous]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthCsrfByIp)]
     public IActionResult Csrf()
     {
-        _antiforgery.GetAndStoreTokens(HttpContext);
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        // The cookie token goes to Set-Cookie automatically (configured in Program.cs).
+        // The request token must be exposed to the SPA via a response header so apiFetch
+        // can echo it on subsequent state-changing requests. ASP.NET's IAntiforgery uses
+        // a cryptographic pair (cookie-token + request-token); sending the cookie value
+        // as the header would be a mismatch (the pre-fix bug).
+        Response.Headers[SessionConstants.CsrfHeaderName] = tokens.RequestToken;
         return NoContent();
     }
 

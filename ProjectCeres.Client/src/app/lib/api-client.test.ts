@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch, ReauthRequiredError, NetworkError } from './api-client';
+import { clearXsrfTokenCacheForTests } from '../auth/csrf';
 
 describe('apiFetch', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, 'fetch');
-    // Reset any module-level CSRF cache between tests.
-    // __Host- prefix requires the Secure attribute; vite.config sets the jsdom
-    // URL to https://localhost so Secure cookies are accepted.
+    // Reset the module-level CSRF request-token memo between tests so each
+    // test starts without a cached token and can exercise the full handshake.
+    clearXsrfTokenCacheForTests();
+    // Clear the cookie too (belt-and-suspenders; __Host- prefix requires Secure
+    // attribute; vite.config sets the jsdom URL to https://localhost so Secure
+    // cookies are accepted).
     document.cookie = '__Host-XSRF=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; Secure';
   });
 
@@ -39,12 +43,14 @@ describe('apiFetch', () => {
     );
   });
 
-  it('POST request runs the CSRF handshake first when no cookie present', async () => {
+  it('POST request runs the CSRF handshake first when no token cached', async () => {
     fetchSpy
-      // Handshake call to /api/auth/csrf — sets the cookie via Set-Cookie.
+      // Handshake call to /api/auth/csrf — returns request token in response header.
       .mockImplementationOnce(async () => {
-        document.cookie = '__Host-XSRF=test-csrf-token; path=/; Secure';
-        return new Response(null, { status: 204 });
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-XSRF-TOKEN': 'test-csrf-token' },
+        });
       })
       // The actual POST.
       .mockResolvedValueOnce(jsonResponse(null, { status: 204 }));
@@ -63,8 +69,10 @@ describe('apiFetch', () => {
     fetchSpy.mockImplementation(async (url) => {
       if (url === '/api/auth/csrf') {
         handshakeCount++;
-        document.cookie = '__Host-XSRF=test-csrf-token; path=/; Secure';
-        return new Response(null, { status: 204 });
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-XSRF-TOKEN': 'test-csrf-token' },
+        });
       }
       return jsonResponse(null, { status: 204 });
     });
@@ -81,8 +89,10 @@ describe('apiFetch', () => {
   it('maps 422 with field details into fieldErrors', async () => {
     fetchSpy.mockImplementation(async (url) => {
       if (url === '/api/auth/csrf') {
-        document.cookie = '__Host-XSRF=test-csrf-token; path=/; Secure';
-        return new Response(null, { status: 204 });
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-XSRF-TOKEN': 'test-csrf-token' },
+        });
       }
       return jsonResponse(
         {
@@ -107,8 +117,10 @@ describe('apiFetch', () => {
   it('maps 422 with empty details into formError', async () => {
     fetchSpy.mockImplementation(async (url) => {
       if (url === '/api/auth/csrf') {
-        document.cookie = '__Host-XSRF=test-csrf-token; path=/; Secure';
-        return new Response(null, { status: 204 });
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-XSRF-TOKEN': 'test-csrf-token' },
+        });
       }
       return jsonResponse(
         {
@@ -129,8 +141,10 @@ describe('apiFetch', () => {
   it('throws ReauthRequiredError on 401 REAUTH_REQUIRED', async () => {
     fetchSpy.mockImplementation(async (url) => {
       if (url === '/api/auth/csrf') {
-        document.cookie = '__Host-XSRF=test-csrf-token; path=/; Secure';
-        return new Response(null, { status: 204 });
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-XSRF-TOKEN': 'test-csrf-token' },
+        });
       }
       return jsonResponse(
         { error: { code: 'REAUTH_REQUIRED', message: 'Please reauthenticate.' } },

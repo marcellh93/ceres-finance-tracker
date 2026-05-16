@@ -6,6 +6,7 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n/i18n';
 import { AuthProvider } from '../../auth/auth-context';
 import { Login } from './Login';
+import { clearXsrfTokenCacheForTests } from '../../auth/csrf';
 
 function renderLogin(initialPath = '/login') {
   return render(
@@ -32,6 +33,9 @@ describe('Login page', () => {
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, 'fetch');
+    // Reset the module-level CSRF request-token memo between tests to avoid
+    // cross-test pollution (the memo persists for the module lifetime).
+    clearXsrfTokenCacheForTests();
     // /api/auth/me returns 401 (anonymous) by default for these tests.
     fetchSpy.mockImplementation(async (url) => {
       if (typeof url === 'string' && url === '/api/auth/me') {
@@ -39,6 +43,13 @@ describe('Login page', () => {
           JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
           { status: 401, headers: { 'Content-Type': 'application/json' } },
         );
+      }
+      // /api/auth/csrf returns the request token in the response header.
+      if (typeof url === 'string' && url === '/api/auth/csrf') {
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-XSRF-TOKEN': 'test-csrf-token' },
+        });
       }
       return new Response(null, { status: 204 });
     });
