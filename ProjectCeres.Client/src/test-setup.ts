@@ -1,5 +1,36 @@
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
+
+// ── Global fetch isolation ────────────────────────────────────────────────────
+// Many test files assign `global.fetch = vi.fn()` in a `beforeEach` without
+// restoring the original in `afterEach`. Because Vitest runs each test FILE in
+// its own worker but runs all TESTS within a file in the same global scope,
+// a stale mock from one test bleeds into the next test that runs in the same
+// worker. The two confirmed victims were:
+//   - features/recurring/RecurringLayout.test.tsx — dialog content missing
+//   - features/movements/MovementEdit.test.tsx (Test 1) — fetch() returns undefined
+//
+// Fix: snapshot the original fetch reference before every test and restore it
+// afterward. This is safe for every test: files that set their own mock in
+// `beforeEach` will still override after this restore (their `beforeEach` runs
+// after this one), and they will find a clean, un-mocked fetch at the start of
+// the NEXT test rather than the previous test's leftover mock.
+//
+// `vi.restoreAllMocks()` covers spies created via `vi.spyOn`.
+// `vi.unstubAllGlobals()` covers stubs created via `vi.stubGlobal`.
+// The manual save/restore below covers direct assignment (`global.fetch = vi.fn()`),
+// which neither of the above APIs touches.
+let _originalFetch: typeof fetch
+
+beforeEach(() => {
+  _originalFetch = global.fetch
+})
+
+afterEach(() => {
+  global.fetch = _originalFetch
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 // @testing-library/react's fake-timer detection checks `typeof jest !== 'undefined'`
 // and then inspects `setTimeout.clock` (set by @sinonjs/fake-timers, which Vitest
