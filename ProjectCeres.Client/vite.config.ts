@@ -13,6 +13,21 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
+    // HMR over the .NET reverse proxy: the page is served from
+    // https://localhost:7081 (Kestrel + Vite.AspNetCore's UseViteDevelopmentServer
+    // middleware), so the Vite client must connect its WebSocket to that origin,
+    // not to Vite's direct port 5173 (which doesn't terminate TLS). Without these
+    // explicit settings Vite auto-derives the WS URL and falls back to
+    // wss://localhost:5173 when the auto-derived URL fails — that fallback can
+    // never work in a TLS-proxied setup.
+    // See https://vite.dev/config/server-options#server-hmr and
+    //     https://vite.dev/guide/troubleshooting (HMR fallback section).
+    hmr: {
+      host: 'localhost',
+      protocol: 'wss',
+      clientPort: 7081,
+    },
     proxy: {
       '/api': {
         target: 'https://localhost:7001',
@@ -25,7 +40,6 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    strictPort: true,
   },
   build: {
     outDir: 'dist',
