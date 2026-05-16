@@ -10,31 +10,39 @@ using ProjectCeres.Services;
 namespace ProjectCeres.Tools;
 
 /// <summary>
-/// Development-only bootstrap helper. Creates the first user account and remaps any
-/// sentinel-tagged (Phase 1/2) data onto that user.
+/// Development-only bootstrap helper. Creates a confirmed dev user account and remaps any
+/// sentinel-tagged (Phase 1/2) data onto that user across all 16 user-owned tables.
 ///
 /// <para>
-/// Invoked via: <c>dotnet run --project ProjectCeres -- --seed-dev-user</c>
-/// </para>
-///
-/// <para>
-/// This helper exists because:
+/// When to use this:
 /// <list type="bullet">
-///   <item>The <c>RemapSentinelToFirstUser</c> migration was a no-op on first apply
-///         (zero users in AspNetUsers at migration time).</item>
-///   <item>The SPA register flow (Stage 9 Phase 2) hasn't shipped yet.</item>
-///   <item>Even when it ships, login is gated on email-confirmation which also hasn't
-///         shipped, so there is no in-band path to a confirmed first-user account.</item>
+///   <item>AspNetUsers is empty and you have pre-Stage-7 sentinel-tagged data that needs
+///         to be owned by a real user account.</item>
+///   <item>After a dev DB wipe — re-run to re-create the account; sentinel remap becomes
+///         a no-op if no sentinel rows remain.</item>
 /// </list>
 /// </para>
 ///
 /// <para>
-/// Exit codes: 0 ok | 1 user-create fail | 2 env gate | 3 remap pre-check | 4 remap post-check.
+/// Gated on <c>IsDevelopment</c>. Will not run in Staging or Production.
+/// </para>
+///
+/// <para>
+/// CLI invocation:
+/// <code>
+/// dotnet run --project ProjectCeres --launch-profile https -- --seed-dev-user --email &lt;addr&gt; --generate-password
+/// dotnet run --project ProjectCeres --launch-profile https -- --seed-dev-user --email &lt;addr&gt; --password &lt;pw&gt;
+/// </code>
+/// </para>
+///
+/// <para>
+/// Exit codes: 0 ok | 1 user-create fail | 2 env gate | 3 remap pre-check | 4 remap post-check | 5 CLI validation.
 /// </para>
 /// </summary>
 public static class SeedDevUser
 {
-    private const string TargetEmail = "marcelljesus1218@gmail.com";
+    /// <summary>Parsed and validated CLI arguments for this helper.</summary>
+    private sealed record Args(string Email, string? PlainPassword, bool GeneratePassword);
 
     // Sentinel UUID from Phase 1/2 — same as RemapSentinelToFirstUser migration.
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");
@@ -42,6 +50,10 @@ public static class SeedDevUser
     // 32-char password alphabet: no easily-confused chars (0/O/I/l/1).
     private const string PasswordAlphabet =
         "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*";
+
+    // Project's Identity password floor (see IdentityConfig). Checked here to fail fast
+    // at the CLI surface rather than waiting for UserManager to reject the value.
+    private const int MinPasswordLength = 15;
 
     // All 16 user-owned tables: 14 from the original migration + TransactionAttachments
     // + TransferAttachments (added in Stage 7.5 with attachment support).
@@ -67,6 +79,11 @@ public static class SeedDevUser
 
     public static async Task<int> RunAsync(WebApplicationBuilder builder, string[] args)
     {
+        // === CLI validation (before touching DI/app) ===
+        var parsed = ParseArgs(args, out int validationExitCode);
+        if (parsed is null)
+            return validationExitCode;
+
         // === Environment gate ===
         if (!builder.Environment.IsDevelopment())
         {
@@ -92,30 +109,42 @@ public static class SeedDevUser
 
         // === Step 1: User creation (idempotent) ===
 
-        var existingUser = await userManager.FindByEmailAsync(TargetEmail);
+        var existingUser = await userManager.FindByEmailAsync(parsed.Email);
         Guid userId;
 
         if (existingUser is not null)
         {
-            Console.WriteLine($"[SeedDevUser] User {TargetEmail} already exists; skipping creation; running remap-only.");
+            Console.WriteLine($"[SeedDevUser] User {parsed.Email} already exists; skipping creation; running remap-only.");
+            // Skip password generation entirely on the existing-user path — generating a
+            // password that won't be used would be misleading and wasteful.
             userId = existingUser.Id;
         }
         else
         {
-            // Generate a 32-char cryptographically-random password from a clean alphabet.
-            var password = RandomNumberGenerator.GetString(PasswordAlphabet, 32);
+            // Determine the password to use.
+            string password;
+            if (parsed.GeneratePassword)
+            {
+                // Generate a 32-char cryptographically-random password from a clean alphabet.
+                password = RandomNumberGenerator.GetString(PasswordAlphabet, 32);
 
-            // === PRINT THE PASSWORD BEFORE THE REMAP — survives even a remap rollback ===
-            Console.WriteLine();
-            Console.WriteLine("=============================================================");
-            Console.WriteLine("  SAVE THIS PASSWORD NOW — it will not be shown again.");
-            Console.WriteLine();
-            Console.WriteLine($"  Email:    {TargetEmail}");
-            Console.WriteLine($"  Password: {password}");
-            Console.WriteLine("=============================================================");
-            Console.WriteLine();
+                // === PRINT THE PASSWORD BEFORE THE REMAP — survives even a remap rollback ===
+                Console.WriteLine();
+                Console.WriteLine("=============================================================");
+                Console.WriteLine("  SAVE THIS PASSWORD NOW — it will not be shown again.");
+                Console.WriteLine();
+                Console.WriteLine($"  Email:    {parsed.Email}");
+                Console.WriteLine($"  Password: {password}");
+                Console.WriteLine("=============================================================");
+                Console.WriteLine();
+            }
+            else
+            {
+                // --password <pw> path: value already validated >=15 chars by ParseArgs.
+                password = parsed.PlainPassword!;
+            }
 
-            var user = new ApplicationUser { UserName = TargetEmail, Email = TargetEmail };
+            var user = new ApplicationUser { UserName = parsed.Email, Email = parsed.Email };
             var createResult = await userManager.CreateAsync(user, password);
             if (!createResult.Succeeded)
             {
@@ -217,6 +246,125 @@ public static class SeedDevUser
 
         Console.WriteLine("[SeedDevUser] Done. Exit 0.");
         return 0;
+    }
+
+    /// <summary>
+    /// Parses and validates the args slice that the dispatch in Program.cs passes in
+    /// (everything after <c>--seed-dev-user</c>).
+    /// Returns a populated <see cref="Args"/> record on success, or null on validation
+    /// failure (in which case <paramref name="errorExitCode"/> is set to 5 and a usage
+    /// block has been printed to <c>Console.Error</c>).
+    /// </summary>
+    private static Args? ParseArgs(string[] args, out int errorExitCode)
+    {
+        errorExitCode = 0;
+
+        string? email         = null;
+        string? plainPassword = null;
+        bool    generatePw    = false;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--help":
+                    PrintUsage();
+                    errorExitCode = 0;
+                    return null;
+
+                case "--email":
+                    if (i + 1 >= args.Length)
+                    {
+                        Console.Error.WriteLine("ERROR: --email requires a value.");
+                        PrintUsage();
+                        errorExitCode = 5;
+                        return null;
+                    }
+                    email = args[++i];
+                    break;
+
+                case "--password":
+                    if (i + 1 >= args.Length)
+                    {
+                        Console.Error.WriteLine("ERROR: --password requires a value.");
+                        PrintUsage();
+                        errorExitCode = 5;
+                        return null;
+                    }
+                    plainPassword = args[++i];
+                    break;
+
+                case "--generate-password":
+                    generatePw = true;
+                    break;
+
+                default:
+                    Console.Error.WriteLine($"ERROR: Unknown flag '{args[i]}'.");
+                    PrintUsage();
+                    errorExitCode = 5;
+                    return null;
+            }
+        }
+
+        // --- Validate: --email required, non-empty, contains '@' ---
+        if (string.IsNullOrEmpty(email))
+        {
+            Console.Error.WriteLine("ERROR: --email is required.");
+            PrintUsage();
+            errorExitCode = 5;
+            return null;
+        }
+
+        if (!email.Contains('@'))
+        {
+            Console.Error.WriteLine($"ERROR: --email value '{email}' does not look like an email address (missing '@').");
+            PrintUsage();
+            errorExitCode = 5;
+            return null;
+        }
+
+        // --- Validate: exactly one of --password or --generate-password ---
+        if (!generatePw && plainPassword is null)
+        {
+            Console.Error.WriteLine("ERROR: Provide exactly one of --generate-password or --password <pw>.");
+            PrintUsage();
+            errorExitCode = 5;
+            return null;
+        }
+
+        if (generatePw && plainPassword is not null)
+        {
+            Console.Error.WriteLine("ERROR: --generate-password and --password are mutually exclusive.");
+            PrintUsage();
+            errorExitCode = 5;
+            return null;
+        }
+
+        // --- Validate: --password value length ---
+        if (plainPassword is not null && plainPassword.Length < MinPasswordLength)
+        {
+            Console.Error.WriteLine(
+                $"ERROR: --password value is {plainPassword.Length} characters; minimum is {MinPasswordLength}.");
+            PrintUsage();
+            errorExitCode = 5;
+            return null;
+        }
+
+        return new Args(email, plainPassword, generatePw);
+    }
+
+    /// <summary>Prints the canonical usage block to <c>Console.Error</c>.</summary>
+    private static void PrintUsage()
+    {
+        Console.Error.WriteLine();
+        Console.Error.WriteLine(
+            "Usage: dotnet run --project ProjectCeres -- --seed-dev-user --email <addr> [--generate-password | --password <pw>]");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("  --email <addr>           Email for the user account (required)");
+        Console.Error.WriteLine("  --generate-password      Generate a 32-char strong password and print it once");
+        Console.Error.WriteLine($"  --password <pw>          Use the provided password (must be >={MinPasswordLength} chars; appears in process args)");
+        Console.Error.WriteLine("  --help                   Show this message");
+        Console.Error.WriteLine();
     }
 
     /// <summary>

@@ -464,7 +464,8 @@ builder.Services.AddScoped<IHeaderDetectionService, HeaderDetectionService>();
 builder.Services.AddViteServices();
 
 // Development-only bootstrap tool: creates the first user + remaps sentinel-tagged data.
-// Invocation: dotnet run --project ProjectCeres -- --seed-dev-user
+// Invocation: dotnet run --project ProjectCeres --launch-profile https -- --seed-dev-user --email <addr> --generate-password
+//         or: dotnet run --project ProjectCeres --launch-profile https -- --seed-dev-user --email <addr> --password <pw>
 // Placed here (after all service registrations, before builder.Build()) so RunAsync
 // can call builder.Build() and resolve the fully-configured DI container.
 if (args.Length > 0 && args[0] == "--seed-dev-user")
