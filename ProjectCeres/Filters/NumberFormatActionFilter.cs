@@ -12,6 +12,12 @@ public class NumberFormatActionFilter(ISettingsService settingsService) : IAsync
 {
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
+        if (context.HttpContext.User.Identity?.IsAuthenticated != true)
+        {
+            await next();
+            return;
+        }
+
         if (context.Controller is Controller controller)
         {
             var settings = await settingsService.GetAsync();
