@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { BrandMark } from './BrandMark';
+import { LanguageToggle } from '../components/auth/LanguageToggle';
 
 /**
  * Layout for unauthenticated auth pages: centered card on a soft
@@ -22,9 +23,9 @@ export function AuthLayout() {
         <div>
           <Outlet />
         </div>
-        {/* Footer slot for <LanguageToggle /> — Task 6 adds it as a child of this element.
-            The element is kept empty here so Task 6 only needs to add children, not restructure the layout. */}
-        <footer className="flex justify-center" data-slot="auth-footer" />
+        <footer className="flex justify-center" data-slot="auth-footer">
+          <LanguageToggle />
+        </footer>
       </Card>
     </div>
   );

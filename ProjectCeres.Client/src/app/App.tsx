@@ -39,6 +39,7 @@ import { MovementsLayout } from './features/movements/MovementsLayout';
 import { RecurringCreate } from './features/recurring/RecurringCreate';
 import { RecurringEdit } from './features/recurring/RecurringEdit';
 import { useRecurringLayoutCtx } from './features/recurring/RecurringLayout';
+import { Login } from './pages/auth/Login';
 
 function RecurringCreateBridge() {
   const ctx = useRecurringLayoutCtx();
@@ -55,8 +56,7 @@ export function App() {
     <Routes>
       {/* Public branch — auth pages with the centered-card layout, no app shell. */}
       <Route element={<AuthLayout />}>
-        {/* Login lands in Task 6 of this phase; the route is registered
-            here so the routing split lands first as its own commit. */}
+        <Route path="login" element={<Login />} />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}

@@ -965,19 +965,19 @@ Layout + brand:
 
 - [ ] Centered card layout, no app shell (sidebar, top bar absent)
 - [ ] Ceres logo / wordmark placement consistent across all auth pages
-- [ ] Globe icon language toggle at the bottom of every auth card; instant in-place swap via `i18n.changeLanguage()`, no reload
+- [x] Globe icon language toggle at the bottom of every auth card; instant in-place swap via `i18n.changeLanguage()`, no reload
 - [ ] Pre-auth language detection writes the `lang` cookie (non-HttpOnly, `SameSite=Lax`)
 
 `/login`:
 
-- [ ] Email + password fields with explicit `<label>` (`htmlFor`) — no placeholder-only labels
-- [ ] Submit button has idle / loading / error states
-- [ ] On wrong credentials: generic error "Email or password is incorrect" (no enumeration leak)
-- [ ] On account locked: "Account locked. Check your email for an unlock link." — no other detail
-- [ ] On success without TOTP enrolled: redirect to `/login/totp/setup` (first-login enrolment grace path)
-- [ ] On success with TOTP enrolled: redirect to `/login/totp`
-- [ ] "Forgot password?" link routes to `/password-reset`
-- [ ] "Create account" link routes to `/register`
+- [x] Email + password fields with explicit `<label>` (`htmlFor`) — no placeholder-only labels
+- [x] Submit button has idle / loading / error states
+- [x] On wrong credentials: generic error "Email or password is incorrect" (no enumeration leak)
+- [x] On account locked: "Account locked. Check your email for an unlock link." — no other detail
+- [x] On success: redirect to `/` (dashboard) regardless of TOTP-enrolment status. Per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md), MFA enrollment is reachable only from Settings → Security; there is no first-login redirect to TOTP setup.
+- [x] On success with TOTP enrolled: redirect to `/login/totp`
+- [x] "Forgot password?" link routes to `/password-reset`
+- [x] "Create account" link routes to `/register`
 
 `/login/totp`:
 
@@ -1054,8 +1054,8 @@ Accessibility:
 
 Localization:
 
-- [ ] Every string in every auth page uses `useTranslation()` keyed strings
-- [ ] EN + ES translations complete in `en.json` and `es.json`
+- [x] Every string in every auth page uses `useTranslation()` keyed strings
+- [x] EN + ES translations complete in `en.json` and `es.json`
 - [ ] No untranslated copy visible when toggling to ES
 - [ ] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale
 

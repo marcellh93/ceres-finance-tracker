@@ -8,6 +8,7 @@ const BUDGETS_GZIP_KB = {
   'app-*.js': 67,
   'vendor-react-*.js': 113,
   'vendor-charts-*.js': 135,
+  'vendor-forms-*.js': 29,
   'vendor-i18n-*.js': 17,
   'vendor-ui-*.js': 16,
   'dialog-*.js': 34,
