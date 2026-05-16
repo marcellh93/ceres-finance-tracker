@@ -494,12 +494,50 @@ app.UseStaticFiles();
 // the proxied assets behave like static files: bypass auth entirely.
 if (app.Environment.IsDevelopment())
 {
-    // WebSocket support is required for Vite HMR. Per the Vite.AspNetCore docs:
-    // "Uncomment the following line if your pipeline doesn't contain it: app.UseWebSockets();"
-    // The project has no other WebSocket consumer, so this is dev-only — narrowly
-    // scoped to the Vite block.
+    // Vite dev middleware must NOT see general page requests — it would serve
+    // its own root index.html for any unmatched path, hijacking /, /app/, and
+    // /app/login from AppController. Scope it to asset-shaped requests + the
+    // HMR WebSocket upgrade. Everything else falls through to UseRouting +
+    // MapControllers where AppController.Index serves the Razor SPA host view.
+    //
+    // Vite asset path prefixes (Vite-internal conventions):
+    //   /@vite/*       — Vite runtime + HMR client bundle
+    //   /@react-refresh — React refresh runtime
+    //   /@id/*         — virtual module IDs
+    //   /src/*         — application source (both /src/main.tsx + /src/app/main.tsx)
+    //   /node_modules/* — third-party packages (fonts, etc.)
+    //
+    // HMR WebSocket: Vite's HMR client connects to wss://host/?token=...
+    // (root path with a token query). Detect via the WebSocket upgrade header
+    // since the root path is otherwise owned by HomeController.
+    //
+    // UseWebSockets() MUST stay BEFORE MapWhen because the predicate reads
+    // ctx.WebSockets.IsWebSocketRequest, which UseWebSockets() populates.
+    static bool IsViteRequest(HttpContext ctx)
+    {
+        var path = ctx.Request.Path.Value;
+        if (path is not null && (
+            path.StartsWith("/@vite/", StringComparison.Ordinal) ||
+            path.StartsWith("/@react-refresh", StringComparison.Ordinal) ||
+            path.StartsWith("/@id/", StringComparison.Ordinal) ||
+            path.StartsWith("/src/", StringComparison.Ordinal) ||
+            path.StartsWith("/node_modules/", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+        // HMR WebSocket upgrade at the root path.
+        if (ctx.WebSockets.IsWebSocketRequest && ctx.Request.Path == "/")
+        {
+            return true;
+        }
+        return false;
+    }
+
     app.UseWebSockets();
-    app.UseViteDevelopmentServer(useMiddleware: true);
+    app.MapWhen(IsViteRequest, branch =>
+    {
+        branch.UseViteDevelopmentServer(useMiddleware: true);
+    });
 }
 
 app.UseMiddleware<ProjectCeres.Common.Localization.LanguagePreferenceMiddleware>();
