@@ -493,7 +493,14 @@ app.UseStaticFiles();
 // they get 401'd by UseAuthorization. Placing Vite alongside UseStaticFiles makes
 // the proxied assets behave like static files: bypass auth entirely.
 if (app.Environment.IsDevelopment())
+{
+    // WebSocket support is required for Vite HMR. Per the Vite.AspNetCore docs:
+    // "Uncomment the following line if your pipeline doesn't contain it: app.UseWebSockets();"
+    // The project has no other WebSocket consumer, so this is dev-only — narrowly
+    // scoped to the Vite block.
+    app.UseWebSockets();
     app.UseViteDevelopmentServer(useMiddleware: true);
+}
 
 app.UseMiddleware<ProjectCeres.Common.Localization.LanguagePreferenceMiddleware>();
 
