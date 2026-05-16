@@ -1083,6 +1083,37 @@ Stage 8 deferred items (carry-forward from Stage 8 — security-event email call
 
 ---
 
+## Stage 9.1.5 — Phase 1 polish + bugfix batch
+
+**Status: ❌ Pending.** Opened 2026-05-17. Closed-batch container for bugs discovered during the Phase 1 UX walkthrough and a pre-existing test-isolation flake surfaced by the build hook the same session. Runs to completion before Phase 2 plan-writing resumes; the batch follows the project's `no-unjustified-deferrals` rule (every bug discovered during in-flight work either gets fixed in the current commit or queued into the open batch stage, never deferred without a tooling-gap or already-scheduled justification).
+
+> **Goal:** close every Phase-1 discovered defect before Phase 2's auth surfaces (register, email-verify, password-reset confirm) get planned and built on top of the same primitives.
+
+### Sub-stages
+
+| # | Sub-stage | Source |
+|---|---|---|
+| 9.1.5.a | Fix rate-limit partition-state leak in `RateLimitedAuthTestWebApplicationFactory` | Test-isolation flake — `MfaRegenerate_rate_limit_is_partitioned_by_user` fails in full suite, passes in isolation. Sibling pattern to the JS fetch-mock leak fixed in commit `1aa4de0`. Stop-hook blocker. |
+| 9.1.5.b | Diagnose + fix: lockout doesn't trigger reliably at 6 attempts (rate-limit fires first) | Phase 1 UX walkthrough — security-pipeline ordering between `AuthLoginByIp` and `AccessFailedCount` increment. Documented threshold (6) currently drifts to 8–9 depending on timing. |
+| 9.1.5.c | Fix: auth-page Tailwind tokens collapse to identical values in light + dark modes | Phase 1 UX walkthrough — `AuthLayout` card + Login page surface tokens render visually identical with OS light/dark toggle. Phase 2 prerequisite: same tokens get reused by `/register`, `/email-verify`, `/password-reset/confirm`. |
+| 9.1.5.d | Add in-app light/dark mode toggle | Phase 1 UX walkthrough — `ThemeProvider defaultTheme="system"` means OS preference wins at load with no in-app override affordance. Pairs with 9.1.5.c — both needed for the toggle to do anything visible. |
+| 9.1.5.e | Add language code (EN/ES) next to globe icon in `LanguageToggle` | Phase 1 UX walkthrough — globe icon alone doesn't communicate the active language. |
+| 9.1.5.f | Wire logout into the SPA app shell | Phase 1 UX walkthrough — server `POST /api/auth/logout` exists; no SPA UI calls it. User had to clear cookies manually mid-walkthrough to test failure cases. |
+| 9.1.5.g | Write ADR-0076 — SPA CSRF token-source via `X-XSRF-TOKEN` response header | Architectural decision shipped in commit `ce2d9e9` (Phase 1 mid-stream fix) without a corresponding ADR. Phase 2/3/4 every state-changing SPA endpoint inherits this pattern; per `feedback_persist_deferred_decisions`, architectural decisions get persisted in durable docs before downstream consumers cite them. |
+
+### Verification checklist
+
+- [ ] 9.1.5.a — `dotnet test --filter "FullyQualifiedName~MfaRegenerate"` green; full `dotnet test` suite green; root cause documented in commit message
+- [ ] 9.1.5.b — typing 6 wrong passwords in a row produces `401 ACCOUNT_LOCKED_OUT` deterministically (not `429`); xUnit regression test pins the threshold + the ordering between rate-limit and lockout-counter increment
+- [ ] 9.1.5.c — toggling OS light/dark on `/app/login` produces visibly distinct surface colors (light card on near-white background in light mode; dark card on near-black background in dark mode); vitest snapshot or assertion pins the token values
+- [ ] 9.1.5.d — in-app toggle is reachable from the AuthLayout footer AND from the AppLayout topbar; switching persists across reloads (`next-themes` handles this); both modes render correctly with the 9.1.5.c token fix
+- [ ] 9.1.5.e — `LanguageToggle` button shows the active language code (`EN` / `ES`) next to the globe icon; updates immediately on selection
+- [ ] 9.1.5.f — Sign Out affordance reachable from the app shell; calls `POST /api/auth/logout` via `apiFetch`; clears local auth-context state; navigates to `/login`; manual UX check confirms a fresh visit to `/app/` after sign-out redirects to `/app/login`
+- [ ] 9.1.5.g — `docs/decisions/ADR-0076-spa-csrf-token-source.md` exists; cites commit `ce2d9e9`; documents the alternatives considered (cookie-as-header / custom IAntiforgery / response-header pattern); notes the consequence that every state-changing SPA endpoint inherits this pattern
+- [ ] **Batch close-out**: every `[ ]` ticked above; `dotnet test` + `pnpm --dir ProjectCeres.Client test --run` + `pnpm --dir ProjectCeres.Client build` + `dotnet build ProjectCeres/ProjectCeres.csproj` all exit 0; this stage marked ✅ Done before Phase 2 plan-writing resumes
+
+---
+
 ## Stage 10 — Onboarding wizard (Batch 3f)
 
 **Status: ❌ Pending.** Lands after Stage 9 because the registration flow ends in onboarding.
