@@ -24,9 +24,16 @@ public static class SessionRevocationValidator
             return;
         }
 
-        var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-        // Cross-tenant by design: validates any session by ID during cookie auth — the HTTP context
-        // principal is not yet committed when this event fires. Stage 10 architecture test allow-lists this file.
+        var db = ctx.HttpContext.RequestServices.GetRequiredService<AdminDbContext>();
+        // Uses AdminDbContext because cookie validation fires BEFORE the auth pipeline
+        // has established the user context, so the RLS GUC `app.current_user_ref` is
+        // unset. With the runtime AppDbContext, RLS would evaluate the user_isolation
+        // policy against an unset GUC and return zero rows — even for valid sessions —
+        // causing the validator to reject every authenticated request. The admin role
+        // (ceres_admin, BYPASSRLS) sees the row directly. Same pattern as UserJobRunner.
+        // IgnoreQueryFilters() bypasses the EF-level UserId filter; AdminDbContext's
+        // ceres_admin role bypasses the PostgreSQL-level RLS policy. Both layers are
+        // required: EF filter is in-process, RLS policy is in the database.
         var session = await db.UserSessions
             .IgnoreQueryFilters()
             .Where(s => s.Id == sessionId && s.RevokedAt == null)
