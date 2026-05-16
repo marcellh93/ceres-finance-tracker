@@ -975,7 +975,7 @@ Layout + brand:
 - [x] On wrong credentials: generic error "Email or password is incorrect" (no enumeration leak)
 - [x] On account locked: "Account locked. Check your email for an unlock link." — no other detail
 - [x] On success: redirect to `/` (dashboard) regardless of TOTP-enrolment status. Per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md), MFA enrollment is reachable only from Settings → Security; there is no first-login redirect to TOTP setup.
-- [x] On success with TOTP enrolled: redirect to `/login/totp`
+- [x] On `200 { requiresTotp: true }` from the API (TOTP challenge step): redirect to `/login/totp`. Distinct from the first bullet — that one covers the `204` success path; this one covers the second-factor challenge handoff.
 - [x] "Forgot password?" link routes to `/password-reset`
 - [x] "Create account" link routes to `/register`
 

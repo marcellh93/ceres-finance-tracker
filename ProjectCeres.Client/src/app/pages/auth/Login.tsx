@@ -133,11 +133,6 @@ export function Login() {
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" {...register('rememberMe')} />
-        {t('auth.login.rememberMeLabel')}
-      </label>
-
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}
       </Button>
@@ -150,6 +145,11 @@ export function Login() {
           {t('auth.login.createAccountLink')}
         </Link>
       </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" {...register('rememberMe')} />
+        {t('auth.login.rememberMeLabel')}
+      </label>
     </form>
   );
 }
