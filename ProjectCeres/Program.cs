@@ -463,6 +463,15 @@ builder.Services.AddScoped<IImportStagedTransactionService, ImportStagedTransact
 builder.Services.AddScoped<IHeaderDetectionService, HeaderDetectionService>();
 builder.Services.AddViteServices();
 
+// Development-only bootstrap tool: creates the first user + remaps sentinel-tagged data.
+// Invocation: dotnet run --project ProjectCeres -- --seed-dev-user
+// Placed here (after all service registrations, before builder.Build()) so RunAsync
+// can call builder.Build() and resolve the fully-configured DI container.
+if (args.Length > 0 && args[0] == "--seed-dev-user")
+{
+    Environment.Exit(await ProjectCeres.Tools.SeedDevUser.RunAsync(builder, args[1..]));
+}
+
 var app = builder.Build();
 
 // Stage 7.5 / ADR-0068 — refuse to start if the runtime role can issue DDL. Skipped
