@@ -12,8 +12,21 @@ const BUDGETS_GZIP_KB = {
   'vendor-forms-*.js': 29,
   'vendor-i18n-*.js': 17,
   'vendor-ui-*.js': 16,
+  // vendor-primitives: @base-ui/react + @floating-ui/* + @radix-ui/* + scroll-lock
+  // helpers. Split out 2026-05-16 to fix the auto-named amount-format chunk budget
+  // breach. 58.47 kB measured 2026-05-16, ~11% headroom.
+  'vendor-primitives-*.js': 65,
+  // vendor-dates: date-fns + @date-fns/tz + react-day-picker. 19.44 kB measured
+  // 2026-05-16, ~13% headroom.
+  'vendor-dates-*.js': 22,
+  // vendor-overlay: sonner + cmdk + next-themes. 24.79 kB measured 2026-05-16,
+  // ~13% headroom.
+  'vendor-overlay-*.js': 28,
   'dialog-*.js': 34,
-  'amount-format-*.js': 81,
+  // amount-format chunk: after vendor splits, contains only shared app-level
+  // components (shadcn/ui wrappers, amount-format.ts, date-format.ts, etc.).
+  // 24.91 kB measured 2026-05-16, well under old 81 kB budget. Tighten to 30 kB.
+  'amount-format-*.js': 30,
   'designSystem-*.js': 14,
 };
 

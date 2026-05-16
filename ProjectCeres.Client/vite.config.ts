@@ -64,6 +64,36 @@ export default defineConfig({
           // Phase 4 once the TOTP setup page imports this package.
           if (id.includes('node_modules/qrcode.react'))
             return 'vendor-qr'
+          // vendor-primitives: @base-ui/react, @floating-ui/*, @radix-ui/*, and the
+          // scroll-lock / focus-trap helpers they pull in. Without this rule Rollup
+          // auto-names a shared chunk after amount-format.ts (the most-imported
+          // source file), causing amount-format-*.js to balloon past its 81 kB gzip
+          // budget even though amount-format.ts itself is tiny. Budget added below.
+          if (id.includes('node_modules/@base-ui/') ||
+              id.includes('node_modules/@floating-ui/') ||
+              id.includes('node_modules/@radix-ui/') ||
+              id.includes('node_modules/react-remove-scroll') ||
+              id.includes('node_modules/react-style-singleton') ||
+              id.includes('node_modules/use-sidecar') ||
+              id.includes('node_modules/use-callback-ref') ||
+              id.includes('node_modules/aria-hidden') ||
+              id.includes('node_modules/get-nonce') ||
+              id.includes('node_modules/tslib'))
+            return 'vendor-primitives'
+          // vendor-dates: date-fns, @date-fns/tz, react-day-picker. Date utilities
+          // are imported by calendar, budgets, and recurring features. They were
+          // landing in the auto-named amount-format chunk because amount-format.ts
+          // is their most-shared neighbour. Budget added below.
+          if (id.includes('node_modules/date-fns') ||
+              id.includes('node_modules/@date-fns/') ||
+              id.includes('node_modules/react-day-picker'))
+            return 'vendor-dates'
+          // vendor-overlay: sonner (toasts), cmdk (command palette), next-themes.
+          // Small but were pulled into the auto-named chunk along with the rest.
+          if (id.includes('node_modules/sonner') ||
+              id.includes('node_modules/cmdk') ||
+              id.includes('node_modules/next-themes'))
+            return 'vendor-overlay'
         },
       },
     },
