@@ -26,6 +26,7 @@ publish/
 *.pdb
 *.nupkg
 *.snupkg
+*.lscache
 project.lock.json
 project.fragment.lock.json
 [Pp]ackages/
@@ -123,3 +124,6 @@ ProjectCeres/wwwroot/css/site.css
 .superpowers/
 # Per-process state from ScheduleWakeup — never share across machines
 .claude/scheduled_tasks.lock
+
+##Testing
+impeccable-sandbox/
