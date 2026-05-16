@@ -486,6 +486,15 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+// Vite dev middleware runs BEFORE the auth pipeline. The global authorization
+// fallback policy at line 252 requires authentication on every non-[AllowAnonymous]
+// endpoint, and Vite-proxied requests (fonts in node_modules, HMR, modules) aren't
+// controllers — they have no [AllowAnonymous] to opt out, so without this ordering
+// they get 401'd by UseAuthorization. Placing Vite alongside UseStaticFiles makes
+// the proxied assets behave like static files: bypass auth entirely.
+if (app.Environment.IsDevelopment())
+    app.UseViteDevelopmentServer(useMiddleware: true);
+
 app.UseMiddleware<ProjectCeres.Common.Localization.LanguagePreferenceMiddleware>();
 
 app.UseRouting();
@@ -496,9 +505,6 @@ app.UseMiddleware<PersistentCookieRotationMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserBlockedIpMiddleware>();
-
-if (app.Environment.IsDevelopment())
-    app.UseViteDevelopmentServer(useMiddleware: true);
 
 app.MapControllers();
 app.MapControllerRoute(
