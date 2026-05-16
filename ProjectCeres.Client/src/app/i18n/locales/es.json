@@ -17,6 +17,18 @@
         "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento."
       }
     },
+    "placeholders": {
+      "register": {
+        "title": "La creación de cuentas estará disponible próximamente",
+        "body": "El registro aún no está disponible. Llegará en la siguiente fase del despliegue de autenticación.",
+        "backToLogin": "Volver a iniciar sesión"
+      },
+      "passwordReset": {
+        "title": "El restablecimiento de contraseña estará disponible próximamente",
+        "body": "La recuperación de contraseña aún no está disponible. Llegará en una fase posterior del despliegue de autenticación.",
+        "backToLogin": "Volver a iniciar sesión"
+      }
+    },
     "languageToggle": {
       "ariaLabel": "Cambiar idioma",
       "english": "English",

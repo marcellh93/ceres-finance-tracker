@@ -17,6 +17,18 @@
         "resendFailed": "Could not send the email. Try again in a moment."
       }
     },
+    "placeholders": {
+      "register": {
+        "title": "Account creation is coming soon",
+        "body": "Sign-up isn't available yet. It ships in the next phase of the auth rollout.",
+        "backToLogin": "Back to sign in"
+      },
+      "passwordReset": {
+        "title": "Password reset is coming soon",
+        "body": "Password recovery isn't available yet. It ships in a later phase of the auth rollout.",
+        "backToLogin": "Back to sign in"
+      }
+    },
     "languageToggle": {
       "ariaLabel": "Change language",
       "english": "English",
