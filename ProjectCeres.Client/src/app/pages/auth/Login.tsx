@@ -12,7 +12,6 @@ import { loginSchema, type LoginFormValues } from '../../auth/schemas/login.sche
 
 type ServerErrorState =
   | { kind: 'none' }
-  | { kind: 'invalidCredentials' }
   | { kind: 'emailNotConfirmed' };
 
 export function Login() {
@@ -22,6 +21,7 @@ export function Login() {
   const auth = useAuth();
   const [serverError, setServerError] = useState<ServerErrorState>({ kind: 'none' });
   const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   const {
     register,
@@ -47,7 +47,12 @@ export function Login() {
           return;
         }
         await auth.refresh();
-        const redirectTo = searchParams.get('redirect') ?? '/';
+        const raw = searchParams.get('redirect') ?? '/';
+        // Defense-in-depth: only accept same-origin relative paths to prevent
+        // open-redirect attacks via crafted /login?redirect=<external> URLs.
+        // RequireAuth always writes encoded relative paths so this only changes
+        // behaviour for hand-crafted links.
+        const redirectTo = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
         navigate(redirectTo);
         return;
       }
@@ -62,7 +67,6 @@ export function Login() {
         return;
       }
       if (result.code === 'INVALID_CREDENTIALS') {
-        setServerError({ kind: 'invalidCredentials' });
         setError('password', { type: 'server', message: t('auth.login.errors.invalidCredentials') });
         return;
       }
@@ -85,12 +89,20 @@ export function Login() {
 
   const onResendVerification = async () => {
     setResending(true);
+    setResendError(null);
     try {
       // Resend endpoint ships in Phase 2 (commit 9); this is a placeholder
       // call that will succeed once that endpoint exists. The button itself
       // should ship now so the EMAIL_NOT_CONFIRMED UX is complete the
       // moment Phase 2 lands.
-      await apiFetch('/api/auth/email/verify/resend', { method: 'POST', body: {} });
+      const result = await apiFetch('/api/auth/email/verify/resend', { method: 'POST', body: {} });
+      if (!result.ok) {
+        // Phase-1 placeholder: the endpoint doesn't exist until Phase 2, so result.ok is always false.
+        // Generic message keeps the user informed without revealing endpoint shape.
+        setResendError(t('auth.login.errors.resendFailed'));
+      }
+    } catch {
+      setResendError(t('auth.login.errors.resendFailed'));
     } finally {
       setResending(false);
     }
@@ -130,6 +142,9 @@ export function Login() {
           >
             {t('auth.login.resendVerification')}
           </Button>
+          {resendError && (
+            <p className="text-xs text-destructive" role="alert">{resendError}</p>
+          )}
         </div>
       )}
 

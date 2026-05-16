@@ -8,6 +8,7 @@ const BUDGETS_GZIP_KB = {
   'app-*.js': 67,
   'vendor-react-*.js': 113,
   'vendor-charts-*.js': 135,
+  // react-hook-form + zod + @hookform/resolvers: 24.84 kB measured 2026-05-16, ~17% headroom.
   'vendor-forms-*.js': 29,
   'vendor-i18n-*.js': 17,
   'vendor-ui-*.js': 16,

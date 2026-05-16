@@ -13,7 +13,8 @@
       "errors": {
         "invalidCredentials": "El correo electrónico o la contraseña no son correctos.",
         "accountLocked": "Cuenta bloqueada. Consulta tu correo para un enlace de desbloqueo.",
-        "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada."
+        "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada.",
+        "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento."
       }
     },
     "languageToggle": {

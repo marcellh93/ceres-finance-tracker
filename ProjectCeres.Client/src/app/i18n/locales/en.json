@@ -13,7 +13,8 @@
       "errors": {
         "invalidCredentials": "Email or password is incorrect.",
         "accountLocked": "Account locked. Check your email for an unlock link.",
-        "emailNotConfirmed": "Verify your email first. Check your inbox."
+        "emailNotConfirmed": "Verify your email first. Check your inbox.",
+        "resendFailed": "Could not send the email. Try again in a moment."
       }
     },
     "languageToggle": {
