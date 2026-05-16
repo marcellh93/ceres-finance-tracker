@@ -47,7 +47,7 @@ export default defineConfig({
       ],
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor-react'
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'vendor-react'
           if (id.includes('node_modules/recharts'))    return 'vendor-charts'
           if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next') ||
               id.includes('node_modules/i18next-browser-languagedetector'))
