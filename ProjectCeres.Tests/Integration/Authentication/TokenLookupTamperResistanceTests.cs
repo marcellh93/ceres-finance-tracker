@@ -87,6 +87,53 @@ public class TokenLookupTamperResistanceTests : IClassFixture<AuthTestWebApplica
         (await resp.Content.ReadAsStringAsync()).Should().Contain("INVALID_EMAIL_CHANGE_TOKEN");
     }
 
+    [Fact]
+    public async Task LockoutUnlock_confirm_with_matching_TokenLookup_but_wrong_TokenHash_returns_401()
+    {
+        // Mirror EmailChange_confirm_with_matching_TokenLookup_but_wrong_TokenHash_returns_401.
+        // Seed a LockoutUnlockToken row where TokenLookup matches a real raw token but
+        // TokenHash is for a DIFFERENT raw token. POSTing the real raw token must:
+        //   (1) hit the indexed TokenLookup query (the row's TokenLookup matches),
+        //   (2) fail the Argon2id verify (the row's TokenHash does not match the raw),
+        //   (3) return 401 with the LockoutUnlock invalid-token envelope.
+        // If a future refactor deletes the Argon2id check, this test goes red while the
+        // happy-path/expiry/consumed suite stays green — that's the defence-in-depth gap
+        // it's here to catch.
+        string realToken;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var lookupHasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
+            var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
+
+            realToken = generator.Generate();
+            var forgedToken = generator.Generate();
+
+            var email = $"tamper-lockout-{Guid.NewGuid():N}@tamper-test.local";
+            var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
+
+            db.LockoutUnlockTokens.Add(new LockoutUnlockToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                TokenLookup = lookupHasher.ComputeLookup(realToken),
+                TokenHash = generator.Hash(forgedToken),  // mismatched on purpose
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow + LockoutUnlockService.TokenLifetime,
+                ConsumedAt = null,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client,
+            "/api/auth/lockout-unlock", new { token = realToken });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "the matched row's TokenHash does not Argon2id-verify against the raw token — defence-in-depth check must reject");
+        (await resp.Content.ReadAsStringAsync()).Should().Contain("INVALID_LOCKOUT_UNLOCK_TOKEN");
+    }
+
     /// <summary>Returns a raw token whose TokenLookup matches a seeded row, but whose
     /// TokenHash was generated from an UNRELATED raw token so Argon2id verify fails.</summary>
     private async Task<(string RawToken, Guid UserId)> SeedPasswordResetTamperedRowAsync()
