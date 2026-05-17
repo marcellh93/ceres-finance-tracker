@@ -322,4 +322,4 @@ Total: ≈16 test methods. All hit real DB; no mocks.
 
 - **Stage 7.5 (PostgreSQL RLS)** lands immediately after Stage 7 — same Batch 3c — per ADR-0068. Stage 7.5 spec authored separately after Stage 7 ships.
 - **Admin namespace** — `ProjectCeres/Admin/` does not exist yet. The architecture-test allow-list anticipates it; the first admin file lands in Phase 4 with its own ADR.
-- **Per-user category onboarding UX** — Stage 10 (onboarding wizard) can optionally let new users choose which default categories to keep. Out of Stage 7 scope; the registration flow copies all 25 unconditionally.
+- **Per-user category onboarding UX** — Stage 15.5 (onboarding wizard) can optionally let new users choose which default categories to keep. Out of Stage 7 scope; the registration flow copies all 25 unconditionally.

@@ -28,13 +28,13 @@
 10. [Stage 7.6 — Error legibility + OCP cleanup (Batch 3c continued)](#stage-76--error-legibility--ocp-cleanup-batch-3c-continued)
 11. [Stage 8 — Email service + email security (Batch 3d)](#stage-8--email-service--email-security-batch-3d)
 12. [Stage 9 — Auth SPA pages (Batch 3e)](#stage-9--auth-spa-pages-batch-3e)
-13. [Stage 10 — Onboarding wizard (Batch 3f)](#stage-10--onboarding-wizard-batch-3f)
-14. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
-15. [Stage 11.5 — Import sandbox + admin tooling (Batch 4)](#stage-115--import-sandbox--admin-tooling-batch-4)
-16. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
-17. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
-18. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
-19. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
+13. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
+14. [Stage 11.5 — Import sandbox + admin tooling (Batch 4)](#stage-115--import-sandbox--admin-tooling-batch-4)
+15. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
+16. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
+17. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
+18. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
+19. [Stage 15.5 — Onboarding wizard (Batch 5)](#stage-155--onboarding-wizard-batch-5)
 20. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
 21. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
 
@@ -1019,7 +1019,7 @@ TOTP setup (`/login/totp/setup`):
 - [ ] On successful enrolment: 10 backup codes generated (cryptographically random, ≥ 20 bits entropy each per NIST 800-63B), shown ONCE, with download (.txt) + print options
 - [ ] Backup codes are hashed in DB after this step; the page warns "These will not be shown again"
 - [ ] User must confirm "I've saved my backup codes" checkbox before proceeding
-- [ ] After enrolment: redirect to onboarding (Stage 10) for first-run, or dashboard for re-enrolment
+- [ ] After enrolment: redirect to onboarding (Stage 15.5) for first-run, or dashboard for re-enrolment
 
 Backup-codes recovery flow:
 
@@ -1116,108 +1116,9 @@ Stage 8 deferred items (carry-forward from Stage 8 — security-event email call
 
 ---
 
-## Stage 10 — Onboarding wizard (Batch 3f)
-
-**Status: ❌ Pending.** Lands after Stage 9 because the registration flow ends in onboarding.
-
-> **Goal:** five-step wizard at `/onboarding` that takes a freshly-registered user from "I just created an account" to "I see my net worth on the dashboard." Full-screen stepper, distinct from the standard app shell. See [ADR-0053](decisions/ADR-0053-guided-onboarding-deferred.md).
-
-> **Decision gate before Step 1 design:** the timezone strategy is owed at this stage. ADR-0009 deferred the Phase 3 TZ decision to "before launch"; Stage 10's Preferences screen is the natural place to either add a TZ field (option B — per-user IANA) or commit to not adding one (option C — client passes its `today` in requests; recommended). See `planning-phase3.md` § Open Questions → "Timezone handling" for the 28-site audit, three options, and rationale. New ADR (next free: 0071 after CI/CD = 0069 and Playwright = 0070) supersedes ADR-0009's launch-gate follow-up at decision time.
-
-### Sub-stages
-
-| # | Sub-stage | Reference |
-|---|---|---|
-| 10.1 | `/onboarding` route + full-screen stepper layout | `planning-phase3.md` § 11 Onboarding flow design |
-| 10.2 | Step 1 — Preferences (language, country, default currency, number format, date format; **timezone field gated on TZ-strategy ADR**) | (above) + `planning-phase3.md` § Localization + § Open Questions (Timezone handling) |
-| 10.3 | Step 2 — First asset account | (above) |
-| 10.4 | Step 3 — First liability (optional, skippable) | (above) |
-| 10.5 | Step 4 — Opening balance | (above) + ADR-0010 (opening balance as auto-created transaction) |
-| 10.6 | Step 5 — Immediate net worth display + "Go to dashboard" CTA | (above) |
-
-### Verification checklist
-
-Layout + flow:
-
-- [ ] `/onboarding` is a top-level route OUTSIDE `AppLayout` (no sidebar, no top bar)
-- [ ] Full-screen stepper with progress indicator at top showing 5 numbered steps
-- [ ] First-run users (no `OnboardingCompletedAt` on Settings) are redirected to `/onboarding` after login until completion
-- [ ] Completion flag persisted to per-user Settings; subsequent logins go straight to dashboard
-- [ ] User can navigate back to a previous step; data from later steps is preserved if revisited
-- [ ] Browser back button triggers an "are you sure you want to leave?" guard if onboarding is partial
-
-Step 1 — Preferences:
-
-- [ ] **Timezone strategy ADR landed before this step ships** (`planning-phase3.md` § Open Questions → Timezone handling). Outcome is one of: (A) sweep 28 server-side `DateTime.Today` sites to UTC, no Preferences field; (B) add TimeZoneId column + IANA picker to this step + IUserTimeZone service; (C — recommended) endpoints accept `today` query parameter from the client, no Preferences field, no schema change. Choice locks the field set below.
-- [ ] Five fields grouped: Language (EN/ES), Country (ES, US, GB, CO, AR, VE, Other), Default Currency (EUR, USD, GBP, COP, ARS, VED), Number format (`comma_decimal` / `dot_decimal`), Date format (`DD/MM/YYYY` / `MM/DD/YYYY` / `YYYY-MM-DD`)
-- [ ] All fields pre-filled from `Accept-Language` detection (`security-model.md` § Localization, `planning-phase3.md`)
-- [ ] All fields independently overridable — no cascade (changing country does NOT change currency)
-- [ ] Live format preview displayed: e.g., `€1.234,56 · 28/04/2026`
-- [ ] Saving step 1 applies the language IMMEDIATELY (subsequent steps render in chosen language)
-- [ ] Saved values written to per-user `Settings` row
-
-Step 2 — First asset account:
-
-- [ ] Fields: name (required), `AccountType` (select from asset types: Checking, Savings, Cash, Investment), currency (defaults to step 1's `DefaultCurrency`), opening balance (defaults to 0)
-- [ ] Validation matches the regular Accounts form (Stage 3.3)
-- [ ] On save: account created via the same `AccountService` used by `/accounts/new`
-- [ ] At least one asset account is required to proceed; "Add another" button repeatable
-
-Step 3 — First liability (optional):
-
-- [ ] Skippable via "I don't have any liabilities" option
-- [ ] If proceeding: same form shape as Account Create with liability types (Credit Card, Loan, Mortgage, Other)
-- [ ] Conditional Asset/Liability fields work per Stage 3.3 (interest rate normalization, repayment type)
-
-Step 4 — Opening balance:
-
-- [ ] For each account created in Steps 2 + 3, prompts for the opening balance and date
-- [ ] Defaults the date to today (per ADR-0010 § Opening balance cutover UX)
-- [ ] If user changes the date, shows the explanation about how moving the date affects balance + history
-- [ ] Creates an `IsSystem` opening-balance Transaction for each account
-
-Step 5 — Net worth display:
-
-- [ ] Computed across all accounts created in steps 2–4
-- [ ] Shows per-currency breakdown if multiple currencies (matching the dashboard rule)
-- [ ] "Go to dashboard" CTA marks `OnboardingCompletedAt` and redirects to `/`
-
-Accessibility (per `planning-phase3.md` § 8 Accessibility baseline):
-
-- [ ] Focus moves to the new step's `<h2>` heading on transition (`tabindex="-1"` + `.focus()`)
-- [ ] `aria-live="polite"` step announcer announces step transitions
-- [ ] `aria-current="step"` on the current step indicator
-- [ ] Form-error focus management on validation failures
-- [ ] vitest-axe runs against every onboarding step with zero violations
-
-Localization:
-
-- [ ] Every string keyed; EN + ES complete
-- [ ] "Account type" labels seeded with localized names (e.g., Spanish for "Checking" → "Cuenta corriente")
-- [ ] System category names available in chosen language for any defaults
-
-Tests required before Stage 11 begins:
-
-- [ ] Happy-path integration test: register → verify email → enroll TOTP → onboarding 5 steps → land on dashboard with correct net worth
-- [ ] Skipped-liability path test (Step 3 skipped)
-- [ ] Multi-asset-account path test (two accounts created in Step 2)
-- [ ] Language change in Step 1 propagates to subsequent steps
-- [ ] Onboarding completion flag persists; second login skips onboarding
-
-Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — full-screen stepper on every tier):
-
-- [ ] Mobile (375px): stepper progress indicator visible without scrolling; step content fills viewport; the live format preview in Step 1 (`€1.234,56 · 28/04/2026`) wraps cleanly
-- [ ] Tablet + desktop: stepper centered with comfortable max-width; same step content, just constrained
-- [ ] Step transitions don't trigger horizontal overflow at any width
-- [ ] All form inputs meet 44×44px touch-target minimum on mobile
-- [ ] Per-account opening-balance step on mobile lists each account vertically (no horizontal table on small screens)
-- [ ] Step 5 net-worth display per-currency breakdown wraps cleanly on mobile when 2+ currencies present
-
----
-
 ## Stage 11 — Razor + URL cleanup (Batch 4)
 
-**Status: ❌ Pending.** Mechanical cleanup. Lands after Stage 10 because Auth is the last surface that needs the `/app/` prefix to coexist with Razor stubs.
+**Status: ❌ Pending.** Mechanical cleanup. Lands after Stage 9 because Auth is the last surface that needs the `/app/` prefix to coexist with Razor stubs. (Note: previously stated "after Stage 10" when onboarding occupied that slot; onboarding moved to Stage 15.5, so this stage now follows Stage 9 directly with no functional change.)
 
 > **Goal:** `/app/` prefix dropped, MVC infrastructure stripped from `Program.cs`, all per-area 302 redirects deleted, one-shot `/app/*` → `/*` 301 in place for legacy bookmarks. The product becomes a pure Web API + SPA.
 
@@ -1612,6 +1513,105 @@ Cache headers:
 
 ---
 
+## Stage 15.5 — Onboarding wizard (Batch 5)
+
+**Status: ❌ Pending.** Was Stage 10 (Batch 3f); moved here 2026-05-17 because Phase 3 accumulated too many polish + wiring items ahead of it. Lands immediately before the hosting cut so onboarding ships against a fully-polished, security-headers-on, identity-masked surface.
+
+> **Goal:** five-step wizard at `/onboarding` that takes a freshly-registered user from "I just created an account" to "I see my net worth on the dashboard." Full-screen stepper, distinct from the standard app shell. See [ADR-0053](decisions/ADR-0053-guided-onboarding-deferred.md).
+
+> **Decision gate before Step 1 design:** the timezone strategy is owed at this stage. ADR-0009 deferred the Phase 3 TZ decision to "before launch"; the Preferences screen here is the natural place to either add a TZ field (option B — per-user IANA) or commit to not adding one (option C — client passes its `today` in requests; recommended). See `planning-phase3.md` § Open Questions → "Timezone handling" for the 28-site audit, three options, and rationale. New ADR (next free: 0071 after CI/CD = 0069 and Playwright = 0070) supersedes ADR-0009's launch-gate follow-up at decision time.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 15.5.1 | `/onboarding` route + full-screen stepper layout | `planning-phase3.md` § 11 Onboarding flow design |
+| 15.5.2 | Step 1 — Preferences (language, country, default currency, number format, date format; **timezone field gated on TZ-strategy ADR**) | (above) + `planning-phase3.md` § Localization + § Open Questions (Timezone handling) |
+| 15.5.3 | Step 2 — First asset account | (above) |
+| 15.5.4 | Step 3 — First liability (optional, skippable) | (above) |
+| 15.5.5 | Step 4 — Opening balance | (above) + ADR-0010 (opening balance as auto-created transaction) |
+| 15.5.6 | Step 5 — Immediate net worth display + "Go to dashboard" CTA | (above) |
+
+### Verification checklist
+
+Layout + flow:
+
+- [ ] `/onboarding` is a top-level route OUTSIDE `AppLayout` (no sidebar, no top bar)
+- [ ] Full-screen stepper with progress indicator at top showing 5 numbered steps
+- [ ] First-run users (no `OnboardingCompletedAt` on Settings) are redirected to `/onboarding` after login until completion
+- [ ] Completion flag persisted to per-user Settings; subsequent logins go straight to dashboard
+- [ ] User can navigate back to a previous step; data from later steps is preserved if revisited
+- [ ] Browser back button triggers an "are you sure you want to leave?" guard if onboarding is partial
+
+Step 1 — Preferences:
+
+- [ ] **Timezone strategy ADR landed before this step ships** (`planning-phase3.md` § Open Questions → Timezone handling). Outcome is one of: (A) sweep 28 server-side `DateTime.Today` sites to UTC, no Preferences field; (B) add TimeZoneId column + IANA picker to this step + IUserTimeZone service; (C — recommended) endpoints accept `today` query parameter from the client, no Preferences field, no schema change. Choice locks the field set below.
+- [ ] Five fields grouped: Language (EN/ES), Country (ES, US, GB, CO, AR, VE, Other), Default Currency (EUR, USD, GBP, COP, ARS, VED), Number format (`comma_decimal` / `dot_decimal`), Date format (`DD/MM/YYYY` / `MM/DD/YYYY` / `YYYY-MM-DD`)
+- [ ] All fields pre-filled from `Accept-Language` detection (`security-model.md` § Localization, `planning-phase3.md`)
+- [ ] All fields independently overridable — no cascade (changing country does NOT change currency)
+- [ ] Live format preview displayed: e.g., `€1.234,56 · 28/04/2026`
+- [ ] Saving step 1 applies the language IMMEDIATELY (subsequent steps render in chosen language)
+- [ ] Saved values written to per-user `Settings` row
+
+Step 2 — First asset account:
+
+- [ ] Fields: name (required), `AccountType` (select from asset types: Checking, Savings, Cash, Investment), currency (defaults to step 1's `DefaultCurrency`), opening balance (defaults to 0)
+- [ ] Validation matches the regular Accounts form (Stage 3.3)
+- [ ] On save: account created via the same `AccountService` used by `/accounts/new`
+- [ ] At least one asset account is required to proceed; "Add another" button repeatable
+
+Step 3 — First liability (optional):
+
+- [ ] Skippable via "I don't have any liabilities" option
+- [ ] If proceeding: same form shape as Account Create with liability types (Credit Card, Loan, Mortgage, Other)
+- [ ] Conditional Asset/Liability fields work per Stage 3.3 (interest rate normalization, repayment type)
+
+Step 4 — Opening balance:
+
+- [ ] For each account created in Steps 2 + 3, prompts for the opening balance and date
+- [ ] Defaults the date to today (per ADR-0010 § Opening balance cutover UX)
+- [ ] If user changes the date, shows the explanation about how moving the date affects balance + history
+- [ ] Creates an `IsSystem` opening-balance Transaction for each account
+
+Step 5 — Net worth display:
+
+- [ ] Computed across all accounts created in steps 2–4
+- [ ] Shows per-currency breakdown if multiple currencies (matching the dashboard rule)
+- [ ] "Go to dashboard" CTA marks `OnboardingCompletedAt` and redirects to `/`
+
+Accessibility (per `planning-phase3.md` § 8 Accessibility baseline):
+
+- [ ] Focus moves to the new step's `<h2>` heading on transition (`tabindex="-1"` + `.focus()`)
+- [ ] `aria-live="polite"` step announcer announces step transitions
+- [ ] `aria-current="step"` on the current step indicator
+- [ ] Form-error focus management on validation failures
+- [ ] vitest-axe runs against every onboarding step with zero violations
+
+Localization:
+
+- [ ] Every string keyed; EN + ES complete
+- [ ] "Account type" labels seeded with localized names (e.g., Spanish for "Checking" → "Cuenta corriente")
+- [ ] System category names available in chosen language for any defaults
+
+Tests required before Stage 16 begins:
+
+- [ ] Happy-path integration test: register → verify email → enroll TOTP → onboarding 5 steps → land on dashboard with correct net worth
+- [ ] Skipped-liability path test (Step 3 skipped)
+- [ ] Multi-asset-account path test (two accounts created in Step 2)
+- [ ] Language change in Step 1 propagates to subsequent steps
+- [ ] Onboarding completion flag persists; second login skips onboarding
+
+Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — full-screen stepper on every tier):
+
+- [ ] Mobile (375px): stepper progress indicator visible without scrolling; step content fills viewport; the live format preview in Step 1 (`€1.234,56 · 28/04/2026`) wraps cleanly
+- [ ] Tablet + desktop: stepper centered with comfortable max-width; same step content, just constrained
+- [ ] Step transitions don't trigger horizontal overflow at any width
+- [ ] All form inputs meet 44×44px touch-target minimum on mobile
+- [ ] Per-account opening-balance step on mobile lists each account vertically (no horizontal table on small screens)
+- [ ] Step 5 net-worth display per-currency breakdown wraps cleanly on mobile when 2+ currencies present
+
+---
+
 ## Stage 16 — Hosting + ops (Batch 5)
 
 **Status: ❌ Pending.** Final stage before public beta. Operational, not application-code.
@@ -1727,7 +1727,7 @@ Data Protection key storage (Stage 6 carry-forward):
 
 - [ ] All Stage 6 verification items green
 - [ ] All Stage 9 verification items green
-- [ ] All Stage 10 verification items green
+- [ ] All Stage 15.5 verification items green
 - [ ] First-user registration tested end-to-end on staging: register → verify email → enroll TOTP + download backup codes → onboarding 5 steps → land on dashboard
 - [ ] Lockout tested: 10 failed attempts → email arrives with unlock link → unlock works
 - [ ] Password reset tested: request → email → click → enter TOTP → set new password → all sessions revoked

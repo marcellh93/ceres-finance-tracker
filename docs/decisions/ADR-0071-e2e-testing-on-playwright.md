@@ -9,7 +9,7 @@
 
 ## Context
 
-Phase 3 ships the first user-visible auth flows (Stage 9) and the onboarding wizard (Stage 10). Both are end-to-end flows that exercise the browser, the SPA, the cookie-auth pipeline, and the database simultaneously — exactly the scenario unit and integration tests cannot cover alone.
+Phase 3 ships the first user-visible auth flows (Stage 9) and the onboarding wizard (Stage 15.5). Both are end-to-end flows that exercise the browser, the SPA, the cookie-auth pipeline, and the database simultaneously — exactly the scenario unit and integration tests cannot cover alone.
 
 The candidates considered were:
 
@@ -37,7 +37,7 @@ The first E2E suite ships **after Stage 9** (auth SPA pages) because Stage 9 pro
 - TOTP enrolment → first-login-with-TOTP golden path.
 - Lockout self-service unlock → unlock-email link → re-login.
 
-Subsequent stages add E2E coverage as they introduce user-facing flows (Stage 10 onboarding wizard, Stage 11+ feature areas).
+Subsequent stages add E2E coverage as they introduce user-facing flows (Stage 15.5 onboarding wizard, Stage 11+ feature areas).
 
 ## Consequences
 
