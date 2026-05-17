@@ -148,6 +148,15 @@
             "command": "node .claude/skills/state-rehydration/hooks/snapshot-on-turn-end.js"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/surface-build-warnings.js"
+          }
+        ]
       }
     ],
     "PreCompact": [
