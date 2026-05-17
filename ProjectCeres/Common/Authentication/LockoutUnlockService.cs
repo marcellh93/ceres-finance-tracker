@@ -36,6 +36,7 @@ public class LockoutUnlockService
     private readonly ILanguageResolver _languages;
     private readonly ILogger<LockoutUnlockService> _logger;
     private readonly IAuditLogWriter _auditLog;
+    private readonly LockoutCache _lockoutCache;
 
     public LockoutUnlockService(
         UserManager<ApplicationUser> userManager,
@@ -47,7 +48,8 @@ public class LockoutUnlockService
         IEmailRecipientResolver recipients,
         ILanguageResolver languages,
         ILogger<LockoutUnlockService> logger,
-        IAuditLogWriter auditLog)
+        IAuditLogWriter auditLog,
+        LockoutCache lockoutCache)
     {
         _userManager = userManager;
         _db = db;
@@ -59,6 +61,7 @@ public class LockoutUnlockService
         _languages = languages;
         _logger = logger;
         _auditLog = auditLog;
+        _lockoutCache = lockoutCache;
     }
 
     public virtual async Task IssueAsync(
@@ -166,6 +169,11 @@ public class LockoutUnlockService
 
             await _userManager.ResetAccessFailedCountAsync(user);
             await _userManager.SetLockoutEndDateAsync(user, null);
+
+            // Stage 9.1.5.b: invalidate the LockoutCache hint so OnRejected doesn't surface
+            // a stale "locked" envelope on the user's next request burst. The DB row is now
+            // unlocked; the cache must follow.
+            if (!string.IsNullOrEmpty(user.Email)) _lockoutCache.Remove(user.Email);
 
             // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             // Stage 7.6.3: Exactly-1 — the row was just re-read inside the lock and verified

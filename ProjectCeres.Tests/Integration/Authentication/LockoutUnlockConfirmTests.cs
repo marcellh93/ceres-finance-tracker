@@ -385,6 +385,65 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Confirm_RemovesEmailFromLockoutCache()
+    {
+        // Spec §4.3 staleness gap: after Confirm clears LockoutEnd in the DB, the
+        // in-memory LockoutCache hint must also be invalidated. Otherwise OnRejected
+        // would surface ACCOUNT_LOCKED_OUT on the user's next request burst — based
+        // on a stale entry whose natural TTL has not yet elapsed.
+        var email = $"cache-invalidate-{Guid.NewGuid():N}{EmailDomain}";
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
+
+        string rawToken;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var fresh = await um.FindByIdAsync(user.Id.ToString());
+            await um.SetLockoutEndDateAsync(fresh!, DateTimeOffset.UtcNow.AddMinutes(15));
+
+            // Seed the LockoutCache the way AuthController.Login does on the
+            // lockout transition. The Email property is set during registration.
+            var cache = scope.ServiceProvider.GetRequiredService<LockoutCache>();
+            cache.SetLockoutEnd(user.Email!, DateTimeOffset.UtcNow.AddMinutes(15));
+            cache.TryGetLockoutEnd(user.Email!, out _).Should().BeTrue(
+                "test precondition: cache entry must exist before Confirm runs");
+
+            // Mint an unlock token directly (same pattern as ArrangeLockedUserWithUnlockTokenAsync).
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
+            rawToken = generator.Generate();
+            var hash = generator.Hash(rawToken);
+            var now = DateTime.UtcNow;
+            db.LockoutUnlockTokens.Add(new LockoutUnlockToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                TokenHash = hash,
+                CreatedAt = now,
+                ExpiresAt = now + LockoutUnlockService.TokenLifetime,
+                ConsumedAt = null,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        LockoutUnlockOutcome outcome;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var unlock = scope.ServiceProvider.GetRequiredService<LockoutUnlockService>();
+            outcome = await unlock.ConfirmAsync(rawToken, CancellationToken.None);
+        }
+        outcome.Should().BeOfType<LockoutUnlockOutcome.Success>(
+            "ConfirmAsync must succeed for a fresh, unconsumed token");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var cache = scope.ServiceProvider.GetRequiredService<LockoutCache>();
+            cache.TryGetLockoutEnd(user.Email!, out _).Should().BeFalse(
+                "ConfirmAsync success path must call _lockoutCache.Remove(email) so a subsequent burst doesn't see a stale 'locked' hint");
+        }
+    }
+
+    [Fact]
     public async Task Service_ConfirmAsync_with_user_deleted_between_match_and_lock_returns_InvalidToken()
     {
         // Race window: candidate-scan matches a valid token, then BEFORE the in-lock
