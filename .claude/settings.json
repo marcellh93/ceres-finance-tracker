@@ -214,6 +214,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node .claude/skills/no-unjustified-deferrals/hooks/stop-chat-deferral-detect.js"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
             "command": ".claude/hooks/run-tests.sh"
           }
         ]

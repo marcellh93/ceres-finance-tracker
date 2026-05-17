@@ -56,11 +56,49 @@ If both hold, the deferral entry needs THREE fields: cited reason, receiving-sta
 Invoke the skill, run the procedure, and rewrite the deferral OR replace it with the fix-now plan before completing this write.
 ```
 
-## What the hook does NOT catch
+## What the docs-write hook does NOT catch
 
-- Conversational deferrals in user-facing text (not a tool call → no hook fires). The skill rule covers these — invoke any time the proposal contains deferral intent.
+- **Conversational deferrals in user-facing chat text** (no tool call, no hook fires from the docs-write hook). → Covered by the chat-deferral Stop hook below, added 2026-05-17.
 - Creative phrasings that miss every regex. Same coverage rationale.
 - Deferrals split across multiple writes (one write adds the rationale, a later write adds the entry). The hook fires on each write that matches; a partial match still fires.
+
+## Companion hook — chat-deferral detect (Stop hook, 2026-05-17)
+
+`hooks/stop-chat-deferral-detect.js` runs on every `Stop` event, reads the most recent assistant message from the transcript, and scans for a TIGHT subset of deferral phrases that almost-always indicate deferral intent in chat output. The phrase list:
+
+```
+/\bfiled (for|under) (later|a (new|separate|future) (stage|phase|sprint))\b/i
+/\bqueue (it|this|that) (for|to) (later|a future|the next session)\b/i
+/\bseparate stage'?s? worth of work\b/i
+/\bseparate (stage|sprint) of work\b/i
+/\bnot a regression\b[\s\S]{0,80}\b(separate|filed|queue|punt|skip|move on)\b/i
+/\bout of scope (of|for) (this|the current) (task|stage|sprint)\b[\s\S]{0,80}\b(later|future|next stage|separate)\b/i
+/\bPhase \d+ polish (\+|and) bugfix follow[- ]?up\b/i
+/\b(kicked|punted|deferred) to (later|a (new|separate|future|next) (stage|phase|sprint))\b/i
+```
+
+These are deliberately narrower than the docs-write regex list — every phrase pairs a deferral verb with a temporal anchor ("later" / "future" / "separate stage") so neutral usage doesn't flip on the verb alone.
+
+### Three guards before blocking
+
+The hook does NOT block when ANY of these pass:
+
+1. **USER-AUTH guard** — the user's last message contains explicit deferral verbs (`defer this` / `skip this` / `queue this` / `later` / `not now` / `leave that` / `move on` / `next task`). Explicit user authorization overrides the rule.
+2. **FIX-CONTEXT guard** — assistant's message ALSO contains active-work markers (commit SHA, file:line reference, `` ``` `` code block, "running tests", "committing", "fixing it now", properly-formed deferral entry with Stage X + `- [ ]` + Reason 1/2). I'm clearly working, not punting.
+3. **DECISION-QUESTION guard** — assistant's message ends with `?` in the last 200 characters. I'm asking the user to decide, not deferring unilaterally.
+
+Only blocks when ALL THREE guards fail: phrase matched, user didn't authorize, no fix-context markers, message didn't end with a question. That's exactly the "unauthorized scoping call" bypass pattern from the audit.
+
+### Modes
+
+The hook reads `CERES_DEFERRAL_HOOK_MODE` from env:
+
+- `"log"` (default) — appends match info to `.claude/state/deferral-detect/log.jsonl` and exits 0 always. Use for calibration.
+- `"block"` — exits 2 + stderr when guards fail, blocking the Stop event.
+
+Calibration workflow: run in log mode for 1-2 sessions, review `log.jsonl` to confirm guards work and no real-world false positives slip through, then flip the env var to enable blocking.
+
+Bypass: `CERES_SKIP_DEFERRAL_CHAT_HOOK=1` exits 0 unconditionally.
 
 ## Why these phrases
 
