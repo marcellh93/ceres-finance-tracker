@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/deep-fix-mode/hooks/frustration-detect.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/frustration-detect.js\""
           }
         ]
       },
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/decision-mode/hooks/decision-detect.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/decision-mode/hooks/decision-detect.js\""
           }
         ]
       },
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/no-unjustified-deferrals/hooks/pushback-detect.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/pushback-detect.js\""
           }
         ]
       },
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/stage-start-detect.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/stage-start-detect.js\""
           }
         ]
       },
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/frontend-touch-detect.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-touch-detect.js\""
           }
         ]
       }
@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/pre-spec-write-gate.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-spec-write-gate.js\""
           }
         ]
       },
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/warn-on-test-edit.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/warn-on-test-edit.sh\""
           }
         ]
       },
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/no-unjustified-deferrals/hooks/pre-write-deferral.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/pre-write-deferral.js\""
           }
         ]
       },
@@ -80,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/pre-stage-close-gate.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-stage-close-gate.js\""
           }
         ]
       },
@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/pre-commit-gate.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-commit-gate.js\""
           }
         ]
       }
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/flag-doc-change.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/flag-doc-change.js\""
           }
         ]
       },
@@ -109,7 +109,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/check-assertion-count.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/check-assertion-count.sh\""
           }
         ]
       },
@@ -118,7 +118,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/deep-fix-mode/hooks/loop-fingerprint.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/loop-fingerprint.js\""
           }
         ]
       },
@@ -127,7 +127,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/deep-fix-mode/hooks/same-target-edit-count.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/same-target-edit-count.js\""
           }
         ]
       },
@@ -136,7 +136,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/track-session-writes.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/track-session-writes.js\""
           }
         ]
       },
@@ -145,7 +145,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/state-record-skill-fire.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/state-record-skill-fire.js\""
           }
         ]
       },
@@ -154,7 +154,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/frontend-spec-postcheck.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-spec-postcheck.js\""
           }
         ]
       },
@@ -163,7 +163,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/playbook/hooks/brainstorm-needs-decision-mode.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/brainstorm-needs-decision-mode.js\""
           }
         ]
       },
@@ -172,7 +172,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/state-rehydration/hooks/snapshot-on-turn-end.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/snapshot-on-turn-end.js\""
           }
         ]
       },
@@ -181,7 +181,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/surface-build-warnings.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/surface-build-warnings.js\""
           }
         ]
       }
@@ -192,7 +192,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/state-rehydration/hooks/snapshot-on-pre-compact.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/snapshot-on-pre-compact.js\""
           }
         ]
       }
@@ -203,7 +203,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/state-rehydration/hooks/detect-compaction.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/detect-compaction.js\""
           }
         ]
       }
@@ -214,7 +214,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/skills/no-unjustified-deferrals/hooks/stop-chat-deferral-detect.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/stop-chat-deferral-detect.js\""
           }
         ]
       },
@@ -223,7 +223,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/stop-roadmap-verify-flip.js"
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-roadmap-verify-flip.js\""
           }
         ]
       },
@@ -232,7 +232,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/run-tests.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.sh\""
           }
         ]
       }
