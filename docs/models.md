@@ -992,6 +992,8 @@ ASP.NET Core Identity user. Inherits `IdentityUser<Guid>` — the standard Ident
 
 **TOTP seed storage:** Identity stores the authenticator seed in `AspNetUserTokens` (one row per user keyed under `[AspNetUserStore].AuthenticatorKey`), encrypted at rest via ASP.NET Core Data Protection. Production key-storage hardening (KMS / encrypted external volume) is a Stage 16 (Hosting + ops) launch gate.
 
+**Normalizer DI changes:** any change to the registered `ILookupNormalizer` (e.g. swapping `LowercaseLookupNormalizer` for a different variant) requires a same-commit EF migration that backfills `AspNetUsers.NormalizedEmail` + `NormalizedUserName` (and `AspNetRoles.NormalizedName` if roles are populated) to the new normalizer's output. See `security-model.md` § ASP.NET Core Identity Hardening for the full rule and the Stage 9.1.5.h precedent.
+
 ---
 
 ### UserSession (Phase 3, Stage 6a)

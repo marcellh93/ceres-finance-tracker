@@ -444,6 +444,16 @@ builder.Services.Configure<SecurityStampValidatorOptions>(o =>
 
 The security stamp changes on password reset, MFA change, and session revocation. With a 5-minute validation interval, a stolen cookie is rejected within 5 minutes of the legitimate user revoking it. The default is 30 minutes; values much lower than 5 minutes increase database load without proportional benefit on a solo-budget VPS.
 
+#### `ILookupNormalizer` registration changes require a same-commit data-migration
+
+ASP.NET Identity stores normalized lookup values (`AspNetUsers.NormalizedEmail`, `AspNetUsers.NormalizedUserName`, `AspNetRoles.NormalizedName`) and uses them as the matching key in `FindByEmailAsync`, `FindByNameAsync`, etc. Swapping `ILookupNormalizer` changes the format of NEW lookup values, but pre-existing rows retain the previous format. The result: every pre-existing user's `FindByNameAsync`/`FindByEmailAsync` lookup returns null, `PasswordSignInAsync` returns "invalid login" without ever checking the password, `AccessFailedCount` stays at 0, and the user is locked out of the application with no audit trail.
+
+Any commit that registers a new `ILookupNormalizer` (e.g. swapping `UpperInvariantLookupNormalizer` for a custom variant, or changing the algorithm of an existing custom normalizer) MUST include an EF migration in the same commit that backfills every populated normalized column to the new normalizer's output. The migration MUST be idempotent (filtered `UPDATE` that no-ops on already-correct rows).
+
+Precedent: commit `4b35911` (Stage 9 mid-stream) swapped to `LowercaseLookupNormalizer` without this migration and silently broke login for every pre-existing user. The fix shipped in Stage 9.1.5.h (`BackfillIdentityNormalizedToLowercase`) — see `docs/superpowers/specs/2026-05-17-stage-9-1-5-h-lookup-normalizer-backfill-design.md`.
+
+**Tables currently covered:** `AspNetUsers.NormalizedEmail`, `AspNetUsers.NormalizedUserName`, `AspNetRoles.NormalizedName`. All three are backfilled by the Stage 9.1.5.h migration regardless of whether the table currently has rows.
+
 ---
 
 ## Authentication Flow Diagrams (Stage 6 close-out)
