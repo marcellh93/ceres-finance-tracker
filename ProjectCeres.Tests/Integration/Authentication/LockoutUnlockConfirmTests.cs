@@ -61,6 +61,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
 
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
+        var lookupHasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
         var rawToken = generator.Generate();
         var hash = generator.Hash(rawToken);
         var now = DateTime.UtcNow;
@@ -68,6 +69,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
+            TokenLookup = lookupHasher.ComputeLookup(rawToken),
             TokenHash = hash,
             CreatedAt = now,
             ExpiresAt = now + LockoutUnlockService.TokenLifetime,
@@ -142,11 +144,13 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
+            var lookupHasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
             rawToken = generator.Generate();
             db.LockoutUnlockTokens.Add(new LockoutUnlockToken
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
+                TokenLookup = lookupHasher.ComputeLookup(rawToken),
                 TokenHash = generator.Hash(rawToken),
                 CreatedAt = DateTime.UtcNow.AddMinutes(-30),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(-1),
@@ -411,6 +415,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
             // Mint an unlock token directly (same pattern as ArrangeLockedUserWithUnlockTokenAsync).
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
+            var lookupHasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
             rawToken = generator.Generate();
             var hash = generator.Hash(rawToken);
             var now = DateTime.UtcNow;
@@ -418,6 +423,7 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
+                TokenLookup = lookupHasher.ComputeLookup(rawToken),
                 TokenHash = hash,
                 CreatedAt = now,
                 ExpiresAt = now + LockoutUnlockService.TokenLifetime,

@@ -30,6 +30,7 @@ public class LockoutUnlockService
     private readonly AppDbContext _db;
     private readonly Argon2idPasswordHasher _argon;
     private readonly LockoutUnlockTokenGenerator _tokens;
+    private readonly TokenLookupHasher _lookupHasher;
     private readonly IEmailService _email;
     private readonly IEmailComposer _composer;
     private readonly IEmailRecipientResolver _recipients;
@@ -43,6 +44,7 @@ public class LockoutUnlockService
         AppDbContext db,
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
+        TokenLookupHasher lookupHasher,
         IEmailService email,
         IEmailComposer composer,
         IEmailRecipientResolver recipients,
@@ -55,6 +57,7 @@ public class LockoutUnlockService
         _db = db;
         _argon = argon;
         _tokens = tokens;
+        _lookupHasher = lookupHasher;
         _email = email;
         _composer = composer;
         _recipients = recipients;
@@ -81,11 +84,16 @@ public class LockoutUnlockService
 
             rawToken = _tokens.Generate();
             var hash = _tokens.Hash(rawToken);
+            var lookup = _lookupHasher.ComputeLookup(rawToken);
             var now = DateTime.UtcNow;
             _db.LockoutUnlockTokens.Add(new LockoutUnlockToken
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
+                // Stage 9.1.5.a — TokenLookup is NOT NULL + unique. IssueAsync MUST
+                // stamp it to satisfy the schema contract. The ConfirmAsync read-side
+                // refactor (O(N) → O(1) lookup) lands in Commit 2.
+                TokenLookup = lookup,
                 TokenHash = hash,
                 CreatedAt = now,
                 ExpiresAt = now + TokenLifetime,

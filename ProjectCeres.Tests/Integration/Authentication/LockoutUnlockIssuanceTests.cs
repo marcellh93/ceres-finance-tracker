@@ -175,6 +175,11 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
             {
                 Id = staleId,
                 UserId = user.Id,
+                // Stage 9.1.5.a — TokenLookup is NOT NULL + unique. This stale row has
+                // no corresponding raw token (the test fabricates the hash from a
+                // fixed string), so a random 32-byte value satisfies the schema
+                // contract; the supersede test never reads TokenLookup back.
+                TokenLookup = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32),
                 TokenHash = generator.Hash("stale-raw-token-value-doesnt-matter"),
                 CreatedAt = DateTime.UtcNow.AddMinutes(-10),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(5),
@@ -271,6 +276,7 @@ internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
         AppDbContext db,
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
+        TokenLookupHasher lookupHasher,
         IEmailService email,
         ProjectCeres.Common.Email.IEmailComposer composer,
         ProjectCeres.Common.Email.IEmailRecipientResolver recipients,
@@ -278,7 +284,7 @@ internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
         Microsoft.Extensions.Logging.ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog,
         LockoutCache lockoutCache)
-        : base(userManager, db, argon, tokens, email, composer, recipients, languages, logger, auditLog, lockoutCache) { }
+        : base(userManager, db, argon, tokens, lookupHasher, email, composer, recipients, languages, logger, auditLog, lockoutCache) { }
 
     public override Task IssueAsync(
         Guid userId, string userEmail, string ip, string userAgent,
