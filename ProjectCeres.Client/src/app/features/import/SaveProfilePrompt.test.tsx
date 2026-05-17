@@ -8,7 +8,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const mappings: ImportColumnMappings = {
   dateColumn:        'Fecha',
@@ -20,8 +20,8 @@ const mappings: ImportColumnMappings = {
 };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
-  mockFetch.mockReset();
 });
 
 afterEach(() => vi.resetAllMocks());

@@ -3,9 +3,10 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsFilterBar, buildTypeFilterParams } from './MovementsFilterBar';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockResolvedValue({
     ok: true,

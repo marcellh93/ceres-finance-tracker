@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build && pnpm check-size",
     "lint": "eslint .",
+    "lint:tests": "! grep -rE '^const mockFetch = vi\\.fn' src --include='*.test.tsx' --include='*.test.ts'",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "pnpm lint:tests && vitest run",
+    "test:ci": "pnpm lint:tests && vitest run",
     "test:watch": "vitest",
     "check-size": "node scripts/check-bundle-size.mjs"
   },

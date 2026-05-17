@@ -9,7 +9,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const activeRow: CategoryListItemDto = {
   id: 'a-1',
@@ -24,8 +24,8 @@ const activeRow: CategoryListItemDto = {
 const archivedRow: CategoryListItemDto = { ...activeRow, id: 'a-2', name: 'Old', isActive: false };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
-  mockFetch.mockReset();
 });
 
 afterEach(() => vi.resetAllMocks());

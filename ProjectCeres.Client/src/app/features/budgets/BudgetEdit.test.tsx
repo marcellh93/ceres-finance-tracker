@@ -9,8 +9,9 @@ vi.mock('../../lib/use-settings', () => ({
   useSettings: () => ({ data: { numberFormat: 'period_decimal', dateFormat: 'DD/MM/YYYY' }, loading: false }),
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
 afterEach(() => vi.resetAllMocks());

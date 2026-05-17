@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsCurrencyTabs } from './MovementsCurrencyTabs';
 import { LAST_CURRENCY_STORAGE_KEY } from './use-active-currency';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const ACCOUNTS = [
   { id: 'a1', name: 'EUR Checking', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Asset' },
@@ -12,6 +12,7 @@ const ACCOUNTS = [
 ];
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockResolvedValue({ ok: true, json: async () => ACCOUNTS });
   window.localStorage.clear();

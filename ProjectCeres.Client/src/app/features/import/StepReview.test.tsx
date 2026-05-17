@@ -4,7 +4,7 @@ import { StepReview } from './StepReview';
 import type { ImportColumnMappings } from './import-api';
 import type { AccountOptionDto } from '../movements/movements-api';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const accounts: AccountOptionDto[] = [
   { id: 'a-1', name: 'Sabadell Checking', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Checking' },
@@ -20,6 +20,7 @@ const mappings: ImportColumnMappings = {
 };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(() =>
     Promise.resolve({ ok: true, status: 200, json: async () => accounts }),

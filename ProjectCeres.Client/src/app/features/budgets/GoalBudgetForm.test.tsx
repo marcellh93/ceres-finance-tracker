@@ -2,8 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GoalBudgetForm, type GoalBudgetFormValues } from './GoalBudgetForm';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/accounts/active') {

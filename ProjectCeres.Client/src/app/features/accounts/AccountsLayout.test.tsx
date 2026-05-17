@@ -7,7 +7,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const allRows = [
   { id: 'a-1', name: 'Cash',             accountTypeId: 1, accountTypeName: 'Asset',     currencyId: 1, currencyCode: 'EUR', currencySymbol: '€', description: null, isActive: true,  excludeFromSpendable: false, liabilityRepaymentType: null,         interestRate: null,  balance: 120,     hasTransactions: false },
@@ -17,6 +17,7 @@ const allRows = [
 ];
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/accounts') {

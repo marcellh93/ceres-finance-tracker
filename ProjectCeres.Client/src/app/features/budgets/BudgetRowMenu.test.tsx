@@ -8,9 +8,10 @@ vi.mock('sonner', () => ({
 }));
 import { toast } from 'sonner';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
 

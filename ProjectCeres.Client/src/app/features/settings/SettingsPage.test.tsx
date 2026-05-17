@@ -12,7 +12,7 @@ vi.mock('../../lib/use-settings', () => ({
   refetchSettings: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const settingsResponse = {
   numberFormat: 'comma_decimal',
@@ -28,6 +28,7 @@ const currenciesResponse = [
 ];
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/settings') {

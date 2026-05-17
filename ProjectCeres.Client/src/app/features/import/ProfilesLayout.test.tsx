@@ -8,7 +8,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const activeRow: ImportProfileListItemDto = {
   id: 'a-1',
@@ -37,6 +37,7 @@ const archivedRow: ImportProfileListItemDto = {
 };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/import-profiles') {

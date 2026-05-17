@@ -7,7 +7,7 @@ import type {
   ImportProfileListItemDto,
 } from './import-api';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const headers: HeaderDetectionResult = {
   headers: ['Fecha', 'Importe', 'Concepto', 'Tipo'],
@@ -55,6 +55,7 @@ const mismatchingProfile: ImportProfileListItemDto = {
 };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/import-profiles') {

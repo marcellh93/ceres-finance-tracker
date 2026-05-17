@@ -7,7 +7,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const SYSTEM_ID = '20000000-0000-0000-0000-000000000001';
 const UNCAT_INCOME_ID = '20000000-0000-0000-0000-000000000025';
@@ -25,6 +25,7 @@ const allRows = [
 ];
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/categories') {

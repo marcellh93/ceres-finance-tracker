@@ -9,7 +9,7 @@ import {
   useActiveCurrency,
 } from './use-active-currency';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 function wrapperFactory(initialEntries: string[]) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -34,6 +34,7 @@ function settingsResponse(defaultCurrencyCode: string) {
 beforeEach(() => {
   __resetSettingsForTests();
   window.localStorage.clear();
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url.startsWith('/api/accounts/active')) {

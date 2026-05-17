@@ -40,9 +40,10 @@ vi.mock('./AttachmentDropzone', () => ({
 }));
 
 // ── Mock fetch ──
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 
   // Default: accounts + categories resolve with test data

@@ -8,7 +8,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const categoryDetail = {
   id: 'cat-1',
@@ -26,6 +26,7 @@ const categoryTypesResponse = [
 ];
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/category-types') {

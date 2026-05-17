@@ -29,7 +29,7 @@ vi.mock('./AttachmentDropzone', () => ({
 }));
 
 // ── Mock fetch ──
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const TRANSACTION_DTO = {
   id: 'abc-123',
@@ -133,6 +133,7 @@ function defaultFetchImpl(url: string, init?: RequestInit) {
 }
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(defaultFetchImpl);
   discriminatorType = 'Transaction';

@@ -8,7 +8,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 function renderAt(search: string, totalCount = 5, onAfterBulk = vi.fn()) {
   return render(
@@ -19,6 +19,7 @@ function renderAt(search: string, totalCount = 5, onAfterBulk = vi.fn()) {
 }
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
 

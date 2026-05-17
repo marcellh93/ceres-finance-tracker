@@ -20,7 +20,7 @@ vi.mock('../lib/use-settings', () => ({
   }),
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const accountsResponse = {
   ok: true,
@@ -39,6 +39,7 @@ const categoriesResponse = {
 };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url.includes('/api/accounts/active')) return Promise.resolve(accountsResponse);

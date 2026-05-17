@@ -19,11 +19,12 @@ vi.mock('./MovementsFilterBar', () => ({
   MovementsFilterBar: vi.fn(() => <div data-testid="filter-bar" />),
 }));
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   __resetSettingsForTests();
   window.localStorage.clear();
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url.startsWith('/api/accounts/active')) {

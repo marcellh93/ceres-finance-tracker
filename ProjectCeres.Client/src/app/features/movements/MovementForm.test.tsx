@@ -6,21 +6,21 @@ import type { GoalBudgetListItemDto } from '../budgets/budgets-api';
 // Per-test goal-budget fixture; tests can override before rendering.
 let SPENDING_GOALS: GoalBudgetListItemDto[] = [];
 
-const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
-  const url = typeof input === 'string' ? input : input.toString();
-  if (url === '/api/goal-budgets?type=spending&includeArchived=true') {
-    return {
-      ok: true,
-      status: 200,
-      json: async () => SPENDING_GOALS,
-    } as Response;
-  }
-  return { ok: true, status: 200, json: async () => [] } as Response;
-});
+let mockFetch: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   SPENDING_GOALS = [];
-  mockFetch.mockClear();
+  mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url === '/api/goal-budgets?type=spending&includeArchived=true') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => SPENDING_GOALS,
+      } as Response;
+    }
+    return { ok: true, status: 200, json: async () => [] } as Response;
+  });
   global.fetch = mockFetch as unknown as typeof fetch;
 });
 

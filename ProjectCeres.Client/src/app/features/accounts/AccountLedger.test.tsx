@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AccountLedger } from './AccountLedger';
 
-const mockFetch = vi.fn();
+let mockFetch: ReturnType<typeof vi.fn>;
 
 const baseAccount = {
   id: 'a-1', name: 'Checking Account',
@@ -26,6 +26,7 @@ const baseLedger = {
 };
 
 beforeEach(() => {
+  mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/accounts/a-1') return Promise.resolve({ ok: true, status: 200, json: async () => baseAccount });
