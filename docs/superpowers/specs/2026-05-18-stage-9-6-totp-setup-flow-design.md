@@ -14,15 +14,25 @@ The server side is complete (`MfaController` from Stage 6.4: `enroll`, `enroll/v
 
 ---
 
-## Server contract (existing, unchanged)
+## Server contract
 
-| Endpoint | Auth | Body | Success | Failure |
-|---|---|---|---|---|
-| `POST /api/auth/mfa/enroll` | `[Authorize] + [RequireRecentAuth]` | — | `200 { otpAuthUri, manualEntryKey }` | `409 MFA_ALREADY_ENROLLED`; `401 REAUTH_REQUIRED` if last-reauth > 5 min |
-| `POST /api/auth/mfa/enroll/verify` | `[Authorize] + [RequireRecentAuth]` | `{ code }` (6 digits) | `200 { backupCodes: string[] }` (10 items) | `400 NO_ENROLLMENT_IN_PROGRESS`; `400 INVALID_MFA_CODE`; `422 VALIDATION_ERROR` on malformed code shape; `401 REAUTH_REQUIRED` |
-| `POST /api/auth/mfa/backup-codes/regenerate` | `[Authorize] + [RequireRecentAuth]` | — | `200 { backupCodes }` | `409 MFA_NOT_ENABLED`; `401 REAUTH_REQUIRED` |
+Three endpoints already shipped from Stage 6.4. **One new endpoint added in 9.6** so the SPA "Turn off" button is real and not a deferral.
 
-The `auth/me` response already carries `twoFactorEnabled: boolean` (see `Login.test.tsx`), so the Security page knows which state to render without a separate fetch.
+| Endpoint | Status | Auth | Body | Success | Failure |
+|---|---|---|---|---|---|
+| `POST /api/auth/mfa/enroll` | shipped | `[Authorize] + [RequireRecentAuth]` | — | `200 { otpAuthUri, manualEntryKey }` | `409 MFA_ALREADY_ENROLLED`; `401 REAUTH_REQUIRED` if last-reauth > 5 min |
+| `POST /api/auth/mfa/enroll/verify` | shipped | `[Authorize] + [RequireRecentAuth]` | `{ code }` (6 digits) | `200 { backupCodes: string[] }` (10 items) | `400 NO_ENROLLMENT_IN_PROGRESS`; `400 INVALID_MFA_CODE`; `422 VALIDATION_ERROR`; `401 REAUTH_REQUIRED` |
+| `POST /api/auth/mfa/backup-codes/regenerate` | shipped | `[Authorize] + [RequireRecentAuth]` | — | `200 { backupCodes }` | `409 MFA_NOT_ENABLED`; `401 REAUTH_REQUIRED` |
+| `POST /api/auth/mfa/disable` | **NEW in 9.6** | `[Authorize] + [RequireRecentAuth]` | — | `204 NoContent` | `409 MFA_NOT_ENABLED`; `401 REAUTH_REQUIRED` |
+
+**`POST /api/auth/mfa/disable` shape:**
+
+- New action in `MfaController` mirroring the shape of `RegenerateBackupCodes` (same attributes, same auth posture).
+- On call: `_userManager.SetTwoFactorEnabledAsync(user, false)`, then `_userManager.ResetAuthenticatorKeyAsync(user)` (regenerates the secret so a fresh enrolment starts clean), then `backupCodes.PurgeAsync(user.Id, ct)` to consume all persisted backup-code rows so old codes can't be used after re-enrolment, then `_auditLog.RecordAsync(user.Id, AuditLogAction.MfaDisabled, ct: ...)`.
+- New `AuditLogAction.MfaDisabled` enum value if not already present.
+- `MfaBackupCodeService` may need a `PurgeAsync(Guid userId, CancellationToken ct)` method; if it doesn't have one, add it alongside the controller change. The existing `RegenerateAsync` already deletes old rows internally, so the deletion pattern is established.
+
+The `auth/me` response already carries `twoFactorEnabled: boolean`, so the Security page knows which state to render without a separate fetch.
 
 ---
 
@@ -64,12 +74,12 @@ Two-factor sign-in is on
 Every sign-in now requires a 6-digit code from your authenticator
 app. If you lose your device, use one of your backup codes.
 
-[ Regenerate backup codes ]   [ Turn off two-factor sign-in (disabled) ]
+[ Regenerate backup codes ]   [ Turn off two-factor sign-in ]
 ```
 
-"Turn off" is rendered disabled with tooltip "Coming in a follow-up — no server endpoint yet." A `[ ]` line lands under Stage 9.6's verification checklist as the receiving entry for that follow-up (Phase D satisfied).
+**Turn off** opens an `AlertDialog`: "Turn off two-factor sign-in? Your account will only be protected by your password until you turn it back on." On confirm, fires `POST /api/auth/mfa/disable`. On 200 → `auth.refresh()` → page re-renders the Disabled state.
 
-"Regenerate" opens a confirmation `AlertDialog`: "This invalidates your existing backup codes. Make sure you can scan a fresh QR or have your phone." Confirming fires `POST /api/auth/mfa/backup-codes/regenerate`; on 200, renders the new 10 codes in the same UI as wizard step 2 (without the "you're enrolled now" framing).
+**Regenerate** opens a confirmation `AlertDialog`: "This invalidates your existing backup codes. Make sure you can scan a fresh QR or have your phone." Confirming fires `POST /api/auth/mfa/backup-codes/regenerate`; on 200, renders the new 10 codes in the same UI as wizard step 2 (without the "you're enrolled now" framing).
 
 ---
 
@@ -181,7 +191,6 @@ No new dependencies. `qrcode.react@4.2.0` already installed (`package.json:30`) 
     "enabledBody": "Every sign-in now requires a 6-digit code from your authenticator app. If you lose your device, use one of your backup codes.",
     "regenerateButton": "Regenerate backup codes",
     "disableButton": "Turn off two-factor sign-in",
-    "disableTooltip": "Coming in a follow-up — no server endpoint yet.",
     "reauthRequired": "Your sign-in is older than 5 minutes. Sign out and sign in again to continue.",
     "signOutLink": "Sign out",
     "wizard": {
@@ -276,7 +285,7 @@ Vitest unit + RTL. All use the same `fetchSpy + clearXsrfTokenCacheForTests + I1
 5. Click Enable → on 409 `MFA_ALREADY_ENROLLED` (race condition) calls `auth.refresh` and re-renders enabled state.
 6. Click Regenerate → opens AlertDialog → confirm → fires POST `/api/auth/mfa/backup-codes/regenerate` → on 200 renders the new codes block.
 7. Regenerate AlertDialog cancel closes without fetching.
-8. Disable button is rendered with `aria-disabled="true"` and tooltip text.
+8. Click Disable → opens AlertDialog → confirm → fires POST `/api/auth/mfa/disable` → on 204 calls `auth.refresh` and re-renders disabled state.
 
 ### `TotpEnrollmentWizard.test.tsx` — wizard flow (9 tests)
 
@@ -310,13 +319,10 @@ Total: 24 tests, plus the existing `LoginTotp` tests stay green.
 | Item | Receiving stage | Reason |
 |---|---|---|
 | Proper reauth modal (real `useStepUp` behaviour) | Stage 9.8 — Reauthentication prompts on sensitive operations (`docs/roadmap-phase-three.md:959`) | Already-scheduled. 9.6 uses inline alert as a stopgap. |
-| `POST /api/auth/mfa/disable` server endpoint + client wiring | New `[ ]` line under Stage 9.6's verification checklist for the disable endpoint | Already-scheduled (about to be added in the same commit as this spec — see "Receiving entry to add" below). |
 | TOTP-enrolled security-event email | Stage 8 carry-forward at `docs/roadmap-phase-three.md:1079` (already a `[ ]` line) | Already-scheduled. |
 | Backup-codes recovery flow during sign-in (lost device path) | Stage 9.7 — Backup-codes recovery flow (`docs/roadmap-phase-three.md:958`) | Already-scheduled. |
 
-### Receiving entry to add (Phase D)
-
-Adding a `[ ]` line to Stage 9.6's verification checklist in `roadmap-phase-three.md` for the disable-endpoint follow-up, in the same commit as the spec. Tripwire: the disabled button + tooltip in production code is the visible reminder; the roadmap `[ ]` is the close-out gate.
+**Folded INTO 9.6 (not deferred):** The disable-MFA server endpoint + client wiring. First draft of this spec marked it as deferred with a same-commit receiving `[ ]` line — but ran through the no-defer gate, no valid reason held (tooling gap = no, already-scheduled = no), so the disable flow is in-scope for 9.6. ~30 lines of server code + 3-4 integration tests + the SPA button wiring.
 
 ---
 

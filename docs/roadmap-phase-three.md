@@ -1020,7 +1020,7 @@ TOTP setup (entry point: `/app/security` per ADR-0069 — NOT `/login/totp/setup
 - [ ] Backup codes are hashed in DB after this step (server-side, already done in `MfaBackupCodeService`); the page warns "These will not be shown again"
 - [ ] User must confirm "I've saved my backup codes" checkbox before proceeding
 - [ ] After enrolment: page renders Enabled state (NOT a redirect — single SPA page). First-run onboarding redirect is Stage 15.5's owner per `docs/roadmap-phase-three.md:1518`.
-- [ ] **Disable two-factor sign-in endpoint** — `POST /api/auth/mfa/disable` is not yet built. 9.6 ships the "Turn off" button as `disabled` with tooltip "Coming in a follow-up — no server endpoint yet." This `[ ]` line is the receiving entry for the follow-up: when the endpoint lands, wire the button + `RequireRecentAuth` + audit-log row, then tick this line. *Anchor: 9.6 spec § Out of scope.*
+- [ ] **Disable two-factor sign-in** — `POST /api/auth/mfa/disable` server endpoint (mirrors `enroll`/`enroll/verify` shape: `[Authorize] + [RequireRecentAuth]`, sets `TwoFactorEnabled = false`, clears persisted backup codes via `MfaBackupCodeService`, writes `MfaDisabled` audit-log row) + SPA "Turn off two-factor sign-in" button on the Enabled state of `/app/security` (opens an `AlertDialog` confirming the loss of MFA protection, then POSTs and re-renders Disabled state via `auth.refresh()`).
 
 Backup-codes recovery flow:
 
