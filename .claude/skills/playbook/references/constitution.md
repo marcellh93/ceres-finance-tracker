@@ -11,7 +11,7 @@ State for all gates: `.claude/state/playbook/<session_id>.json` — recorded by 
 
 ---
 
-## The seven phases
+## The seven phases (plus Phase A′ and Phase A″)
 
 ### Phase A — `stage-start` (advisory)
 
@@ -34,20 +34,79 @@ State for all gates: `.claude/state/playbook/<session_id>.json` — recorded by 
 
 ---
 
-### Phase B — `pre-spec-write` (HARD)
+### Phase A′ — `frontend-touch` (advisory)
+
+**Gating event.** Either of:
+
+1. **Prompt-side.** UserPromptSubmit where the prompt contains frontend phrasing: "build the X page/component/drawer", "design this", "redesign", "polish", "review the UI", "audit accessibility", "make this bolder/quieter/tighter", "fix the empty state", "design system", "design tokens", or any direct mention of `ProjectCeres.Client/`, a `.tsx`/`.ts` filename, or `shadcn`/`tailwind`/`vite`/`vitest`. Full regex list in `playbook/hooks/frontend-touch-detect.js`.
+2. **Spec-content-side.** PostToolUse Edit/Write/MultiEdit on `docs/superpowers/specs/*.md` where the new content contains frontend signals (`ProjectCeres.Client`, `.tsx`, shadcn/Tailwind names, UI nouns, React hook names, `docs/design-system.md`). Full regex list in `playbook/hooks/frontend-spec-postcheck.js`.
+
+**Required chain.**
+
+1. `frontend-orchestrator` — routes between `frontend-design`, `vercel-react-best-practices`, `web-design-guidelines`, `impeccable`, and `docs/design-system.md` based on phase (discovery → build → refine → simplify → harden → system maintenance).
+
+**Enforcement.** ADVISORY via two hooks:
+
+- `playbook/hooks/frontend-touch-detect.js` (UserPromptSubmit) — emits an advisory before brainstorming begins.
+- `playbook/hooks/frontend-spec-postcheck.js` (PostToolUse on Edit/Write/MultiEdit) — emits an advisory if a spec write contained frontend signals but `frontend-orchestrator` never fired.
+
+Both hooks no-op when `frontend-orchestrator` has already fired this session (state-file check).
+
+**What counts as fired.** A `Skill` tool call with `skill: "frontend-orchestrator"` recorded in `.claude/state/playbook/<session_id>.json`.
+
+**Consumes / produces.**
+- Consumes: a user prompt with frontend phrasing OR a spec write with frontend signals.
+- Produces: advisory `additionalContext` reminding to invoke `frontend-orchestrator`. The orchestrator's own pipeline then runs.
+
+**Why ADVISORY not HARD.** Frontend orchestrator selection is judgment-driven (which phase, which sub-skill); a hard-block on UI vocabulary would false-positive on backend specs that merely reference a frontend file. Start advisory, escalate later if real misses accumulate.
+
+**Hand-off.** Phase A′ runs in parallel with Phase A (`stage-start`) — both can fire on the same prompt, both are advisory. When both fire: `superpowers:brainstorming` and `frontend-orchestrator` both come before any Write.
+
+---
+
+### Phase A″ — `brainstorming-needs-decision-mode` (advisory)
+
+**Gating event.** PostToolUse on Skill where `tool_input.skill === "superpowers:brainstorming"` AND `decision-mode` is not yet in this session's `fired` list.
+
+**Required chain.**
+
+1. `decision-mode` style must apply to every proposal, option, and trade-off emitted during the brainstorm — three-layer Container → Term → Why-here, no forbidden words inside Layer 2 unless defined in the same paragraph.
+
+**Enforcement.** ADVISORY via `playbook/hooks/brainstorm-needs-decision-mode.js`. The hook does not require `decision-mode` to be invoked as a `Skill` call; it requires the *style* to apply. Suppressed when `decision-mode` has already fired this session (because then its rules are already in scope).
+
+**Why ADVISORY not HARD.** `superpowers:brainstorming` is a long interactive flow with many tool calls; hard-blocking each one would be disruptive. The advisory is sufficient because the agent reads it on every Skill fire and the user can correct in real time. If real misses accumulate, escalate to HARD with a PreToolUse gate on the brainstorming Skill invocation.
+
+**What counts as resolved.** Either (a) the user observes plain-language style and does not push back, OR (b) `decision-mode` is invoked as a Skill (which suppresses the advisory).
+
+**Consumes / produces.**
+- Consumes: a `superpowers:brainstorming` Skill invocation.
+- Produces: advisory `additionalContext` reminding to apply `decision-mode` style to proposals.
+
+**Hand-off.** Runs in parallel with Phase A (`stage-start`) and Phase A′ (`frontend-touch`); all three can fire on the same turn, all are advisory. When all three fire: brainstorm with plain-language proposals, route the frontend pipeline via `frontend-orchestrator` if applicable.
+
+**Origin.** User pushback 2026-05-17 after the stage-start advisory routed to `superpowers:brainstorming` but the resulting proposals still leaked framework jargon ("middleware", "lifecycle", "DbContext"). The brainstorming skill itself is silent on language style — it relies on the host project's other skills to enforce that. Without a coordination hook, the two skills are siblings that don't know about each other.
+
+---
+
+### Phase B — `pre-spec-write` (HARD, tiered)
 
 **Gating event.** PreToolUse on Write/Edit/MultiEdit where `file_path` matches `docs/superpowers/specs/*.md` AND the file does not already exist on disk.
 
 **Required chain.** Both of the following must be in the session state file:
 
 1. `superpowers:brainstorming` (established the design)
-2. `verify-against-codebase` (audited the design against project conventions)
+2. The matching verify skill(s) (audited the design against project conventions) — tiered per the spec's proposed content:
+   - **Backend signals only** in the proposed content (e.g. mentions of `ProjectCeres/`, `Program.cs`, EF Core, HTTP status codes, ASP.NET pipeline) → `verify-backend`.
+   - **Frontend signals only** (e.g. mentions of `ProjectCeres.Client/`, `shadcn`, `base-ui`, Tailwind, design-system primitives) → `verify-frontend`.
+   - **Both signals** OR **no detectable signals** (default-safe) → BOTH `verify-backend` AND `verify-frontend`. Invoking the legacy `verify-against-codebase` router satisfies both.
 
 **Enforcement.** HARD via `playbook/hooks/pre-spec-write-gate.js`. **Replaces** the existing `require-verify-against-codebase-before-spec.js` (whose scope is a subset of this gate). Bypass: the file already exists (rewrite of an existing spec).
 
-**What counts as fired.** A `Skill` tool call with the required skill name recorded in state, OR an explicit `verify-against-codebase` mention in the assistant transcript (preserves the bypass behavior of today's hook).
+**What counts as fired.** A `Skill` tool call with the required skill name recorded in state, OR an explicit mention of `verify-backend` / `verify-frontend` / `verify-against-codebase` in the assistant transcript (preserves the bypass behavior of today's hook).
 
-**Why HARD not ADVISORY.** The originating motivation for the existing hook was the Stage 6b.1 incident where Claude proposed a homegrown `MfaTicketService` that duplicated framework features. That class of error is high-cost — caught pre-dispatch it's a re-plan; caught mid-execution it's a subagent round trip plus rework.
+**Why tiered.** A pure frontend spec (Stage 9.x theme-toggle-shaped work) gains nothing from running through `verify-backend`'s §1–§5 — those steps inspect `Program.cs`, EF models, and API conventions that the spec doesn't touch. A pure backend spec gains nothing from `verify-frontend`'s shadcn / design-system audit. Splitting keeps the audit proportional to the spec without weakening either side. Origin: 2026-05-17 review session after the `8c8aab9` ThemeToggle commit's audit pipeline ran irrelevant backend checks.
+
+**Why HARD not ADVISORY.** The originating motivation for the existing hook was the Stage 6b.1 incident where Claude proposed a homegrown `MfaTicketService` that duplicated framework features. That class of error is high-cost — caught pre-dispatch it's a re-plan; caught mid-execution it's a subagent round trip plus rework. The tiering doesn't weaken that — it just routes to the half of the audit that can catch the relevant class of conflict.
 
 **Consumes / produces.**
 - Consumes: approved design from Phase A + spec file path under `docs/superpowers/specs/`.
@@ -112,21 +171,25 @@ State for all gates: `.claude/state/playbook/<session_id>.json` — recorded by 
 
 ---
 
-### Phase F — `pre-commit` (HARD, conditional)
+### Phase F — `pre-commit` (HARD, conditional + tiered)
 
 **Gating event.** PreToolUse Bash where the command matches `^\s*git\s+(-C\s+\S+\s+)?commit\b` AND the staged diff contains files matching `\.(cs|ts|tsx|csproj|sln)$`.
 
-**Required chain.**
+**Required chain.** Tiered by what the staged diff actually touches:
 
-1. `verify-against-codebase` must have fired this session against the latest diff.
+- **Backend-only staged diff** (`.cs` / `.csproj` files only, no `.ts` / `.tsx`, no `.sln`) → `verify-backend` must have fired this session against the latest diff.
+- **Frontend-only staged diff** (`.ts` / `.tsx` files only, no `.cs` / `.csproj`, no `.sln`) → `verify-frontend` must have fired this session against the latest diff.
+- **Mixed diff** (both sides touched) OR **`.sln` present** → BOTH `verify-backend` AND `verify-frontend` must have fired this session. Invoking the legacy `verify-against-codebase` router satisfies both. `.sln` escalates to mixed because solution-file edits can ripple either side.
 
-**Enforcement.** HARD via `playbook/hooks/pre-commit-gate.js`. **Path-based bypass (Option C, resolved 2026-05-17):** pure documentation / config / gitignore diffs (`*.md`, `*.json`, `.gitignore`, `*.txt`) skip the gate. Rationale: `verify-against-codebase` exists to catch code-convention conflicts — it has nothing meaningful to say about doc-only commits.
+**Enforcement.** HARD via `playbook/hooks/pre-commit-gate.js`. **Path-based bypass (Option C, resolved 2026-05-17):** pure documentation / config / gitignore diffs (`*.md`, `*.json`, `.gitignore`, `*.txt`) skip the gate. Rationale: the verify skills exist to catch code-convention conflicts — they have nothing meaningful to say about doc-only commits.
 
-**What counts as fired.** State-file check for `verify-against-codebase` invocation AFTER the most recent code Write in this session. The gate inspects: was the skill run AFTER the most recent code Write? If yes, allow. If the last code Write was after the last verify-fire, deny with "verify-against-codebase needs to re-run against the latest diff".
+**What counts as fired.** State-file check for the required verify skill name(s) invoked AFTER the most recent code Write in this session. The legacy `verify-against-codebase` name counts toward either or both sides (it's now a router). The gate inspects: was the required skill run AFTER the most recent code Write? If yes, allow. If the last code Write was after the last verify-fire, deny with "verify needs to re-run against the latest diff".
+
+**Why tiered.** Same rationale as Phase B's tiering, plus a real-world miss: commit `8c8aab9` (ThemeToggle rewrite, 2026-05-17) had four `.tsx` files staged and the agent paid for a full backend audit + `dotnet test` run that found nothing because there was nothing backend-shaped to find. The tier rule fixes that without giving up the convention-audit guard. The split skills + tiered gate together cap audit cost at the diff's actual surface area. Origin: 2026-05-17 review session.
 
 **Consumes / produces.**
 - Consumes: a `git commit` Bash invocation + the current staged diff.
-- Produces: either the commit proceeds OR a hard-block naming the unverified files.
+- Produces: either the commit proceeds OR a hard-block naming the unverified files + the required verify skill(s) for this tier.
 
 ---
 
@@ -154,10 +217,11 @@ State for all gates: `.claude/state/playbook/<session_id>.json` — recorded by 
 
 ```json
 {
-  "fired": ["superpowers:brainstorming", "verify-against-codebase", "no-unjustified-deferrals"],
+  "fired": ["superpowers:brainstorming", "verify-frontend", "verify-backend", "no-unjustified-deferrals"],
   "fired_with_timestamps": [
     {"skill": "superpowers:brainstorming", "at": "2026-05-17T03:12:01Z", "tool_use_index": 14},
-    {"skill": "verify-against-codebase", "at": "2026-05-17T03:18:33Z", "tool_use_index": 27}
+    {"skill": "verify-frontend", "at": "2026-05-17T03:18:33Z", "tool_use_index": 27},
+    {"skill": "verify-backend", "at": "2026-05-17T03:19:02Z", "tool_use_index": 28}
   ],
   "writes_since_last_skill": [
     {"file": "ProjectCeres/Common/Authentication/EmailChangeService.cs", "at": "2026-05-17T03:25:01Z"}
@@ -184,7 +248,7 @@ State for all gates: `.claude/state/playbook/<session_id>.json` — recorded by 
 
 Default rule: a `Skill` tool call with the exact `skill` argument value, recorded in `fired`.
 
-**Bypass-friendly carve-out** (preserves existing hook behavior): for `verify-against-codebase`, an explicit literal string `verify-against-codebase` in the latest assistant message also counts. Rationale: the existing spec-write hook scans the transcript for the string; behavior preservation is non-negotiable to avoid surprise denials.
+**Bypass-friendly carve-out** (preserves existing hook behavior): for the verify-skill family, an explicit literal string `verify-backend`, `verify-frontend`, or `verify-against-codebase` in the latest assistant message also counts. The router name `verify-against-codebase` satisfies BOTH backend and frontend requirements (it routes to the appropriate sibling); the specific sibling names satisfy only their respective half. Rationale: the existing spec-write hook scans the transcript for these strings; behavior preservation is non-negotiable to avoid surprise denials.
 
 ---
 
@@ -207,9 +271,16 @@ Three more are situationally inappropriate for Ceres' single-machine local-only 
 
 ## Sibling routing skill — `frontend-orchestrator`
 
-`frontend-orchestrator` owns the frontend domain pipeline (discovery → build → refine → simplify → harden → system maintenance for `ProjectCeres.Client/`). `playbook` covers **cross-cutting cohesion only** — the seven phases above. The two skills are siblings, not nested: when a frontend phase boundary is crossed (e.g. "build the X page"), `frontend-orchestrator` routes the frontend pipeline; when a cross-cutting phase boundary is crossed (e.g. "let's close Stage 7"), `playbook` enforces the constitution.
+`frontend-orchestrator` owns the frontend domain pipeline (discovery → build → refine → simplify → harden → system maintenance for `ProjectCeres.Client/`). `playbook` covers **cross-cutting cohesion** — the seven phases above plus Phase A′. The two skills are siblings, not nested: `frontend-orchestrator` routes the frontend pipeline; `playbook` enforces the constitution and now also flags when frontend work is in scope (Phase A′).
 
-No coordination logic between the two skills in v1. If they conflict in practice, the user surfaces it and a follow-up edit reconciles them.
+**Coordination — v2 (2026-05-17).** `playbook` invokes `frontend-orchestrator` indirectly via the Phase A′ advisory hooks. Both directions of detection are wired:
+
+- Prompt-side (`frontend-touch-detect.js`): user's intent contains frontend phrasing → advisory before any tool call.
+- Content-side (`frontend-spec-postcheck.js`): spec write contained frontend signals → advisory after the write.
+
+The advisory is suppressed once `frontend-orchestrator` has fired in this session. The two hooks share the same state file used by every other phase (`.claude/state/playbook/<session_id>.json`).
+
+Original v1 note: "No coordination logic between the two skills in v1. If they conflict in practice, the user surfaces it and a follow-up edit reconciles them." — That happened; this is the reconciliation.
 
 ---
 

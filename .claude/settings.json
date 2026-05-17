@@ -36,6 +36,15 @@
             "command": "node .claude/skills/playbook/hooks/stage-start-detect.js"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/frontend-touch-detect.js"
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -137,6 +146,24 @@
           {
             "type": "command",
             "command": "node .claude/skills/playbook/hooks/state-record-skill-fire.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/frontend-spec-postcheck.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/brainstorm-needs-decision-mode.js"
           }
         ]
       },
