@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -27,17 +28,20 @@ public sealed class ResendWebhookController : ControllerBase
     private readonly IResendSignatureVerifier _verifier;
     private readonly IOptions<EmailOptions> _opts;
     private readonly AppDbContext _db;
+    private readonly ILookupNormalizer _normalizer;
     private readonly ILogger<ResendWebhookController> _logger;
 
     public ResendWebhookController(
         IResendSignatureVerifier verifier,
         IOptions<EmailOptions> opts,
         AppDbContext db,
+        ILookupNormalizer normalizer,
         ILogger<ResendWebhookController> logger)
     {
         _verifier = verifier;
         _opts = opts;
         _db = db;
+        _normalizer = normalizer;
         _logger = logger;
     }
 
@@ -117,8 +121,14 @@ public sealed class ResendWebhookController : ControllerBase
         // Cross-tenant lookup by normalized email. The controller is pre-auth, so EF's
         // per-tenant global query filter would zero-rows this — IgnoreQueryFilters is
         // the documented escape hatch (allow-listed in ArchitectureTests).
+        //
+        // Stage 9.1.5.b §4.6: normalize via ILookupNormalizer (the same normalizer
+        // Identity's UserManager.NormalizeEmail uses) instead of a local ToUpperInvariant.
+        // The project registers LowercaseLookupNormalizer, so AspNetUsers.NormalizedEmail
+        // is stored lowercase; a hard-coded ToUpperInvariant here would silently miss
+        // every row.
         Guid? userId = null;
-        string normalized = emailAddress.Trim().ToUpperInvariant();
+        string normalized = _normalizer.NormalizeEmail(emailAddress.Trim()) ?? "";
         if (!string.IsNullOrEmpty(normalized))
         {
             userId = await _db.Users

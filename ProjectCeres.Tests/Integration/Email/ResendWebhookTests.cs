@@ -82,7 +82,10 @@ public sealed class ResendWebhookTests
 
         // GUID-suffixed email so re-runs against the shared test database don't collide.
         var email = $"bounce-test-{Guid.NewGuid():N}@example.invalid";
-        var normalized = email.ToUpperInvariant();
+        // Stage 9.1.5.b §4.6: project uses LowercaseLookupNormalizer in place of
+        // Identity's default UpperInvariantLookupNormalizer, so NormalizedEmail is
+        // stored in lowercase.
+        var normalized = email.ToLowerInvariant();
 
         // Seed a user with EmailConfirmed = true
         using (var scope = factory.Services.CreateScope())

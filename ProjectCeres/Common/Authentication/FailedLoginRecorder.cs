@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -7,6 +8,7 @@ namespace ProjectCeres.Common.Authentication;
 public class FailedLoginRecorder
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILookupNormalizer _normalizer;
 
     // Use IServiceScopeFactory so each RecordAsync call gets a fresh, isolated
     // DbContext scope. When PasswordSignInAsync races under concurrency, Identity's
@@ -16,7 +18,11 @@ public class FailedLoginRecorder
     // that same context would re-attempt the failed update and throw again, silently
     // swallowing the FailedLoginAttempt insert. Creating a private scope here avoids
     // the contaminated context entirely.
-    public FailedLoginRecorder(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
+    public FailedLoginRecorder(IServiceScopeFactory scopeFactory, ILookupNormalizer normalizer)
+    {
+        _scopeFactory = scopeFactory;
+        _normalizer = normalizer;
+    }
 
     public virtual async Task RecordAsync(
         string? emailAttempted,
@@ -43,10 +49,15 @@ public class FailedLoginRecorder
         await db.SaveChangesAsync(ct);
     }
 
-    private static string? TruncateAndNormalize(string? input, int max)
+    private string? TruncateAndNormalize(string? input, int max)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
-        var normalized = input.Trim().ToLowerInvariant();
+        // Stage 9.1.5.b §4.6: route through ILookupNormalizer (the same normalizer
+        // UserManager.NormalizeEmail uses, and that LockoutCache uses) so all three
+        // sites produce identical email keys. The DI-registered LowercaseLookupNormalizer
+        // preserves the prior lowercase semantics. Falls back to a trim-only path if
+        // the normalizer returns null for any reason.
+        var normalized = _normalizer.NormalizeEmail(input.Trim()) ?? input.Trim();
         return normalized.Length > max ? normalized[..max] : normalized;
     }
 

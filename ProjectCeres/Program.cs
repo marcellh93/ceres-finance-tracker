@@ -130,6 +130,14 @@ builder.Services
     .AddPasswordValidator<BreachedPasswordValidator>()
     .AddClaimsPrincipalFactory<ApplicationUserClaimsPrincipalFactory>();
 
+// Stage 9.1.5.b §4.6: replace Identity's UpperInvariantLookupNormalizer with a
+// lowercase variant so FailedLoginRecorder, LockoutCache, and
+// UserManager.NormalizeEmail all produce identical email keys. The lowercase
+// choice preserves the prior FailedLoginRecorder.TruncateAndNormalize semantics
+// (which existing tests assert against). Registered AFTER AddIdentity so this
+// registration overrides Identity's default.
+builder.Services.AddSingleton<ILookupNormalizer, LowercaseLookupNormalizer>();
+
 builder.Services.Configure<SecurityStampValidatorOptions>(o =>
 {
     o.ValidationInterval = TimeSpan.FromMinutes(5);

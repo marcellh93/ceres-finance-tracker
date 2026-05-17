@@ -35,8 +35,10 @@ public sealed class EmailDeliveryEvent
 
     /// <summary>
     /// The recipient address as Resend reported it (i.e. <c>data.to[0]</c>). Stored
-    /// case-preserved; lookups against <c>ApplicationUser.NormalizedEmail</c> uppercase
-    /// at the call site. Used by the index <c>(EmailAddress, OccurredAt DESC)</c>.
+    /// case-preserved; lookups against <c>ApplicationUser.NormalizedEmail</c> go through
+    /// <c>ILookupNormalizer</c> at the call site (Stage 9.1.5.b §4.6 —
+    /// <c>LowercaseLookupNormalizer</c>). Used by the index
+    /// <c>(EmailAddress, OccurredAt DESC)</c>.
     /// </summary>
     public string EmailAddress { get; init; } = "";
 

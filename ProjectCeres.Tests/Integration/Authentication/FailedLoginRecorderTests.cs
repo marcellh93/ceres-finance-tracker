@@ -410,7 +410,8 @@ public sealed class ThrowingRecorderFactory : ProjectCeres.Tests.Integration.Aut
 
 internal sealed class ThrowingFailedLoginRecorder : FailedLoginRecorder
 {
-    public ThrowingFailedLoginRecorder(IServiceScopeFactory scopeFactory) : base(scopeFactory) { }
+    public ThrowingFailedLoginRecorder(IServiceScopeFactory scopeFactory, Microsoft.AspNetCore.Identity.ILookupNormalizer normalizer)
+        : base(scopeFactory, normalizer) { }
 
     public override Task RecordAsync(
         string? emailAttempted, Guid? userId, FailedLoginReason reason,
