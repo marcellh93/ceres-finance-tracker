@@ -132,28 +132,26 @@ public class LockoutUnlockService
         }
 
         var now = DateTime.UtcNow;
-        // Cross-tenant by design: scans unconsumed tokens across all users to verify by hash before the caller is identified. Stage 10 architecture test allow-lists this file.
-        var candidates = await _db.LockoutUnlockTokens
+        var lookup = _lookupHasher.ComputeLookup(rawToken);
+        // Cross-tenant by design: token-based pre-auth operation; caller is not in session.
+        // Stage 10 architecture test allow-lists this file. Stage 9.1.5.a: indexed lookup
+        // replaces the O(N) Argon2 scan; a single row matches the HMAC-derived TokenLookup
+        // or none does, so we run at most one Argon2 verify per request.
+        var candidate = await _db.LockoutUnlockTokens
             .IgnoreQueryFilters()
-            .Where(t => t.ConsumedAt == null && t.ExpiresAt > now)
-            .ToListAsync(ct);
+            .Where(t => t.TokenLookup == lookup && t.ConsumedAt == null && t.ExpiresAt > now)
+            .SingleOrDefaultAsync(ct);
 
-        LockoutUnlockToken? match = null;
-        foreach (var candidate in candidates)
+        if (candidate is null || !_tokens.Verify(rawToken, candidate.TokenHash))
         {
-            if (_tokens.Verify(rawToken, candidate.TokenHash))
-            {
-                match = candidate;
-                break;
-            }
-        }
-
-        if (match is null)
-        {
-            // Constant-time: even with zero candidates, run one verify so timing doesn't reveal "no rows".
-            if (candidates.Count == 0) _argon.RunDummyHash();
+            // Constant-time: even with no matching row, run one verify so timing doesn't
+            // reveal "no rows" vs "rows but no Argon2 match". Mirrors the prior pattern
+            // and preserves the anti-enumeration property of the original scan.
+            if (candidate is null) _argon.RunDummyHash();
             return new LockoutUnlockOutcome.InvalidToken();
         }
+
+        var match = candidate;
 
         var sem = _userLocks.GetOrAdd(match.UserId, _ => new SemaphoreSlim(1, 1));
         await sem.WaitAsync(ct);

@@ -477,4 +477,60 @@ public class LockoutUnlockConfirmTests : IAsyncLifetime
         outcome.Should().BeOfType<LockoutUnlockOutcome.InvalidToken>(
             "user vanished after candidate-match — confirm must reject, not 500");
     }
+
+    [Fact]
+    public async Task Confirm_runs_at_most_one_Argon2_verify_regardless_of_unconsumed_token_count()
+    {
+        // Seed 30 stale unconsumed-and-unexpired token rows for OTHER unrelated users.
+        // Then issue + confirm a token for the test's own user.
+        // Without TokenLookup: 30+ Argon2 verifies × ~80ms ≈ 2400ms+ on the request thread.
+        // With TokenLookup: 1 verify, total elapsed < 500ms (HTTP overhead included).
+        var seededIds = new List<Guid>();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var generator = scope.ServiceProvider.GetRequiredService<LockoutUnlockTokenGenerator>();
+            var hasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
+            for (int i = 0; i < 30; i++)
+            {
+                var noise = generator.Generate();
+                var noiseId = Guid.NewGuid();
+                db.LockoutUnlockTokens.Add(new LockoutUnlockToken
+                {
+                    Id = noiseId,
+                    UserId = Guid.NewGuid(),
+                    TokenLookup = hasher.ComputeLookup(noise),
+                    TokenHash = generator.Hash(noise),
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow + LockoutUnlockService.TokenLifetime,
+                    ConsumedAt = null,
+                });
+                seededIds.Add(noiseId);
+            }
+            await db.SaveChangesAsync();
+        }
+
+        try
+        {
+            var (_, rawToken) = await ArrangeLockedUserWithUnlockTokenAsync();
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var resp = await PostConfirmAsync(rawToken);
+            sw.Stop();
+
+            resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+            sw.ElapsedMilliseconds.Should().BeLessThan(500,
+                "ConfirmAsync must run at most one Argon2 verify; the indexed TokenLookup lookup must return a single candidate row regardless of unconsumed-row count");
+        }
+        finally
+        {
+            // Inline cleanup so noise rows don't accumulate across suite runs.
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.LockoutUnlockTokens
+                .IgnoreQueryFilters()
+                .Where(t => seededIds.Contains(t.Id))
+                .ExecuteDeleteAsync();
+        }
+    }
 }
