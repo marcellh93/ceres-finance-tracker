@@ -38,6 +38,19 @@ dotnet test                                  # run all server tests
 pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on view changes
 ```
 
+## When the Stop hook actually fires
+
+The Stop hook (`.claude/hooks/run-tests.sh`) is the project's `dotnet test` gate. Three facts to keep straight, because earlier drafts of Phase 3 specs got them wrong:
+
+1. **It fires on the Stop event (turn-end), NOT on `git commit`.** Claude Code triggers it when the agent ends its turn. A commit is just a Bash call; the hook does not run as part of it.
+2. **It tiers by the session's *tracked-extension* writes** (`.cs`/`.ts`/`.tsx`/`.csproj`/`.sln`, populated by `track-session-writes.js`):
+   - **Tier 0** — only `.tsx`/`.ts` touched, OR no tracked-extension writes at all (e.g. docs-only) → exit 0, no `dotnet test` runs.
+   - **Tier 1** — only `ProjectCeres/` `.cs`/`.csproj` (no test files, no `.sln`) → `dotnet test --filter "FullyQualifiedName~ProjectCeres.Tests.Unit"` (~30s).
+   - **Tier 2** — test files, `.sln`, or mixed → full suite (~4 min).
+3. **Do NOT run `dotnet test` preemptively in plans or specs for frontend-only / docs-only stages.** The hook would skip it; running it manually is wasted minutes. Run it only when the .NET suite is suspected red from a prior change, or when the diff genuinely touches `.cs`/`.csproj`/`.sln`.
+
+Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able from another terminal). Tier decision printed to stderr at start: `[stop-hook] tier N (scope) — running dotnet test ...` or `[stop-hook] tier 0: no .NET-impacting writes this turn — skipping dotnet test.`
+
 ## Architecture Rules (Non-Obvious)
 
 **Data model:**

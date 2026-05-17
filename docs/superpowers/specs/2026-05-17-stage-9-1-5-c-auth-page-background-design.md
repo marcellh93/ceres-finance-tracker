@@ -168,7 +168,7 @@ None. The fix is self-contained.
 - [ ] `AuthLayout.test.tsx` exists with the regression test pinning `bg-background` + `not bg-muted/30` + `not bg-muted`.
 - [ ] `pnpm --dir ProjectCeres.Client test --run` exits 0.
 - [ ] `pnpm --dir ProjectCeres.Client build` exits 0 (no new bundle-budget regressions; no TS errors).
-- [ ] `dotnet test` exits 0 (sanity — no backend changes, but stop-hook will run it anyway on commit).
+- [ ] **No `dotnet test` run required for this stage** — touches only `.tsx`/`.test.tsx`, which the Stop hook classifies as tier 0 (skips `dotnet test`). The hook fires on turn-end, not on commit. (Earlier draft claimed otherwise; corrected per `CLAUDE.md` § "When the Stop hook actually fires".)
 - [ ] Manual browser verification per § 5: light mode card boundary clear, dark mode card lighter than page, mobile 375px clean, both placeholder pages inherit the fix.
 - [ ] Roadmap line 1098 (`docs/roadmap-phase-three.md`) flipped to `[x]`; verification text replaced.
 - [ ] Task #39 marked completed in the task tracker.

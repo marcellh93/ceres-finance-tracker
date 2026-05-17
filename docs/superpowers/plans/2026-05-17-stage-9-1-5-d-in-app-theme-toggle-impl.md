@@ -21,7 +21,7 @@
 - No `Co-Authored-By` trailer in any commit message.
 - TDD per `docs/testing.md` § Rules. Every test-touching commit names which of TDD cases (1), (2), or (3) applied. Commit 2's new test file is **case (1)** — new tests for a new (post-rewrite) component shape. The contract-change framing is incidental because zero existing tests assert on the old binary toggle's strings.
 - Pre-existing failures get root-caused NOW (per `feedback_never_skip_tests_to_make_them_pass`). Don't defer.
-- Stop-hook (`.claude/hooks/run-tests.sh`) runs `dotnet test` on every commit. Frontend-only stage but it still gates — both commits must keep the .NET suite green.
+- Stop-hook (`.claude/hooks/run-tests.sh`) — **CORRECTED 2026-05-17:** fires on Stop event (turn-end), NOT on commit. Tiers by file extension: turns that wrote only `.tsx`/`.ts`/`.md` files exit tier 0 without running `dotnet test`. This stage is frontend-only, so the hook will skip `dotnet test`. Do NOT run it manually unless the .NET suite is suspected red from a prior change. (Earlier drafts of this plan claimed the hook ran on every commit; that was wrong — see `CLAUDE.md` § "When the Stop hook actually fires".)
 - `pnpm test` and `pnpm build` always run **foreground** (per `feedback_dont_background_one_shot_verifications` — backgrounded pnpm subprocess output is buffered/empty).
 - Per the recent flake root-cause (commit `cda7b04`): **NO `vi.resetAllMocks()` in any test file's `afterEach`.** Use per-test fresh `vi.fn()` for spies.
 

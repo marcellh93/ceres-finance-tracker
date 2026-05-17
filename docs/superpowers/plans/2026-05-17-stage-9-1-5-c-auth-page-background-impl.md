@@ -19,7 +19,7 @@
 - **TDD per `docs/testing.md` § Rules** — write the failing test, run it to confirm it fails for the right reason, then make it pass. Every test-touching commit names which of cases (1), (2), or (3) applied. **Case (3)** applies here (contract change: AuthLayout's page-background token).
 - **Never modify, skip, or weaken tests.** No `[Fact(Skip=…)]`, no commented-out assertions.
 - **Pre-existing test failures encountered mid-task get root-caused now.**
-- **Stop-hook (`.claude/hooks/run-tests.sh`) blocks commits on `dotnet test` failure.** Even though this stage is frontend-only, the stop-hook still runs `dotnet test` (it's a backend test runner watching for backend regressions on every commit). The frontend test runs via `pnpm --dir ProjectCeres.Client test --run`; the implementer runs both before each commit.
+- **Stop-hook (`.claude/hooks/run-tests.sh`) — CORRECTED 2026-05-17:** the hook fires on the Stop event (turn-end), NOT on `git commit`. It also tiers by file extension: a turn that wrote only `.tsx`/`.ts`/`.md` files exits at tier 0 without running `dotnet test`. For this stage (frontend-only, no `.cs`/`.csproj`/`.sln` writes), the hook will skip `dotnet test` entirely. **Do NOT run `dotnet test` preemptively** — it's wasted work. The frontend test (`pnpm --dir ProjectCeres.Client test --run`) is what the implementer runs before commits. (Earlier drafts of this plan claimed the hook ran on commit; that was wrong.)
 - **`pnpm` only.** Every Vite/vitest invocation uses `pnpm --dir ProjectCeres.Client`. Never `npm`, never `npx`. Per `feedback_pnpm_only_never_npm`.
 - **Do NOT touch `AuthLayout.a11y.test.tsx`** — that file covers a different concern (axe-core a11y violations). The new test lives in a sibling file `AuthLayout.test.tsx`.
 

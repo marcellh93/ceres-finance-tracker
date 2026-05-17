@@ -151,7 +151,7 @@ fi
 
 case "$TIER" in
   0)
-    echo "[stop-hook] tier 0: frontend-only writes — skipping dotnet test." >&2
+    echo "[stop-hook] tier 0: no .NET-impacting writes this turn — skipping dotnet test." >&2
     exit 0
     ;;
   1)

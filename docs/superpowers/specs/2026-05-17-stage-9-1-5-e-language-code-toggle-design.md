@@ -253,7 +253,7 @@ None. Two implementation commits + one close-out commit, all atomic.
 - [ ] All 5 tests in `LanguageToggle.test.tsx` exit 0.
 - [ ] `pnpm --dir ProjectCeres.Client test --run` exits 0 (full suite stays at ≥908 passing).
 - [ ] `pnpm --dir ProjectCeres.Client build` exits 0 (no TS errors, no bundle-budget regressions).
-- [ ] `dotnet test` exits 0 (sanity; stop-hook runs it on commit anyway).
+- [ ] **No `dotnet test` run required for this stage** — touches only `.tsx`/`.ts`/`.json`, which the Stop hook classifies as tier 0 (skips `dotnet test`). The hook fires on turn-end, not on commit. (Earlier draft claimed otherwise; corrected per `CLAUDE.md` § "When the Stop hook actually fires".)
 - [ ] `grep -rn "languageToggle.ariaLabel\"" ProjectCeres.Client/src` returns zero hits (the old key is gone; the new `ariaLabelWithLanguage` is the only one in use).
 - [ ] Manual browser verification per § 5.5 passes on every URL + viewport listed.
 - [ ] `docs/roadmap-phase-three.md` lines 1100 + 1111 flipped to `[x]` with implementation + verification summaries.
