@@ -89,16 +89,16 @@ The hook does NOT block when ANY of these pass:
 
 Only blocks when ALL THREE guards fail: phrase matched, user didn't authorize, no fix-context markers, message didn't end with a question. That's exactly the "unauthorized scoping call" bypass pattern from the audit.
 
-### Modes
+### Behavior
 
-The hook reads `CERES_DEFERRAL_HOOK_MODE` from env:
+The hook always does two things on every Stop where a phrase matches:
 
-- `"block"` (default) — exits 2 + stderr when phrases match and all three guards fail. The turn is held open until the assistant rewrites the response or accepts the rejection. This is the safe default; the per-session bypass below covers genuine false positives.
-- `"log"` — appends match info to `.claude/state/deferral-detect/log.jsonl` and exits 0 always. Use only when studying match patterns (e.g. tuning the regex list); does NOT prevent bypasses.
+1. **Append a log entry** to `.claude/state/deferral-detect/log.jsonl` with the matched phrases, guard outcomes, message snippets, and the final outcome (`blocked` / `passed` / `bypassed`). Audit trail is uniform across every outcome.
+2. **Block the Stop (exit 2 + stderr)** when phrases match AND all three guards fail. The turn is held open until the assistant rewrites the response or sets the bypass var.
 
-The hook always writes to the log regardless of mode — log mode just means "log only, don't block." Block mode logs AND blocks.
+Per-session bypass for confirmed false positives: `CERES_SKIP_DEFERRAL_CHAT_HOOK=1` exits 0 unconditionally (logged as `outcome: "bypassed"` so the audit trail still sees it).
 
-Per-session bypass for confirmed false positives: `CERES_SKIP_DEFERRAL_CHAT_HOOK=1` exits 0 unconditionally.
+No mode flag — the previous `CERES_DEFERRAL_HOOK_MODE` env var was removed 2026-05-17 because it duplicated what the bypass var already does. Two mechanisms for "suppress blocking" were one too many.
 
 ## Why these phrases
 

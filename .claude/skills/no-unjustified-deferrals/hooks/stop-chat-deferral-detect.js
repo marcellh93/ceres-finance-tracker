@@ -31,20 +31,15 @@
 //     block. That should mean: I made an unauthorized scope call, did
 //     no inline work, and didn't ask permission. Exactly the bypass.
 //
-// Mode flag:
-//   The env var CERES_DEFERRAL_HOOK_MODE controls behavior:
-//     "block" (default) — exit 2 + stderr to block the Stop when guards fail.
-//                         This is the safe default; the bypass below covers
-//                         false positives.
-//     "log"             — write match info to .claude/state/deferral-detect/
-//                         log.jsonl but ALWAYS exit 0. Use only for studying
-//                         match patterns; does NOT prevent bypasses.
+// Behavior (always-block + always-log; no mode flag):
+//   1. Every match is logged to .claude/state/deferral-detect/log.jsonl with
+//      the matched phrases and guard outcomes (audit trail, always).
+//   2. When phrases match AND all three guards fail, exit 2 + stderr to
+//      block the Stop event (forces a rewrite or explicit bypass).
 //
 // Per-session bypass for confirmed false positives:
-//   - CERES_SKIP_DEFERRAL_CHAT_HOOK=1 → exit 0 unconditionally (bypass).
-//
-// The hook always writes to the log regardless of mode — log mode just means
-// "log only, don't block." Block mode logs AND blocks when guards fail.
+//   - CERES_SKIP_DEFERRAL_CHAT_HOOK=1 → exit 0 unconditionally (skip both
+//     blocking AND logging — the log still receives a "skipped" marker).
 
 const fs = require("fs");
 const path = require("path");
@@ -113,8 +108,7 @@ function endsWithQuestion(text) {
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
-  if (process.env.CERES_SKIP_DEFERRAL_CHAT_HOOK === "1") process.exit(0);
-  const mode = process.env.CERES_DEFERRAL_HOOK_MODE || "block";
+  const bypassed = process.env.CERES_SKIP_DEFERRAL_CHAT_HOOK === "1";
 
   let input;
   try {
@@ -183,14 +177,16 @@ process.stdin.on("end", () => {
 
   const guardsPassed = userAuthorized || inFixContext || isDecisionQuestion;
 
-  // Log every match (matched phrases + guard state) for calibration review.
+  // Always log every match (matched phrases + guard state + outcome) so the
+  // audit trail covers blocked, passed, AND bypassed events uniformly.
+  const outcome = bypassed ? "bypassed" : guardsPassed ? "passed" : "blocked";
   try {
     const stateDir = path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), ".claude/state/deferral-detect");
     fs.mkdirSync(stateDir, { recursive: true });
     const logEntry = {
       ts: new Date().toISOString(),
       sessionId: input.session_id || "",
-      mode,
+      outcome,
       matched,
       guards: {
         userAuthorized,
@@ -207,8 +203,8 @@ process.stdin.on("end", () => {
     // logging is best-effort
   }
 
-  // If guards passed OR we're in log mode, exit 0.
-  if (guardsPassed || mode !== "block") process.exit(0);
+  // Exit 0 if any guard passed OR the session bypass env var is set.
+  if (guardsPassed || bypassed) process.exit(0);
 
   // BLOCK mode + guards failed: emit reason on stderr, exit 2.
   const reason = [
