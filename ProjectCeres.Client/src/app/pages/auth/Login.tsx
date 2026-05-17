@@ -28,6 +28,9 @@ export function Login() {
     if (searchParams.get('expired') === '1') {
       toast(t('auth.login.toasts.totpExpired'));
     }
+    if (searchParams.get('reset') === '1') {
+      toast(t('auth.login.toasts.passwordResetSuccess'));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

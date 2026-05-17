@@ -17,7 +17,8 @@
         "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento."
       },
       "toasts": {
-        "totpExpired": "Tu sesión caducó. Inicia sesión de nuevo."
+        "totpExpired": "Tu sesión caducó. Inicia sesión de nuevo.",
+        "passwordResetSuccess": "Contraseña restablecida. Inicia sesión con tu nueva contraseña."
       }
     },
     "totp": {
@@ -44,11 +45,40 @@
         "title": "La creación de cuentas estará disponible próximamente",
         "body": "El registro aún no está disponible. Llegará en la siguiente fase del despliegue de autenticación.",
         "backToLogin": "Volver a iniciar sesión"
+      }
+    },
+    "passwordReset": {
+      "request": {
+        "title": "Restablecer contraseña",
+        "description": "Introduce el correo de tu cuenta y te enviaremos un enlace.",
+        "emailLabel": "Correo electrónico",
+        "submit": "Enviar enlace",
+        "submitting": "Enviando",
+        "successTitle": "Revisa tu bandeja de entrada",
+        "successBody": "Si ese correo está registrado, recibirás un enlace para restablecer la contraseña en un minuto.",
+        "backToSignIn": "Volver a iniciar sesión",
+        "errors": {
+          "tooManyAttempts": "Demasiados intentos. Inténtalo en {{seconds}} segundos.",
+          "tooManyAttemptsNoCountdown": "Demasiados intentos. Espera un momento.",
+          "network": "No se pudo enviar la solicitud. Comprueba tu conexión e inténtalo de nuevo."
+        }
       },
-      "passwordReset": {
-        "title": "El restablecimiento de contraseña estará disponible próximamente",
-        "body": "La recuperación de contraseña aún no está disponible. Llegará en una fase posterior del despliegue de autenticación.",
-        "backToLogin": "Volver a iniciar sesión"
+      "confirm": {
+        "title": "Elige una nueva contraseña",
+        "description": "Introduce una nueva contraseña para tu cuenta de Ceres.",
+        "newPasswordLabel": "Nueva contraseña",
+        "confirmPasswordLabel": "Confirmar nueva contraseña",
+        "totpLabel": "Código de verificación",
+        "totpHint": "Introduce el código de 6 dígitos de tu aplicación de autenticación.",
+        "submit": "Restablecer contraseña",
+        "submitting": "Restableciendo",
+        "backToSignIn": "Volver a iniciar sesión",
+        "requestNewLink": "Solicitar un nuevo enlace",
+        "errors": {
+          "invalidToken": "Este enlace de restablecimiento no es válido o ha caducado.",
+          "invalidTotp": "Código de verificación no válido.",
+          "network": "No se pudo restablecer la contraseña. Comprueba tu conexión e inténtalo de nuevo."
+        }
       }
     },
     "languageToggle": {

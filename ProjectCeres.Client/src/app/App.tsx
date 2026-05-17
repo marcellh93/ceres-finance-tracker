@@ -41,7 +41,7 @@ import { RecurringEdit } from './features/recurring/RecurringEdit';
 import { useRecurringLayoutCtx } from './features/recurring/RecurringLayout';
 import { Login } from './pages/auth/Login';
 import { LoginTotp } from './pages/auth/LoginTotp';
-import { PasswordResetPlaceholder } from './pages/auth/PasswordResetPlaceholder';
+import { PasswordReset } from './pages/auth/PasswordReset';
 import { RegisterPlaceholder } from './pages/auth/RegisterPlaceholder';
 
 function RecurringCreateBridge() {
@@ -61,7 +61,7 @@ export function App() {
       <Route element={<AuthLayout />}>
         <Route path="login" element={<Login />} />
         <Route path="login/totp" element={<LoginTotp />} />
-        <Route path="password-reset" element={<PasswordResetPlaceholder />} />
+        <Route path="password-reset" element={<PasswordReset />} />
         <Route path="register" element={<RegisterPlaceholder />} />
       </Route>
 

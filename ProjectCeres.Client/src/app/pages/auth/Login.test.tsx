@@ -217,6 +217,25 @@ describe('Login page', () => {
     );
   });
 
+  it('fires the password-reset toast when /login?reset=1', async () => {
+    render(
+      <I18nextProvider i18n={i18n}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/login?reset=1']}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </I18nextProvider>,
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringMatching(/password reset/i),
+      ),
+    );
+  });
+
   it('fires the expired-sign-in toast when /login?expired=1', async () => {
     render(
       <I18nextProvider i18n={i18n}>

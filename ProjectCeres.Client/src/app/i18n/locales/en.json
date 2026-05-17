@@ -17,7 +17,8 @@
         "resendFailed": "Could not send the email. Try again in a moment."
       },
       "toasts": {
-        "totpExpired": "Your sign-in expired. Please sign in again."
+        "totpExpired": "Your sign-in expired. Please sign in again.",
+        "passwordResetSuccess": "Password reset. Sign in with your new password."
       }
     },
     "totp": {
@@ -44,11 +45,40 @@
         "title": "Account creation is coming soon",
         "body": "Sign-up isn't available yet. It ships in the next phase of the auth rollout.",
         "backToLogin": "Back to sign in"
+      }
+    },
+    "passwordReset": {
+      "request": {
+        "title": "Reset your password",
+        "description": "Enter your account email and we'll send you a link.",
+        "emailLabel": "Email",
+        "submit": "Send reset link",
+        "submitting": "Sending",
+        "successTitle": "Check your inbox",
+        "successBody": "If that email is registered, you'll receive a reset link within a minute.",
+        "backToSignIn": "Back to sign in",
+        "errors": {
+          "tooManyAttempts": "Too many requests. Try again in {{seconds}} seconds.",
+          "tooManyAttemptsNoCountdown": "Too many requests. Try again in a moment.",
+          "network": "Could not send the request. Check your connection and try again."
+        }
       },
-      "passwordReset": {
-        "title": "Password reset is coming soon",
-        "body": "Password recovery isn't available yet. It ships in a later phase of the auth rollout.",
-        "backToLogin": "Back to sign in"
+      "confirm": {
+        "title": "Choose a new password",
+        "description": "Enter a new password for your Ceres account.",
+        "newPasswordLabel": "New password",
+        "confirmPasswordLabel": "Confirm new password",
+        "totpLabel": "Verification code",
+        "totpHint": "Enter the 6-digit code from your authenticator app.",
+        "submit": "Reset password",
+        "submitting": "Resetting",
+        "backToSignIn": "Back to sign in",
+        "requestNewLink": "Request a new link",
+        "errors": {
+          "invalidToken": "This reset link is invalid or has expired.",
+          "invalidTotp": "Invalid verification code.",
+          "network": "Could not reset your password. Check your connection and try again."
+        }
       }
     },
     "languageToggle": {
