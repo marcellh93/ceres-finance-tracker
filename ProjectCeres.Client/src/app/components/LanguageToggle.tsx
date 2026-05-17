@@ -8,7 +8,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { writeLangCookie, type SupportedLanguage } from '../../i18n/i18n';
+import { writeLangCookie, type SupportedLanguage } from '../i18n/i18n';
 
 export function LanguageToggle() {
   const { t, i18n } = useTranslation();

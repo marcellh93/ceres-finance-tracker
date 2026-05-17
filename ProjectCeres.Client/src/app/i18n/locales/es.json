@@ -36,6 +36,7 @@
         "es": "ES"
       },
       "english": "English",
+      "label": "Idioma",
       "spanish": "Español"
     },
     "logout": {

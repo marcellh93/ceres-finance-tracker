@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { BrandMark } from './BrandMark';
-import { LanguageToggle } from '../components/auth/LanguageToggle';
+import { LanguageToggle } from '../components/LanguageToggle';
 import { ThemeToggle } from '@/design-system/components/ThemeToggle';
 
 /**

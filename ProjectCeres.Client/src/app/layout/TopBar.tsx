@@ -5,6 +5,7 @@ import { AvatarMenu } from './AvatarMenu';
 import { BrandMark } from './BrandMark';
 import { useReminderCount } from './ReminderCountProvider';
 import { ThemeToggle } from '@/design-system/components/ThemeToggle';
+import { LanguageToggle } from '@/app/components/LanguageToggle';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -86,6 +87,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         {isDesktop && (
           <>
             <NotificationsButton />
+            <LanguageToggle />
             <ThemeToggle />
           </>
         )}

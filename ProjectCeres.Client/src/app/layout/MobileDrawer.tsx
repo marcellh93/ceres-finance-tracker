@@ -1,8 +1,9 @@
-import { Moon, Sun } from 'lucide-react';
+import { Globe, Moon, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useTheme, type Theme } from '@/app/theme/theme-context';
+import { writeLangCookie, type SupportedLanguage } from '@/app/i18n/i18n';
 import { cn } from '@/lib/utils';
 import { bottomItems, navGroups, type NavItem } from './nav-items';
 
@@ -43,6 +44,7 @@ export function MobileDrawer({ open, onOpenChange }: MobileDrawerProps) {
                 </li>
               ))}
             </ul>
+            <LanguageDrawerRow />
             <ThemeDrawerRow />
           </div>
         </nav>
@@ -80,6 +82,56 @@ function ThemeDrawerRow() {
               role="radio"
               aria-checked={active}
               onClick={() => setTheme(value)}
+              className={cn(
+                'rounded px-2 py-1 text-xs transition-colors',
+                active
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LanguageDrawerRow() {
+  const { i18n, t } = useTranslation();
+  const current = ((i18n.language ?? 'en').slice(0, 2) as SupportedLanguage);
+  const currentName =
+    current === 'es' ? t('auth.languageToggle.spanish') : t('auth.languageToggle.english');
+
+  const options: { value: SupportedLanguage; label: string }[] = [
+    { value: 'en', label: t('auth.languageToggle.code.en') },
+    { value: 'es', label: t('auth.languageToggle.code.es') },
+  ];
+
+  const choose = async (lang: SupportedLanguage) => {
+    await i18n.changeLanguage(lang);
+    writeLangCookie(lang);
+  };
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={t('auth.languageToggle.ariaLabelWithLanguage', { language: currentName })}
+      className="mt-2 flex items-center gap-3 px-3 py-2"
+    >
+      <Globe className="h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
+      <span className="text-sm text-foreground">{t('auth.languageToggle.label')}</span>
+      <div className="ml-auto inline-flex rounded-md border border-border bg-muted/30 p-0.5">
+        {options.map(({ value, label }) => {
+          const active = current === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => void choose(value)}
               className={cn(
                 'rounded px-2 py-1 text-xs transition-colors',
                 active
