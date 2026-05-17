@@ -16,6 +16,7 @@ type AuthContextValue = {
   status: AuthStatus;
   user: AuthUser | null;
   refresh: () => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -41,12 +42,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const logout = useCallback(async () => {
+    // Fire the server logout, but clear local state unconditionally — even on
+    // 401/500 the user wants to be signed out client-side; RequireAuth will
+    // redirect on next render. apiFetch swallows network errors into ApiResult,
+    // so this can't throw.
+    await apiFetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
+    setStatus('anon');
+  }, []);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   return (
-    <AuthContext.Provider value={{ status, user, refresh }}>
+    <AuthContext.Provider value={{ status, user, refresh, logout }}>
       {children}
     </AuthContext.Provider>
   );

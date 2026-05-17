@@ -37,6 +37,13 @@
       },
       "english": "English",
       "spanish": "Español"
+    },
+    "logout": {
+      "title": "Cerrar sesión",
+      "body": "¿Seguro que quieres cerrar sesión?",
+      "cancel": "Cancelar",
+      "submit": "Cerrar sesión",
+      "submitting": "Cerrando sesión…"
     }
   },
   "theme": {

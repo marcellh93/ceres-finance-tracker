@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TopBar } from './TopBar';
 import { ReminderCountProvider } from './ReminderCountProvider';
 import { ThemeProvider } from '@/app/theme/theme-context';
+import { AuthProvider } from '@/app/auth/auth-context';
 
 beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -20,18 +21,33 @@ beforeEach(() => {
       dispatchEvent: vi.fn(),
     })),
   });
-  // ReminderCountProvider fetches on mount — provide a default empty response
-  global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+  // ReminderCountProvider fetches reminders, AuthProvider fetches /api/auth/me
+  // via apiFetch (which calls response.headers.get(...)), so the mock must
+  // return real Response objects, not bare {ok, json} stubs.
+  global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url.includes('/api/auth/me')) {
+      // 401 anon — TopBar tests don't care about auth state
+      return new Response(
+        JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    // Default: empty array (ReminderCountProvider / ReviewCountProvider)
+    return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }) as unknown as typeof fetch;
 });
 
 function renderTopBar(route: string) {
   return render(
     <ThemeProvider>
-      <MemoryRouter initialEntries={[route]}>
-        <ReminderCountProvider>
-          <TopBar onMenuClick={vi.fn()} />
-        </ReminderCountProvider>
-      </MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[route]}>
+          <ReminderCountProvider>
+            <TopBar onMenuClick={vi.fn()} />
+          </ReminderCountProvider>
+        </MemoryRouter>
+      </AuthProvider>
     </ThemeProvider>,
   );
 }
@@ -66,7 +82,19 @@ describe('TopBar — bell badge', () => {
       frequency: 'Monthly', dayOfPeriod: null, nextDueDate: '2026-05-03',
       isActive: true, reminderBehaviour: 'SnapToCalendarDay',
     }));
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => items });
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/me')) {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify(items), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
     renderTopBar('/');
   }
 

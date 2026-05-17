@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,10 +11,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/app/auth/auth-context';
 
 export function AvatarMenu() {
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { t } = useTranslation();
+
+  async function handleLogout() {
+    setSubmitting(true);
+    try {
+      await logout();
+      setLogoutOpen(false);
+      navigate('/login');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -44,11 +60,25 @@ export function AvatarMenu() {
       <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Logout</DialogTitle>
+            <DialogTitle>{t('auth.logout.title')}</DialogTitle>
           </DialogHeader>
-          <p className="text-muted-foreground">
-            Logout will end your session. Wired up when authentication ships.
-          </p>
+          <p className="text-muted-foreground">{t('auth.logout.body')}</p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLogoutOpen(false)}
+              disabled={submitting}
+            >
+              {t('auth.logout.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleLogout()}
+              disabled={submitting}
+            >
+              {submitting ? t('auth.logout.submitting') : t('auth.logout.submit')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
