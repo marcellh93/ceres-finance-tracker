@@ -10,33 +10,26 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme, type Theme } from '@/app/theme/theme-context';
 
-type ThemeToggleProps = {
-  showLabel?: boolean;
-};
-
-export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
+export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { t } = useTranslation();
-  const isDark = resolvedTheme === 'dark';
-  const Icon = isDark ? Moon : Sun;
-  const resolvedLabel = isDark ? t('theme.dark') : t('theme.light');
+  const Icon = resolvedTheme === 'dark' ? Moon : Sun;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
           <Button
-            variant={showLabel ? 'outline' : 'ghost'}
-            size={showLabel ? 'sm' : 'icon'}
+            variant="ghost"
+            size="icon"
             type="button"
             aria-label={t('theme.ariaLabel')}
           >
-            <Icon className={showLabel ? 'h-4 w-4' : 'h-5 w-5'} />
-            {showLabel && <span className="ml-2">{resolvedLabel}</span>}
+            <Icon className="h-5 w-5" />
           </Button>
         }
       />
-      <DropdownMenuContent align={showLabel ? 'end' : 'center'}>
+      <DropdownMenuContent align="center">
         <DropdownMenuRadioGroup
           value={theme}
           onValueChange={(value) => setTheme(value as Theme)}

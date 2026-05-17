@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nextProvider } from 'react-i18next';
@@ -41,13 +41,12 @@ afterEach(() => {
 function renderToggle(
   themeValue: UseThemeReturn['theme'],
   resolvedValue: UseThemeReturn['resolvedTheme'],
-  showLabel = false,
 ) {
   const setTheme = vi.fn();
   mockUseTheme({ theme: themeValue, resolvedTheme: resolvedValue, setTheme });
   render(
     <I18nextProvider i18n={i18n}>
-      <ThemeToggle showLabel={showLabel} />
+      <ThemeToggle />
     </I18nextProvider>,
   );
   return { setTheme };
@@ -117,11 +116,5 @@ describe('ThemeToggle', () => {
     await user.click(screen.getByRole('button', { name: /toggle theme/i }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'System' }));
     expect(setTheme).toHaveBeenCalledWith('system');
-  });
-
-  it('showLabel variant adds the resolved theme label next to the icon', () => {
-    renderToggle('system', 'light', true);
-    const trigger = screen.getByRole('button', { name: /toggle theme/i });
-    expect(within(trigger).getByText('Light')).toBeDefined();
   });
 });

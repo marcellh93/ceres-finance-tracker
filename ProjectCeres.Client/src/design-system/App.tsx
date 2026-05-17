@@ -28,7 +28,7 @@ export function App() {
       <aside className="border-r border-border p-6">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Ceres DS</h1>
-          <ThemeToggle showLabel />
+          <ThemeToggle />
         </header>
         <nav className="flex flex-col gap-1">
           {sections.map((s) => (

@@ -1,18 +1,26 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '@/app/i18n/i18n';
 import { MobileDrawer } from './MobileDrawer';
 import { ThemeProvider } from '@/app/theme/theme-context';
+
+beforeEach(() => {
+  void i18n.changeLanguage('en');
+});
 
 function renderDrawer(open = true, onOpenChange = vi.fn()) {
   return {
     onOpenChange,
     ...render(
       <ThemeProvider>
-        <MemoryRouter>
-          <MobileDrawer open={open} onOpenChange={onOpenChange} />
-        </MemoryRouter>
+        <I18nextProvider i18n={i18n}>
+          <MemoryRouter>
+            <MobileDrawer open={open} onOpenChange={onOpenChange} />
+          </MemoryRouter>
+        </I18nextProvider>
       </ThemeProvider>,
     ),
   };
@@ -48,5 +56,17 @@ describe('MobileDrawer', () => {
     const nav = screen.getByRole('navigation', { name: 'Primary' });
     expect(nav.className).toContain('flex-1');
     expect(nav.className).toContain('overflow-y-auto');
+  });
+
+  it('renders the theme row as a full-width DrawerLink-style row, not a floating button', async () => {
+    // Regression guard for Stage 9.1.5.d UX fix: the drawer's theme control
+    // now matches the Settings/Support row shape (icon-left, label, current
+    // preference right-aligned) rather than a floating outline button.
+    renderDrawer(true);
+    const trigger = screen.getByRole('button', { name: /toggle theme/i });
+    expect(trigger.className).toContain('w-full');
+    expect(trigger.textContent).toContain('Theme');
+    // Current preference is surfaced on the trigger (default = system).
+    expect(trigger.textContent).toContain('System');
   });
 });

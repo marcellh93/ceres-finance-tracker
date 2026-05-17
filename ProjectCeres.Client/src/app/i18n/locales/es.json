@@ -36,6 +36,7 @@
     }
   },
   "theme": {
+    "label": "Tema",
     "system": "Sistema",
     "light": "Claro",
     "dark": "Oscuro",
