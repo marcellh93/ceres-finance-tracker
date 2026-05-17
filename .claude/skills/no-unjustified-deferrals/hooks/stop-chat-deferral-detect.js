@@ -33,15 +33,18 @@
 //
 // Mode flag:
 //   The env var CERES_DEFERRAL_HOOK_MODE controls behavior:
-//     "log" (default) — write match info to .claude/state/deferral-detect/
-//                       log.jsonl but ALWAYS exit 0. Use during calibration.
-//     "block"         — exit 2 + stderr to block the Stop when guards fail.
+//     "block" (default) — exit 2 + stderr to block the Stop when guards fail.
+//                         This is the safe default; the bypass below covers
+//                         false positives.
+//     "log"             — write match info to .claude/state/deferral-detect/
+//                         log.jsonl but ALWAYS exit 0. Use only for studying
+//                         match patterns; does NOT prevent bypasses.
 //
-// Mode override:
+// Per-session bypass for confirmed false positives:
 //   - CERES_SKIP_DEFERRAL_CHAT_HOOK=1 → exit 0 unconditionally (bypass).
 //
-// To enable blocking, set CERES_DEFERRAL_HOOK_MODE=block in shell env or
-// rewrite the default below after the log-mode calibration period passes.
+// The hook always writes to the log regardless of mode — log mode just means
+// "log only, don't block." Block mode logs AND blocks when guards fail.
 
 const fs = require("fs");
 const path = require("path");
@@ -111,7 +114,7 @@ let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   if (process.env.CERES_SKIP_DEFERRAL_CHAT_HOOK === "1") process.exit(0);
-  const mode = process.env.CERES_DEFERRAL_HOOK_MODE || "log";
+  const mode = process.env.CERES_DEFERRAL_HOOK_MODE || "block";
 
   let input;
   try {

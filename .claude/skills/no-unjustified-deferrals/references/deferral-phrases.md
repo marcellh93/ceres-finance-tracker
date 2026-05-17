@@ -93,12 +93,12 @@ Only blocks when ALL THREE guards fail: phrase matched, user didn't authorize, n
 
 The hook reads `CERES_DEFERRAL_HOOK_MODE` from env:
 
-- `"log"` (default) — appends match info to `.claude/state/deferral-detect/log.jsonl` and exits 0 always. Use for calibration.
-- `"block"` — exits 2 + stderr when guards fail, blocking the Stop event.
+- `"block"` (default) — exits 2 + stderr when phrases match and all three guards fail. The turn is held open until the assistant rewrites the response or accepts the rejection. This is the safe default; the per-session bypass below covers genuine false positives.
+- `"log"` — appends match info to `.claude/state/deferral-detect/log.jsonl` and exits 0 always. Use only when studying match patterns (e.g. tuning the regex list); does NOT prevent bypasses.
 
-Calibration workflow: run in log mode for 1-2 sessions, review `log.jsonl` to confirm guards work and no real-world false positives slip through, then flip the env var to enable blocking.
+The hook always writes to the log regardless of mode — log mode just means "log only, don't block." Block mode logs AND blocks.
 
-Bypass: `CERES_SKIP_DEFERRAL_CHAT_HOOK=1` exits 0 unconditionally.
+Per-session bypass for confirmed false positives: `CERES_SKIP_DEFERRAL_CHAT_HOOK=1` exits 0 unconditionally.
 
 ## Why these phrases
 
