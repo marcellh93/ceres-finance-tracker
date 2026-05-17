@@ -136,6 +136,12 @@ public class LockoutBehaviorTests : IAsyncLifetime
         // structurally; here we sanity-check at the integration level by firing
         // many requests (no-op limiter accepts them all) and confirming each one
         // contributes exactly 1 to AccessFailedCount.
+        //
+        // Stage 9.1.5.b note: this test uses the no-op rate-limit factory, so
+        // OnRejected never runs and the LockoutCache lookup path is not exercised
+        // here. The cache-aware envelope behavior is covered by
+        // RateLimitRejection_AfterLockoutEngaged_ReturnsAccountLockedOut_NotRateLimited
+        // and siblings in RateLimitedAuthEndpointTests.
         var user = await AuthTestFixture.RegisterUserAsync(_factory, "rl-no-lock@lockout-test.local");
         var client = _factory.CreateClient();
 
