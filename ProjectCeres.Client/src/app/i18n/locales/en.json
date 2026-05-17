@@ -30,7 +30,6 @@
       }
     },
     "languageToggle": {
-      "ariaLabel": "Change language",
       "ariaLabelWithLanguage": "Change language, currently {{language}}",
       "code": {
         "en": "EN",
