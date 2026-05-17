@@ -146,7 +146,8 @@ builder.Services.AddScoped<EmailChangeService>();
 builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
 builder.Services.AddScoped<LockoutUnlockService>();
 builder.Services.AddMemoryCache();
-builder.Services.AddOptions<LockoutCacheOptions>();
+builder.Services.AddOptions<LockoutCacheOptions>()
+    .Validate(o => o.IpPointerTtl > TimeSpan.Zero, "LockoutCacheOptions.IpPointerTtl must be positive.");
 builder.Services.AddSingleton<LockoutCache>();
 
 // === Email service registration (Stage 8c) ===

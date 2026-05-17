@@ -10,7 +10,7 @@ namespace ProjectCeres.Common.Authentication;
 /// instead of RATE_LIMITED when the per-IP rate-limit fires AFTER the account
 /// has already been locked. Two entry shapes:
 /// <list type="bullet">
-///   <item><c>lockout:{normalizedEmail}</c> → <see cref="DateTimeOffset"/> of LockoutEnd. TTL = <see cref="LockoutCacheOptions.EntryTtl"/>.</item>
+///   <item><c>lockout:{normalizedEmail}</c> → <see cref="DateTimeOffset"/> of LockoutEnd. Cache TTL = <c>until - UtcNow</c>, so the entry expires exactly when the lockout window does.</item>
 ///   <item><c>last-login-email:{ip}</c> → (email, lockedAt). TTL = <see cref="LockoutCacheOptions.IpPointerTtl"/>. OnRejected only honors the pointer if lockedAt is within the IpPointerTtl window.</item>
 /// </list>
 /// Memory-only reads in OnRejected — no DB query — so the DoS-amplification
@@ -46,7 +46,11 @@ public sealed class LockoutCache
     {
         var key = EntryKey(email);
         if (key is null) return;
-        _cache.Set(key, until, _options.Value.EntryTtl);
+        var ttl = until - DateTimeOffset.UtcNow;
+        // Guard against an already-elapsed `until` (clock skew in tests, stale state).
+        // IMemoryCache throws on a non-positive TTL.
+        if (ttl <= TimeSpan.Zero) return;
+        _cache.Set(key, until, ttl);
     }
 
     public bool TryGetLastLockedEmailForIp(string ip, out string normalizedEmail, out DateTimeOffset lockedAt)
@@ -57,9 +61,10 @@ public sealed class LockoutCache
         if (!_cache.TryGetValue<PointerEntry>(PointerKeyPrefix + ip, out var entry) || entry is null)
             return false;
 
-        // Honor the pointer only if lockedAt is within IpPointerTtl. The IMemoryCache absolute
-        // expiry already enforces this, but the explicit check defends against clock skew or
-        // any future caller that reads the entry via a non-expiring path.
+        // Honor the pointer only if lockedAt is within IpPointerTtl. IMemoryCache's absolute
+        // expiry uses the same clock, so this isn't a skew defense — it covers the test path
+        // where PostConfigure changes IpPointerTtl AFTER an entry was written under the old
+        // TTL, and any hypothetical future caller that scans the cache via a non-expiring path.
         if (DateTimeOffset.UtcNow - entry.LockedAt > _options.Value.IpPointerTtl) return false;
         normalizedEmail = entry.NormalizedEmail;
         lockedAt = entry.LockedAt;
