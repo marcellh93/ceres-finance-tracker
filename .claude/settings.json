@@ -1,12 +1,50 @@
 {
   "hooks": {
-    "PreToolUse": [
+    "UserPromptSubmit": [
       {
-        "matcher": "Write",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/require-verify-against-codebase-before-spec.js"
+            "command": "node .claude/skills/deep-fix-mode/hooks/frustration-detect.js"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/decision-mode/hooks/decision-detect.js"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/no-unjustified-deferrals/hooks/pushback-detect.js"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/stage-start-detect.js"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/pre-spec-write-gate.js"
           }
         ]
       },
@@ -16,6 +54,33 @@
           {
             "type": "command",
             "command": ".claude/hooks/warn-on-test-edit.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/no-unjustified-deferrals/hooks/pre-write-deferral.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/pre-stage-close-gate.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/pre-commit-gate.js"
           }
         ]
       }
@@ -36,6 +101,42 @@
           {
             "type": "command",
             "command": ".claude/hooks/check-assertion-count.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/deep-fix-mode/hooks/loop-fingerprint.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/deep-fix-mode/hooks/same-target-edit-count.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/track-session-writes.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/playbook/hooks/state-record-skill-fire.js"
           }
         ]
       }
