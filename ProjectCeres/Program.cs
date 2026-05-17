@@ -146,6 +146,8 @@ builder.Services.AddScoped<EmailChangeService>();
 builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
 builder.Services.AddScoped<LockoutUnlockService>();
 builder.Services.AddMemoryCache();
+builder.Services.AddOptions<LockoutCacheOptions>();
+builder.Services.AddSingleton<LockoutCache>();
 
 // === Email service registration (Stage 8c) ===
 // Production must fail loud if Email:Resend:ApiKey is unbound — silently
