@@ -1,40 +1,51 @@
 import { Moon, Sun } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { useTheme } from '@/app/theme/theme-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useTheme, type Theme } from '@/app/theme/theme-context';
 
 type ThemeToggleProps = {
   showLabel?: boolean;
 };
 
 export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
-  const { resolvedTheme, setTheme } = useTheme();
-
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const isDark = resolvedTheme === 'dark';
-  const nextTheme = isDark ? 'light' : 'dark';
-  const ariaLabel = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-
-  if (showLabel) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setTheme(nextTheme)}
-        aria-label={ariaLabel}
-      >
-        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        <span className="ml-2">{isDark ? 'Light' : 'Dark'}</span>
-      </Button>
-    );
-  }
+  const Icon = isDark ? Moon : Sun;
+  const resolvedLabel = isDark ? t('theme.dark') : t('theme.light');
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(nextTheme)}
-      aria-label={ariaLabel}
-    >
-      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant={showLabel ? 'outline' : 'ghost'}
+            size={showLabel ? 'sm' : 'icon'}
+            type="button"
+            aria-label={t('theme.ariaLabel')}
+          >
+            <Icon className={showLabel ? 'h-4 w-4' : 'h-5 w-5'} />
+            {showLabel && <span className="ml-2">{resolvedLabel}</span>}
+          </Button>
+        }
+      />
+      <DropdownMenuContent align={showLabel ? 'end' : 'center'}>
+        <DropdownMenuRadioGroup
+          value={theme}
+          onValueChange={(value) => setTheme(value as Theme)}
+        >
+          <DropdownMenuRadioItem value="system">{t('theme.system')}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="light">{t('theme.light')}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark">{t('theme.dark')}</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

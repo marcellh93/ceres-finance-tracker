@@ -140,7 +140,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.resetAllMocks();
+  // Do NOT use vi.resetAllMocks() — it wipes mockFetch's implementation mid-test
+  // when other test files' afterEach hooks fire concurrently (cda7b04 root cause).
+  // Only clear call history for mocks this file owns.
+  vi.mocked(mockFetch).mockClear();
+  vi.mocked(refetchMock).mockClear();
 });
 
 // ── Route helpers ──
