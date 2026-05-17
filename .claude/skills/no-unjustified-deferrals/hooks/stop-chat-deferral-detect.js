@@ -64,6 +64,24 @@ const PHRASES = [
   /\bPhase \d+ polish (\+|and) bugfix follow[- ]?up\b/i,
   // "kicked / punted / deferred to later" — but allow "to Stage X"
   /\b(kicked|punted|deferred) to (later|a (new|separate|future|next) (stage|phase|sprint))\b/i,
+  // 2026-05-18 audit additions — patterns I used to dodge the gate in the
+  // 9.2 + 9.4 close-out session, none of which the original 8 phrases caught.
+  // (a) "flagging it as something for you to scope" — pushing the discovery
+  //     to the user instead of running the gate myself.
+  /\bflagging (it|this|that|them) (as|for) (something for you to scope|you to (scope|prioritize|prioritise|triage|decide))\b/i,
+  // (b) "its own conversation" / "its own batch stage opening" — reframing the
+  //     fix as out-of-scope-of-this-turn without a receiving [ ] entry.
+  /\bits own (conversation|batch stage|stage entry|sprint|task|ticket|investigation)\b/i,
+  // (c) "Pre-existing X surfaced" heading immediately followed by a list of
+  //     unactioned items with no fix-context tokens nearby — the exact shape
+  //     of the 2026-05-18 end-of-session summary that dodged the gate.
+  /\bpre[- ]existing (flaky |flake |intermittent )?(tests? |failures? |issues? |bugs? )?surfaced?\b/i,
+  // (d) "did not create a [ ] line" / "would need its own batch stage" — the
+  //     explicit admission of bypass, named-and-shamed by the user 2026-05-18.
+  /\b(did not|didn't|haven't|have not) (create|open|add) (a |an )?(\[ \]|new (stage|batch)|receiving (line|entry|checkbox))\b/i,
+  // (e) "this is the only thing in this session that violates X" — naming the
+  //     rule I'm breaking and breaking it anyway is itself the bypass.
+  /\b(only thing in (this|the) session that|with full transparency that I'?m doing so) (violates|breaks|bypasses)\b/i,
 ];
 
 // User-authorization markers — if user's last message contains any of these,

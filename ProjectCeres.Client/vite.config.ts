@@ -124,5 +124,28 @@ export default defineConfig({
       },
     },
     setupFiles: ['./src/test-setup.ts'],
+    // The suite is ~152 test files / ~929 tests across heavy portal-rendered
+    // UI (base-ui dropdowns, popovers, dialogs) plus axe-core a11y passes.
+    // Vitest defaults to one worker per CPU core, which on an 8-core box
+    // saturates the CPU and makes `userEvent.click` / `waitFor` cycles
+    // exceed the default 5s per-test budget — flakes show up in the
+    // worst-contention slot of any given run (different test each run).
+    //
+    // Two tuning levers:
+    //   1. testTimeout 15_000ms — generous per-test budget so a slow worker
+    //      slot doesn't fail a test that's otherwise correct.
+    //   2. poolOptions.threads.maxThreads 4 — cap concurrency at 4 workers
+    //      regardless of CPU count. Halves contention on 8-core hosts;
+    //      no effect on CI runners that already have ≤4 cores.
+    //
+    // Origin: 2026-05-18 audit after 4 different tests intermittently failed
+    // across 3 full-suite runs (QuickAddModal, ImportWizard, LanguageToggle,
+    // MovementForm). All passed when run scoped; failure pattern was timing
+    // under parallel-worker CPU saturation, not logic bugs.
+    testTimeout: 15_000,
+    // Vitest 4 lifted poolOptions to top-level. The threads pool key for
+    // worker count is `maxWorkers` (not nested under `poolOptions.threads`).
+    // See https://vitest.dev/guide/migration#pool-rework
+    maxWorkers: 4,
   },
 })
