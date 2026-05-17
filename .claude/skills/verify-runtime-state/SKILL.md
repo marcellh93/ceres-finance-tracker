@@ -105,6 +105,24 @@ Per-session bypass: `CERES_SKIP_RUNTIME_STATE_HOOK=1`.
 - Does not require running every test in the checklist for the user — only
   that each prerequisite the test depends on is reachable.
 
+## Playbook integration
+
+This skill is wired into the playbook constitution:
+
+- **Phase C — `mid-build`** (item 4) — `stop-runtime-state-claim.js` HARD-blocks
+  the Stop event on runtime-state claims that lack co-located evidence. Sits
+  alongside the existing trio (`deep-fix-mode`, `decision-mode`,
+  `no-unjustified-deferrals`).
+- **Phase H — `pre-handoff`** (new phase, HARD) — `stop-manual-test-handoff.js`
+  HARD-blocks the Stop event on manual-test handoffs lacking a
+  prerequisite-audit block.
+
+Both phases share the same per-session bypass env var
+(`CERES_SKIP_RUNTIME_STATE_HOOK=1`) and the same audit log
+(`.claude/state/runtime-state-verify/log.jsonl`). The playbook constitution at
+`.claude/skills/playbook/references/constitution.md` is the source of truth for
+phase semantics.
+
 ## Linked memory
 
 - `feedback_research_before_confident_claims` — the broader "no confident

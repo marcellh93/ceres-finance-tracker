@@ -114,19 +114,20 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 ---
 
-### Phase C — `mid-build` (advisory, plus existing live guards)
+### Phase C — `mid-build` (advisory + HARD claim-gate, plus existing live guards)
 
-**Gating event.** Continuous — fires throughout the build phase via the existing hooks. No additional `playbook` hook needed here; this phase is the existing trio:
+**Gating event.** Continuous — fires throughout the build phase via the existing hooks. No additional `playbook` hook needed here; this phase is the existing trio plus one HARD Stop-event gate added 2026-05-18:
 
 1. `deep-fix-mode` — auto-fires on circling signals via `frustration-detect.js`, `loop-fingerprint.js`, `same-target-edit-count.js`.
 2. `decision-mode` — auto-fires on decision-asking prompts via `decision-detect.js`.
-3. `no-unjustified-deferrals` — auto-fires on deferral language and pushback via `pre-write-deferral.js`, `pushback-detect.js`.
+3. `no-unjustified-deferrals` — auto-fires on deferral language and pushback via `pre-write-deferral.js`, `pushback-detect.js`. Phase D escalates this to HARD.
+4. **`verify-runtime-state` (HARD)** — auto-fires on Stop when the assistant's final message asserts a runtime-state value (database row, env var, file contents on disk, process state) without co-located evidence from an actual query. Enforced by `verify-runtime-state/hooks/stop-runtime-state-claim.js`. Three guards (evidence-co-located, explicit-assumption, user-authorization); if all fail, the Stop is blocked with `exit 2`. Origin: 2026-05-18 — assistant claimed `AspNetUsers.TwoFactorEnabled = false` based on the absence of a grep hit in `SeedDevUser.cs`. Code inspection ≠ runtime state.
 
-**Enforcement.** All ADVISORY today. **Phase D (`pre-deferral`) escalates one of them to HARD.**
+**Enforcement.** Items 1-3 are ADVISORY today (Phase D escalates #3 to HARD). Item 4 is HARD at the Stop event, regardless of which subsystem the claim touches — it's a cross-cutting message-shape gate, not phase-specific.
 
 **Consumes / produces.**
-- Consumes: in-progress build state (edits, tool calls, user prompts).
-- Produces: advisory `additionalContext` reminders; in Phase D, a hard-block.
+- Consumes: in-progress build state (edits, tool calls, user prompts, assistant outgoing messages).
+- Produces: advisory `additionalContext` reminders (items 1-3); a hard-block on the Stop event when item 4's gate fails.
 
 ---
 
@@ -206,6 +207,35 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 **Consumes / produces.**
 - Consumes: user prompt mentioning PR/review.
 - Produces (when enabled): advisory `additionalContext` reminding to run `superpowers:requesting-code-review`.
+
+---
+
+### Phase H — `pre-handoff` (HARD)
+
+**Gating event.** Stop event where the assistant's final message contains a manual-test-handoff fingerprint AND a numbered checklist of ≥5 items. Fingerprints (full list in `verify-runtime-state/hooks/stop-manual-test-handoff.js`):
+
+- "manual tests you have to do" / "things to test in the browser"
+- "browser checklist" / "verify these in the browser"
+- "what to test on your end" / "steps to manually verify"
+- "end-of-batch manual verification" / "UX/UI verification checklist"
+
+**Required chain.** ONE of three guards must pass:
+
+1. **Prerequisite-audit block** — the message has a "Prerequisites" / "Before you start" / "Required UI" section, OR an explicit "I audited each entry point" / "verified each prerequisite exists" marker. The audit confirms that each step's entry point (route, button, email trigger) exists in committed code.
+2. **Blocked-step markers** — every step whose entry point is missing is marked with "⚠ blocked — UI not built yet" / "prerequisite missing" / "no SPA flow to reach X". Affected steps can be omitted or kept as future work.
+3. **User-authorization waiver** — the user's last message explicitly waives the prerequisite audit ("just give me the list", "I'll figure out the prerequisites").
+
+**Enforcement.** HARD via `verify-runtime-state/hooks/stop-manual-test-handoff.js` (Stop event). If no guard passes, exit 2 + stderr explaining the missing audit, and the Stop is blocked. The hook logs every match to `.claude/state/runtime-state-verify/log.jsonl` (audit-trail discipline).
+
+**What counts as fired.** A Stop event where the message contains the handoff fingerprint AND a guard passes. No state-file entry is required — the hook is purely message-shape-driven.
+
+**Why HARD not ADVISORY.** Origin: 2026-05-18. Assistant drafted a 17-step manual TOTP-flow test list for the user where Step 1 required a TOTP-enabled user, but the SPA has no TOTP enrolment page and the seed user doesn't have `TwoFactorEnabled = true`. The list was uncrawlable. Advisory wouldn't have caught it — the assistant had to actually be denied the Stop to learn the lesson.
+
+**Consumes / produces.**
+- Consumes: the assistant's final message + the user's prior message.
+- Produces: either the Stop completes OR a hard-block with a named missing guard.
+
+**Per-session bypass.** `CERES_SKIP_RUNTIME_STATE_HOOK=1` (shared with Phase C item 4 — they're siblings under the same skill).
 
 ---
 

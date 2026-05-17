@@ -26,17 +26,18 @@ Three pieces:
 - **Slash command** — `/playbook` is the user-facing entrypoint; same effect as invoking the skill directly.
 - **Per-prompt advisory passes** — `stage-start-detect.js`, the existing `decision-detect.js` / `frustration-detect.js` / `pushback-detect.js` / `pre-write-deferral.js` continue firing as today. `playbook` is the umbrella, not a replacement.
 
-## 4 — The seven phases
+## 4 — The eight phases
 
 See `references/constitution.md`. The constitution is the single source of truth — do NOT duplicate it here (per `feedback_pointers_are_not_redundant`). One-line summaries for quick reference:
 
 - **Phase A — stage-start** (advisory): `superpowers:brainstorming` before any plan-mode plan or code Write.
 - **Phase B — pre-spec-write** (HARD): `superpowers:brainstorming` + `verify-against-codebase` before a new spec under `docs/superpowers/specs/`.
-- **Phase C — mid-build** (advisory): `deep-fix-mode` / `decision-mode` / `no-unjustified-deferrals` fire continuously via existing hooks.
+- **Phase C — mid-build** (advisory + HARD claim-gate): `deep-fix-mode` / `decision-mode` / `no-unjustified-deferrals` fire continuously via existing hooks; `verify-runtime-state` HARD-blocks the Stop event on runtime-state claims that lack evidence (added 2026-05-18).
 - **Phase D — pre-deferral** (HARD): `no-unjustified-deferrals` six-step gate satisfied before deferral language lands in `docs/**`.
 - **Phase E — pre-stage-close** (HARD): `sync-docs` + `changelog-sync` fired this session AND zero unchecked `[ ]` items in the closing stage's body.
 - **Phase F — pre-commit** (HARD, conditional): `verify-against-codebase` fired since the most recent code Write. Doc-only commits bypass.
 - **Phase G — pre-PR-review** (advisory, disabled in Ceres): `superpowers:requesting-code-review` chain; hook lives on disk for future re-enablement.
+- **Phase H — pre-handoff** (HARD): `verify-runtime-state` HARD-blocks the Stop event on manual-test handoffs (numbered checklists ≥5 items) that lack a prerequisite-audit block or blocked-step markers on missing-UI steps (added 2026-05-18).
 
 ## 5 — Reading the state file
 
