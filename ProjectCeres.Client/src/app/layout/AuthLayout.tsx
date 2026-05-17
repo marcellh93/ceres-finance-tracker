@@ -15,7 +15,7 @@ import { LanguageToggle } from '../components/auth/LanguageToggle';
  */
 export function AuthLayout() {
   return (
-    <div className="min-h-dvh w-full bg-muted/30 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-dvh w-full bg-background flex items-center justify-center p-4 sm:p-6">
       <Card className="w-full max-w-[420px] p-6 sm:p-8 space-y-6">
         <header className="flex flex-col items-center gap-2">
           <BrandMark />
