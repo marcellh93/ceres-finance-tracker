@@ -38,6 +38,7 @@ public sealed class AuthController : ControllerBase
     private readonly LockoutUnlockService _lockoutUnlock;
     private readonly ILogger<AuthController> _logger;
     private readonly Services.CategorySeedService _categorySeedService;
+    private readonly LockoutCache _lockoutCache;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -50,7 +51,8 @@ public sealed class AuthController : ControllerBase
         IAuditLogWriter auditLog,
         LockoutUnlockService lockoutUnlock,
         ILogger<AuthController> logger,
-        Services.CategorySeedService categorySeedService)
+        Services.CategorySeedService categorySeedService,
+        LockoutCache lockoutCache)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -63,6 +65,7 @@ public sealed class AuthController : ControllerBase
         _lockoutUnlock = lockoutUnlock;
         _logger = logger;
         _categorySeedService = categorySeedService;
+        _lockoutCache = lockoutCache;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -192,6 +195,24 @@ public sealed class AuthController : ControllerBase
             HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
             var (ip, ua) = RequestContext();
             await _failedLogins.RecordAsync(request.Email, userStub.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
+
+            // Stage 9.1.5.b: seed LockoutCache so OnRejected can surface ACCOUNT_LOCKED_OUT
+            // on subsequent 429s. Memory-only writes; no additional DB read. Per-IP pointer
+            // expires at IpPointerTtl (60s = rate-limit window) so other accounts on the
+            // same NAT aren't mis-flagged for longer than the rate-limit cooldown itself.
+            //
+            // IP key uses "unknown" fallback to match the rate-limiter's partition key on
+            // requests where Connection.RemoteIpAddress is null (e.g. TestServer hops).
+            // Without this alignment, controller writes under "" and OnRejected reads under
+            // "" — both no-op due to LockoutCache's empty-IP guard — so the cache never
+            // wires across the two middleware hops.
+            if (userStub.LockoutEnd is { } lockoutEnd)
+            {
+                var cacheIp = string.IsNullOrWhiteSpace(ip) ? "unknown" : ip;
+                _lockoutCache.SetLockoutEnd(request.Email, lockoutEnd);
+                _lockoutCache.SetLastLockedEmailForIp(cacheIp, request.Email);
+            }
+
             if (lockoutTransitioned)
             {
                 try

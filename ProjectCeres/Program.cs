@@ -274,6 +274,36 @@ builder.Services.AddRateLimiter(options =>
             : 15;
         context.HttpContext.Response.Headers.RetryAfter =
             retryAfterSeconds.ToString(CultureInfo.InvariantCulture);
+
+        // Stage 9.1.5.b: when rejecting /api/auth/login, consult LockoutCache. If the
+        // requesting IP's last-attempted email is known to be locked, surface the
+        // ACCOUNT_LOCKED_OUT envelope (401) instead of RATE_LIMITED (429). Memory-only
+        // reads — no DB query — so the DoS-amplification concern in security-model.md
+        // § lockout is preserved.
+        if (context.HttpContext.Request.Path.StartsWithSegments("/api/auth/login"))
+        {
+            var lockoutCache = context.HttpContext.RequestServices
+                .GetRequiredService<ProjectCeres.Common.Authentication.LockoutCache>();
+            // Match the AuthLoginByIp rate-limiter partition fallback so the cache key
+            // aligns when Connection.RemoteIpAddress is null (e.g. TestServer requests).
+            var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            if (lockoutCache.TryGetLastLockedEmailForIp(ip, out var lockedEmail, out _)
+                && lockoutCache.TryGetLockoutEnd(lockedEmail, out _))
+            {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.HttpContext.Response.ContentType = "application/json";
+                await context.HttpContext.Response.WriteAsJsonAsync(new
+                {
+                    error = new
+                    {
+                        code = "ACCOUNT_LOCKED_OUT",
+                        message = "Account temporarily locked. Try again in 15 minutes.",
+                    }
+                }, ct);
+                return;
+            }
+        }
+
         context.HttpContext.Response.ContentType = "application/json";
         await context.HttpContext.Response.WriteAsJsonAsync(new
         {

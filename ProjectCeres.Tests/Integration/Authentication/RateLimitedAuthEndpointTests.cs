@@ -47,12 +47,14 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Login_RequestsEventuallyReturn429WithRetryAfter()
     {
-        await AuthTestFixture.RegisterUserAsync(_factory, "rl@rl-test.local");
+        // Use an UNREGISTERED email so we exercise the per-IP rate-limit path without
+        // triggering account lockout (which would cause OnRejected to surface
+        // ACCOUNT_LOCKED_OUT 401 instead of RATE_LIMITED 429 from Stage 9.1.5.b onward).
         var client = _factory.CreateClient();
 
         var rejected = await FireUntilRateLimited(() =>
             AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-                new { email = "rl@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
+                new { email = "nouser-rl@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
 
         rejected.Should().NotBeNull("expected rate limit to fire within 25 attempts");
         rejected!.Headers.RetryAfter.Should().NotBeNull();
@@ -61,12 +63,12 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task RateLimit429_ResponseBodyMatchesApiContractEnvelope()
     {
-        await AuthTestFixture.RegisterUserAsync(_factory, "envelope@rl-test.local");
+        // Unregistered email — see Login_RequestsEventuallyReturn429WithRetryAfter rationale.
         var client = _factory.CreateClient();
 
         var rejected = await FireUntilRateLimited(() =>
             AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-                new { email = "envelope@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
+                new { email = "nouser-envelope@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
 
         rejected.Should().NotBeNull("expected rate limit to fire within 25 attempts");
         var body = await rejected!.Content.ReadFromJsonAsync<JsonElement>();
@@ -117,12 +119,12 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task RateLimitOnRejected_ContentTypeIsApplicationJson()
     {
-        await AuthTestFixture.RegisterUserAsync(_factory, "contenttype@rl-test.local");
+        // Unregistered email — see Login_RequestsEventuallyReturn429WithRetryAfter rationale.
         var client = _factory.CreateClient();
 
         var rejected = await FireUntilRateLimited(() =>
             AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-                new { email = "contenttype@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
+                new { email = "nouser-contenttype@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
 
         rejected.Should().NotBeNull("expected rate limit to fire within 25 attempts");
         rejected!.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
@@ -136,21 +138,23 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // "saturate, wait, confirm window rolled over" — we just shrink the wall-clock
         // duration of the rollover instead of using a fresh limiter (which would
         // defeat the test's purpose).
+        //
+        // Unregistered email so the burst doesn't trip lockout (Stage 9.1.5.b: lockout
+        // would cause OnRejected to surface ACCOUNT_LOCKED_OUT 401 instead of 429).
         await using var factory = _factory.WithShortLoginWindow();
-        var user = await AuthTestFixture.RegisterUserAsync(factory, "reset-window@rl-test.local");
         var client = factory.CreateClient();
 
         // Saturate the bucket.
         var rejected = await FireUntilRateLimited(() =>
             AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
-                new { email = user.Email, password = "x-long-enough-x", rememberMe = false }));
+                new { email = "nouser-reset-window@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
         rejected.Should().NotBeNull();
 
         // Sliding window is 1s for this test (see WithShortLoginWindow).
         await Task.Delay(RateLimitedAuthTestWebApplicationFactory.ShortLoginWindowClearDelay);
 
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
-            new { email = user.Email, password = "x-long-enough-x", rememberMe = false });
+            new { email = "nouser-reset-window@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         resp.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
     }
 
@@ -302,8 +306,10 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // returns 429, proving the limiter ignores the spoofed header.
 
         // Fresh rate-limiter so prior tests don't leave the login bucket saturated.
+        // Unregistered email so the burst doesn't trip lockout (Stage 9.1.5.b: lockout
+        // would cause OnRejected to surface ACCOUNT_LOCKED_OUT 401 instead of 429,
+        // defeating the partition-collision assertion which expects 429).
         await using var factory = _factory.WithFreshRateLimiter();
-        await AuthTestFixture.RegisterUserAsync(factory, "xff-spoof@rl-test.local");
         var client = factory.CreateClient();
 
         HttpResponseMessage? last429 = null;
@@ -313,7 +319,7 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
             {
                 Content = System.Net.Http.Json.JsonContent.Create(new
                 {
-                    email = "xff-spoof@rl-test.local",
+                    email = "nouser-xff-spoof@rl-test.local",
                     password = "x-long-enough-x",
                     rememberMe = false
                 }),
@@ -379,22 +385,115 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         // 5s is the smallest window that comfortably accommodates an 11-request burst
         // (~1-3s of HTTP + Argon2id overhead on the dummy-hash path) without the
         // early requests aging out before the 11th lands.
+        //
+        // Unregistered email so the burst doesn't trip lockout (Stage 9.1.5.b: lockout
+        // would cause OnRejected to surface ACCOUNT_LOCKED_OUT 401 instead of the 429
+        // this test pins).
         await using var factory = _factory.WithMediumLoginWindow();
-        await AuthTestFixture.RegisterUserAsync(factory, "slidingwindow@rl-test.local");
         var client = factory.CreateClient();
 
         for (int i = 0; i < 5; i++)
             await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
-                new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
+                new { email = "nouser-slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         // 20% of 5s test window — straddles a segment boundary without falling out of
         // the rolling window even with ~2s of HTTP overhead for the 11 requests.
         await Task.Delay(TimeSpan.FromMilliseconds(1000));
         for (int i = 0; i < 5; i++)
             await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
-                new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
+                new { email = "nouser-slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         var eleventh = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
-            new { email = "slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
+            new { email = "nouser-slidingwindow@rl-test.local", password = "x-long-enough-x", rememberMe = false });
         eleventh.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
             "10 requests within the 5s test sliding window should saturate the login bucket; the 11th must be rejected");
+    }
+
+    [Fact]
+    public async Task RateLimitRejection_AfterLockoutEngaged_ReturnsAccountLockedOut_NotRateLimited()
+    {
+        await using var factory = _factory.WithFreshRateLimiter();
+        var user = await AuthTestFixture.RegisterUserAsync(factory, "rl-locked@rl-test.local");
+        var client = factory.CreateClient();
+
+        HttpResponseMessage? tenth = null;
+        for (int i = 1; i <= 10; i++)
+        {
+            tenth = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+                new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        }
+        var tenthBody = await tenth!.Content.ReadFromJsonAsync<JsonElement>();
+        tenthBody.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("ACCOUNT_LOCKED_OUT",
+                "attempt 10 trips MaxFailedAccessAttempts; controller returns ACCOUNT_LOCKED_OUT and seeds the lockout-cache");
+
+        var eleventh = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+            new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        eleventh.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "post-lockout 429s must be replaced by 401 ACCOUNT_LOCKED_OUT");
+        var eleventhBody = await eleventh.Content.ReadFromJsonAsync<JsonElement>();
+        eleventhBody.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("ACCOUNT_LOCKED_OUT",
+                "envelope must surface the lockout state so the SPA shows the locked-account banner");
+    }
+
+    [Fact]
+    public async Task RateLimitRejection_OnNonLoginEndpoint_StillReturnsRateLimited()
+    {
+        var client = _factory.CreateClient();
+        HttpResponseMessage? rejected = null;
+        for (int i = 0; i < 70; i++)
+        {
+            var resp = await client.GetAsync("/api/auth/csrf");
+            if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                rejected = resp;
+                break;
+            }
+        }
+        rejected.Should().NotBeNull("CSRF endpoint must still rate-limit at 60/min");
+
+        var body = await rejected!.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("RATE_LIMITED",
+                "non-login endpoints must keep the original rate-limit envelope; the lockout-aware path is /api/auth/login only");
+        rejected.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
+            "non-login endpoints must keep status 429");
+    }
+
+    [Fact]
+    public async Task RateLimitRejection_WhenPerEmailEntryAbsent_FallsBackToRateLimitedEnvelope()
+    {
+        await using var factory = _factory.WithShortLockoutCacheTtl();
+        var user = await AuthTestFixture.RegisterUserAsync(factory, "rl-expire@rl-test.local");
+        var client = factory.CreateClient();
+
+        // Drive the standard 10-burst to engage lockout and seed both cache entries.
+        for (int i = 0; i < 10; i++)
+        {
+            await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+                new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        }
+
+        // Force-evict the per-email cache entry (simulates entry TTL elapse OR manual
+        // unlock invalidation). The per-IP pointer still exists, but TryGetLockoutEnd
+        // for the pointed email now returns false, so OnRejected must fall back to
+        // the default RATE_LIMITED envelope.
+        using (var scope = factory.Services.CreateScope())
+        {
+            var cache = scope.ServiceProvider
+                .GetRequiredService<ProjectCeres.Common.Authentication.LockoutCache>();
+            cache.Remove(user.Email!);
+        }
+
+        // Next attempt — rate-limit budget is exhausted from the 10-burst, so the
+        // request hits OnRejected. With the per-email entry gone, OnRejected falls
+        // back to RATE_LIMITED.
+        var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+            new { email = user.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        resp.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
+            "rate-limit must still fire when the per-email cache entry is absent");
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("RATE_LIMITED",
+                "after the per-email entry is gone, OnRejected must fall back to the default RATE_LIMITED envelope");
     }
 }

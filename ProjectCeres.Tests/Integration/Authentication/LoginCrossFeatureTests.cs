@@ -27,12 +27,13 @@ public class LoginCrossFeatureTests : IAsyncLifetime
     public async Task RateLimitFires_BeforeAntiforgeryValidation()
     {
         var client = _factory.CreateClient();
-        // Saturate the bucket with valid CSRF.
-        await AuthTestFixture.RegisterUserAsync(_factory, "csrf@cross-test.local");
+        // Saturate the bucket with valid CSRF. Use an UNREGISTERED email so the
+        // burst doesn't trip lockout (Stage 9.1.5.b: lockout would cause OnRejected
+        // to surface ACCOUNT_LOCKED_OUT 401 instead of the 429 this test pins).
         for (int i = 0; i < 30; i++)
         {
             var r = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client, "/api/auth/login",
-                new { email = "csrf@cross-test.local", password = "wrong-but-long-enough", rememberMe = false });
+                new { email = "nouser-csrf@cross-test.local", password = "wrong-but-long-enough", rememberMe = false });
             if (r.StatusCode == HttpStatusCode.TooManyRequests) break;
         }
 
@@ -40,7 +41,7 @@ public class LoginCrossFeatureTests : IAsyncLifetime
         // Rate limit must intercept first → 429.
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
         {
-            Content = JsonContent.Create(new { email = "csrf@cross-test.local", password = "x-long-enough", rememberMe = false }),
+            Content = JsonContent.Create(new { email = "nouser-csrf@cross-test.local", password = "x-long-enough", rememberMe = false }),
         };
         var resp = await client.SendAsync(req);
         resp.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);

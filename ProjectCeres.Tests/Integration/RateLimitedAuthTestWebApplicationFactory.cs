@@ -120,6 +120,23 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
             }));
 
     /// <summary>
+    /// Returns a derived factory whose LockoutCache uses a 1-second TTL for the per-IP
+    /// last-login-email pointer (instead of the production 60s value). Per-email entries
+    /// derive their TTL from the LockoutEnd value the controller passes to SetLockoutEnd;
+    /// tests that need the per-email entry to expire quickly should manipulate LockoutEnd
+    /// directly rather than rely on a separate per-email TTL knob.
+    /// </summary>
+    public WebApplicationFactory<Program> WithShortLockoutCacheTtl() =>
+        this.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.PostConfigure<ProjectCeres.Common.Authentication.LockoutCacheOptions>(opts =>
+                {
+                    opts.IpPointerTtl = TimeSpan.FromSeconds(1);
+                });
+            }));
+
+    /// <summary>
     /// Returns a derived factory with a fresh, empty <see cref="IMemoryCache"/> singleton.
     /// Use this for per-email rate-limit tests so each test starts with a clean bucket
     /// regardless of prior test state.
