@@ -126,6 +126,9 @@ ProjectCeres/wwwroot/css/site.css
 .claude/scheduled_tasks.lock
 # Per-session state from deep-fix-mode hooks
 .claude/state/
+# One-shot research artifact that produced the playbook skill; superseded
+# by playbook/references/constitution.md once the build landed.
+.claude/skills-cohesion-review.md
 
 ##Testing
 impeccable-sandbox/
