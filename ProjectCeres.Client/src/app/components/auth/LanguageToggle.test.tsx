@@ -81,19 +81,17 @@ describe('LanguageToggle', () => {
     expect(englishItem.getAttribute('aria-checked')).toBe('true');
     expect(spanishItem.getAttribute('aria-checked')).toBe('false');
 
-    // Close menu cleanly via Escape before changing language.
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('menuitemradio')).toBeNull());
+    // Phase 2: click the Spanish radio item — this is the user-driven contract
+    // (clicking flips the active language). base-ui auto-closes the menu after
+    // selection. waitFor (below) handles the requestAnimationFrame-deferred
+    // close/reopen settling under parallel-suite CPU load.
+    await user.click(spanishItem);
 
-    // Phase 2: change language to Spanish directly via act() — this avoids the
-    // multi-step user.click-item → menu-auto-close → re-open sequence that is
-    // unreliable under parallel-suite CPU load (base-ui's popup open/close
-    // uses requestAnimationFrame which jsdom defers under heavy concurrency).
-    await act(() => i18n.changeLanguage('es'));
-
-    // Open a fresh menu and verify Español is now checked.
-    await user.click(screen.getByRole('button', { name: /cambiar idioma/i }));
-    await waitFor(() => {
+    // Phase 3: re-open the menu (it auto-closed after click) and verify
+    // Spanish is now checked + English unchecked. The waitFor wrapper absorbs
+    // any rAF-deferred state propagation.
+    await waitFor(async () => {
+      await user.click(screen.getByRole('button', { name: /cambiar idioma/i }));
       const eng = screen.getByRole('menuitemradio', { name: 'English' });
       const esp = screen.getByRole('menuitemradio', { name: 'Español' });
       expect(eng.getAttribute('aria-checked')).toBe('false');
