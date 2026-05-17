@@ -1085,7 +1085,7 @@ Stage 8 deferred items (carry-forward from Stage 8 — security-event email call
 
 ## Stage 9.1.5 — Phase 1 polish + bugfix batch
 
-**Status: ❌ Pending.** Opened 2026-05-17. Closed-batch container for bugs discovered during the Phase 1 UX walkthrough and a pre-existing suite-wide auth-tier test-contention issue surfaced by the build hook the same session. Runs to completion before Phase 2 plan-writing resumes; the batch follows the project's `no-unjustified-deferrals` rule (every bug discovered during in-flight work either gets fixed in the current commit or queued into the open batch stage, never deferred without a tooling-gap or already-scheduled justification).
+**Status: ✅ Done (2026-05-17).** Opened + closed 2026-05-17. Closed-batch container for bugs discovered during the Phase 1 UX walkthrough and a pre-existing suite-wide auth-tier test-contention issue surfaced by the build hook the same session. All 9 sub-stages (a–i) shipped, all verification commands green (`dotnet test`: 1098 Passed / 0 Failed; `pnpm test`: green; both builds: clean), browser verification confirmed across the user-facing changes. Phase 2 plan-writing can resume. The batch followed the project's `no-unjustified-deferrals` rule (every bug discovered during in-flight work either fixed in the current commit or queued into the open batch stage, never deferred without a tooling-gap or already-scheduled justification).
 
 > **Goal:** close every Phase-1 discovered defect before Phase 2's auth surfaces (register, email-verify, password-reset confirm) get planned and built on top of the same primitives.
 
