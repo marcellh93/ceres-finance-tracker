@@ -65,6 +65,15 @@ global.ResizeObserver = class ResizeObserver {
 // cmdk calls scrollIntoView when navigating items — mock it for jsdom
 Element.prototype.scrollIntoView = () => {}
 
+// input-otp uses a background setInterval that calls document.elementFromPoint
+// to detect clicks outside its own area. jsdom doesn't implement that API, so
+// the timer throws an Uncaught Exception in every test that mounts InputOTP.
+// Stub it as a no-op returning null (matches the "no element at this point"
+// browser semantics).
+if (typeof document !== 'undefined' && typeof document.elementFromPoint !== 'function') {
+  document.elementFromPoint = (() => null) as typeof document.elementFromPoint
+}
+
 // Recharts also calls getBoundingClientRect for dimensions
 Element.prototype.getBoundingClientRect = () => ({
   width: 500,

@@ -15,6 +15,28 @@
         "accountLocked": "Account locked. Check your email for an unlock link.",
         "emailNotConfirmed": "Verify your email first. Check your inbox.",
         "resendFailed": "Could not send the email. Try again in a moment."
+      },
+      "toasts": {
+        "totpExpired": "Your sign-in expired. Please sign in again."
+      }
+    },
+    "totp": {
+      "title": "Verify your identity",
+      "description": "Enter the 6-digit code from your authenticator app",
+      "codeLabel": "Verification code",
+      "submit": "Verify",
+      "submitting": "Verifying",
+      "backupCodePrompt": "Lost your device? Use a backup code",
+      "backupCodeDescription": "Enter one of your backup codes",
+      "backupCodeLabel": "Backup code",
+      "useTotpInstead": "Use verification code instead",
+      "backToSignIn": "Back to sign in",
+      "errors": {
+        "invalid": "Invalid code",
+        "tooManyAttempts": "Too many attempts. Try again in {{seconds}} seconds.",
+        "tooManyAttemptsNoCountdown": "Too many attempts. Try again in a moment.",
+        "expired": "Your sign-in expired. Please sign in again.",
+        "network": "Could not verify the code. Check your connection and try again."
       }
     },
     "placeholders": {

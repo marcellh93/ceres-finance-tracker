@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '../../components/Field';
@@ -22,6 +23,13 @@ export function Login() {
   const [serverError, setServerError] = useState<ServerErrorState>({ kind: 'none' });
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get('expired') === '1') {
+      toast(t('auth.login.toasts.totpExpired'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     register,

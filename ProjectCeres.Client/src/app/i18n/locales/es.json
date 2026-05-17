@@ -15,6 +15,28 @@
         "accountLocked": "Cuenta bloqueada. Consulta tu correo para un enlace de desbloqueo.",
         "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada.",
         "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento."
+      },
+      "toasts": {
+        "totpExpired": "Tu sesión caducó. Inicia sesión de nuevo."
+      }
+    },
+    "totp": {
+      "title": "Verifica tu identidad",
+      "description": "Introduce el código de 6 dígitos de tu aplicación de autenticación",
+      "codeLabel": "Código de verificación",
+      "submit": "Verificar",
+      "submitting": "Verificando",
+      "backupCodePrompt": "¿Perdiste el dispositivo? Usa un código de respaldo",
+      "backupCodeDescription": "Introduce uno de tus códigos de respaldo",
+      "backupCodeLabel": "Código de respaldo",
+      "useTotpInstead": "Usar código de verificación",
+      "backToSignIn": "Volver a iniciar sesión",
+      "errors": {
+        "invalid": "Código no válido",
+        "tooManyAttempts": "Demasiados intentos. Inténtalo en {{seconds}} segundos.",
+        "tooManyAttemptsNoCountdown": "Demasiados intentos. Espera un momento.",
+        "expired": "Tu sesión caducó. Inicia sesión de nuevo.",
+        "network": "No se pudo verificar el código. Comprueba tu conexión e inténtalo de nuevo."
       }
     },
     "placeholders": {

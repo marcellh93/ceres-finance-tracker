@@ -1,6 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('sonner', async () => {
+  const actual = await vi.importActual<typeof import('sonner')>('sonner');
+  return { ...actual, toast: vi.fn() };
+});
+import { toast } from 'sonner';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n/i18n';
@@ -208,6 +214,25 @@ describe('Login page', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /resend verification email/i })).toBeDefined(),
+    );
+  });
+
+  it('fires the expired-sign-in toast when /login?expired=1', async () => {
+    render(
+      <I18nextProvider i18n={i18n}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/login?expired=1']}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </I18nextProvider>,
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringMatching(/your sign-in expired/i),
+      ),
     );
   });
 
