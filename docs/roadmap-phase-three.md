@@ -1011,15 +1011,16 @@ Lockout / unlock:
 - [ ] Token expires after a reasonable window (e.g., 1 hour)
 - [ ] Lockout email also tells the user "valid TOTP codes are still accepted during lockout" (per `security-model.md` § Login)
 
-TOTP setup (`/login/totp/setup`):
+TOTP setup (entry point: `/app/security` per ADR-0069 — NOT `/login/totp/setup`; the original roadmap URL predated the ADR):
 
-- [ ] QR code displayed (otpauth:// URI) — uses `qrcode` library or equivalent
-- [ ] Manual-entry secret displayed below QR for accessibility / desktop authenticators
+- [ ] QR code displayed (otpauth:// URI) — uses `qrcode.react` (4.2.0, already installed)
+- [ ] Manual-entry secret displayed below QR (collapsed behind a disclosure) for accessibility / desktop authenticators
 - [ ] Verification step requires entering one valid code before enrolment is complete
-- [ ] On successful enrolment: 10 backup codes generated (cryptographically random, ≥ 20 bits entropy each per NIST 800-63B), shown ONCE, with download (.txt) + print options
-- [ ] Backup codes are hashed in DB after this step; the page warns "These will not be shown again"
+- [ ] On successful enrolment: 10 backup codes generated (cryptographically random, ≥ 20 bits entropy each per NIST 800-63B), shown ONCE, with download (.txt) + copy-to-clipboard options
+- [ ] Backup codes are hashed in DB after this step (server-side, already done in `MfaBackupCodeService`); the page warns "These will not be shown again"
 - [ ] User must confirm "I've saved my backup codes" checkbox before proceeding
-- [ ] After enrolment: redirect to onboarding (Stage 15.5) for first-run, or dashboard for re-enrolment
+- [ ] After enrolment: page renders Enabled state (NOT a redirect — single SPA page). First-run onboarding redirect is Stage 15.5's owner per `docs/roadmap-phase-three.md:1518`.
+- [ ] **Disable two-factor sign-in endpoint** — `POST /api/auth/mfa/disable` is not yet built. 9.6 ships the "Turn off" button as `disabled` with tooltip "Coming in a follow-up — no server endpoint yet." This `[ ]` line is the receiving entry for the follow-up: when the endpoint lands, wire the button + `RequireRecentAuth` + audit-log row, then tick this line. *Anchor: 9.6 spec § Out of scope.*
 
 Backup-codes recovery flow:
 
