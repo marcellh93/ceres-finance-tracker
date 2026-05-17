@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { BrandMark } from './BrandMark';
 import { LanguageToggle } from '../components/auth/LanguageToggle';
+import { ThemeToggle } from '@/design-system/components/ThemeToggle';
 
 /**
  * Layout for unauthenticated auth pages: centered card on a soft
@@ -23,8 +24,9 @@ export function AuthLayout() {
         <div>
           <Outlet />
         </div>
-        <footer className="flex justify-center" data-slot="auth-footer">
+        <footer className="flex justify-center gap-2" data-slot="auth-footer">
           <LanguageToggle />
+          <ThemeToggle />
         </footer>
       </Card>
     </div>
