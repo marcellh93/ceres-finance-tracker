@@ -223,6 +223,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node .claude/hooks/stop-roadmap-verify-flip.js"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
             "command": ".claude/hooks/run-tests.sh"
           }
         ]
