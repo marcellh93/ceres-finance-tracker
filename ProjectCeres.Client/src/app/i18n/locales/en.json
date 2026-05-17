@@ -34,5 +34,11 @@
       "english": "English",
       "spanish": "Español"
     }
+  },
+  "theme": {
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "ariaLabel": "Toggle theme"
   }
 }
