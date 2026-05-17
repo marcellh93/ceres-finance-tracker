@@ -36,12 +36,25 @@ Do not delete tests, do not add `[Fact(Skip="…")]`, do not comment out asserti
 
 ### Definition of Done
 
-Before saying "done," "ready," "complete," or "passing":
+Before saying "done," "ready," "complete," or "passing," run the tier-scoped pre-flight. The tier is picked by inspecting the working-tree diff (`git diff --name-only HEAD` + untracked tracked-extension files) — same scheme as `.claude/hooks/run-tests.sh` and the `/verify` slash command:
 
-1. `dotnet build` is clean (no errors, no new warnings).
-2. `dotnet test` is all green with zero skipped tests, unless every skip has an inline comment with a tracked issue link.
-3. For each new branch in production code, name the test that exercises it.
-4. If any test file was modified in this change, state which of cases (1), (2), or (3) above applied.
+- **TIER 0** — no `.cs` / `.ts` / `.tsx` / `.csproj` / `.sln` touched (doc/config only): skip steps 1 and 2 entirely.
+- **TIER F** — only `.ts` / `.tsx` under `ProjectCeres.Client/` touched: run the frontend pair in steps 1 and 2.
+- **TIER B** — only `.cs` / `.csproj` under `ProjectCeres/` touched (no test-project, no `.sln`): run the backend pair in steps 1 and 2.
+- **TIER M** — mixed, OR `.sln` touched, OR `ProjectCeres.Tests/` edits, OR anything ambiguous: run both pairs.
+
+Then:
+
+1. **Build is clean** (no errors, no new warnings) for every command the tier required:
+   - Frontend pair: `pnpm --dir ProjectCeres.Client build`
+   - Backend pair: `dotnet build ProjectCeres/ProjectCeres.csproj`
+2. **Tests are all green** with zero skipped, unless every skip has an inline comment with a tracked issue link:
+   - Frontend pair: `pnpm --dir ProjectCeres.Client test --run` (allow ONE retry on a known-isolation Vitest flake; if it fails twice, root-cause it)
+   - Backend pair: `dotnet test` (no retries)
+3. For each new branch in production code, name the test that exercises it. (Runs regardless of tier.)
+4. If any test file was modified in this change, state which of cases (1), (2), or (3) above applied. (Runs regardless of tier.)
+
+**Tier-up when in doubt.** Picking TIER M when uncertain is fine — picking a smaller tier than the diff warrants is not. The `/verify` slash command implements this check; reach for it instead of running the commands ad-hoc.
 
 ---
 
