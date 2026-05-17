@@ -1,3 +1,7 @@
+> **⚠️ CORRECTION — 2026-05-17.** This spec misdiagnosed the bug. The actual root cause was next-themes failing to honor OS color-scheme toggle in our Vite SPA — not a token-contrast issue in AuthLayout. The fix shipped in commit `014f2b5` (bg-muted/30 → bg-background) is kept on independent merits (it's correct per the shadcn page-background convention) but did NOT fix the user-visible symptom. See the revised spec at `docs/superpowers/specs/2026-05-17-stage-9-1-5-c-revised-theme-provider-design.md` for the actual fix. This spec is preserved in git history as a record of the wrong diagnosis.
+
+---
+
 # Stage 9.1.5.c — Auth-page background contrast fix
 
 **Status:** Spec — pending user review, then writing-plans skill.

@@ -970,6 +970,7 @@ report-uri /csp-report;
 
 Notes:
 - `'strict-dynamic'` allows a server-nonced script to load further scripts without requiring additional domain allowlists. Host-allowlist CSPs (e.g. `script-src 'self' cdn.example.com`) are bypassable in the majority of real-world deployments; nonces + `strict-dynamic` are the current recommendation.
+- **Inline pre-paint theme-init script** (`ProjectCeres.Client/index.html`, added in Stage 9.1.5.c-revised) — must receive the server-injected nonce when CSP middleware lands. Without a nonce, the script will be blocked, causing a first-paint flash of incorrect theme for OS-dark users. See `docs/superpowers/specs/2026-05-17-stage-9-1-5-c-revised-theme-provider-design.md` §4.11.
 - `'unsafe-inline'` and `'unsafe-eval'` are prohibited for `script-src`. Modern Vite/webpack outputs are eval-free.
 - `'unsafe-inline'` for `style-src` may be required by Tailwind v4 — evaluate at implementation time; replace with a nonce if possible.
 - `frame-ancestors 'none'` supersedes `X-Frame-Options: DENY` in modern browsers — both must be present for full coverage.
