@@ -1,11 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReportsLayout } from './ReportsLayout';
 import { NetWorthOverTime } from './NetWorthOverTime';
 
 beforeEach(() => { global.fetch = vi.fn(); });
-afterEach(() => { vi.resetAllMocks(); });
 
 function renderPage() {
   render(

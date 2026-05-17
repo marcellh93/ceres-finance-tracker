@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsFilterBar, buildTypeFilterParams } from './MovementsFilterBar';
 
 let mockFetch: ReturnType<typeof vi.fn>;
@@ -15,8 +15,6 @@ beforeEach(() => {
     ],
   });
 });
-
-afterEach(() => { vi.resetAllMocks(); });
 
 function LocationSpy({ onChange }: { onChange: (search: string) => void }) {
   const loc = useLocation();

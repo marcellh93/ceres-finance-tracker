@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StepReview } from './StepReview';
 import type { ImportColumnMappings } from './import-api';
 import type { AccountOptionDto } from '../movements/movements-api';
@@ -26,8 +26,6 @@ beforeEach(() => {
     Promise.resolve({ ok: true, status: 200, json: async () => accounts }),
   );
 });
-
-afterEach(() => vi.resetAllMocks());
 
 describe('StepReview', () => {
   it('renders file, account, and mapping rows', async () => {

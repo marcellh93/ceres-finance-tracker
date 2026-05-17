@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StepMapping } from './StepMapping';
 import type {
   HeaderDetectionResult,
@@ -64,8 +64,6 @@ beforeEach(() => {
     return Promise.resolve({ ok: false, status: 404, json: async () => null });
   });
 });
-
-afterEach(() => vi.resetAllMocks());
 
 describe('StepMapping', () => {
   it('renders the file name and pre-selected columns', async () => {

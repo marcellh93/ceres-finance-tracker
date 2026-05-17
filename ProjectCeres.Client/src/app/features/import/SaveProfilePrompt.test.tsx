@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { SaveProfilePrompt } from './SaveProfilePrompt';
 import type { ImportColumnMappings } from './import-api';
@@ -23,8 +23,6 @@ beforeEach(() => {
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
-
-afterEach(() => vi.resetAllMocks());
 
 describe('SaveProfilePrompt', () => {
   it('renders the inline form with name input and Save/Skip buttons', () => {

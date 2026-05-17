@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ReportsLayout } from './ReportsLayout';
 
 beforeEach(() => { global.fetch = vi.fn().mockReturnValue(new Promise(() => {})); });
-afterEach(() => { vi.resetAllMocks(); });
 
 function renderLayout(path = '/reports/net-worth-over-time') {
   render(

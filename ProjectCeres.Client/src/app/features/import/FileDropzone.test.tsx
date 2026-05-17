@@ -1,13 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { FileDropzone } from './FileDropzone';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
-
-afterEach(() => vi.resetAllMocks());
 
 function makeFile(name: string, sizeBytes: number, type = 'text/csv') {
   const blob = new Blob([new Uint8Array(sizeBytes)], { type });

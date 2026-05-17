@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { BudgetEdit } from './BudgetEdit';
 
@@ -14,7 +14,6 @@ beforeEach(() => {
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
-afterEach(() => vi.resetAllMocks());
 
 function renderAt(path: string) {
   return render(

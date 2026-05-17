@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncomeExpenseChart } from './IncomeExpenseChart';
 
 let mockFetch: ReturnType<typeof vi.fn>;
@@ -8,7 +8,6 @@ beforeEach(() => {
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
-afterEach(() => { vi.resetAllMocks(); });
 
 describe('IncomeExpenseChart', () => {
   it('renders title and subtitle', () => {

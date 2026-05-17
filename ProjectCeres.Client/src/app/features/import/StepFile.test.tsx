@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StepFile } from './StepFile';
 import type { AccountOptionDto } from '../movements/movements-api';
 import type { HeaderDetectionResult } from './import-api';
@@ -35,8 +35,6 @@ beforeEach(() => {
     return Promise.resolve({ ok: false, status: 404, json: async () => null });
   });
 });
-
-afterEach(() => vi.resetAllMocks());
 
 function makeCsv(name = 'a.csv', size = 100) {
   const blob = new Blob([new Uint8Array(size)], { type: 'text/csv' });

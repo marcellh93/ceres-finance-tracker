@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { SettingsPage } from './SettingsPage';
 import { refetchSettings } from '../../lib/use-settings';
@@ -28,6 +28,10 @@ const currenciesResponse = [
 ];
 
 beforeEach(() => {
+  // Clear call history on module-level mocks (per-file scope, no cross-file race).
+  vi.mocked(toast.success).mockClear();
+  vi.mocked(toast.error).mockClear();
+  vi.mocked(refetchSettings).mockClear();
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation((url: string) => {
@@ -40,8 +44,6 @@ beforeEach(() => {
     return Promise.resolve({ ok: false, status: 404, json: async () => null });
   });
 });
-
-afterEach(() => vi.resetAllMocks());
 
 describe('SettingsPage', () => {
   it('renders skeleton after the delay window when loading is slow', async () => {

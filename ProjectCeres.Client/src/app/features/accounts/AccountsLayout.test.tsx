@@ -30,8 +30,6 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.resetAllMocks());
-
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>

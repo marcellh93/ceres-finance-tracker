@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CategoryEdit } from './CategoryEdit';
@@ -44,8 +44,6 @@ beforeEach(() => {
     return Promise.resolve({ ok: false, status: 404, json: async () => null });
   });
 });
-
-afterEach(() => vi.resetAllMocks());
 
 function LayoutShim() {
   return <Outlet context={{ refetch: vi.fn() }} />;

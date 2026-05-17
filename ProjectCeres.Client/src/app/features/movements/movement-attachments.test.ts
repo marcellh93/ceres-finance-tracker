@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { uploadAttachment, deleteAttachment } from './movement-attachments';
 
 let mockFetch: ReturnType<typeof vi.fn>;
@@ -6,7 +6,6 @@ beforeEach(() => {
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
-afterEach(() => { vi.resetAllMocks(); });
 
 describe('uploadAttachment', () => {
   it('POSTs multipart/form-data to the transaction endpoint', async () => {

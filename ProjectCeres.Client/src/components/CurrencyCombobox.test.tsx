@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CurrencyCombobox } from './CurrencyCombobox';
 
 let mockFetch: ReturnType<typeof vi.fn>;
@@ -16,8 +16,6 @@ beforeEach(() => {
     ],
   });
 });
-
-afterEach(() => vi.resetAllMocks());
 
 describe('CurrencyCombobox', () => {
   it('renders the placeholder when no value selected', async () => {

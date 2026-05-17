@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GoalBudgetForm, type GoalBudgetFormValues } from './GoalBudgetForm';
 
 let mockFetch: ReturnType<typeof vi.fn>;
@@ -25,7 +25,6 @@ beforeEach(() => {
     return Promise.resolve({ ok: false, status: 404, json: async () => null });
   });
 });
-afterEach(() => vi.resetAllMocks());
 
 vi.mock('../../lib/use-settings', () => ({
   useSettings: () => ({ data: { numberFormat: 'period_decimal' }, loading: false }),

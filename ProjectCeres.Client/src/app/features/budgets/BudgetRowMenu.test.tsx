@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BudgetRowMenu } from './BudgetRowMenu';
 
 vi.mock('sonner', () => ({
@@ -14,8 +14,6 @@ beforeEach(() => {
   mockFetch = vi.fn();
   global.fetch = mockFetch as unknown as typeof fetch;
 });
-
-afterEach(() => vi.resetAllMocks());
 
 function renderMenu({
   budgetId = 'b1',
