@@ -124,6 +124,8 @@ ProjectCeres/wwwroot/css/site.css
 .superpowers/
 # Per-process state from ScheduleWakeup — never share across machines
 .claude/scheduled_tasks.lock
+# Per-session state from deep-fix-mode hooks
+.claude/state/
 
 ##Testing
 impeccable-sandbox/
