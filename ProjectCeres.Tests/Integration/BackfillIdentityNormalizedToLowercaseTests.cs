@@ -301,6 +301,13 @@ public class BackfillIdentityNormalizedToLowercaseTests
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+    // SECURITY NOTE: the seed helpers below use SQL string interpolation for the
+    // values. This is SAFE here because every input is test-controlled — Guid.NewGuid()
+    // for ids, internally-constructed marker strings for the normalized columns.
+    // NullableSqlString escapes single quotes for the rare marker that contains one.
+    // DO NOT copy these helpers into production code paths or into tests that
+    // accept user-sourced input — use parameterized queries (FormattableString /
+    // ExecuteSqlInterpolatedAsync) instead.
 
     private static async Task SeedAspNetUserAsync(AdminDbContext db, Guid id,
         string? normalizedEmail, string? normalizedUserName)
