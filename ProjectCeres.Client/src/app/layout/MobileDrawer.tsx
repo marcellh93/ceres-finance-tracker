@@ -13,11 +13,11 @@ export function MobileDrawer({ open, onOpenChange }: MobileDrawerProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-72 p-0">
+      <SheetContent side="left" className="w-72 p-0 flex flex-col">
         <SheetHeader className="border-b border-border p-4">
           <SheetTitle>Ceres</SheetTitle>
         </SheetHeader>
-        <nav aria-label="Primary" className="flex flex-col gap-6 p-4">
+        <nav aria-label="Primary" className="flex flex-1 flex-col gap-6 overflow-y-auto p-4">
           {navGroups.map((group) => (
             <div key={group.label}>
               <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

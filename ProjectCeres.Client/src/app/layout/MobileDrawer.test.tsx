@@ -37,4 +37,16 @@ describe('MobileDrawer', () => {
     renderDrawer(false);
     expect(screen.queryByRole('link', { name: 'Movements' })).toBeNull();
   });
+
+  it('nav region scrolls when content exceeds viewport height', () => {
+    // Regression guard for Stage 9.1.5.d: adding ThemeToggle to the drawer
+    // bottom pushed the total content past the viewport on short mobile
+    // screens. Sheet height-bounds its content; the inner <nav> must be
+    // flex-1 + overflow-y-auto so the bottom items + ThemeToggle remain
+    // reachable via scroll.
+    renderDrawer(true);
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(nav.className).toContain('flex-1');
+    expect(nav.className).toContain('overflow-y-auto');
+  });
 });
