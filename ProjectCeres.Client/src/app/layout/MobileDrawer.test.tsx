@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -58,15 +58,33 @@ describe('MobileDrawer', () => {
     expect(nav.className).toContain('overflow-y-auto');
   });
 
-  it('renders the theme row as a full-width DrawerLink-style row, not a floating button', async () => {
-    // Regression guard for Stage 9.1.5.d UX fix: the drawer's theme control
-    // now matches the Settings/Support row shape (icon-left, label, current
-    // preference right-aligned) rather than a floating outline button.
+  it('renders the theme row as a segmented control with 3 direct-select options', async () => {
+    // Regression guard for Stage 9.1.5.d UX fix: dropdown was rejected on
+    // mobile because popping above the trigger covered Settings/Support
+    // (mobile vertical pixels are scarce). Replaced with a segmented control
+    // — 1-tap direct selection, no portal, no positioning bugs. The icon-only
+    // dropdown variant of ThemeToggle is still used in TopBar (desktop) and
+    // AuthLayout where toolbar real estate forbids 3 inline buttons.
     renderDrawer(true);
-    const trigger = screen.getByRole('button', { name: /toggle theme/i });
-    expect(trigger.className).toContain('w-full');
-    expect(trigger.textContent).toContain('Theme');
-    // Current preference is surfaced on the trigger (default = system).
-    expect(trigger.textContent).toContain('System');
+    const group = screen.getByRole('radiogroup', { name: /toggle theme/i });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios).toHaveLength(3);
+    expect(radios.map((r) => r.textContent)).toEqual(['System', 'Light', 'Dark']);
+    // Default theme is 'system' — that option is checked.
+    expect(radios[0].getAttribute('aria-checked')).toBe('true');
+    expect(radios[1].getAttribute('aria-checked')).toBe('false');
+    expect(radios[2].getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('clicking a segmented theme option flips the theme', async () => {
+    // Direct-select replacement for the prior dropdown click flow.
+    const user = userEvent.setup();
+    renderDrawer(true);
+    const group = screen.getByRole('radiogroup', { name: /toggle theme/i });
+    await user.click(within(group).getByRole('radio', { name: 'Light' }));
+    // After click, Light is checked; System is not.
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.find((r) => r.textContent === 'Light')?.getAttribute('aria-checked')).toBe('true');
+    expect(radios.find((r) => r.textContent === 'System')?.getAttribute('aria-checked')).toBe('false');
   });
 });

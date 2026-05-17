@@ -1,15 +1,8 @@
-import { ChevronDown, Moon, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useTheme, type Theme } from '@/app/theme/theme-context';
+import { cn } from '@/lib/utils';
 import { bottomItems, navGroups, type NavItem } from './nav-items';
 
 type MobileDrawerProps = {
@@ -58,41 +51,45 @@ export function MobileDrawer({ open, onOpenChange }: MobileDrawerProps) {
 }
 
 function ThemeDrawerRow() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
-  const ResolvedIcon = resolvedTheme === 'dark' ? Moon : Sun;
-  const preferenceLabel =
-    theme === 'system' ? t('theme.system') : theme === 'dark' ? t('theme.dark') : t('theme.light');
+
+  const options: { value: Theme; label: string }[] = [
+    { value: 'system', label: t('theme.system') },
+    { value: 'light', label: t('theme.light') },
+    { value: 'dark', label: t('theme.dark') },
+  ];
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            aria-label={t('theme.ariaLabel')}
-            className="mt-2 flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
-          >
-            <ResolvedIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>{t('theme.label')}</span>
-            <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-              {preferenceLabel}
-              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-            </span>
-          </button>
-        }
-      />
-      <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup
-          value={theme}
-          onValueChange={(value) => setTheme(value as Theme)}
-        >
-          <DropdownMenuRadioItem value="system">{t('theme.system')}</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="light">{t('theme.light')}</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">{t('theme.dark')}</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div
+      role="radiogroup"
+      aria-label={t('theme.ariaLabel')}
+      className="mt-2 flex items-center gap-2 px-3 py-2"
+    >
+      <span className="text-sm text-foreground">{t('theme.label')}</span>
+      <div className="ml-auto inline-flex rounded-md border border-border bg-muted/30 p-0.5">
+        {options.map(({ value, label }) => {
+          const active = theme === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => setTheme(value)}
+              className={cn(
+                'rounded px-2 py-1 text-xs transition-colors',
+                active
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
