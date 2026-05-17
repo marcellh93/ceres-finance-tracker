@@ -37,6 +37,7 @@ public sealed class PasswordResetService
     private readonly IMemoryCache _cache;
     private readonly ILogger<PasswordResetService> _logger;
     private readonly IAuditLogWriter _auditLog;
+    private readonly ILookupNormalizer _normalizer;
 
     public PasswordResetService(
         UserManager<ApplicationUser> userManager,
@@ -53,7 +54,8 @@ public sealed class PasswordResetService
         ILanguageResolver languages,
         IMemoryCache cache,
         ILogger<PasswordResetService> logger,
-        IAuditLogWriter auditLog)
+        IAuditLogWriter auditLog,
+        ILookupNormalizer normalizer)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -70,6 +72,7 @@ public sealed class PasswordResetService
         _cache = cache;
         _logger = logger;
         _auditLog = auditLog;
+        _normalizer = normalizer;
     }
 
     public sealed class RateLimitedException : Exception
@@ -83,7 +86,15 @@ public sealed class PasswordResetService
     public async Task RequestAsync(
         string email, string ip, string userAgent, string resetUrlBase, CancellationToken ct)
     {
-        var normalized = (email ?? "").Trim().ToLowerInvariant();
+        // Stage 9.1.5.b Task 6 follow-up: route through ILookupNormalizer so this site
+        // tracks the project's normalizer registration. If the registration changes
+        // (e.g. back to Identity's default UpperInvariantLookupNormalizer), the
+        // FindByEmailAsync lookup below — and the FailedLoginRecorder cache key downstream
+        // (itself fixed in 4b35911 to use ILookupNormalizer) — would otherwise silently
+        // miss their UserManager-normalized rows. Null-coalesce fallback preserves the
+        // empty-string contract for the early-return branch immediately below.
+        var trimmed = email?.Trim();
+        var normalized = _normalizer.NormalizeEmail(trimmed) ?? trimmed ?? "";
         if (normalized.Length == 0)
         {
             _argon.RunDummyHash();

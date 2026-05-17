@@ -37,6 +37,7 @@ public sealed class EmailChangeService
     private readonly IMemoryCache _cache;
     private readonly ILogger<EmailChangeService> _logger;
     private readonly IAuditLogWriter _auditLog;
+    private readonly ILookupNormalizer _normalizer;
 
     public EmailChangeService(
         UserManager<ApplicationUser> userManager,
@@ -50,7 +51,8 @@ public sealed class EmailChangeService
         ILanguageResolver languages,
         IMemoryCache cache,
         ILogger<EmailChangeService> logger,
-        IAuditLogWriter auditLog)
+        IAuditLogWriter auditLog,
+        ILookupNormalizer normalizer)
     {
         _userManager = userManager;
         _db = db;
@@ -64,6 +66,7 @@ public sealed class EmailChangeService
         _cache = cache;
         _auditLog = auditLog;
         _logger = logger;
+        _normalizer = normalizer;
     }
 
     public sealed class RateLimitedException : Exception
@@ -80,7 +83,13 @@ public sealed class EmailChangeService
         string verifyUrlBase, string revokeUrlBase,
         CancellationToken ct)
     {
-        var normalized = (newEmail ?? "").Trim().ToLowerInvariant();
+        // Stage 9.1.5.b Task 6 follow-up: route through ILookupNormalizer so this site
+        // tracks the project's normalizer registration. If the registration changes
+        // (e.g. back to Identity's default UpperInvariantLookupNormalizer), the
+        // FindByEmailAsync lookup below would otherwise silently miss its UserManager-
+        // normalized rows. Null-coalesce fallback preserves the empty-string contract.
+        var trimmed = newEmail?.Trim();
+        var normalized = _normalizer.NormalizeEmail(trimmed) ?? trimmed ?? "";
         if (normalized.Length == 0)
         {
             _argon.RunDummyHash();
