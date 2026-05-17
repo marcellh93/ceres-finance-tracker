@@ -1,3 +1,4 @@
+import { Moon, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -51,8 +52,9 @@ export function MobileDrawer({ open, onOpenChange }: MobileDrawerProps) {
 }
 
 function ThemeDrawerRow() {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const { t } = useTranslation();
+  const ResolvedIcon = resolvedTheme === 'dark' ? Moon : Sun;
 
   const options: { value: Theme; label: string }[] = [
     { value: 'system', label: t('theme.system') },
@@ -64,8 +66,9 @@ function ThemeDrawerRow() {
     <div
       role="radiogroup"
       aria-label={t('theme.ariaLabel')}
-      className="mt-2 flex items-center gap-2 px-3 py-2"
+      className="mt-2 flex items-center gap-3 px-3 py-2"
     >
+      <ResolvedIcon className="h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
       <span className="text-sm text-foreground">{t('theme.label')}</span>
       <div className="ml-auto inline-flex rounded-md border border-border bg-muted/30 p-0.5">
         {options.map(({ value, label }) => {
