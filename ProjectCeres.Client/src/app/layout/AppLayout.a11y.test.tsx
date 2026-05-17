@@ -5,8 +5,8 @@ import { AppLayout } from './AppLayout';
 import { expectNoA11yViolations } from '../lib/test-axe';
 
 // AppLayout renders <Toaster /> from @/components/ui/sonner, which in turn
-// wraps the real `sonner` Toaster and calls `useTheme` from next-themes.
-// Mock the local wrapper so JSDOM doesn't choke on portals / canvas / theme.
+// wraps the real `sonner` Toaster and calls `useTheme` from @/app/theme/theme-context.
+// Mock the local wrapper so JSDOM doesn't choke on portals / canvas.
 vi.mock('@/components/ui/sonner', () => ({
   Toaster: () => null,
 }));
