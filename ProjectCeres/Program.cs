@@ -275,12 +275,18 @@ builder.Services.AddRateLimiter(options =>
         context.HttpContext.Response.Headers.RetryAfter =
             retryAfterSeconds.ToString(CultureInfo.InvariantCulture);
 
-        // Stage 9.1.5.b: when rejecting /api/auth/login, consult LockoutCache. If the
-        // requesting IP's last-attempted email is known to be locked, surface the
-        // ACCOUNT_LOCKED_OUT envelope (401) instead of RATE_LIMITED (429). Memory-only
-        // reads — no DB query — so the DoS-amplification concern in security-model.md
-        // § lockout is preserved.
-        if (context.HttpContext.Request.Path.StartsWithSegments("/api/auth/login"))
+        // Stage 9.1.5.b: when rejecting POST /api/auth/login (the password step — NOT
+        // /api/auth/login/totp, which uses a per-user AuthTotpByUser limiter unrelated
+        // to account lockout), consult LockoutCache. If the requesting IP's
+        // last-attempted email is known to be locked, surface the ACCOUNT_LOCKED_OUT
+        // envelope (401) instead of RATE_LIMITED (429). Memory-only reads — no DB
+        // query — so the DoS-amplification concern in security-model.md § lockout is
+        // preserved.
+        //
+        // Exact-match on PathString (case-insensitive + trailing-slash-normalized per
+        // ASP.NET conventions) excludes /api/auth/login/totp without a separate
+        // exclusion clause.
+        if (context.HttpContext.Request.Path == "/api/auth/login")
         {
             var lockoutCache = context.HttpContext.RequestServices
                 .GetRequiredService<ProjectCeres.Common.Authentication.LockoutCache>();
@@ -297,7 +303,7 @@ builder.Services.AddRateLimiter(options =>
                     error = new
                     {
                         code = "ACCOUNT_LOCKED_OUT",
-                        message = "Account temporarily locked. Try again in 15 minutes.",
+                        message = ProjectCeres.Common.Authentication.AuthMessages.AccountTemporarilyLockedFifteenMinutes,
                     }
                 }, ct);
                 return;

@@ -229,7 +229,7 @@ public sealed class AuthController : ControllerBase
                     _logger.LogError(ex, "Failed to issue lockout-unlock token for user {UserId}", userStub.Id);
                 }
             }
-            return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+            return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", AuthMessages.AccountTemporarilyLockedFifteenMinutes);
         }
 
         if (!signIn.Succeeded)
@@ -281,7 +281,7 @@ public sealed class AuthController : ControllerBase
                     await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
                     await _signInManager.SignOutAsync();
                     ClearRememberMeCookie();
-                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", AuthMessages.AccountTemporarilyLockedFifteenMinutes);
                 }
                 return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
             }
@@ -296,7 +296,7 @@ public sealed class AuthController : ControllerBase
                     await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
                     await _signInManager.SignOutAsync();
                     ClearRememberMeCookie();
-                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", AuthMessages.AccountTemporarilyLockedFifteenMinutes);
                 }
                 await _signInManager.SignOutAsync();
                 return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
@@ -331,7 +331,7 @@ public sealed class AuthController : ControllerBase
                     await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.LockedOut, ip, ua, HttpContext.RequestAborted);
                     await _signInManager.SignOutAsync();
                     ClearRememberMeCookie();
-                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", AuthMessages.AccountTemporarilyLockedFifteenMinutes);
                 }
                 return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
             }

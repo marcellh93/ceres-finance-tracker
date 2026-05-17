@@ -39,7 +39,7 @@ public sealed class ReauthController : ControllerBase
         if (user is null) return UnauthorizedEnvelope("UNAUTHENTICATED", "Authentication required.");
 
         if (await _userManager.IsLockedOutAsync(user))
-            return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+            return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", AuthMessages.AccountTemporarilyLockedFifteenMinutes);
 
         if (user.TwoFactorEnabled)
         {
@@ -76,7 +76,7 @@ public sealed class ReauthController : ControllerBase
             {
                 await _userManager.AccessFailedAsync(user);
                 if (await _userManager.IsLockedOutAsync(user))
-                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", "Account temporarily locked. Try again in 15 minutes.");
+                    return UnauthorizedEnvelope("ACCOUNT_LOCKED_OUT", AuthMessages.AccountTemporarilyLockedFifteenMinutes);
                 return UnauthorizedEnvelope("INVALID_REAUTH", "Password is incorrect.");
             }
         }

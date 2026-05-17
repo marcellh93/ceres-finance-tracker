@@ -460,6 +460,42 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RateLimitRejection_OnLoginTotpEndpoint_StillReturnsRateLimited()
+    {
+        // The OnRejected lockout-aware override only applies to POST /api/auth/login
+        // (password step). The TOTP step uses AuthTotpByUser (per-user partition);
+        // a TOTP 429 has no relationship to per-IP account-lockout state and must
+        // surface RATE_LIMITED, not ACCOUNT_LOCKED_OUT.
+        await using var factory = _factory.WithFreshRateLimiter();
+        var user = await AuthTestFixture.RegisterUserAsync(factory, "rl-totp@rl-test.local");
+        await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+
+        var options = new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            HandleCookies = false,
+        };
+        var client = factory.CreateClient(options);
+
+        // Pass the password step to get the Identity.TwoFactorUserId cookie
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = false });
+        var mfaCookie = ExtractSetCookie(loginResp, "Identity.TwoFactorUserId");
+        mfaCookie.Should().NotBeNullOrEmpty("password login must return Identity.TwoFactorUserId");
+
+        // Burn the TOTP per-user bucket until 429
+        var rejected = await FireUntilRateLimited(
+            () => PostTotpWithCookieAsync(client, mfaCookie!, "000000"));
+        rejected.Should().NotBeNull("TOTP per-user limiter must fire within 25 attempts");
+
+        rejected!.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
+            "TOTP 429 must NOT be re-surfaced as 401 ACCOUNT_LOCKED_OUT — the TOTP step uses a per-user limiter unrelated to account-lockout state");
+        var body = await rejected.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("RATE_LIMITED",
+                "/api/auth/login/totp must always return RATE_LIMITED on 429 — the OnRejected lockout override applies only to /api/auth/login");
+    }
+
+    [Fact]
     public async Task RateLimitRejection_WhenPerEmailEntryAbsent_FallsBackToRateLimitedEnvelope()
     {
         await using var factory = _factory.WithShortLockoutCacheTtl();
