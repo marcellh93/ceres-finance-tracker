@@ -532,4 +532,39 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
             .Should().Be("RATE_LIMITED",
                 "after the per-email entry is gone, OnRejected must fall back to the default RATE_LIMITED envelope");
     }
+
+    [Fact]
+    public async Task RateLimitRejection_DifferentUserFromSameIp_OutsideWindow_ReturnsRateLimited()
+    {
+        await using var factory = _factory.WithShortLockoutCacheTtl();
+        var userA = await AuthTestFixture.RegisterUserAsync(factory, "rl-ip-a@rl-test.local");
+        var userB = await AuthTestFixture.RegisterUserAsync(factory, "rl-ip-b@rl-test.local");
+        var client = factory.CreateClient();
+
+        // User A locks out — seeds both LockoutCache entries.
+        for (int i = 0; i < 10; i++)
+        {
+            await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+                new { email = userA.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        }
+
+        // Wait for the per-IP pointer to expire. WithShortLockoutCacheTtl sets
+        // IpPointerTtl = 1s; we wait 1.2s for safety margin.
+        await Task.Delay(TimeSpan.FromMilliseconds(1200));
+
+        // User B's attempt from the SAME IP: per-IP rate-limit bucket is already
+        // saturated from A's 10 attempts (within the 60s rate-limit window), so the
+        // request hits OnRejected. The per-IP pointer to user A has expired, so
+        // TryGetLastLockedEmailForIp returns false; OnRejected falls back to the
+        // default RATE_LIMITED envelope — even though A's account is still locked
+        // (per-email entry persists until A's actual LockoutEnd of UtcNow+15min).
+        var bResp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
+            new { email = userB.Email, password = "wrong-but-long-enough-pwd", rememberMe = false });
+        bResp.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
+            "outside the per-IP pointer window, a different user's 429 must keep its RATE_LIMITED shape");
+        var body = await bResp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("error").GetProperty("code").GetString()
+            .Should().Be("RATE_LIMITED",
+                "user B is not locked; the per-IP pointer to user A must have expired");
+    }
 }
