@@ -40,6 +40,28 @@ Hard requirement: if you cannot fill in the fourth column for an attempt — "wh
 
 If the table has fewer than 2 rows, you are not circling — exit this skill and proceed normally.
 
+## Step 2.5 — False-positive exit gate
+
+The hooks that auto-trigger this skill (`loop-fingerprint.js`, `same-target-edit-count.js`) use counts and content fingerprints. They cannot semantically distinguish three different shapes of repeated tool calls:
+
+| Shape | Looks like | Is it Fixation? |
+|---|---|---|
+| **Circling** | Same file, same content fingerprint, same symptom across N attempts | **Yes** — invoke the rest of the skill |
+| **Sweeping** | Same file, DISTINCT fingerprints per edit, planned linear pass (doc move, find-and-replace, refactor across N sections) | **No** — false positive |
+| **Pre-edit verification** | Multiple Read/Grep calls before a careful Edit (especially subagent flows) | **No** — false positive |
+
+Look at the table from step 2. If **every row's fourth column** would honestly read "this was a planned step in a sweep, not an attempt to fix a failing symptom" — OR if there is no failing symptom at all, only a series of distinct planned actions — the trigger is a false positive.
+
+**False-positive exit protocol:**
+
+1. State in one sentence why the trigger was a false positive (e.g. "planned multi-section doc-move sweep, each edit targets a distinct line").
+2. Resume the work. Do NOT push through steps 3–6 just because the hook fired.
+3. The `Skill` invocation that brought you here is still recorded in the playbook state file, so the system has an audit trail of the check.
+
+If you cannot honestly say "every row is a planned step," continue to step 3. Fixation often disguises itself as planning, so the bar is "would a skeptical reviewer agree these are distinct steps with distinct targets and distinct content."
+
+This exit clause exists because the hooks improved in 2026-05-17 to count *distinct content fingerprints* (not raw edit counts), but the v1 false-positives that motivated the improvement are worth documenting so future agents know the shape.
+
 ## Step 3 — Name the pattern
 
 From `references/loop-patterns.md`, name the **specific** pattern your behavior matches. Examples:

@@ -85,8 +85,18 @@ process.stdin.on("end", () => {
 
   if (!sessionId || !toolName) process.exit(0);
 
-  // Only fingerprint tools where repetition is meaningful.
-  const TRACKED = new Set(["Bash", "Edit", "Write", "Read", "Grep", "Glob"]);
+  // Only fingerprint tools where repetition is meaningfully mutating or stateful.
+  //
+  // Excluded by design (v2 fix, 2026-05-17):
+  //   - Read, Grep, Glob — diligent pre-edit verification routinely produces
+  //     repeated reads when an agent is being careful (re-reading after an edit
+  //     to confirm, or scanning N matches of the same grep). Subagent flows
+  //     especially hit this: a fresh subagent re-reads its target file before
+  //     editing, which the v1 tracker counted as a "loop." See screenshot
+  //     2026-05-17 of the "stalled on advisory" subagent incident.
+  //   - Edit/Write are still tracked because content-identical mutations across
+  //     turns IS a real Fixation signal.
+  const TRACKED = new Set(["Bash", "Edit", "Write"]);
   if (!TRACKED.has(toolName)) process.exit(0);
 
   ensureDir(STATE_DIR);
@@ -133,7 +143,7 @@ process.stdin.on("end", () => {
     "",
     "Per Anthropic Fellows 2026 (https://alignment.anthropic.com/2026/hot-mess-of-ai/): the longer models spend on a task, the more incoherent their errors become. More retries ≠ better.",
     "",
-    "MANDATORY: Invoke `deep-fix-mode` skill now. Do not retry this action. Do not propose another variant. Follow the six-step procedure: stop → failed-attempts table → pattern match → layer naming → external research → finished diagnosis.",
+    "Consider invoking `deep-fix-mode` to run the six-step procedure (stop → failed-attempts table → pattern match → layer naming → external research → finished diagnosis). If you believe this is a false positive (e.g. content-identical mutations are intentional, like a script that emits a fixed string), state that explicitly and proceed — the skill's step-2 table check accepts the exit reason. The escalation to BLOCK still applies at 5+ identical fingerprints because at that count the cost of a false-positive pause is lower than the cost of un-checked Fixation.",
   ].join("\n");
 
   if (escalate) {
