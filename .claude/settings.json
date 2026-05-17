@@ -139,6 +139,37 @@
             "command": "node .claude/skills/playbook/hooks/state-record-skill-fire.js"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/state-rehydration/hooks/snapshot-on-turn-end.js"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/state-rehydration/hooks/snapshot-on-pre-compact.js"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/skills/state-rehydration/hooks/detect-compaction.js"
+          }
+        ]
       }
     ],
     "Stop": [
