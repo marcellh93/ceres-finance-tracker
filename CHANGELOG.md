@@ -6,6 +6,29 @@
 
 #### Added
 
+**Authentication (Stage 9.4 — `/password-reset` SPA pages, 2026-05-18)**
+- Single SPA page mounted at `/password-reset` that dispatches by `location.hash`: empty/missing hash renders the request form (one email field + "Send reset link" submit + back-to-sign-in); `#token=<raw>` renders the confirm form (new + confirm password, optional TOTP cells revealed if the server responds `200 { requiresTotp: true }`)
+- Honors the server's pre-existing URL convention from `PasswordResetService.cs:164` — reset link embeds the raw token in the URL fragment, not query, so the token never reaches the server logs or Referer headers
+- Failure paths wired end-to-end: `401 INVALID_RESET_TOKEN` replaces the form with an invalid-token block + "Request a new link" link to `/password-reset`; `401 INVALID_MFA_CODE` shows an inline error on the TOTP cells without losing the password fields; `422 VALIDATION_ERROR` maps `details[]` to react-hook-form field errors (PwnedPasswords / policy violations surface inline)
+- On `204` success: navigate to `/login?reset=1`; Login's existing `useEffect` toast handler now also fires `auth.login.toasts.passwordResetSuccess` ("Password reset. Sign in with your new password.")
+- 11 vitest unit tests pin the contract: hash parsing (no token / empty token / valid token), request 204 success block, request 429 no-countdown variant, confirm zod mismatch (no fetch), confirm 204 navigate, requiresTotp two-step flow, INVALID_RESET_TOKEN block, INVALID_MFA_CODE preserves passwords, VALIDATION_ERROR maps to field errors
+- `PasswordResetPlaceholder.tsx` deleted; its dead i18n keys at `auth.placeholders.passwordReset.*` removed in the same commit
+- Spec: `docs/superpowers/specs/2026-05-18-stage-9-4-password-reset-design.md`
+
+**Authentication (Stage 9.2 — `/login/totp` SPA page, 2026-05-17)**
+- New `/login/totp` route mounted under the public `AuthLayout` centered-card branch; six-cell `InputOTP` shadcn primitive as the default state with auto-submit when 6 digits are typed or pasted; manual "Verify" button for backup-code mode
+- Backup-code state reached via "Lost your device?" link toggle; uses a plain text input (alphanumeric); submit posts to the same `/api/auth/login/totp` endpoint per the server's existing contract
+- Failure paths: `401 INVALID_MFA_CODE` renders the inline `auth.totp.errors.invalid` error and clears the cells; `401 ACCOUNT_LOCKED_OUT` navigates to `/account/unlock` (matches Login page parity); `401 UNAUTHENTICATED` navigates to `/login?expired=1` with a new sonner toast (`auth.login.toasts.totpExpired`); `429` reads `Retry-After` header and surfaces the countdown via `aria-live="polite"`, falling back to the no-countdown variant if the header is missing
+- `submitTotp` page-local helper bypasses `apiFetch` only for this endpoint so the SPA can read response headers (CSRF prime + raw `fetch`); isolated to 9 lines, called out in the spec as the trade-off
+- 10 vitest unit tests + 2 vitest-axe a11y tests (serious/critical filter via `expectNoA11yViolations`); pre-existing `Login.test.tsx` gains a sonner-mocked test asserting the `?expired=1` toast fires
+- Test-infrastructure: `document.elementFromPoint` no-op polyfill added to `src/test-setup.ts` so input-otp's background timer no longer throws an Uncaught Exception under jsdom (was poisoning unrelated test files via cross-file pollution)
+- Spec: `docs/superpowers/specs/2026-05-17-stage-9-2-login-totp-design.md`; plan: `docs/superpowers/plans/2026-05-17-stage-9-2-login-totp-impl.md`
+
+**Authentication (Stage 9.3 — spec only, implementation in follow-up session, 2026-05-18)**
+- `docs/superpowers/specs/2026-05-18-stage-9-3-register-and-email-verify-design.md` — comprehensive design for the `/register` SPA page + `/email-verify` token-consumption page + the server-side `EmailConfirmationToken` pipeline (entity + EF migration with TokenLookup column matching the Stage 6.15 / 9.1.5.a indexed-lookup pattern + service mirroring `PasswordResetService` line-for-line + two new HTTP endpoints + `RegistrationConfirmation` resx EN+ES + `EmailTemplateKey` enum addition + register-flow wiring + DI + ~10 integration tests + ~10 SPA tests)
+- Splits the duplicate-username anti-enumeration notice INTO 9.3 scope (rather than deferring it to a still-undefined "Stage 6c follow-up" with no roadmap `[ ]` line) — the verification email itself IS the notice when sent to the existing account holder; per `feedback_deferral_requires_receiving_stage_checkbox`, deferring without a receiving entry isn't allowed
+- Receiving entry / tripwire: the existing `[ ]` line at `docs/roadmap-phase-three.md:954` (Stage 9 sub-stage 9.3) — Stage 9 close-out cannot complete with 9.3 unticked
+
 **Authentication (Stage 6 close-out — flow diagrams, 2026-05-11)**
 - `docs/security-model.md § Authentication Flow Diagrams (Stage 6 close-out)` — single end-of-stage Mermaid set: request pipeline; registration; login (no-MFA / MFA TOTP / backup-code branches); password reset (request + confirm); reauth step-up + `[RequireRecentAuth]` gate; email-address change (request + confirm + revoke); lockout self-service unlock; audit-log writes overlay; cross-flow authentication state machine
 - Each diagram paired with explicit audit prompts pointing at the integration tests that pin the behaviour

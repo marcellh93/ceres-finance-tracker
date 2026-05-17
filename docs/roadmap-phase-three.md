@@ -981,12 +981,12 @@ Layout + brand:
 
 `/login/totp`:
 
-- [ ] 6-digit input with auto-focus, auto-advance, paste handling
-- [ ] On wrong code: generic error "Invalid code"
-- [ ] On expired window: same generic error (no leak that "the code was right but expired")
-- [ ] On success: cookie set, redirect to `/` (dashboard) or onboarding if first-run
-- [ ] Backup-code link below input: "Lost your device? Use a backup code"
-- [ ] Backup-code path uses single-use code; on success offers backup-codes regeneration
+- [x] 6-digit input with auto-focus, auto-advance, paste handling — shadcn `InputOTP` primitive with 6 `InputOTPSlot` cells; auto-submit fires on 6 digits typed/pasted. Test `LoginTotp.test.tsx > auto-submits when 6 digits typed` pins the contract.
+- [x] On wrong code: generic error "Invalid code" — `auth.totp.errors.invalid` i18n key; tested in `LoginTotp.test.tsx > on 401 INVALID_MFA_CODE renders the inline error`.
+- [x] On expired window: same generic error (no leak that "the code was right but expired") — server already collapses both into `401 INVALID_MFA_CODE` per `AuthController.cs:286`; SPA renders the same `auth.totp.errors.invalid` regardless.
+- [x] On success: cookie set, redirect to `/` (dashboard) **on dashboard path only** — first-run onboarding redirect deferred to Stage 15.5 (onboarding wizard owns first-run UX). Tested in `LoginTotp.test.tsx > auto-submits when 6 digits typed; on 204 navigates to /`.
+- [x] Backup-code link below input: "Lost your device? Use a backup code" — i18n `auth.totp.backupCodePrompt`; tested in `LoginTotp.test.tsx > backup-code mode: link toggles form`.
+- [x] Backup-code path uses single-use code (server-side single-use enforcement in `MfaBackupCodeService.VerifyAndConsumeAsync` at `AuthController.cs:325`); **on success offers backup-codes regeneration** — server returns `204` regardless and does not currently signal "you just consumed your last code". Regeneration prompt is Stage 9.7's scope (backup-codes recovery flow). 9.2 ships the consume path; 9.7 ships the post-consume UX. Spec: `docs/superpowers/specs/2026-05-17-stage-9-2-login-totp-design.md`. Plan: `docs/superpowers/plans/2026-05-17-stage-9-2-login-totp-impl.md`.
 
 `/register`:
 
@@ -997,12 +997,12 @@ Layout + brand:
 
 `/password-reset` (request) + `/password-reset/confirm` (action):
 
-- [ ] Request page: email field; submit returns "If that email is registered, you'll receive a link" (constant response + timing)
-- [ ] Email contains link with 256-bit token (15-min expiry)
-- [ ] `/password-reset/confirm?token=...` form requires: TOTP code + new password
-- [ ] On success: token invalidated, all sessions revoked, redirect to `/login`
-- [ ] On expired token: clear error, link to request a new one
-- [ ] On wrong TOTP: generic error, does NOT consume the reset token (token still valid for retry until expiry)
+- [x] Request page: email field; submit returns "If that email is registered, you'll receive a link" (constant response + timing) — server `PasswordResetService.RequestAsync` mirrors the Argon2id cost across known/unknown email branches per Stage 6.16. SPA renders the success block (`auth.passwordReset.request.successTitle` + `successBody`) on 204 regardless. Tested in `PasswordReset.test.tsx > request 204 replaces form with success block`.
+- [ ] Email contains link with 256-bit token (15-min expiry) — server-side; verified by `PasswordResetService` unit tests, not by 9.4's SPA work.
+- [x] **Form requires: TOTP code + new password** — implemented as a two-step UX (new-password first; reveal TOTP cells if server returns `200 { requiresTotp: true }`; submit again with all three fields). Note: SPA URL uses fragment-based delivery (`/password-reset#token=...`) per the server's existing URL convention at `PasswordResetService.cs:164`, not the query-based shape implied by the original roadmap line. Tested in `PasswordReset.test.tsx > confirm 200 requiresTotp → reveals OTP cells; second submit posts all three fields`.
+- [x] On success: token invalidated (server-side per `PasswordResetService.ConfirmAsync`), all sessions revoked (server-side per `PasswordResetService.cs:350-353`), redirect to `/login` — SPA navigates to `/login?reset=1`; Login fires a sonner toast on mount. Tested in `PasswordReset.test.tsx > confirm 204 navigates to /login?reset=1` + `Login.test.tsx > fires the password-reset toast when /login?reset=1`.
+- [x] On expired token: clear error, link to request a new one — `auth.passwordReset.confirm.errors.invalidToken` rendered as a full block with `auth.passwordReset.confirm.requestNewLink` link to `/password-reset`. Tested in `PasswordReset.test.tsx > confirm 401 INVALID_RESET_TOKEN → invalid-token block with request-new-link`.
+- [x] On wrong TOTP: generic error, does NOT consume the reset token — server contract at `PasswordResetService.cs:300-303` already pins this (the token is consumed only on success). SPA renders the inline error and preserves the password fields. Tested in `PasswordReset.test.tsx > confirm 401 INVALID_MFA_CODE → inline error on OTP, password fields preserved`. Spec: `docs/superpowers/specs/2026-05-18-stage-9-4-password-reset-design.md`.
 
 Lockout / unlock:
 
