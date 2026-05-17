@@ -994,13 +994,18 @@ Required when the React SPA is on a different origin from the API (Phase 3). Con
 
 All state-changing API endpoints authenticated via cookies require CSRF protection. CORS does not prevent CSRF — it only blocks cross-origin reads, not cross-origin state-changing requests. `SameSite` cookies reduce the risk but are not a complete substitute for an explicit token.
 
-**Pattern for the React SPA (double-submit cookie):**
-1. The server sets a separate non-HttpOnly `XSRF-TOKEN` cookie on page load
-2. The React client reads this cookie and includes it as an `X-XSRF-TOKEN` request header on all state-changing requests (POST, PUT, PATCH, DELETE)
-3. The server validates that the header value matches the cookie value
-4. Because cross-site requests cannot read the cookie value (same-origin policy), forged requests cannot supply the correct header
+**Pattern for the React SPA (double-submit cookie pair — see [ADR-0076](decisions/ADR-0076-spa-csrf-token-source-via-response-header.md) for the full mechanism):**
 
-**Note:** `planning-phase3-spa-migration.md` previously stated that anti-forgery tokens are "replaced by CORS + HttpOnly cookie auth." This is incorrect — CORS does not prevent CSRF. The double-submit pattern above is the required approach. That statement in the migration doc has been corrected.
+ASP.NET's `IAntiforgery` generates a **cryptographic pair** of tokens on each `GetAndStoreTokens` call: a cookie token and a separate request token. They are different values; sending the cookie value as the header value fails validation. The mechanism:
+
+1. `GET /api/auth/csrf` sets the cookie token in `__Host-XSRF` (`HttpOnly = false`, `Secure`, `SameSite = Lax`) AND emits the matching request token in the `X-XSRF-TOKEN` response header.
+2. The React SPA reads the response header (NOT the cookie), caches the request token in a module-level memo in `csrf.ts`, and includes it as the `X-XSRF-TOKEN` request header on every subsequent POST/PUT/PATCH/DELETE.
+3. ASP.NET's `AutoValidateAntiforgeryTokenAttribute` checks both tokens are present AND were generated together by `GetAndStoreTokens`.
+4. Because cross-site requests cannot read the response header (same-origin policy on `fetch`/`XHR`), forged requests cannot supply the correct header value.
+
+**Common anti-pattern (do NOT do this):** an earlier version of this doc described "the client reads the cookie and includes it as the header." That description was wrong for this server's `IAntiforgery` configuration — the cookie and header values are distinct, so reusing the cookie as the header fails validation every time. That misdescription caused the early-Stage-9 "400 on every login POST" bug, fixed in commit `ce2d9e9` and documented in ADR-0076.
+
+**Note:** `planning-phase3-spa-migration.md` previously stated that anti-forgery tokens are "replaced by CORS + HttpOnly cookie auth." This is also incorrect — CORS does not prevent CSRF. The double-submit pattern above is the required approach. That statement in the migration doc has been corrected.
 
 ---
 
