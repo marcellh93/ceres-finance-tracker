@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { App } from './App';
 import { AuthProvider } from './auth/auth-context';
+import { ThemeProvider } from './theme/theme-context';
 
 // Mock /api/auth/me to return an authenticated user so RequireAuth
 // resolves to 'authed' and renders protected children. All App.test.tsx
@@ -31,11 +32,13 @@ function mockAuthedMe() {
 
 function renderApp(path: string) {
   return render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <App />
-      </MemoryRouter>
-    </AuthProvider>,
+    <ThemeProvider>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>
+      </AuthProvider>
+    </ThemeProvider>,
   );
 }
 

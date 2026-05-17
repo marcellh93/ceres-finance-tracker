@@ -1,7 +1,6 @@
 import { Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useTheme } from '@/app/theme/theme-context';
 
 type ThemeToggleProps = {
   showLabel?: boolean;
@@ -9,13 +8,8 @@ type ThemeToggleProps = {
 
 export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const isDark = mounted && resolvedTheme === 'dark';
+  const isDark = resolvedTheme === 'dark';
   const nextTheme = isDark ? 'light' : 'dark';
   const ariaLabel = isDark ? 'Switch to light mode' : 'Switch to dark mode';
 

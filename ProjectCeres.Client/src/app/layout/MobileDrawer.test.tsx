@@ -3,14 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { MobileDrawer } from './MobileDrawer';
+import { ThemeProvider } from '@/app/theme/theme-context';
 
 function renderDrawer(open = true, onOpenChange = vi.fn()) {
   return {
     onOpenChange,
     ...render(
-      <MemoryRouter>
-        <MobileDrawer open={open} onOpenChange={onOpenChange} />
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <MobileDrawer open={open} onOpenChange={onOpenChange} />
+        </MemoryRouter>
+      </ThemeProvider>,
     ),
   };
 }

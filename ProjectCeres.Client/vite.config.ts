@@ -102,11 +102,10 @@ export default defineConfig({
               id.includes('node_modules/@date-fns/') ||
               id.includes('node_modules/react-day-picker'))
             return 'vendor-dates'
-          // vendor-overlay: sonner (toasts), cmdk (command palette), next-themes.
+          // vendor-overlay: sonner (toasts), cmdk (command palette).
           // Small but were pulled into the auto-named chunk along with the rest.
           if (id.includes('node_modules/sonner') ||
-              id.includes('node_modules/cmdk') ||
-              id.includes('node_modules/next-themes'))
+              id.includes('node_modules/cmdk'))
             return 'vendor-overlay'
         },
       },

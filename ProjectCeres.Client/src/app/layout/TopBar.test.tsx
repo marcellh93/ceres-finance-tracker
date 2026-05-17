@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TopBar } from './TopBar';
 import { ReminderCountProvider } from './ReminderCountProvider';
+import { ThemeProvider } from '@/app/theme/theme-context';
 
 beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -25,11 +26,13 @@ beforeEach(() => {
 
 function renderTopBar(route: string) {
   return render(
-    <MemoryRouter initialEntries={[route]}>
-      <ReminderCountProvider>
-        <TopBar onMenuClick={vi.fn()} />
-      </ReminderCountProvider>
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[route]}>
+        <ReminderCountProvider>
+          <TopBar onMenuClick={vi.fn()} />
+        </ReminderCountProvider>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
