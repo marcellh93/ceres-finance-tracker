@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { apiFetch } from '../lib/api-client';
+import { setCachedXsrfRequestToken } from './csrf';
 
 export type AuthUser = {
   userId: string;
@@ -48,6 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // redirect on next render. apiFetch swallows network errors into ApiResult,
     // so this can't throw.
     await apiFetch('/api/auth/logout', { method: 'POST' });
+    // Server rotates the CSRF cookie+token pair on logout (AuthController.cs
+    // calls _antiforgery.GetAndStoreTokens). Clear our cached request token so
+    // the next state-changing call (e.g. POST /api/auth/login) triggers a
+    // fresh handshake; otherwise we'd send the stale token against the new
+    // cookie and the server rejects with 400.
+    setCachedXsrfRequestToken(null);
     setUser(null);
     setStatus('anon');
   }, []);

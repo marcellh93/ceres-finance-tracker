@@ -2,6 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './auth-context';
+import {
+  clearXsrfTokenCacheForTests,
+  getCachedXsrfRequestToken,
+  setCachedXsrfRequestToken,
+} from './csrf';
 
 function StatusProbe() {
   const auth = useAuth();
@@ -18,9 +23,13 @@ describe('AuthProvider', () => {
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, 'fetch');
+    clearXsrfTokenCacheForTests();
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearXsrfTokenCacheForTests();
+  });
 
   it('starts in loading status', () => {
     fetchSpy.mockImplementationOnce(() => new Promise(() => {})); // never resolves
@@ -95,6 +104,34 @@ describe('AuthProvider', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'logout' }));
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anon'));
     expect(screen.getByTestId('user-email').textContent).toBe('none');
+  });
+
+  it('logout() clears the cached CSRF request token (server rotates the pair on logout)', async () => {
+    // Seed a cached token as if a prior state-changing request had set it.
+    setCachedXsrfRequestToken('stale-token-from-previous-session');
+    expect(getCachedXsrfRequestToken()).toBe('stale-token-from-previous-session');
+
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/me')) return AUTHED_ME_RESPONSE.clone();
+      if (url.includes('/api/auth/logout')) return new Response(null, { status: 204 });
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    render(
+      <AuthProvider>
+        <StatusProbe />
+        <LogoutButton />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authed'));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'logout' }));
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anon'));
+
+    // Stale token must be gone — otherwise the next POST (e.g. login) sends
+    // the old request token against the server's newly-rotated cookie and
+    // gets rejected with 400. This was the regression introduced by 9.1.5.f
+    // before the cache-clear was added.
+    expect(getCachedXsrfRequestToken()).toBeNull();
   });
 
   it('logout() still clears local state even when server returns 401 (server already lost the session)', async () => {
