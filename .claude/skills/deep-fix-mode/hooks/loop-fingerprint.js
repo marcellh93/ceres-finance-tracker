@@ -142,13 +142,13 @@ process.stdin.on("end", () => {
       JSON.stringify({
         decision: "block",
         reason: guidance,
-        hookSpecificOutput: { additionalContext: guidance },
+        hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: guidance },
       })
     );
   } else {
     process.stdout.write(
       JSON.stringify({
-        hookSpecificOutput: { additionalContext: guidance },
+        hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: guidance },
       })
     );
   }

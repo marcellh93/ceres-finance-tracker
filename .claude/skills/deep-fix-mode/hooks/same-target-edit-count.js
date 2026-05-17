@@ -78,7 +78,7 @@ process.stdin.on("end", () => {
 
   process.stdout.write(
     JSON.stringify({
-      hookSpecificOutput: { additionalContext: msg },
+      hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: msg },
     })
   );
   process.exit(0);
