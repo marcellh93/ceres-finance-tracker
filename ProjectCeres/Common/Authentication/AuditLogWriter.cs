@@ -48,7 +48,15 @@ public class AuditLogWriter : IAuditLogWriter
             IpAddress = string.IsNullOrEmpty(ip) ? "unknown" : ip,
         };
 
+        // Stage 9.6.1 (2026-05-18) — AuditLogs is RLS-protected (user-owned
+        // table). This writer creates its own DI scope per call (fresh
+        // DbContext + fresh connection), so it doesn't inherit any GUC the
+        // caller's PreAuthUserScope might have set. Wrap the write in our
+        // own PreAuthUserScope so the user_isolation policy passes
+        // regardless of whether the caller is pre-auth or authed.
+        await using var rlsScope = await db.BeginPreAuthUserScopeAsync(userId, ct);
         db.AuditLogs.Add(entry);
         await db.SaveChangesAsync(ct);
+        await rlsScope.CommitAsync(ct);
     }
 }
