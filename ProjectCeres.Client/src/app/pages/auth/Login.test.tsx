@@ -12,7 +12,11 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n/i18n';
 import { AuthProvider } from '../../auth/auth-context';
 import { Login } from './Login';
-import { clearXsrfTokenCacheForTests } from '../../auth/csrf';
+import {
+  clearXsrfTokenCacheForTests,
+  getCachedXsrfRequestToken,
+  setCachedXsrfRequestToken,
+} from '../../auth/csrf';
 
 function renderLogin(initialPath = '/login') {
   return render(
@@ -253,6 +257,75 @@ describe('Login page', () => {
         expect.stringMatching(/your sign-in expired/i),
       ),
     );
+  });
+
+  it('clears the cached CSRF request token after a successful login', async () => {
+    // Server rotates the CSRF pair on login. If the SPA keeps the
+    // pre-login request-token cached, the next state-changing call sends
+    // it against the freshly-rotated cookie and the server rejects with
+    // 400. Regression test for the /app/security "first click 400s,
+    // refresh fixes it" bug surfaced 2026-05-18.
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/csrf') {
+        return new Response(null, { status: 204, headers: { 'X-XSRF-TOKEN': 'pre-login-token' } });
+      }
+      if (typeof url === 'string' && url === '/api/auth/login') {
+        return new Response(null, { status: 204 });
+      }
+      return new Response(null, { status: 204 });
+    });
+    // Pre-seed the cache to simulate "we already did a handshake before login".
+    setCachedXsrfRequestToken('pre-login-token');
+    expect(getCachedXsrfRequestToken()).toBe('pre-login-token');
+
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'a@b.test');
+    await user.type(screen.getByLabelText(/password/i), 'pw');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => expect(screen.getByText('dashboard')).toBeDefined());
+    expect(getCachedXsrfRequestToken()).toBeNull();
+  });
+
+  it('clears the cached CSRF request token before redirecting to /login/totp', async () => {
+    // Same rotation happens when the server returns requiresTotp: true
+    // (it sets the Identity.TwoFactorUserId cookie + calls GetAndStoreTokens).
+    // The TOTP page's first submit must re-handshake.
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/csrf') {
+        return new Response(null, { status: 204, headers: { 'X-XSRF-TOKEN': 'pre-login-token' } });
+      }
+      if (typeof url === 'string' && url === '/api/auth/login') {
+        return new Response(JSON.stringify({ requiresTotp: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(null, { status: 204 });
+    });
+    setCachedXsrfRequestToken('pre-login-token');
+
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'a@b.test');
+    await user.type(screen.getByLabelText(/password/i), 'pw');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => expect(screen.getByText('totp step')).toBeDefined());
+    expect(getCachedXsrfRequestToken()).toBeNull();
   });
 
   it('honours the redirect query param on success', async () => {

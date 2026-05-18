@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Field } from '../../components/Field';
 import { apiFetch } from '../../lib/api-client';
 import { useAuth } from '../../auth/auth-context';
+import { setCachedXsrfRequestToken } from '../../auth/csrf';
 import { loginSchema, type LoginFormValues } from '../../auth/schemas/login.schema';
 
 type ServerErrorState =
@@ -53,6 +54,17 @@ export function Login() {
       });
 
       if (result.ok) {
+        // Server rotates the CSRF cookie+request-token pair on successful
+        // login (AuthController.IssueSessionAndCookiesAsync calls
+        // _antiforgery.GetAndStoreTokens). Clear our cached request token
+        // so the next state-changing call (e.g. POST /api/auth/mfa/enroll
+        // from /app/security) re-handshakes against the new cookie. Without
+        // this clear, the SPA sends the stale request-token against the
+        // fresh cookie and the server rejects with 400 — same anti-pattern
+        // 9.1.5.i fixed for the logout path. Applies to BOTH the no-MFA
+        // success (here) and the requiresTotp branch (the TOTP-pending
+        // cookie counts as a rotated CSRF state too).
+        setCachedXsrfRequestToken(null);
         if (result.data?.requiresTotp) {
           navigate('/login/totp');
           return;

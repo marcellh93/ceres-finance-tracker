@@ -85,6 +85,12 @@ export function LoginTotp() {
 
   const handleOutcome = async (outcome: SubmitOutcome, onInvalidReset: () => void) => {
     if (outcome.kind === 'ok') {
+      // Server rotates the CSRF pair on TOTP success (same as plain login —
+      // AuthController.IssueSessionAndCookiesAsync calls _antiforgery.
+      // GetAndStoreTokens). Clear cache so the next state-changing call
+      // re-handshakes. See the matching comment in Login.tsx for the long
+      // explanation. Without this, /app/security's first enroll POST 400s.
+      setCachedXsrfRequestToken(null);
       await auth.refresh();
       navigate('/');
       return;
