@@ -186,6 +186,32 @@ process.stdin.on("end", () => {
         if (letterStrip) touchedStages.add(letterStrip[1]);
       }
     }
+
+    // 2026-05-18 audit fix: subject lines that name BOTH a sub-stage AND its
+    // numeric parent (e.g. `docs(stage-9.10): ... sub-stage of Stage 9 ...`)
+    // pull "9" into touchedStages alongside "9.10". The Stage 9 status
+    // heading at line 944 then matches as `id === t` and the hook blocks the
+    // Stop even though the commit is about Stage 9.10.
+    //
+    // Strip a NUMERIC ancestor only if its descendant is ALSO purely numeric
+    // (e.g. 9.10 → strip 9). This preserves the letter-suffix-batch rule
+    // (9.1.5.h's parent 9.1.5 was added intentionally so the batch line
+    // matches; we must NOT strip it).
+    const idsBefore = Array.from(touchedStages);
+    for (const id of idsBefore) {
+      if (/[a-z]$/.test(id)) continue;          // letter-suffix child → its
+                                                 //   numeric ancestor was
+                                                 //   added intentionally
+      // Walk up: drop the last ".N" segment, delete any numeric-only ancestor
+      // from the set.
+      let parent = id;
+      while (true) {
+        const next = parent.replace(/\.\d+$/, "");
+        if (next === parent || next.length === 0) break;
+        parent = next;
+        if (touchedStages.has(parent)) touchedStages.delete(parent);
+      }
+    }
   } catch {
     // If we can't read the commit range, fall back to checking everything
     // (safe-but-noisy default). Empty set below would skip ALL lines.
