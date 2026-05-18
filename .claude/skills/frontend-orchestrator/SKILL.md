@@ -19,7 +19,8 @@ Impeccable expects two files at repo root: `PRODUCT.md` (audience, brand voice, 
 
 - **`docs/design-system.md` IS the DESIGN.md.** It already documents every token in `ProjectCeres.Client/src/index.css`, every recipe, the do's and don'ts, and the working rules. Do **not** create a parallel `DESIGN.md` at the repo root. Do **not** run `/impeccable document`. When invoking any impeccable command, explicitly tell it: *"Read `docs/design-system.md` instead of looking for `DESIGN.md`. It is the same contract in a different filename."*
 - **`PRODUCT.md` has no local equivalent and DOES need to exist** for impeccable's discovery, critique, and register-aware Refine commands to behave correctly. The skill creates it once via `/impeccable teach` on the first run that needs it.
-- **CLAUDE.md's "Frontend Work" section** stays authoritative for project-specific gates (show rendered result, wait for explicit approval before commit, run the UX/UI verification checklist). This skill calls into that flow — it doesn't replace it.
+- **CLAUDE.md's "Frontend Work" section** stays authoritative for project-specific gates (show rendered result, wait for explicit approval before commit, run the UX/UI verification checklist; the manual-test handoff Stop gate / Phase H enforces the last one). This skill calls into that flow — it doesn't replace it.
+- **The design system is a living contract — propose extensions proactively.** When the work suggests a new primitive, token, or recipe would help (a one-off pattern that could be reused, a missing variant, a gap in the empty/error/loading vocabulary, an aesthetic improvement the user hasn't named), surface it as part of the phase output — don't wait to be asked. Treat proposals as opening moves: the user reviews and approves before extraction lands. Phase 6 (system maintenance) is the formal ratification path; this clause sanctions naming candidates from any phase. The goal is to grow `docs/design-system.md`, not to preserve it as a fixed inventory.
 
 ## Phase 0 — Project bootstrap gate (runs once, then never again)
 
@@ -116,6 +117,7 @@ The user said "review this UI", "audit this page", "what's wrong with this", "ch
 - **For a single dimension** (typography, color, motion, layout): `/impeccable polish` — 5-dimension scoring, design-system alignment.
 - **For overall usability and quality**: `/impeccable critique` — Nielsen heuristics, persona sub-agents, detector.
 - **For accessibility specifically**: `web-design-guidelines` first, then `/impeccable critique` for the rest.
+- **For perf specifically**: `vercel-react-best-practices` first (pattern-level prevention — re-render hygiene, bundle/import). Escalate to `/impeccable optimize` only if measurements are needed (LCP, INP, CLS). The two skills are complements, not substitutes: prevention catches patterns at write-time; optimize diagnoses the production app's actual bottlenecks.
 - **For high-stakes surfaces** (sign-up flow, billing, account deletion): run all three — `polish`, `critique`, and `web-design-guidelines`. Cost is worth it.
 
 ## Routing decision table
@@ -136,6 +138,7 @@ When the user's request is ambiguous, classify with this table before reaching f
 | "this pattern is now in N places" | 6 | `/impeccable extract` |
 | "review this UI" | 7 | `/impeccable critique` |
 | "audit accessibility" | 7 | `web-design-guidelines` |
+| "review for perf" / "is this slow" | 7 | `vercel-react-best-practices` (then `/impeccable optimize` if measurements are needed) |
 | "score this against the design system" | 7 | `/impeccable polish` |
 
 ## Things this skill explicitly prevents
