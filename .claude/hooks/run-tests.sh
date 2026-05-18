@@ -180,7 +180,15 @@ echo "[stop-hook] tier $TIER ($SCOPE) — running dotnet test ${FILTER_ARGS[*]:-
 
 # --nologo: drop the .NET banner. --verbosity normal: per-test progress in
 # the log. `tee` writes live; PIPESTATUS[0] preserves dotnet's exit code.
-TEST_OUTPUT=$(dotnet test --nologo --verbosity normal "${FILTER_ARGS[@]}" 2>&1 | tee "$LOG_FILE")
+# Bash 3.x (system bash on macOS) treats "${arr[@]}" of an empty array as
+# unbound under `set -u`, even when the array was explicitly assigned `()`
+# earlier in the script. The `${arr[@]+...}` form expands to the array only
+# when the variable IS set, sidestepping the unbound check. Tier 2 (full
+# scope) sets FILTER_ARGS=() so this branch hit the failure mode on every
+# tier-2 run. See feedback_fix_hook_errors_when_first_seen — 2026-05-17
+# session caught me leaving this regression untouched; fixing on first sight
+# this time.
+TEST_OUTPUT=$(dotnet test --nologo --verbosity normal ${FILTER_ARGS[@]+"${FILTER_ARGS[@]}"} 2>&1 | tee "$LOG_FILE")
 TEST_EXIT=${PIPESTATUS[0]}
 
 # Detect skipped tests even on a passing run.
