@@ -10,6 +10,8 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 
 **Phase 3 — Hosted Beta.** Phase 1 (Local MVP) and Phase 2 (Local Extended) are complete. Phase 3 moves the app from local to a hosted server, introducing authentication, multi-tenancy, and the MVC → SPA migration. See `docs/planning-phase3.md` for scope and open decisions.
 
+**Session is gated by `playbook`.** The skill orchestrates eight phases — four HARD (pre-spec-write, pre-deferral, pre-stage-close, pre-commit), three advisory (stage-start, mid-build, pre-PR-review), plus pre-handoff. Read `.claude/skills/playbook/references/constitution.md` before bypassing any HARD gate. Per-session state: `.claude/state/playbook/<session_id>.json`.
+
 ## Tech Stack
 
 - **Runtime:** .NET 10 on macOS
@@ -84,6 +86,8 @@ Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able fr
 ## What NOT to Do
 
 - Do not modify, skip, or weaken tests to make them pass. If a test fails, fix the production code, or state which legitimate case applies before editing the test (see `docs/testing.md` § Rules)
+- Do not use `[Fact(Skip="...")]` to make a failing test pass — rewrite the assertion to match what's now true, add a deeper assertion, or fix the production code. Never drop the assertion. Flakes get root-caused, not dismissed
+- Do not file pre-existing failures (red `dotnet test`, red `pnpm test`, red `pnpm build`) as "follow-up TaskCreate" entries when you encounter them mid-task — root-cause them now. Before reporting any task complete, `pnpm build`, `pnpm test`, `dotnet build`, and `dotnet test` (relevant filter) must all exit 0
 - Do not add authentication — Phase 3 only
 - Do not implement currency conversion — explicitly out of scope
 - Do not support cross-currency transfers — out of scope
@@ -104,19 +108,25 @@ Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able fr
 - `docs/design-system.md` — React client design system: tokens, primitives, recipes. Source of truth for UI look-and-feel.
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
+- `.claude/skills/playbook/references/constitution.md` — the eight-phase routing matrix the session is gated by. Source of truth for HARD/advisory phases and their required chains.
+- `~/.claude/projects/<project-slug>/memory/MEMORY.md` — index of pinned `feedback_*` / `project_*` / `reference_*` memory entries. Auto-loaded on session start, but truncated past ~200 lines; the topic files it points to are not.
 - When an open question in any planning doc (`docs/planning.md`, `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md`) is resolved, remove it from Open Questions, mark it `[x]`, and append it to `docs/planning-resolved.md`. If the decision is architectural, execute the sync-docs skill.
 
 ## Frontend Work
 
-For any change to `ProjectCeres.Client/` (React/TS, styling, layout, copy):
+For any change under `ProjectCeres.Client/` (React/TS, styling, layout, copy), enter through the `frontend-orchestrator` skill — it routes between `frontend-design`, `vercel-react-best-practices`, `web-design-guidelines`, `impeccable`, and `docs/design-system.md` by phase (new surface, refine, strip, harden, maintenance, review). Don't reach for those tools directly; the orchestrator owns sequencing.
 
-1. Read `docs/design-system.md` — use existing tokens/recipes; never hard-code values.
-2. Invoke `frontend-design` for visual design and `vercel-react-best-practices` for React perf patterns before proposing.
-3. Show the result; wait for approval before committing.
-4. Before commit, run `web-design-guidelines` against the changed files as a final audit.
-5. **After implementing, run the UX/UI verification checklist** (see `docs/design-system.md` § Working rules). Start the dev server, open every changed page in the browser, and explicitly verify: golden path, layout context (sticky ancestors don't obscure content), empty state, error state, mobile at 375px, and all navigation links. If browser access is unavailable, say so and hand the checklist to the user with specific URLs to check.
+The orchestrator is empowered to propose visual improvements, new components, and design-system extensions on its own initiative — not just to execute what's asked. Treat its proposals as opening moves, not finished work; the design system is meant to grow.
+
+Three rules the orchestrator inherits from this file:
+
+- **`docs/design-system.md` is the contract.** Use existing tokens and recipes from it; never hard-code values. If a token is missing, add it to `ProjectCeres.Client/src/index.css`, document it in `docs/design-system.md`, then consume it. A change to a shared primitive must be propagated everywhere it's used in the same pass.
+- **Show, then approval.** Show the rendered result; wait for the user's explicit approval before committing. Silence ≠ approval.
+- **Verify before claiming done.** After implementing, run the UX/UI verification checklist (`docs/design-system.md` § Working rules): golden path, layout context, empty state, error state, 375px mobile, all navigation links. If browser access is unavailable, say so and hand the checklist to the user with specific URLs. The manual-test handoff Stop gate (Phase H) denies the Stop if you list ≥5 steps without auditing that each step's entry point exists.
 
 ## After Completing Any Stage
+
+Phase E (HARD) blocks the close-out edit if any item under the closing stage's `## Stage N` heading is still unchecked, or if `sync-docs` and `changelog-sync` have not fired this session. The steps below are the human-readable expansion of that gate.
 
 After finishing a stage implementation, regardless of phase:
 
@@ -128,4 +138,10 @@ After finishing a stage implementation, regardless of phase:
 
 ## Before Writing a New Spec
 
-Any new file under `docs/superpowers/specs/*.md` is gated by a `PreToolUse` hook (`.claude/hooks/require-verify-against-codebase-before-spec.js`) that **denies the Write tool call** unless the `verify-against-codebase` skill has been invoked earlier in the session. The hook exists because Stage 6b.1's first spec draft proposed a homegrown `MfaTicketService` + "issue then undo" pattern that duplicated framework features — the skill catches that class of error. Bypass: invoke `verify-against-codebase` before retrying the Write, or rewrite an existing spec (the hook allows path-already-exists writes).
+Any new file under `docs/superpowers/specs/*.md` is gated by playbook **Phase B (HARD)** via `.claude/skills/playbook/hooks/pre-spec-write-gate.js`, which **denies the Write tool call** unless the required skills have fired this session. The gate is tiered by the proposed spec content:
+
+- **Backend signals only** (`ProjectCeres/`, `Program.cs`, EF Core, ASP.NET pipeline, HTTP status codes) → `superpowers:brainstorming` + `verify-backend`.
+- **Frontend signals only** (`ProjectCeres.Client/`, shadcn, Tailwind, design-system primitives) → `superpowers:brainstorming` + `verify-frontend`.
+- **Both signals** OR **no detectable signals** (default-safe) → `superpowers:brainstorming` + BOTH verify siblings. The legacy `verify-against-codebase` router name satisfies both.
+
+The gate exists because Stage 6b.1's first spec draft proposed a homegrown `MfaTicketService` + "issue then undo" pattern that duplicated framework features — the verify skills catch that class of error. The tiering exists because a `.tsx`-only spec gains nothing from running through `verify-backend`'s checks (and vice versa). Bypass: the path already exists on disk (rewrite of an existing spec is allowed).
