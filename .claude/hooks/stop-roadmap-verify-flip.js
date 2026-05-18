@@ -153,12 +153,23 @@ process.stdin.on("end", () => {
   let touchedStages = new Set();
   try {
     const range = `${storedHead}..${currentHead}`;
-    const msgs = execSync(`git log --format=%B ${range}`, {
+    // Read SUBJECT LINES only (--format=%s), not full bodies. Commit subjects
+    // name their primary stage; bodies frequently cross-reference other
+    // stages ("deferred to Stage 9.8", "follows Stage 6.4's pattern") which
+    // are NOT in scope of this commit and should not be flagged as pending.
+    //
+    // Origin: 2026-05-18. The 9.6 implementation commit's subject was
+    // `feat(stage-9.6): ...` but its body contained "Closes Stage 9
+    // sub-stage 9.6" and "deferred to Stage 9.8". The hook scanning bodies
+    // pulled in Stage 9 (parent, legitimately Pending) and Stage 9.8 (not
+    // touched, also legitimately Pending), then blocked the Stop with a
+    // false positive.
+    const subjects = execSync(`git log --format=%s ${range}`, {
       cwd: projectDir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
-    const stageRefs = msgs.match(/\b[Ss]tage[-\s]+(\d+(?:\.\d+)*[a-z]?)/g) || [];
+    const stageRefs = subjects.match(/\b[Ss]tage[-\s]+(\d+(?:\.\d+)*[a-z]?)/g) || [];
     for (const ref of stageRefs) {
       const m = ref.match(/(\d+(?:\.\d+)*[a-z]?)/);
       if (m) {
