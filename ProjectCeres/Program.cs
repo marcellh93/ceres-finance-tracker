@@ -177,8 +177,15 @@ if (string.IsNullOrWhiteSpace(resendApiKey))
 }
 else
 {
-    builder.Services.AddHttpClient<IResend, ResendClient>(c =>
-        c.DefaultRequestHeaders.Authorization = new("Bearer", resendApiKey));
+    // Stage 9.6.1 (2026-05-18) — the Resend SDK reads its API token from
+    // IOptions<ResendClientOptions>.ApiToken, NOT from the HttpClient's
+    // DefaultRequestHeaders.Authorization. Pre-fix we configured the wrong
+    // knob so every send hit Resend's API with no usable token and got back
+    // 401 "API key is invalid" — even though the key was valid and a raw
+    // curl with the same key succeeded. The README's documented pattern is
+    // `AddResend(o => o.ApiToken = ...)`. See
+    // https://github.com/resend/resend-dotnet for the README reference.
+    builder.Services.AddResend(o => o.ApiToken = resendApiKey);
     builder.Services.AddScoped<IEmailService, ResendEmailService>();
 }
 
