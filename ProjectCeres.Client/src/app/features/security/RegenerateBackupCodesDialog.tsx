@@ -45,6 +45,11 @@ export function RegenerateBackupCodesDialog({ onReauthRequired }: Props) {
       setState({ kind: 'idle' });
     } catch (err) {
       if (err instanceof ReauthRequiredError) {
+        // Reset our own dialog state BEFORE notifying the parent, so the
+        // dialog actually closes. Previous bug: we left state='pending'
+        // (dialog still open) and only told the parent to render the
+        // reauth alert — the user saw both surfaces stacked.
+        setState({ kind: 'idle' });
         onReauthRequired();
         return;
       }
@@ -71,7 +76,16 @@ export function RegenerateBackupCodesDialog({ onReauthRequired }: Props) {
     <AlertDialog
       open={state.kind === 'confirming' || state.kind === 'pending'}
       onOpenChange={(open) => {
-        if (!open && state.kind === 'confirming') setState({ kind: 'idle' });
+        // Close in any open-state (confirming OR pending). Pre-fix this only
+        // dropped to idle from 'confirming', so Cancel was a no-op while the
+        // dialog was waiting on a POST that had already returned an error
+        // (e.g. REAUTH_REQUIRED) — the dialog stayed stuck open. Ignoring
+        // the close while pending isn't useful: the user CAN cancel a
+        // network call by closing the dialog, and the AlertDialogAction is
+        // already disabled during pending so they can't double-submit.
+        if (!open && (state.kind === 'confirming' || state.kind === 'pending')) {
+          setState({ kind: 'idle' });
+        }
       }}
     >
       <Button type="button" variant="outline" onClick={() => setState({ kind: 'confirming' })}>

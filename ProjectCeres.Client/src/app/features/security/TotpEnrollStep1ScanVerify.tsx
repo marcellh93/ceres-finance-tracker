@@ -119,11 +119,37 @@ export function TotpEnrollStep1ScanVerify({
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <div className="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-start">
         <div className="space-y-3">
+          {/*
+            QR codes MUST render dark-on-light with a white quiet zone, in
+            BOTH themes — authenticator apps (Google Authenticator, Aegis,
+            Authy) scan via the camera as a black-on-white image and refuse
+            inverted codes. Two failure modes we hit pre-fix:
+              (a) The wrapper used `bg-card`, which is dark in dark mode →
+                  the QR's white background looked like a tiny white square
+                  in a dark frame with no quiet zone.
+              (b) qrcode.react's default `marginSize=0` produces no internal
+                  quiet zone, so the QR itself starts at the SVG edge.
+            Fix:
+              - Force the wrapper to a hard `bg-white` regardless of theme.
+              - Set `marginSize={4}` on the SVG so the spec-required
+                4-module quiet zone lives INSIDE the SVG, independent of
+                whatever pixels surround it.
+              - Explicit fgColor/bgColor for resilience against future
+                qrcode.react default changes.
+          */}
           <div
-            className="inline-block rounded-md border border-border bg-card p-3"
+            className="inline-block rounded-md border border-border bg-white p-3"
             data-testid="totp-qr-wrapper"
           >
-            <QRCodeSVG value={otpAuthUri} size={192} level="M" aria-label="TOTP enrolment QR code" />
+            <QRCodeSVG
+              value={otpAuthUri}
+              size={192}
+              level="M"
+              marginSize={4}
+              fgColor="#000000"
+              bgColor="#FFFFFF"
+              aria-label="TOTP enrolment QR code"
+            />
           </div>
 
           <details
