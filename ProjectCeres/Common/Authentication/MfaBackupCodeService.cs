@@ -96,6 +96,17 @@ public sealed class MfaBackupCodeService
         return await GenerateAndPersistAsync(userId, ct);
     }
 
+    /// <summary>
+    /// Stage 9.6 — Deletes all persisted backup codes for the user without generating new ones.
+    /// Called from `POST /api/auth/mfa/disable` so that turning MFA off invalidates any codes
+    /// the user still has on paper. If the user re-enrols later, fresh codes are generated.
+    /// </summary>
+    public async Task PurgeAsync(Guid userId, CancellationToken ct)
+    {
+        // Cross-tenant by design: called via authenticated session; userId from session claim. Stage 10 allow-lists this file.
+        await _db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+    }
+
     private static string GenerateOne()
     {
         var sb = new StringBuilder(MfaConstants.BackupCodeLength);

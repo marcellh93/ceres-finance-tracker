@@ -1013,14 +1013,14 @@ Lockout / unlock:
 
 TOTP setup (entry point: `/app/security` per ADR-0069 — NOT `/login/totp/setup`; the original roadmap URL predated the ADR):
 
-- [ ] QR code displayed (otpauth:// URI) — uses `qrcode.react` (4.2.0, already installed)
-- [ ] Manual-entry secret displayed below QR (collapsed behind a disclosure) for accessibility / desktop authenticators
-- [ ] Verification step requires entering one valid code before enrolment is complete
-- [ ] On successful enrolment: 10 backup codes generated (cryptographically random, ≥ 20 bits entropy each per NIST 800-63B), shown ONCE, with download (.txt) + copy-to-clipboard options
-- [ ] Backup codes are hashed in DB after this step (server-side, already done in `MfaBackupCodeService`); the page warns "These will not be shown again"
-- [ ] User must confirm "I've saved my backup codes" checkbox before proceeding
-- [ ] After enrolment: page renders Enabled state (NOT a redirect — single SPA page). First-run onboarding redirect is Stage 15.5's owner per `docs/roadmap-phase-three.md:1518`.
-- [ ] **Disable two-factor sign-in** — `POST /api/auth/mfa/disable` server endpoint (mirrors `enroll`/`enroll/verify` shape: `[Authorize] + [RequireRecentAuth]`, sets `TwoFactorEnabled = false`, clears persisted backup codes via `MfaBackupCodeService`, writes `MfaDisabled` audit-log row) + SPA "Turn off two-factor sign-in" button on the Enabled state of `/app/security` (opens an `AlertDialog` confirming the loss of MFA protection, then POSTs and re-renders Disabled state via `auth.refresh()`).
+- [x] QR code displayed (otpauth:// URI) — `qrcode.react` 4.2.0 rendering an `otpauth://totp/Ceres:<email>?secret=<key>&issuer=Ceres&algorithm=SHA1&digits=6&period=30` URI from the server's `POST /api/auth/mfa/enroll` response. Tested in `Security.test.tsx > clicking Enable fires POST /api/auth/mfa/enroll and advances to wizard step 1`.
+- [x] Manual-entry secret displayed below QR (collapsed behind a `<details>` disclosure) for accessibility / desktop authenticators — space-grouped format from the server's `manualEntryKey` field. Copy-to-clipboard button writes the unspaced key. Tested in the same Security test (asserts the manual key text is in the DOM).
+- [x] Verification step requires entering one valid code before enrolment is complete — 6-cell `InputOTP` auto-submits to `/api/auth/mfa/enroll/verify`; server returns 10 backup codes on success.
+- [x] On successful enrolment: 10 backup codes generated (cryptographically random, ≥ 20 bits entropy each per NIST 800-63B per existing `MfaBackupCodeService.GenerateOne`), shown ONCE in a 2×5 grid, with "Copy all" and "Download as .txt" actions. Tested in `backup-codes-download.test.ts` (Blob MIME type, URL revoke, txt content).
+- [x] Backup codes are hashed in DB after this step (server-side, already done in `MfaBackupCodeService.GenerateAndPersistAsync` since Stage 6.4); the page warns "These codes will not be shown again" via an inline alert block.
+- [x] User must confirm "I've saved my backup codes" checkbox before proceeding — the Done button is `disabled={!confirmed}` in `TotpEnrollStep2BackupCodes.tsx`.
+- [x] After enrolment: page renders Enabled state (NOT a redirect — single SPA page). First-run onboarding redirect is Stage 15.5's owner per `docs/roadmap-phase-three.md:1518`. Wizard step 3 calls `auth.refresh()` before unmounting so `twoFactorEnabled` flips in context.
+- [x] **Disable two-factor sign-in** — new `POST /api/auth/mfa/disable` endpoint in `MfaController` (`[Authorize] + [RequireRecentAuth]`, sets `TwoFactorEnabled = false`, resets authenticator key, purges persisted backup codes via new `MfaBackupCodeService.PurgeAsync`, writes `AuditLogAction.MfaDisabled` row). SPA "Turn off two-factor sign-in" button on the Enabled state opens an `AlertDialog` confirming the loss of MFA protection, then POSTs and re-renders Disabled state via `auth.refresh()`. Pinned by 5 integration tests in `ProjectCeres.Tests/Integration/Authentication/Mfa/MfaDisableTests.cs` (status, flag flip, backup-code purge, authenticator-key reset, 409-on-not-enabled).
 
 Backup-codes recovery flow:
 

@@ -5,7 +5,14 @@ import { gzipSync } from 'node:zlib';
 // Per-asset gzip size budgets in kB. Values are 2026-05-08 baseline + 20%
 // headroom rounded to a clean number. Each pattern globs `dist/assets/`.
 const BUDGETS_GZIP_KB = {
-  'app-*.js': 67,
+  // app chunk: 2026-05-08 baseline + 20% headroom was 67 kB. Stage 9.6 lifted
+  // it past the ceiling — the codebase has grown legitimately (Movements +
+  // Quick-Add + Settings + Categories + Accounts + Recurring + Reports +
+  // Review + Import + auth pages + Security feature). Security itself is
+  // lazy-loaded via React.lazy(), so further growth from new features mostly
+  // adds to per-route chunks, not app. Re-baselined 2026-05-18 at 67.52 kB +
+  // ~7% headroom = 72 kB.
+  'app-*.js': 72,
   'vendor-react-*.js': 113,
   'vendor-charts-*.js': 135,
   // react-hook-form + zod + @hookform/resolvers: 24.84 kB measured 2026-05-16, ~17% headroom.

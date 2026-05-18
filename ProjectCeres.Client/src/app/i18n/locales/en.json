@@ -105,5 +105,86 @@
     "light": "Light",
     "dark": "Dark",
     "ariaLabel": "Toggle theme"
+  },
+  "security": {
+    "title": "Security",
+    "totp": {
+      "disabledHeading": "Two-factor sign-in is off",
+      "disabledBody": "Add a second step to every sign-in: a 6-digit code from your authenticator app. Without it, your account stays protected by password only.",
+      "enableButton": "Set up two-factor sign-in",
+      "enabledHeading": "Two-factor sign-in is on",
+      "enabledBody": "Every sign-in now requires a 6-digit code from your authenticator app. If you lose your device, use one of your backup codes.",
+      "regenerateButton": "Regenerate backup codes",
+      "disableButton": "Turn off two-factor sign-in",
+      "disable": {
+        "dialogTitle": "Turn off two-factor sign-in?",
+        "dialogBody": "Your account will only be protected by your password until you turn it back on. You will need to re-scan the QR code if you re-enable it later.",
+        "dialogCancel": "Cancel",
+        "dialogConfirm": "Turn off"
+      },
+      "reauthRequired": "Your sign-in is older than 5 minutes. Sign out and sign in again to continue.",
+      "signOutLink": "Sign out",
+      "wizard": {
+        "stepper": {
+          "scanVerify": "Scan & verify",
+          "saveCodes": "Save codes",
+          "done": "Done"
+        },
+        "cancel": "Cancel",
+        "step1": {
+          "heading": "Scan with your authenticator app",
+          "instruction1": "Open Google Authenticator, 1Password, Authy, or any TOTP app.",
+          "instruction2": "Scan the QR code on the left.",
+          "instruction3": "Type the 6-digit code your app shows below.",
+          "manualEntryDisclosure": "Can't scan? Enter this key manually",
+          "manualEntryCopy": "Copy",
+          "manualEntryCopied": "Manual key copied",
+          "codeLabel": "Verification code",
+          "submit": "Turn on two-factor sign-in",
+          "submitting": "Turning on",
+          "errors": {
+            "invalidCode": "That code didn't match. Try the next one your app shows.",
+            "noEnrollmentInProgress": "Something went wrong. Click Restart to begin again.",
+            "restartButton": "Restart",
+            "network": "Couldn't reach the server. Check your connection and try again."
+          }
+        },
+        "step2": {
+          "heading": "Save your backup codes",
+          "body": "If you lose access to your authenticator app, use one of these codes to sign in. Each code works once.",
+          "copyAll": "Copy all",
+          "copiedToast": "Backup codes copied",
+          "download": "Download as .txt",
+          "downloadFilename": "ceres-backup-codes.txt",
+          "warning": "These codes will not be shown again.",
+          "confirmCheckboxLabel": "I've saved my backup codes somewhere safe",
+          "done": "Done",
+          "cancelAlert": {
+            "title": "Leave without saving?",
+            "body": "You're already enrolled but haven't saved backup codes. They won't be shown again. You can regenerate them from the Security page.",
+            "cancel": "Cancel",
+            "confirm": "Leave without saving"
+          }
+        },
+        "step3": {
+          "heading": "Two-factor sign-in is on",
+          "bodyHeading1": "From now on, every sign-in needs:",
+          "bodyItem1a": "Your password",
+          "bodyItem1b": "A 6-digit code from your authenticator app",
+          "bodyHeading2": "If you lose your device:",
+          "bodyItem2a": "Use one of your backup codes",
+          "bodyItem2b": "Then regenerate codes from this page",
+          "back": "Back to Security"
+        }
+      },
+      "regenerate": {
+        "dialogTitle": "Regenerate backup codes?",
+        "dialogBody": "This invalidates your existing backup codes. Make sure you can scan a fresh QR or have your phone.",
+        "dialogCancel": "Cancel",
+        "dialogConfirm": "Regenerate codes",
+        "successHeading": "Here are your new backup codes",
+        "successBody": "Your old codes are no longer valid. Save these somewhere safe."
+      }
+    }
   }
 }

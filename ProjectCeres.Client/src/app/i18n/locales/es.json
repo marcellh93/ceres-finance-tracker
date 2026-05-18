@@ -105,5 +105,86 @@
     "light": "Claro",
     "dark": "Oscuro",
     "ariaLabel": "Cambiar tema"
+  },
+  "security": {
+    "title": "Seguridad",
+    "totp": {
+      "disabledHeading": "El inicio de sesión en dos pasos está desactivado",
+      "disabledBody": "Añade un segundo paso a cada inicio de sesión: un código de 6 dígitos de tu aplicación de autenticación. Sin él, tu cuenta queda protegida solo por la contraseña.",
+      "enableButton": "Configurar inicio de sesión en dos pasos",
+      "enabledHeading": "El inicio de sesión en dos pasos está activado",
+      "enabledBody": "Cada inicio de sesión requiere ahora un código de 6 dígitos de tu aplicación de autenticación. Si pierdes tu dispositivo, usa uno de tus códigos de respaldo.",
+      "regenerateButton": "Regenerar códigos de respaldo",
+      "disableButton": "Desactivar el inicio de sesión en dos pasos",
+      "disable": {
+        "dialogTitle": "¿Desactivar el inicio de sesión en dos pasos?",
+        "dialogBody": "Tu cuenta solo estará protegida por tu contraseña hasta que lo vuelvas a activar. Tendrás que volver a escanear el código QR si lo activas más tarde.",
+        "dialogCancel": "Cancelar",
+        "dialogConfirm": "Desactivar"
+      },
+      "reauthRequired": "Tu sesión tiene más de 5 minutos. Cierra sesión e inicia sesión de nuevo para continuar.",
+      "signOutLink": "Cerrar sesión",
+      "wizard": {
+        "stepper": {
+          "scanVerify": "Escanear y verificar",
+          "saveCodes": "Guardar códigos",
+          "done": "Listo"
+        },
+        "cancel": "Cancelar",
+        "step1": {
+          "heading": "Escanea con tu aplicación de autenticación",
+          "instruction1": "Abre Google Authenticator, 1Password, Authy o cualquier aplicación TOTP.",
+          "instruction2": "Escanea el código QR de la izquierda.",
+          "instruction3": "Escribe el código de 6 dígitos que muestra tu aplicación a continuación.",
+          "manualEntryDisclosure": "¿No puedes escanear? Introduce esta clave manualmente",
+          "manualEntryCopy": "Copiar",
+          "manualEntryCopied": "Clave manual copiada",
+          "codeLabel": "Código de verificación",
+          "submit": "Activar el inicio de sesión en dos pasos",
+          "submitting": "Activando",
+          "errors": {
+            "invalidCode": "Ese código no coincide. Prueba con el siguiente que muestre tu aplicación.",
+            "noEnrollmentInProgress": "Algo salió mal. Haz clic en Reiniciar para empezar de nuevo.",
+            "restartButton": "Reiniciar",
+            "network": "No se pudo contactar con el servidor. Comprueba tu conexión e inténtalo de nuevo."
+          }
+        },
+        "step2": {
+          "heading": "Guarda tus códigos de respaldo",
+          "body": "Si pierdes el acceso a tu aplicación de autenticación, usa uno de estos códigos para iniciar sesión. Cada código funciona una sola vez.",
+          "copyAll": "Copiar todos",
+          "copiedToast": "Códigos de respaldo copiados",
+          "download": "Descargar como .txt",
+          "downloadFilename": "ceres-codigos-respaldo.txt",
+          "warning": "Estos códigos no se mostrarán de nuevo.",
+          "confirmCheckboxLabel": "He guardado mis códigos de respaldo en un lugar seguro",
+          "done": "Listo",
+          "cancelAlert": {
+            "title": "¿Salir sin guardar?",
+            "body": "Ya estás registrado pero no has guardado los códigos de respaldo. No se mostrarán de nuevo. Puedes regenerarlos desde la página de Seguridad.",
+            "cancel": "Cancelar",
+            "confirm": "Salir sin guardar"
+          }
+        },
+        "step3": {
+          "heading": "El inicio de sesión en dos pasos está activado",
+          "bodyHeading1": "A partir de ahora, cada inicio de sesión necesita:",
+          "bodyItem1a": "Tu contraseña",
+          "bodyItem1b": "Un código de 6 dígitos de tu aplicación de autenticación",
+          "bodyHeading2": "Si pierdes tu dispositivo:",
+          "bodyItem2a": "Usa uno de tus códigos de respaldo",
+          "bodyItem2b": "Luego regenera los códigos desde esta página",
+          "back": "Volver a Seguridad"
+        }
+      },
+      "regenerate": {
+        "dialogTitle": "¿Regenerar códigos de respaldo?",
+        "dialogBody": "Esto invalida tus códigos de respaldo actuales. Asegúrate de poder escanear un QR nuevo o de tener tu teléfono.",
+        "dialogCancel": "Cancelar",
+        "dialogConfirm": "Regenerar códigos",
+        "successHeading": "Aquí tienes tus nuevos códigos de respaldo",
+        "successBody": "Tus códigos anteriores ya no son válidos. Guárdalos en un lugar seguro."
+      }
+    }
   }
 }

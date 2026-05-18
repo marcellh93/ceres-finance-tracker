@@ -102,6 +102,34 @@ public sealed class MfaController : ControllerBase
         return Ok(new { backupCodes = codes });
     }
 
+    /// <summary>
+    /// Stage 9.6 — Turns off two-factor sign-in for the calling user. Flips
+    /// <c>TwoFactorEnabled = false</c>, resets the authenticator key so a re-enrolment
+    /// starts clean, purges persisted backup codes so old codes can't be used after
+    /// re-enrolment, and writes an <c>MfaDisabled</c> audit-log row.
+    /// </summary>
+    [HttpPost("disable")]
+    [RequireRecentAuth]
+    [EnableRateLimiting(AuthRateLimitPolicies.AuthMfaByUser)]
+    public async Task<IActionResult> Disable(
+        [FromServices] MfaBackupCodeService backupCodes)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user is null) return Unauthorized();
+
+        if (!user.TwoFactorEnabled)
+            return Conflict(new { error = new { code = "MFA_NOT_ENABLED", message = "MFA is not enabled." } });
+
+        await _userManager.SetTwoFactorEnabledAsync(user, false);
+        await _userManager.ResetAuthenticatorKeyAsync(user);
+        await backupCodes.PurgeAsync(user.Id, HttpContext.RequestAborted);
+
+        await _auditLog.RecordAsync(user.Id, AuditLogAction.MfaDisabled, ct: HttpContext.RequestAborted);
+
+        Response.ApplyNoStore();
+        return NoContent();
+    }
+
     private async Task<ApplicationUser?> GetCurrentUserAsync()
     {
         var sid = User.FindFirstValue(ClaimTypes.NameIdentifier);

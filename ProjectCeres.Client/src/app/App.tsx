@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './layout/AppLayout';
 import { AuthLayout } from './layout/AuthLayout';
@@ -20,7 +21,10 @@ import { BudgetVsActual } from './features/reports/BudgetVsActual';
 import { LargestExpenses } from './features/reports/LargestExpenses';
 import { TransactionHistory } from './features/reports/TransactionHistory';
 import { Review } from './pages/Review';
-import { Security } from './pages/Security';
+// Security lazy-loaded: TOTP wizard pulls qrcode.react + the full security
+// feature folder, only needed when the user visits /app/security. Keeps the
+// main app chunk thin (Phase 2 budget breach 2026-05-18).
+const Security = lazy(() => import('./pages/Security').then((m) => ({ default: m.Security })));
 import { Settings } from './pages/Settings';
 import { Support } from './pages/Support';
 import { AccountCreate } from './features/accounts/AccountCreate';
@@ -115,7 +119,14 @@ export function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="support" element={<Support />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="security" element={<Security />} />
+        <Route
+          path="security"
+          element={
+            <Suspense fallback={null}>
+              <Security />
+            </Suspense>
+          }
+        />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
