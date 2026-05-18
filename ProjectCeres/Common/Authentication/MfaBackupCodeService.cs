@@ -69,6 +69,16 @@ public sealed class MfaBackupCodeService
         var normalized = NormalizeForVerify(submittedCode);
         if (normalized is null) return false;
 
+        // Stage 9.6.1 (2026-05-18) — wrap the read+update in a PreAuthUserScope.
+        // VerifyAndConsume runs from AuthController.LoginTotp under
+        // [PreAuthCallSite("Auth.LoginTotp")] — the RLS interceptor RESETs
+        // app.current_user_ref on every connection acquisition, so without
+        // this scope the SELECT below returns zero rows (user_isolation
+        // policy NULL-filters) → the foreach never matches → backup-code
+        // verify silently returns false with a valid code. User-visible:
+        // "Invalid code" on every backup-code login attempt.
+        await using var scope = await _db.BeginPreAuthUserScopeAsync(userId, ct);
+
         // Cross-tenant by design: called during MFA step before full identity cookie is issued; userId comes from the MFA-pending cookie claim. Stage 10 architecture test allow-lists this file.
         var unused = await _db.UserMfaBackupCodes
             .IgnoreQueryFilters()
@@ -83,6 +93,7 @@ public sealed class MfaBackupCodeService
                 row.UsedAt = DateTime.UtcNow;
                 row.UsedFromIp = clientIp;
                 await _db.SaveChangesAsync(ct);
+                await scope.CommitAsync(ct);
                 return true;
             }
         }
