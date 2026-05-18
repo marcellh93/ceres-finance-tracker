@@ -30,10 +30,20 @@ public sealed class LanguageResolver : ILanguageResolver
             .Select(s => s.Language)
             .FirstOrDefaultAsync(ct);
 
-        return lang switch
-        {
-            "es" => Es,
-            _ => En,
-        };
+        // Persistent user preference wins when set — a user who has explicitly
+        // chosen their email language doesn't want a one-off browser session
+        // to flip every future transactional email.
+        if (lang == "es") return Es;
+        if (lang == "en") return En;
+
+        // Settings.Language is empty (default for newly-registered users until
+        // they visit Settings → Preferences). Stage 9.6.1 (2026-05-18): fall
+        // back to the SPA's language toggle for the current request, so an
+        // anonymous-ish action like password-reset emails in the same language
+        // the form was just submitted in. LanguagePreferenceMiddleware (Stage 8)
+        // sets CurrentUICulture from the `lang` cookie on every request, so we
+        // read that as the fallback hint rather than re-parsing the cookie.
+        var ui = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        return ui == "es" ? Es : En;
     }
 }
