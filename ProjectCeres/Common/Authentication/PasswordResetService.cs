@@ -131,6 +131,12 @@ public sealed class PasswordResetService
         string rawToken;
         try
         {
+            // Stage 9.6.1 (2026-05-18) — wrap the supersede-UPDATE + INSERT in a
+            // PreAuthUserScope. Pre-auth path so the RLS interceptor RESETs the
+            // GUC on every connection-acquisition; the transaction pins one
+            // connection so the SET LOCAL persists across both operations.
+            await using var scope = await _db.BeginPreAuthUserScopeAsync(user.Id, ct);
+
             // Supersede prior unused tokens.
             // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.PasswordResetTokens
@@ -155,6 +161,7 @@ public sealed class PasswordResetService
                 MfaVerifiedAt = null,
             });
             await _db.SaveChangesAsync(ct);
+            await scope.CommitAsync(ct);
         }
         finally
         {

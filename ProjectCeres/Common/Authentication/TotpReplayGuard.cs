@@ -52,6 +52,16 @@ public sealed class TotpReplayGuard
     {
         var threshold = DateTime.UtcNow - MfaConstants.ReplayWindow;
 
+        // Stage 9.6.1 (2026-05-18) — wrap the read+write sequence in an explicit
+        // transaction with SET LOCAL app.current_user_ref. Without this, the
+        // [PreAuthCallSite("Auth.LoginTotp")] context causes the RLS interceptor
+        // to RESET the GUC on every pooled-connection acquisition; the SELECT
+        // would return zero candidates and the INSERT would fail with
+        // `42501 new row violates row-level security policy`. The transaction
+        // pins one connection for the duration so the GUC persists across both
+        // reads and writes.
+        await using var scope = await _db.BeginPreAuthUserScopeAsync(userId, ct);
+
         // Cross-tenant by design: called during MFA step before full identity cookie is issued; userId comes from the MFA-pending cookie claim. Stage 10 architecture test allow-lists this file.
         var candidates = await _db.TotpReplayEntries
             .IgnoreQueryFilters()
@@ -63,7 +73,7 @@ public sealed class TotpReplayGuard
             var result = _hasher.VerifyHashedPassword(new ApplicationUser(), row.CodeHash, code);
             if (result is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded)
             {
-                return false;   // replay
+                return false;   // replay; scope rolls back on dispose
             }
         }
 
@@ -81,6 +91,7 @@ public sealed class TotpReplayGuard
             .Where(e => e.AcceptedAt < threshold)
             .ExecuteDeleteAsync(ct);
         await _db.SaveChangesAsync(ct);
+        await scope.CommitAsync(ct);
         return true;
     }
 }

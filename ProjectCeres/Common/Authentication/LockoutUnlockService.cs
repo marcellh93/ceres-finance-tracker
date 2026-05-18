@@ -76,6 +76,13 @@ public class LockoutUnlockService
         string rawToken;
         try
         {
+            // Stage 9.6.1 (2026-05-18) — wrap the supersede-UPDATE + INSERT in a
+            // PreAuthUserScope so the user_isolation policy passes on both
+            // operations. Pre-auth context (issued during a failed-login lockout
+            // transition, no session cookie yet) → interceptor would otherwise
+            // RESET the GUC and the writes would fail with 42501.
+            await using var scope = await _db.BeginPreAuthUserScopeAsync(userId, ct);
+
             // Cross-tenant by design: issued for a locked-out (unauthenticated) user; caller is not in session. Stage 10 allow-lists this file.
             await _db.LockoutUnlockTokens
                 .IgnoreQueryFilters()
@@ -100,6 +107,7 @@ public class LockoutUnlockService
                 ConsumedAt = null,
             });
             await _db.SaveChangesAsync(ct);
+            await scope.CommitAsync(ct);
         }
         finally
         {
