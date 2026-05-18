@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Toaster } from '@/components/ui/sonner';
 import { MobileDrawer } from './MobileDrawer';
 import { ReminderCountProvider } from './ReminderCountProvider';
 import { Sidebar } from './Sidebar';
@@ -40,7 +39,7 @@ export function AppLayout() {
               <Outlet />
             </main>
           </div>
-          <Toaster />
+          {/* Toaster mounted at App root (App.tsx) so AuthLayout pages also get it. */}
         </div>
       </ReviewCountProvider>
     </ReminderCountProvider>

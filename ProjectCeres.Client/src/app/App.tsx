@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
 import { AppLayout } from './layout/AppLayout';
 import { AuthLayout } from './layout/AuthLayout';
 import { RequireAuth } from './auth/RequireAuth';
@@ -60,6 +61,15 @@ function RecurringEditBridge() {
 
 export function App() {
   return (
+    <>
+      {/*
+        Single root-level Toaster. Pre-fix, <Toaster> was mounted only inside
+        AppLayout — toasts fired from auth pages (which use AuthLayout) silently
+        no-op'd. Surfaced 2026-05-18 when the `?expired=1` toast on /login
+        didn't render. Mounting once at the App root lets BOTH layouts inherit
+        sonner without duplicating the component or racing on navigation.
+      */}
+      <Toaster />
     <Routes>
       {/* Public branch — auth pages with the centered-card layout, no app shell. */}
       <Route element={<AuthLayout />}>
@@ -130,5 +140,6 @@ export function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
+    </>
   );
 }

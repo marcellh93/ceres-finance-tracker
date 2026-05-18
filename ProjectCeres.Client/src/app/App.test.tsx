@@ -129,4 +129,27 @@ describe('App routing structure', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined()
     );
   });
+
+  it('mounts sonner Toaster at the App root so AuthLayout pages get toasts', async () => {
+    // Regression for 2026-05-18: <Toaster> was previously mounted inside
+    // AppLayout only, which meant /login + /login/totp + /password-reset toast
+    // calls (auth pages on AuthLayout) silently no-op'd. Surfaced when the
+    // `?expired=1` toast on /login didn't render after LoginTotp navigated
+    // there. The fix mounts <Toaster> once at the App root so BOTH layouts
+    // inherit it.
+    //
+    // sonner renders <Toaster> as a section carrying aria-label like
+    // "Notifications alt+T" (the label includes sonner's keyboard shortcut).
+    // We assert that section is in document.body after rendering any auth route.
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    renderApp('/login');
+    await waitFor(() =>
+      expect(document.body.querySelector('[aria-label^="Notifications"]')).not.toBeNull(),
+    );
+  });
 });
