@@ -257,7 +257,7 @@ export function LoginTotp() {
       <Field
         label={t('auth.totp.backupCodeLabel')}
         htmlFor="backup-code"
-        error={backupForm.formState.errors.code?.message}
+        error={backupForm.formState.errors.code?.message ? t(backupForm.formState.errors.code.message) : undefined}
       >
         <Input
           id="backup-code"

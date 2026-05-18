@@ -1,5 +1,13 @@
 {
   "auth": {
+    "validation": {
+      "email": "Enter a valid email address.",
+      "passwordRequired": "Password is required.",
+      "passwordMinLength": "Use at least 8 characters.",
+      "passwordMismatch": "Passwords do not match.",
+      "totpCodeShape": "Enter the 6-digit code.",
+      "backupCodeRequired": "Enter a backup code."
+    },
     "login": {
       "title": "Sign in",
       "emailLabel": "Email",

@@ -1,5 +1,13 @@
 {
   "auth": {
+    "validation": {
+      "email": "Introduce un correo electrónico válido.",
+      "passwordRequired": "La contraseña es obligatoria.",
+      "passwordMinLength": "Usa al menos 8 caracteres.",
+      "passwordMismatch": "Las contraseñas no coinciden.",
+      "totpCodeShape": "Introduce el código de 6 dígitos.",
+      "backupCodeRequired": "Introduce un código de respaldo."
+    },
     "login": {
       "title": "Iniciar sesión",
       "emailLabel": "Correo electrónico",

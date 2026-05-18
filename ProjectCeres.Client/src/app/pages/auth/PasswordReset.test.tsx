@@ -259,6 +259,35 @@ describe('PasswordReset page', () => {
     expect((screen.getByLabelText(/^new password$/i) as HTMLInputElement).value).toBe('longenough1');
   });
 
+  it('renders zod validation errors in the active i18n language (Spanish)', async () => {
+    // Regression for 2026-05-18: schemas previously hard-coded English strings
+    // (`z.string().email('Enter a valid email address.')`). On a page in
+    // Spanish, the zod error rendered in English. Schemas now emit i18n keys
+    // (`'auth.validation.email'`) and the form component resolves them via
+    // t(...) at render time.
+    const { act } = await import('@testing-library/react');
+    await act(async () => {
+      await i18n.changeLanguage('es');
+    });
+    try {
+      const user = userEvent.setup();
+      renderAt('/password-reset');
+      // Submit with an invalid email → schema emits the key
+      // 'auth.validation.email', which en.json renders as "Enter a valid..."
+      // and es.json renders as "Introduce un correo electrónico válido.".
+      await user.type(screen.getByLabelText(/correo electrónico/i), 'not-an-email');
+      await user.click(screen.getByRole('button', { name: /enviar enlace/i }));
+      await waitFor(() =>
+        expect(screen.getByText(/Introduce un correo electrónico válido/i)).toBeDefined(),
+      );
+      expect(screen.queryByText(/Enter a valid email address/i)).toBeNull();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
   it('confirm 422 VALIDATION_ERROR maps details to field error', async () => {
     fetchSpy.mockImplementation(async (url) => {
       if (typeof url === 'string' && url === '/api/auth/me') {

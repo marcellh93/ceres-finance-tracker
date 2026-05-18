@@ -139,7 +139,7 @@ export function Login() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <h1 className="text-xl font-semibold tracking-tight">{t('auth.login.title')}</h1>
 
-      <Field label={t('auth.login.emailLabel')} htmlFor="email" error={errors.email?.message}>
+      <Field label={t('auth.login.emailLabel')} htmlFor="email" error={errors.email?.message ? t(errors.email.message) : undefined}>
         <Input
           id="email"
           type="email"
@@ -149,7 +149,7 @@ export function Login() {
         />
       </Field>
 
-      <Field label={t('auth.login.passwordLabel')} htmlFor="password" error={errors.password?.message}>
+      <Field label={t('auth.login.passwordLabel')} htmlFor="password" error={errors.password?.message ? t(errors.password.message) : undefined}>
         <Input
           id="password"
           type="password"

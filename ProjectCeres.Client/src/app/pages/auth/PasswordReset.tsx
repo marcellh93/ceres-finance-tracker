@@ -163,7 +163,7 @@ function RequestForm() {
       <Field
         label={t('auth.passwordReset.request.emailLabel')}
         htmlFor="email"
-        error={form.formState.errors.email?.message}
+        error={form.formState.errors.email?.message ? t(form.formState.errors.email.message) : undefined}
       >
         <Input
           id="email"
@@ -279,7 +279,7 @@ function ConfirmForm({ token }: { token: string }) {
       <Field
         label={t('auth.passwordReset.confirm.newPasswordLabel')}
         htmlFor="new-password"
-        error={form.formState.errors.newPassword?.message}
+        error={form.formState.errors.newPassword?.message ? t(form.formState.errors.newPassword.message) : undefined}
       >
         <Input
           id="new-password"
@@ -293,7 +293,7 @@ function ConfirmForm({ token }: { token: string }) {
       <Field
         label={t('auth.passwordReset.confirm.confirmPasswordLabel')}
         htmlFor="confirm-password"
-        error={form.formState.errors.confirmPassword?.message}
+        error={form.formState.errors.confirmPassword?.message ? t(form.formState.errors.confirmPassword.message) : undefined}
       >
         <Input
           id="confirm-password"
