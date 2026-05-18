@@ -236,6 +236,7 @@ describe('Login page', () => {
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith(
         expect.stringMatching(/password reset/i),
+        expect.objectContaining({ id: 'login-password-reset-success' }),
       ),
     );
   });
@@ -255,6 +256,7 @@ describe('Login page', () => {
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith(
         expect.stringMatching(/your sign-in expired/i),
+        expect.objectContaining({ id: 'login-totp-expired' }),
       ),
     );
   });

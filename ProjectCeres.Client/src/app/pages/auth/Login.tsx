@@ -26,11 +26,15 @@ export function Login() {
   const [resendError, setResendError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Sonner's id-based dedup: passing the same id twice collapses to one
+    // toast. Without an id, React 19 StrictMode's dev-mode double-effect-invoke
+    // produces two stacked toasts. Each query-param trigger gets a stable id
+    // so the second invoke is a no-op visually.
     if (searchParams.get('expired') === '1') {
-      toast(t('auth.login.toasts.totpExpired'));
+      toast(t('auth.login.toasts.totpExpired'), { id: 'login-totp-expired' });
     }
     if (searchParams.get('reset') === '1') {
-      toast(t('auth.login.toasts.passwordResetSuccess'));
+      toast(t('auth.login.toasts.passwordResetSuccess'), { id: 'login-password-reset-success' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
