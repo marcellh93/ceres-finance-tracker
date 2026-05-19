@@ -12,6 +12,8 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 
 **Session is gated by `playbook`.** The skill orchestrates eight phases — four HARD (pre-spec-write, pre-deferral, pre-stage-close, pre-commit), three advisory (stage-start, mid-build, pre-PR-review), plus pre-handoff. Read `.claude/skills/playbook/references/constitution.md` before bypassing any HARD gate. Per-session state: `.claude/state/playbook/<session_id>.json`.
 
+**Post-compaction: read the snapshot before the next action.** When a SessionStart system reminder reports `♻️ state-rehydration: compaction detected. Operational snapshot available.`, the next tool call MUST be a `Read` on the snapshot path the reminder cites (`.claude/state/state-rehydration/<session_id>/snapshot.json`). No Edits, no Bash, no spec/plan writing, no `git commit` before that read. The reminder's index of `open_deferrals` / `open_spec` / `open_plan` / `last_code_writes` is intentionally terse — the snapshot itself carries fields the index omits, and the compacted-conversation summary will often drift from current disk state on at least one of those axes. Skipping the read once silently is fine if context happens to align; skipping it as a habit causes the drift that motivated the rehydration mechanism in the first place. Failure mode logged 2026-05-19 (Section D step 38 turn — hook fired, I acknowledged it in text but never opened the file).
+
 ## Tech Stack
 
 - **Runtime:** .NET 10 on macOS
