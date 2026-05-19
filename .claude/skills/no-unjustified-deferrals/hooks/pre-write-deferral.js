@@ -77,7 +77,13 @@ process.stdin.on("end", () => {
   const text = chunks.join("\n");
   if (!text) process.exit(0);
 
-  const matched = PHRASES.filter((re) => re.test(text)).map((re) => re.toString());
+  // Strip markdown stage headings before regex-testing. These lines preserve
+  // closed stages' titles (e.g. "## Stage 9.1.5 — Phase 1 polish + bugfix
+  // batch") and re-match phrases like /Phase \w+ polish/i on every adjacent
+  // edit. The heading itself is not deferral language.
+  const textForMatching = text.replace(/^##\s+Stage\s+\d+(\.\d+)*\b.*$/gim, "");
+
+  const matched = PHRASES.filter((re) => re.test(textForMatching)).map((re) => re.toString());
   if (matched.length === 0) process.exit(0);
 
   // Allowed-pattern guard: if the text also contains a stage ref, a checkbox,

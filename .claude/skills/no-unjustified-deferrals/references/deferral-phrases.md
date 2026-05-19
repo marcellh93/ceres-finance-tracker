@@ -27,6 +27,10 @@ The hook does NOT block the write. It prepends context. False positives cost a p
 /track(ed|ing) (in|on) the spec/i               // tracking in specs is rejected per feedback_persist_deferred_decisions
 ```
 
+## Heading-line carve-out
+
+Before phrase-testing, lines matching `/^##\s+Stage\s+\d+(\.\d+)*\b.*$/` are stripped from the candidate text. These lines preserve closed stages' titles (e.g. `## Stage 9.1.5 — Phase 1 polish + bugfix batch`) and any adjacent Edit re-includes them in `new_string` even when nothing about them changed. The heading itself is not deferral language; matching on it produces false positives every time an unrelated edit lands near a closed stage section. Added 2026-05-19 after the Stage 9.11 Playwright authoring re-fired `/Phase \w+ polish/i` on Stage 9.1.5's preserved title.
+
 ## Allowed-pattern guard
 
 The hook does NOT fire when the WRITE also contains all three of these markers near the deferral phrase (within ±20 lines):
