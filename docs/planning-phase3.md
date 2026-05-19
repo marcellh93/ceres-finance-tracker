@@ -424,7 +424,7 @@ See [planning.md — Open Questions](planning.md#open-questions--decisions) for 
 - ~~MVC → Web API decoupling~~ — Approach locked 2026-04-28. See `planning-phase3-spa-migration.md`.
 - ~~CI service~~ — GitHub Actions per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). Runs `dotnet test` + `pnpm test` against Postgres 16 on every PR.
 - ~~CD strategy~~ — GitHub Actions environments + OIDC per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). Deploy target still scoped to the hosting Open Question; pre-migration DB snapshot is the locked baseline.
-- ~~E2E testing~~ — Playwright per [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md). First suite ships post-Stage 9 covering register/login/reset/TOTP/lockout golden paths.
+- ~~E2E testing~~ — Playwright per [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md). First suite ships in **Stage 9.11** (`roadmap-phase-three.md`) covering register/login/reset/TOTP/lockout golden paths.
 
 ---
 

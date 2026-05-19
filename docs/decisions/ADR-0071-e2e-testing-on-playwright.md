@@ -57,15 +57,24 @@ Subsequent stages add E2E coverage as they introduce user-facing flows (Stage 15
 
 ## Implementation gates
 
-This ADR is locked. The Playwright dependency, base configuration (`playwright.config.ts`), and first test suite land in Stage 9 follow-up (or as a Stage 9.10 sub-stage if scope inflates). CI integration follows once `.github/workflows/ci.yml` is in place (per ADR-0070).
+This ADR is locked. Implementation splits across two roadmap stages because `.github/workflows/ci.yml` does not exist until Stage 16 ships per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md):
 
-Pre-Stage-9-completion must-have:
+- **Stage 9.11 — Playwright E2E foundations** (`roadmap-phase-three.md`) — owns the dep install, `playwright.config.ts`, first golden-path suite, fixture decision, and local-run docs.
+- **Stage 16.16 — Playwright E2E in CI** (`roadmap-phase-three.md`) — wires the suite into the CI workflow (sharded, browser cache via `actions/cache`, trace + report artefacts on failure).
+
+Each stage's roadmap entry owns its own checklist. This section stays as the authoritative source of must-have items below; the two roadmap stages' `[ ]` lines mirror them split by execution boundary.
+
+Pre-Stage-9.11-completion must-have:
 
 - [ ] `pnpm --dir ProjectCeres.Client add -D @playwright/test`
 - [ ] `playwright.config.ts` with `baseURL`, `webServer` (boots `dotnet run` + Vite preview), `projects` for Chromium / Firefox / WebKit.
 - [ ] `e2e/auth/register-login.spec.ts` covers the golden path.
-- [ ] GitHub Actions step: `npx playwright install --with-deps` cached.
-- [ ] Trace files uploaded as artefact on failure.
+
+Pre-Stage-16.16-completion must-have:
+
+- [ ] GitHub Actions step: `npx playwright install --with-deps` cached via `actions/cache`.
+- [ ] Sharded across runner instances; matrix runs each shard.
+- [ ] Trace files + HTML report uploaded as workflow artefact on failure.
 
 ## Cross-references
 

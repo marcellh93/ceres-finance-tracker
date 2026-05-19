@@ -959,6 +959,7 @@ Tests required before Stage 9 begins:
 | 9.8 | Reauthentication prompts on sensitive operations | `security-model.md` § Login → Reauthentication |
 | 9.9 | Language toggle on every auth card (globe icon) | `planning-phase3.md` § Localization |
 | 9.10 | RLS coverage audit for `[PreAuthCallSite]` write paths + test-infra `ceres_app` parity | `planning-phase3.md` § Stage 7.5 deferred items (2026-05-18) |
+| 9.11 | Playwright E2E foundations — install dep, `playwright.config.ts`, first golden-path suites, local-run docs (CI wiring lands in Stage 16.16) | [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md), `planning-phase3.md` § Phase 3 resolved decisions |
 
 ### Verification checklist
 
@@ -1089,6 +1090,22 @@ Stage 9.10 — RLS pre-auth-write audit + test-infrastructure parity:
 - [ ] **Decide test-infrastructure parity strategy** — `ProjectCeres.Tests/Integration/WafCollection.cs` lines 75–76 override `ApplicationConnection` to point at `ceres_admin` (BYPASSRLS), which means every existing auth integration test runs with the Stage 7.5 RLS policies silently inert. The 2026-05-18 bug shipped because no test could catch it. Pick one and ship: (a) flip the override back to `ceres_app` for the auth-tier test collection and patch the test data setup to satisfy the user_isolation policy, OR (b) add a parallel `AuthRlsParityTestCollection` that runs the same flows against `ceres_app`. Document the decision in `docs/testing.md` § Rules so the override doesn't silently regress.
 - [ ] **Extend `PreAuthWritesUnderRlsTests.cs` to cover the audit's findings** — one new `[Fact]` per call site that the audit confirms needs `PreAuthUserScope`. Each test follows the existing pattern: bind directly to `TestDbFixture.AppConnectionString` (`ceres_app`), install a `RowLevelSecurityInterceptor` with `UserContext.PreAuth`, exercise the service method, assert no `RlsPolicyViolationException` and the write actually persists (re-read via admin context to confirm). Pre-fix the new tests fail with 42501; post-fix they pass. The file is already the tripwire for this class of regression.
 - [ ] **Sweep `security-model.md` § Row-Level Security with a "pre-auth write pattern" section** documenting `PreAuthUserScope` as the standing rule: any pre-auth call site that knows its userId AND must read or write a user-owned table MUST wrap the operation in a `PreAuthUserScope`. Cross-reference from `docs/architecture.md` if it documents the RLS layer.
+
+Stage 9.11 — Playwright E2E foundations:
+
+- [ ] **Install Playwright dev dep** — `pnpm --dir ProjectCeres.Client add -D @playwright/test`. *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates.*
+- [ ] **Author `ProjectCeres.Client/playwright.config.ts`** — `baseURL` pointing at the production-built SPA; `webServer` block that boots `dotnet run --project ProjectCeres` + Vite preview before tests; `projects` matrix for Chromium / Firefox / WebKit; `fullyParallel: true`; trace + screenshot + video on failure; output to `ProjectCeres.Client/playwright-report/`. *Anchor: ADR-0071 § Decision + § Implementation gates.*
+- [ ] **Create `ProjectCeres.Client/e2e/` directory** (separate from `src/**/__tests__/`); `pnpm --dir ProjectCeres.Client e2e` command wired in `package.json` per `docs/testing.md` § E2E Tool: Playwright (TypeScript). *Anchor: `testing.md` lines 99–112.*
+- [ ] **Write the five Stage-9 golden-path suites** under `e2e/auth/`:
+  - [ ] `register-login.spec.ts` — register → email-verification interstitial → login → dashboard
+  - [ ] `password-reset.spec.ts` — forgot-password → reset-link email → new-password → login
+  - [ ] `totp-enrol-and-first-login.spec.ts` — TOTP enrolment from Settings → sign-out → login with TOTP → dashboard
+  - [ ] `lockout-self-service.spec.ts` — N wrong passwords → lockout → unlock-email link → re-login
+  - [ ] `backup-code-recovery.spec.ts` — "lost device" → backup-code consume → dashboard. *Anchor: ADR-0071 § Decision lines 35–38; `planning-phase3.md` line 427.*
+- [ ] **Wire fixture for real PostgreSQL** — E2E suite must run against a real `dotnet run` + Postgres (mirrors xUnit integration-test fixture pattern, but at the browser layer). Decide: shared dev DB with a per-suite reset, or a `project_ceres_e2e` database with the existing migration runner. Document the choice in `testing.md` § E2E. *Anchor: ADR-0071 § Decision line 31.*
+- [ ] **Document local-run instructions** in `docs/testing.md` § Running tests — `pnpm --dir ProjectCeres.Client e2e` (headless), `pnpm --dir ProjectCeres.Client e2e --ui` (Playwright UI Mode), prerequisite of `dotnet run` already going or letting `webServer` boot it. *Anchor: `testing.md` § E2E Tool lines 108–112.*
+
+> **CI wiring is deferred to Stage 16.16** (already-scheduled — see `roadmap-phase-three.md` § Stage 16). The `.github/workflows/ci.yml` file does not exist until Stage 16 ships per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md); GH-Actions wiring for the Playwright suite (`npx playwright install --with-deps` cached, sharded runners, trace + report artefacts on failure) is part of that CI bring-up rather than this stage. Stage 9.11 ships the suite + local-run docs; Stage 16.16 wires it into CI.
 
 ---
 
@@ -1648,6 +1665,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 | 16.13 | Container / runtime hardening | `security-model.md` § Container / Runtime Hardening |
 | 16.14 | Data Protection key persistence + rotation | `security-model.md` § TOTP Secrets + § Secrets Rotation Procedures + Stage 6 carry-forward |
 | 16.15 | **Stage 7.5 follow-up.** Production database setup creates `ceres_app`, `ceres_admin`, `ceres_migrator` per `scripts/setup-postgres-roles.sql`. Only `ceres_app` (NOBYPASSRLS) and `ceres_admin` (BYPASSRLS) credentials are deployed with the application; `ceres_migrator` (DDL + BYPASSRLS) credentials are held by the deploy operator and used only when applying migrations. The privilege-leak startup check in `Program.cs` refuses to start if the runtime `ApplicationConnection` is wired to a privileged role — confirm it fires correctly under the production deployment configuration. | Stage 7.5 / ADR-0068 |
+| 16.16 | **Stage 9.11 follow-up.** Playwright E2E suite (shipped in Stage 9.11) wired into `.github/workflows/ci.yml`: `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. Suite runs on every PR + on `main`. | [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates / Stage 9.11 |
 
 ### Verification checklist
 
@@ -1694,6 +1712,7 @@ CI/CD:
 - [ ] CI provider chosen (likely GitHub Actions per `planning.md`)
 - [ ] CI runs: build, all server tests, all client tests, vulnerability scan (`dotnet list package --vulnerable`), secret scan
 - [ ] CI fails the build on any test failure or security finding
+- [ ] **Playwright E2E suite (shipped in Stage 9.11) wired into CI** per Stage 16.16 — `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates.*
 - [ ] CD pipeline runs: build artifact, deploy to staging, run integration smoke tests, deploy to prod (manual approval gate)
 - [ ] Rollback plan documented: how to revert the last deploy in under 10 minutes
 
