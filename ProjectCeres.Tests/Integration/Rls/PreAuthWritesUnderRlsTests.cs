@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
+using ProjectCeres.Models;
 using ProjectCeres.Tests.Common;
 using ProjectCeres.Tests.Integration.Infrastructure;
 
@@ -76,6 +77,97 @@ public class PreAuthWritesUnderRlsTests
             .Where(e => e.UserId == userId)
             .ExecuteDeleteAsync();
         await cleanupScope.CommitAsync();
+    }
+
+    [Fact]
+    public async Task PasswordResetTokens_select_under_PreAuth_returns_null_until_PreAuthUserScope_opens()
+    {
+        // Stage 9.6.1 (2026-05-19) — pins the root cause that
+        // PasswordResetService.ConfirmAsync was suffering from: under a
+        // [PreAuthCallSite] context, the RowLevelSecurityInterceptor RESETs
+        // app.current_user_ref on connection open. A SELECT against the
+        // ceres_app connection therefore filters every PasswordResetToken row
+        // via the user_isolation policy (returns null) regardless of whether
+        // the row exists. The fix is two-part:
+        //   1) read the candidate token via AdminDbContext (BYPASSRLS), and
+        //   2) wrap all subsequent writes in a PreAuthUserScope.
+        // This test pins both behaviors so a future refactor can't re-introduce
+        // the bug by routing the initial lookup through ceres_app.
+        await MigrationFixture.EnsureMigratedAsync();
+        var userId = Guid.NewGuid();
+
+        // Seed a token via the admin context (BYPASSRLS).
+        await using (var admin = AdminContextFactory.Create())
+        {
+            admin.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                TokenLookup = Guid.NewGuid().ToByteArray(),
+                TokenHash = "x",
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
+            });
+            await admin.SaveChangesAsync();
+        }
+
+        try
+        {
+            // (1) ceres_app + PreAuth + no PreAuthUserScope → row filtered.
+            await using (var app = BuildAppContextWithPreAuthInterceptor(userId))
+            {
+                var filtered = await app.PasswordResetTokens
+                    .IgnoreQueryFilters()
+                    .Where(t => t.UserId == userId)
+                    .FirstOrDefaultAsync();
+
+                filtered.Should().BeNull(
+                    "without app.current_user_ref set, the user_isolation RLS policy filters every row " +
+                    "— this is precisely the failure mode ConfirmAsync was hitting on the production ceres_app connection");
+            }
+
+            // (2) Admin context (BYPASSRLS) sees the row — this is the path
+            //     ConfirmAsync's initial lookup uses post-fix. IgnoreQueryFilters
+            //     because AdminDbContext shares AppDbContext's global per-user
+            //     EF filter; ceres_admin bypasses RLS at the DB level but the
+            //     EF filter still applies, and ConfirmAsync's real call site
+            //     explicitly pairs admin reads with IgnoreQueryFilters.
+            await using (var admin = AdminContextFactory.Create())
+            {
+                var visible = await admin.PasswordResetTokens
+                    .IgnoreQueryFilters()
+                    .Where(t => t.UserId == userId)
+                    .FirstOrDefaultAsync();
+
+                visible.Should().NotBeNull(
+                    "AdminDbContext binds to ceres_admin (BYPASSRLS), so the initial token lookup in " +
+                    "ConfirmAsync — which runs before match.UserId is known — sees the row");
+            }
+
+            // (3) ceres_app + PreAuth + PreAuthUserScope keyed to the row's
+            //     UserId → row visible. This is the path the writes take
+            //     after the admin lookup resolves match.UserId.
+            await using (var app = BuildAppContextWithPreAuthInterceptor(userId))
+            {
+                await using var scope = await app.BeginPreAuthUserScopeAsync(userId);
+                var scoped = await app.PasswordResetTokens
+                    .IgnoreQueryFilters()
+                    .Where(t => t.UserId == userId)
+                    .FirstOrDefaultAsync();
+
+                scoped.Should().NotBeNull(
+                    "once PreAuthUserScope sets app.current_user_ref via SET LOCAL, the user_isolation policy " +
+                    "lets the row through and ConfirmAsync's subsequent UPDATE/INSERT writes can proceed");
+                await scope.CommitAsync();
+            }
+        }
+        finally
+        {
+            await using var admin = AdminContextFactory.Create();
+            await admin.PasswordResetTokens
+                .Where(t => t.UserId == userId)
+                .ExecuteDeleteAsync();
+        }
     }
 
     private static AppDbContext BuildAppContextWithPreAuthInterceptor(Guid userId)

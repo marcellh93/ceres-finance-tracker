@@ -25,6 +25,14 @@ public sealed class PasswordResetService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly AppDbContext _db;
+    // Stage 9.6.1 (2026-05-19) — ConfirmAsync needs to look up the token row by
+    // TokenLookup BEFORE the userId is known, but the user_isolation RLS policy
+    // filters every row when app.current_user_ref is unset (PreAuth context).
+    // The chicken-and-egg is solved by reading via AdminDbContext (ceres_admin,
+    // BYPASSRLS) just for the initial lookup; once we have match.UserId we open
+    // a normal PreAuthUserScope on _db (ceres_app) for all subsequent writes.
+    // Same admin-read-then-scoped-write pattern as Stage 7.6.5's IUserJobRunner.
+    private readonly AdminDbContext _admin;
     private readonly Argon2idPasswordHasher _argon;
     private readonly PasswordResetTokenGenerator _tokens;
     private readonly TokenLookupHasher _lookupHasher;
@@ -43,6 +51,7 @@ public sealed class PasswordResetService
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         AppDbContext db,
+        AdminDbContext admin,
         Argon2idPasswordHasher argon,
         PasswordResetTokenGenerator tokens,
         TokenLookupHasher lookupHasher,
@@ -60,6 +69,7 @@ public sealed class PasswordResetService
         _userManager = userManager;
         _signInManager = signInManager;
         _db = db;
+        _admin = admin;
         _argon = argon;
         _tokens = tokens;
         _lookupHasher = lookupHasher;
@@ -236,8 +246,17 @@ public sealed class PasswordResetService
         // unconsumed unexpired row (Argon2id-amplification DoS on /confirm).
         var now = DateTime.UtcNow;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
-        // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
-        var match = await _db.PasswordResetTokens
+        // Stage 9.6.1 (2026-05-19): the UserId isn't known yet, so we cannot set
+        // app.current_user_ref before this SELECT. Without the GUC set, the
+        // user_isolation RLS policy on ceres_app would filter every row. Read
+        // via AdminDbContext (ceres_admin, BYPASSRLS) for this initial lookup
+        // only; once we have match.UserId we open a PreAuthUserScope on _db
+        // for all subsequent writes. Same pattern as Stage 7.6.5's IUserJobRunner.
+        // IgnoreQueryFilters is required: AdminDbContext bypasses RLS at the DB
+        // level (Postgres role) but inherits AppDbContext's EF-level per-user
+        // global filter, which would still hide the row since _currentUser.UserId
+        // is empty under [PreAuthCallSite].
+        var match = await _admin.PasswordResetTokens
             .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup
                      && t.ConsumedAt == null
@@ -264,9 +283,16 @@ public sealed class PasswordResetService
         await sem.WaitAsync(ct);
         try
         {
+            // Stage 9.6.1 (2026-05-19): now that match.UserId is known, open a
+            // PreAuthUserScope on _db (ceres_app) so all the writes below pass
+            // the user_isolation RLS policy. The scope wraps everything inside
+            // the lock and commits at the end; on any early return or exception
+            // the DisposeAsync rolls back.
+            await using var rlsScope = await _db.BeginPreAuthUserScopeAsync(match.UserId, ct);
+
             // Re-read the token row inside the lock; another concurrent caller may have consumed it.
             // Cross-tenant by design: still pre-auth at this point; user id not yet in cookie. Stage 10 architecture test allow-lists this file.
-            var current = await _db.PasswordResetTokens
+            var current = await _admin.PasswordResetTokens
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
@@ -413,6 +439,11 @@ public sealed class PasswordResetService
             }
 
             await _auditLog.RecordAsync(user.Id, AuditLogAction.PasswordResetCompleted, ct: ct);
+
+            // Commit the PreAuthUserScope's transaction (and SET LOCAL GUC) once
+            // every RLS-scoped write above has persisted. DisposeAsync at end of
+            // `using` will be a no-op if commit already ran.
+            await rlsScope.CommitAsync(ct);
 
             return new PasswordResetConfirmOutcome.Success();
         }

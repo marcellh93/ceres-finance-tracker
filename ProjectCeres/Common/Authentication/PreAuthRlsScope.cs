@@ -57,10 +57,38 @@ public static class PreAuthRlsScope
     /// (<c>SET LOCAL</c> scope, valid for the transaction's lifetime).
     /// Caller commits via <see cref="PreAuthUserScope.CommitAsync"/>; failing
     /// to commit before dispose rolls back.
+    ///
+    /// <para>
+    /// <b>Re-entrant.</b> Stage 9.6.1 (2026-05-19): if the connection already
+    /// has an open transaction (because the caller opened its own outer scope),
+    /// returns a no-op nested scope. The outer scope owns commit/rollback and
+    /// has already set <c>app.current_user_ref</c> to the same userId. We
+    /// require the userId to match so a nested call cannot silently widen the
+    /// row set it can write — a mismatch indicates a service-composition bug
+    /// (e.g. one pre-auth service calling another with the wrong userId).
+    /// </para>
     /// </summary>
     public static async Task<PreAuthUserScope> BeginPreAuthUserScopeAsync(
         this AppDbContext db, Guid userId, CancellationToken ct = default)
     {
+        if (db.Database.CurrentTransaction is not null)
+        {
+            // Verify the outer scope is keyed to the same user; cross-user nesting
+            // would let a child service write rows the outer scope authorized for
+            // a different principal. Postgres returns the empty string when the
+            // GUC was never set on this transaction; treat that as a misuse too.
+            var current = await db.Database
+                .SqlQueryRaw<string>("SELECT current_setting('app.current_user_ref', true) AS \"Value\"")
+                .FirstAsync(ct);
+            if (current != userId.ToString("D"))
+            {
+                throw new InvalidOperationException(
+                    $"Nested PreAuthUserScope userId mismatch: outer transaction is keyed to '{current}' but nested call passed '{userId:D}'. " +
+                    "Pre-auth services may only compose when both target the same user.");
+            }
+            return PreAuthUserScope.Nested();
+        }
+
         var tx = await db.Database.BeginTransactionAsync(ct);
         // SET LOCAL persists for the transaction; the interceptor's RESET-on-open
         // doesn't fire again because the transaction holds the same connection.
@@ -73,7 +101,7 @@ public static class PreAuthRlsScope
 
 public sealed class PreAuthUserScope : IAsyncDisposable
 {
-    private readonly IDbContextTransaction _tx;
+    private readonly IDbContextTransaction? _tx;
     private bool _committed;
 
     internal PreAuthUserScope(IDbContextTransaction tx)
@@ -81,15 +109,25 @@ public sealed class PreAuthUserScope : IAsyncDisposable
         _tx = tx;
     }
 
+    private PreAuthUserScope()
+    {
+        _tx = null;
+        _committed = true; // nothing to commit/rollback at this layer
+    }
+
+    /// <summary>Inner-scope sentinel — the outer scope owns the transaction.</summary>
+    internal static PreAuthUserScope Nested() => new();
+
     public async Task CommitAsync(CancellationToken ct = default)
     {
         if (_committed) return;
-        await _tx.CommitAsync(ct);
+        await _tx!.CommitAsync(ct);
         _committed = true;
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (_tx is null) return; // nested no-op scope
         if (!_committed)
         {
             await _tx.RollbackAsync();

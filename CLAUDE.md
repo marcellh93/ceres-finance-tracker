@@ -40,6 +40,8 @@ dotnet test                                  # run all server tests
 pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on view changes
 ```
 
+**Stale-binary trip-up (2026-05-19).** When `dotnet watch` is running and a separate session does a manual `dotnet build`, watch does NOT auto-restart the running app — it only restarts on `.cs` file changes since *its* last scan. The DLL on disk gets ahead of the process in memory, exception stack traces report line numbers from the OLD source, and "I restarted the server" produces no observable change. Detect by comparing `ls -la ProjectCeres/bin/Debug/net10.0/ProjectCeres.dll` against `ps aux | grep "bin/Debug/net10.0/ProjectCeres"` start time; if the DLL is newer, `kill -9 <pid>` and `touch ProjectCeres/<any-source>.cs` to force watch to rebuild + relaunch.
+
 ## When the Stop hook actually fires
 
 The Stop hook (`.claude/hooks/run-tests.sh`) is the project's `dotnet test` gate. Three facts to keep straight, because earlier drafts of Phase 3 specs got them wrong:
