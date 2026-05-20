@@ -312,6 +312,13 @@ public sealed class AuthController : ControllerBase
             HttpContext.Items[SessionConstants.LastReauthAtItemKey] =
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
             await _signInManager.SignInAsync(user, isPersistent: false);
+            // Stage 6b.2 replaced the framework's TwoFactorAuthenticatorSignInAsync (which
+            // implicitly clears Identity.TwoFactorUserId) with manual VerifyTwoFactorToken +
+            // SignInAsync to keep TOTP misses from poisoning the password lockout counter.
+            // The trade-off: SignInAsync only sets the AuthenticationScheme cookie, so the
+            // half-auth handoff cookie lingers until its 5-min TTL. Clear it explicitly so
+            // the success path leaves no stale Identity cookies behind.
+            await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LoginSucceededMfa, ct: HttpContext.RequestAborted);
@@ -346,6 +353,9 @@ public sealed class AuthController : ControllerBase
             HttpContext.Items[SessionConstants.LastReauthAtItemKey] =
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
             await _signInManager.SignInAsync(user, isPersistent: false);
+            // See TOTP-success branch above — manual SignInAsync doesn't clear
+            // the TwoFactorUserId scheme cookie; do it explicitly.
+            await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
             await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
             ClearRememberMeCookie();
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LoginSucceededBackupCode, ct: HttpContext.RequestAborted);
