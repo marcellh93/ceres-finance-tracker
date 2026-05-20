@@ -13,4 +13,5 @@ public sealed class UserSession : IUserOwned
     public DateTime LastUsedAt { get; set; }
     public DateTime? RevokedAt { get; set; }
     public bool IsPersistent { get; set; }
+    public bool UsedBackupCodeAtLogin { get; set; }
 }
