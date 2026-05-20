@@ -32,7 +32,7 @@ See `references/constitution.md`. The constitution is the single source of truth
 
 - **Phase A — stage-start** (advisory): `superpowers:brainstorming` before any plan-mode plan or code Write.
 - **Phase B — pre-spec-write** (HARD): `superpowers:brainstorming` + `verify-against-codebase` before a new spec under `docs/superpowers/specs/`.
-- **Phase C — mid-build** (advisory + HARD claim-gate): `deep-fix-mode` / `decision-mode` / `no-unjustified-deferrals` fire continuously via existing hooks; `verify-runtime-state` HARD-blocks the Stop event on runtime-state claims that lack evidence (added 2026-05-18).
+- **Phase C — mid-build** (advisory + HARD claim-gates): `deep-fix-mode` / `decision-mode` / `no-unjustified-deferrals` fire continuously via existing hooks; `verify-runtime-state` HARD-blocks the Stop event on runtime-state claims that lack evidence (added 2026-05-18); `fix-interaction` HARD-blocks the Stop event when a fix is mentioned without an Edit/Write in the same turn, forcing an explicit "fix or document?" interaction (added 2026-05-20).
 - **Phase D — pre-deferral** (HARD): `no-unjustified-deferrals` six-step gate satisfied before deferral language lands in `docs/**`.
 - **Phase E — pre-stage-close** (HARD): `sync-docs` + `changelog-sync` fired this session AND zero unchecked `[ ]` items in the closing stage's body.
 - **Phase F — pre-commit** (HARD, conditional): `verify-against-codebase` fired since the most recent code Write. Doc-only commits bypass.

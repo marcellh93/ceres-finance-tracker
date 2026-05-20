@@ -114,20 +114,23 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 ---
 
-### Phase C — `mid-build` (advisory + HARD claim-gate, plus existing live guards)
+### Phase C — `mid-build` (advisory + HARD claim-gates, plus existing live guards)
 
-**Gating event.** Continuous — fires throughout the build phase via the existing hooks. No additional `playbook` hook needed here; this phase is the existing trio plus one HARD Stop-event gate added 2026-05-18:
+**Gating event.** Continuous — fires throughout the build phase via the existing hooks. No additional `playbook` hook needed here; this phase is the existing trio plus two HARD Stop-event gates added 2026-05-18 and 2026-05-20:
 
 1. `deep-fix-mode` — auto-fires on circling signals via `frustration-detect.js`, `loop-fingerprint.js`, `same-target-edit-count.js`.
 2. `decision-mode` — auto-fires on decision-asking prompts via `decision-detect.js`.
 3. `no-unjustified-deferrals` — auto-fires on deferral language and pushback via `pre-write-deferral.js`, `pushback-detect.js`. Phase D escalates this to HARD.
 4. **`verify-runtime-state` (HARD)** — auto-fires on Stop when the assistant's final message asserts a runtime-state value (database row, env var, file contents on disk, process state) without co-located evidence from an actual query. Enforced by `verify-runtime-state/hooks/stop-runtime-state-claim.js`. Three guards (evidence-co-located, explicit-assumption, user-authorization); if all fail, the Stop is blocked with `exit 2`. Origin: 2026-05-18 — assistant claimed `AspNetUsers.TwoFactorEnabled = false` based on the absence of a grep hit in `SeedDevUser.cs`. Code inspection ≠ runtime state.
+5. **`fix-interaction` (HARD)** — auto-fires on Stop when the assistant's final message mentions a fix (per the phrase list in `fix-interaction/hooks/detect-fix-mention.js`) AND no `Edit`/`Write`/`MultiEdit` tool call landed in the same turn. Forces an explicit "fix now or document?" → "where?" → action → resume-prior-thread interaction via a five-state machine (`none → fix-or-document → where → documenting/fixing → resume → none`) coordinated by three hooks (`detect-fix-mention.js` on Stop, `await-answer.js` on UserPromptSubmit, `check-resolution.js` on Stop). Five dead-lock defenses (TTL, atomic state writes, fail-open on hook error, topic-shift detection, three-way escape) sourced from primary-source workflow-orchestration literature — see `fix-interaction/references/dead-lock-defenses.md`. FIX-CONTEXT guard skips the hook when the fix landed in the same turn. Per-session bypass: `CERES_SKIP_FIX_INTERACTION_HOOK=1` or `/fix-interaction-reset`. Origin: 2026-05-20 — 10-scenario simulation scored 0/10 on proactive action (every response described the fix instead of doing it); user's framing: *"the important part is not pointing the fix or the issue out, is acting proactively on it."*
 
-**Enforcement.** Items 1-3 are ADVISORY today (Phase D escalates #3 to HARD). Item 4 is HARD at the Stop event, regardless of which subsystem the claim touches — it's a cross-cutting message-shape gate, not phase-specific.
+**Enforcement.** Items 1-3 are ADVISORY today (Phase D escalates #3 to HARD). Items 4 and 5 are HARD at the Stop event, regardless of which subsystem the claim or fix-mention touches — they're cross-cutting message-shape gates, not phase-specific.
 
 **Consumes / produces.**
 - Consumes: in-progress build state (edits, tool calls, user prompts, assistant outgoing messages).
-- Produces: advisory `additionalContext` reminders (items 1-3); a hard-block on the Stop event when item 4's gate fails.
+- Produces: advisory `additionalContext` reminders (items 1-3); a hard-block on the Stop event when item 4's evidence guard fails or item 5's FIX-CONTEXT guard fails.
+
+**Item 5 hand-off.** When the user answers "document", the state machine transitions to `where`, then `documenting`. The required `[ ]` line written in the destination doc hands to `no-unjustified-deferrals` (Phase D) if the deferral-phrase regex matches the new content — both gates can fire on the same write, and the well-formed-deferral guard's three fields are the natural completion for a `[ ]` opened by `fix-interaction`.
 
 ---
 

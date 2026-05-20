@@ -45,6 +45,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-touch-detect.js\""
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/await-answer.js\""
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -242,6 +251,24 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-roadmap-verify-flip.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/check-resolution.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/detect-fix-mention.js\""
           }
         ]
       },
