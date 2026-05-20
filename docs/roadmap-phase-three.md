@@ -1026,10 +1026,10 @@ TOTP setup (entry point: `/app/security` per ADR-0069 — NOT `/login/totp/setup
 
 Backup-codes recovery flow:
 
-- [ ] `/login/totp` accepts a backup code in the same input or via a "Use backup code" toggle
-- [ ] Backup code single-use: marked consumed in DB after success
-- [ ] After backup-code login: warning banner on dashboard suggests "Re-enroll TOTP soon. You have N backup codes remaining."
-- [ ] Re-enrolment from settings invalidates ALL existing backup codes and generates a fresh set
+- [x] `/login/totp` accepts a backup code in the same input or via a "Use backup code" toggle — `LoginTotp.tsx` mode switch (`'totp' | 'backup'`) with `auth.totp.backupCodePrompt` link revealing the backup-code form; verified 2026-05-21 by user.
+- [x] Backup code single-use: marked consumed in DB after success — `MfaBackupCodeService.VerifyAndConsumeAsync` runs under a per-user semaphore and marks `ConsumedAt` in the same transaction; verified 2026-05-21 by user.
+- [x] After backup-code login: warning banner on dashboard suggests "Re-enroll TOTP soon. You have N backup codes remaining." — `BackupCodeLoginBanner.tsx` renders at the top of `Dashboard.tsx` when `backupCodesRemaining ≤ 7` and MFA is enabled. CTA shifts between "Re-enrol authenticator" (when `usedBackupCodeAtLastLogin = true`) and "Regenerate backup codes" (when the user has since logged in normally). Server signal pinned by `BackupCodeLoginSessionFlagTests.cs` (3 [Fact]s); SPA pinned by `BackupCodeLoginBanner.test.tsx` (7 cases). Per-pageview dismiss; reappears on reload. Threshold = 7. Spec: `docs/superpowers/specs/2026-05-21-stage-9-7-backup-code-banner-design.md`. Plan: `docs/superpowers/plans/2026-05-21-stage-9-7-backup-code-banner-impl.md`.
+- [x] Re-enrolment from settings invalidates ALL existing backup codes and generates a fresh set — `MfaBackupCodeService.RegenerateAsync` (called from `MfaController.RegenerateBackupCodes`) purges then re-issues; `RegenerateBackupCodesDialog.tsx` drives the SPA flow; verified 2026-05-21 by user.
 
 Reauthentication prompts:
 

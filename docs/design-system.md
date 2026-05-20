@@ -330,6 +330,29 @@ The pattern is `bg-chart-N/10 text-chart-N`. This is the only blessed way to ste
 
 For destructive operations (delete confirmations), prefer a confirmation dialog over a badge.
 
+### Inline warning strip (named recipe)
+
+For surface-level nudges that need more presence than a `<Badge>` but less than a `<CardError>` — e.g. "you signed in with a backup code", "TOTP enrolment incomplete", "this account has uncategorised movements" — compose the warning tokens inline:
+
+```tsx
+<div
+  role="status"
+  aria-live="polite"
+  className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm"
+>
+  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
+  <div className="flex-1 space-y-2">
+    <p>{message}</p>
+    {/* optional CTA */}
+  </div>
+  {/* optional dismiss button */}
+</div>
+```
+
+Anatomy: `border-warning/30 bg-warning/10` for the surround; `text-warning` only for the icon stroke (per § Known limitations — warning is AA-Large only, body text must inherit default foreground); `AlertTriangle` from `lucide-react` at `h-5 w-5`; `role="status"` + `aria-live="polite"` for the screen-reader announcement. Body and CTA stack vertically inside the middle column.
+
+Current callers: `TotpEnrollStep2BackupCodes.tsx`, `BudgetCreate.tsx`, `BackupCodeLoginBanner.tsx`. **At the fourth caller, promote to `<Alert variant="warning">` in `src/components/ui/alert.tsx`** and back-port all callers in the same commit. Add a paired `--warning-foreground` token (see § Known limitations) so body copy can stay inside the warning palette without inheriting default foreground.
+
 ---
 
 ## Layout primitives

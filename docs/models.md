@@ -1011,6 +1011,7 @@ Tracks active authenticated sessions server-side. Enables multi-device support, 
 | LastUsedAt | timestamp | NOT NULL | Updated on authenticated requests via `SessionRevocationValidator.OnValidatePrincipal`, debounced to at most one write per 60 seconds (Stage 6b.3). The SELECT still runs on every request (revocation guarantee). Future-work options tracked in `planning-future.md` § *Session-validation per-request DB write*. |
 | RevokedAt | timestamp | nullable | Stamped when the session is terminated. Non-null = session no longer accepted (the next request with this cookie returns 401). |
 | IsPersistent | bool | NOT NULL | True = "remember me" session paired with a `__Host-Persist` cookie + `PersistentTokenHash` row. |
+| UsedBackupCodeAtLogin | bool | NOT NULL, default false | True = this session was authenticated via the backup-code branch of `/api/auth/login/totp` (rather than the authenticator app). Drives the Stage 9.7 dashboard backup-code banner: `MeResponse.UsedBackupCodeAtLastLogin` is the value of this column for the row identified by the current request's `sid` claim. Per-session by design — signing in normally on a second device leaves the first session's flag set, so the user's dashboard keeps nudging them to re-enrol until they navigate away or dismiss. Set to false on the password-only and TOTP-app branches, true on the backup-code branch. |
 
 **Indexes:** `(UserId, RevokedAt)` for the revocation lookup; `(LastUsedAt)` for the eventual purge job.
 

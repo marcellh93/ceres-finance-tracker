@@ -6,6 +6,18 @@
 
 #### Added
 
+**Authentication (Stage 9.7 — backup-code dashboard banner, 2026-05-21)**
+- New `BackupCodeLoginBanner` component rendered as the first child of the dashboard surface when the signed-in user has MFA enabled and `backupCodesRemaining ≤ 7`. CTA shifts copy based on how the user last authenticated: "Re-enrol authenticator" if the most recent login consumed a backup code; "Regenerate backup codes" if the user has since logged in normally but is still low on codes. Per-pageview dismiss via a small `X` button (React-local state, no persistence) — the banner reappears on reload while the conditions still apply
+- `UserSession.UsedBackupCodeAtLogin` (nullable bool, defaults false) records which second-factor branch authenticated each active session. Written in `AuthController.IssueSessionAndCookiesAsync` (now takes an explicit `usedBackupCode` parameter; password-only and TOTP-app callers pass `false`, backup-code branch passes `true`). `AuthController.Me` looks the value up by the current request's `sid` claim and exposes it on `MeResponse.UsedBackupCodeAtLastLogin` — multi-device-correct, because each session row is independent
+- Deletes the stale "Phase 4 wires this properly" comment at `AuthController.cs:483`; that deferral was the placeholder this stage was created to retire
+- Reuses the documented `border-warning/30 bg-warning/10 text-warning` recipe from `TotpEnrollStep2BackupCodes` and `BudgetCreate` — third caller. The recipe is now documented in `docs/design-system.md` § Inline warning strip with a fourth-caller promote-to-primitive threshold
+- `docs/models.md` UserSession table grows a row for the new column with the multi-device rationale captured inline
+- New i18n namespace `dashboard.backupCodeBanner.{dismiss, reenrol.{body_one,body_other,cta}, regenerate.{body_one,body_other,cta}}` in EN + ES, using i18next's `_one` / `_other` plural-form convention
+- 3 xUnit integration tests pin the server contract (`BackupCodeLoginSessionFlagTests.cs`): backup-code login flips the flag true on the new session row; TOTP login leaves it false; `Me` returns the flag scoped to the current session cookie (multi-device proof — two parallel `HttpClient` instances, one signed in via backup code, the other via TOTP, get distinct `usedBackupCodeAtLastLogin` from `Me`)
+- 7 vitest unit tests pin the SPA contract (`BackupCodeLoginBanner.test.tsx`): re-enrol CTA when `usedBackupCodeAtLastLogin = true`, regenerate CTA when `false` and codes ≤ 7, absent when codes > 7, absent when MFA off, absent when anonymous, dismiss hides current render but a fresh mount restores it, singular vs plural body copy
+- EF migration `AddUsedBackupCodeAtLoginToUserSession` — single AddColumn, server-side default false; applied to `project_ceres` and `project_ceres_test`
+- Spec: `docs/superpowers/specs/2026-05-21-stage-9-7-backup-code-banner-design.md`; plan: `docs/superpowers/plans/2026-05-21-stage-9-7-backup-code-banner-impl.md`. Stage 9.7 "Backup-codes recovery flow" closes with all four items checked (toggle, single-use, dashboard banner, re-enrolment-invalidation)
+
 **Authentication (Stage 9.4 — `/password-reset` SPA pages, 2026-05-18)**
 - Single SPA page mounted at `/password-reset` that dispatches by `location.hash`: empty/missing hash renders the request form (one email field + "Send reset link" submit + back-to-sign-in); `#token=<raw>` renders the confirm form (new + confirm password, optional TOTP cells revealed if the server responds `200 { requiresTotp: true }`)
 - Honors the server's pre-existing URL convention from `PasswordResetService.cs:164` — reset link embeds the raw token in the URL fragment, not query, so the token never reaches the server logs or Referer headers
