@@ -240,7 +240,7 @@ public sealed class AuthController : ControllerBase
             return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
-        await IssueSessionAndCookiesAsync(userStub, sessionId, request.RememberMe);
+        await IssueSessionAndCookiesAsync(userStub, sessionId, request.RememberMe, usedBackupCode: false);
         await _auditLog.RecordAsync(userStub.Id, AuditLogAction.LoginSucceeded, ct: HttpContext.RequestAborted);
         return NoContent();
     }
@@ -319,7 +319,7 @@ public sealed class AuthController : ControllerBase
             // half-auth handoff cookie lingers until its 5-min TTL. Clear it explicitly so
             // the success path leaves no stale Identity cookies behind.
             await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
-            await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
+            await IssueSessionAndCookiesAsync(user, sessionId, rememberMe, usedBackupCode: false);
             ClearRememberMeCookie();
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LoginSucceededMfa, ct: HttpContext.RequestAborted);
             return NoContent();
@@ -356,7 +356,7 @@ public sealed class AuthController : ControllerBase
             // See TOTP-success branch above — manual SignInAsync doesn't clear
             // the TwoFactorUserId scheme cookie; do it explicitly.
             await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
-            await IssueSessionAndCookiesAsync(user, sessionId, rememberMe);
+            await IssueSessionAndCookiesAsync(user, sessionId, rememberMe, usedBackupCode: true);
             ClearRememberMeCookie();
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LoginSucceededBackupCode, ct: HttpContext.RequestAborted);
             return NoContent();
@@ -365,7 +365,7 @@ public sealed class AuthController : ControllerBase
         return UnauthorizedEnvelope("INVALID_MFA_CODE", "The verification code is invalid or expired.");
     }
 
-    private async Task IssueSessionAndCookiesAsync(ApplicationUser user, Guid sessionId, bool rememberMe)
+    private async Task IssueSessionAndCookiesAsync(ApplicationUser user, Guid sessionId, bool rememberMe, bool usedBackupCode)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
         var ua = Request.Headers.UserAgent.ToString();
@@ -379,6 +379,7 @@ public sealed class AuthController : ControllerBase
             CreatedAt = DateTime.UtcNow,
             LastUsedAt = DateTime.UtcNow,
             IsPersistent = rememberMe,
+            UsedBackupCodeAtLogin = usedBackupCode,
         };
 
         if (rememberMe)
@@ -480,10 +481,15 @@ public sealed class AuthController : ControllerBase
             ? await _db.UserMfaBackupCodes.CountAsync(c => c.UserId == user.Id && c.UsedAt == null, HttpContext.RequestAborted)
             : 0;
 
-        // Phase 4 wires UsedBackupCodeAtLastLogin properly (it depends on a new column
-        // on UserSession written by /login/totp on the backup-code path). For Phase 1
-        // it's always false — the banner that consumes it doesn't ship until Phase 4.
+        var sidClaim = User.FindFirst(SessionConstants.SessionIdClaim)?.Value;
         var usedBackupCodeAtLastLogin = false;
+        if (Guid.TryParse(sidClaim, out var sessionIdForFlag))
+        {
+            usedBackupCodeAtLastLogin = await _db.UserSessions
+                .Where(s => s.Id == sessionIdForFlag && s.UserId == user.Id && s.RevokedAt == null)
+                .Select(s => s.UsedBackupCodeAtLogin)
+                .FirstOrDefaultAsync(HttpContext.RequestAborted);
+        }
 
         Response.ApplyNoStore();
 
