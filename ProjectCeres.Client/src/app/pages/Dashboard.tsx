@@ -9,6 +9,7 @@ import { IncomeExpenseChart } from '../features/dashboard/IncomeExpenseChart';
 import { KpiStrip } from '../features/dashboard/KpiStrip';
 import { NetWorthChart } from '../features/dashboard/NetWorthChart';
 import { SpendingByCategoryChart } from '../features/dashboard/SpendingByCategoryChart';
+import { BackupCodeLoginBanner } from '../features/security/BackupCodeLoginBanner';
 
 export function Dashboard() {
   useDocumentTitle('Dashboard');
@@ -17,6 +18,7 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <BackupCodeLoginBanner />
       <h1
         ref={headingRef}
         tabIndex={-1}

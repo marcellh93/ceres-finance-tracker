@@ -194,5 +194,20 @@
         "successBody": "Tus códigos anteriores ya no son válidos. Guárdalos en un lugar seguro."
       }
     }
+  },
+  "dashboard": {
+    "backupCodeBanner": {
+      "dismiss": "Cerrar",
+      "reenrol": {
+        "body_one": "Iniciaste sesión con un código de respaldo. Te queda {{count}} código. Vuelve a registrar tu aplicación de autenticación para restablecer el inicio de sesión normal.",
+        "body_other": "Iniciaste sesión con un código de respaldo. Te quedan {{count}} códigos. Vuelve a registrar tu aplicación de autenticación para restablecer el inicio de sesión normal.",
+        "cta": "Volver a registrar autenticador"
+      },
+      "regenerate": {
+        "body_one": "Te queda {{count}} código de respaldo. Genera un conjunto nuevo para no quedarte sin acceso si pierdes el dispositivo.",
+        "body_other": "Te quedan pocos códigos de respaldo: {{count}}. Genera un conjunto nuevo para no quedarte sin acceso si pierdes el dispositivo.",
+        "cta": "Regenerar códigos de respaldo"
+      }
+    }
   }
 }

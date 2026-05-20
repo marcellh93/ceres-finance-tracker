@@ -194,5 +194,20 @@
         "successBody": "Your old codes are no longer valid. Save these somewhere safe."
       }
     }
+  },
+  "dashboard": {
+    "backupCodeBanner": {
+      "dismiss": "Dismiss",
+      "reenrol": {
+        "body_one": "You signed in with a backup code. You have {{count}} code left. Re-enrol your authenticator app to restore normal sign-in.",
+        "body_other": "You signed in with a backup code. You have {{count}} codes left. Re-enrol your authenticator app to restore normal sign-in.",
+        "cta": "Re-enrol authenticator"
+      },
+      "regenerate": {
+        "body_one": "You're running low on backup codes — {{count}} left. Generate a new set so you're covered if you lose your device.",
+        "body_other": "You're running low on backup codes — {{count}} left. Generate a new set so you're covered if you lose your device.",
+        "cta": "Regenerate backup codes"
+      }
+    }
   }
 }
