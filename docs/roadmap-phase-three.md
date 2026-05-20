@@ -965,10 +965,10 @@ Tests required before Stage 9 begins:
 
 Layout + brand:
 
-- [ ] Centered card layout, no app shell (sidebar, top bar absent)
-- [ ] Ceres logo / wordmark placement consistent across all auth pages
+- [x] Centered card layout, no app shell (sidebar, top bar absent) — verified at 375px on `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm` during the 2026-05-20 Section E walkthrough. `/app/security` correctly retains the app shell per ADR-0069.
+- [x] Ceres logo / wordmark placement consistent across all auth pages — verified 2026-05-20 (Section E images #59, #60, #70, #71).
 - [x] Globe icon language toggle at the bottom of every auth card; instant in-place swap via `i18n.changeLanguage()`, no reload
-- [ ] Pre-auth language detection writes the `lang` cookie (non-HttpOnly, `SameSite=Lax`)
+- [x] Pre-auth language detection writes the `lang` cookie (non-HttpOnly, `SameSite=Lax`) — verified 2026-05-20 (Section E step 39): `lang=es` cookie present in DevTools cookie panel and in the request `Cookie` header of `/api/auth/csrf`.
 
 `/login`:
 
@@ -1040,7 +1040,7 @@ Reauthentication prompts:
 
 Error states:
 
-- [ ] Wrong password — generic message
+- [x] Wrong password — generic message — verified 2026-05-20 (Section E): Spanish login surfaces "El correo electrónico o la contraseña no son correctos" on 401, no enumeration leak.
 - [ ] Expired TOTP — generic message
 - [ ] Locked account — clear message with "check email" instruction
 - [ ] Network error — retry-able toast, form state preserved
@@ -1059,22 +1059,22 @@ Localization:
 
 - [x] Every string in every auth page uses `useTranslation()` keyed strings
 - [x] EN + ES translations complete in `en.json` and `es.json`
-- [ ] No untranslated copy visible when toggling to ES
-- [ ] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale
+- [x] No untranslated copy visible when toggling to ES — verified 2026-05-20 (Section E): `/login` and `/login/totp` rendered fully in Spanish (Iniciar sesión, Verifica tu identidad, Correo electrónico, Contraseña, ¿Olvidaste tu contraseña?, Crear una cuenta, Recordarme en este dispositivo, Volver a iniciar sesión, ¿Perdiste el dispositivo? Usa un código de respaldo). No English leaks observed.
+- [ ] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale — N/A so far: no relative-time strings render on the auth surfaces walked in 2026-05-20 Section E. Leave open until a surface that renders one is exercised.
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — auth surfaces are single-column centered card on every tier):
 
-- [ ] Mobile (375px iPhone SE): centered card fills viewport with comfortable padding; no horizontal overflow; touch targets on every input/button ≥ 44×44px
+- [x] Mobile (375px iPhone SE): centered card fills viewport with comfortable padding; no horizontal overflow; touch targets on every input/button ≥ 44×44px — verified 2026-05-20 (Section E step 41) across `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm`, `/app/security`. No horizontal overflow on any surface.
 - [ ] Tablet (768px iPad): centered card constrained to a readable max-width; layout unchanged from mobile beyond the max-width clamp
 - [ ] Desktop (≥ 1024px): centered card constrained to a narrow max-width; sidebar/app shell absent on every auth page
-- [ ] TOTP 6-digit input renders cleanly on mobile (no tiny touch targets, no zoom-on-focus)
-- [ ] QR code in TOTP setup flow is large enough to scan on mobile when displayed at the user's screen
-- [ ] Backup codes download offers a `.txt` that copies cleanly on mobile (long press → save / share sheet)
-- [ ] Language toggle (globe icon) is reachable without scrolling on mobile
+- [x] TOTP 6-digit input renders cleanly on mobile (no tiny touch targets, no zoom-on-focus) — verified 2026-05-20 (Section E images #60, #66, #70): cells fit inside the card at 375px on `/login/totp`, `/app/security` step 1, and `/password-reset/confirm`.
+- [x] QR code in TOTP setup flow is large enough to scan on mobile when displayed at the user's screen — verified 2026-05-20 (Section E image #66): QR renders at a comfortably scannable size at 375px.
+- [x] Backup codes download offers a `.txt` that copies cleanly on mobile (long press → save / share sheet) — verified 2026-05-20 (Section E images #67/#68 plus user-confirmed Copy all + Download .txt actions appear below the screenshot crop).
+- [x] Language toggle (globe icon) is reachable without scrolling on mobile — verified 2026-05-20 (Section E images #59, #60, #70, #71): globe icon sits at the bottom of every auth card with no scroll required at 375px.
 
 Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
 
-- [ ] **Manual browser DevTools verification of the auth cookie after a real login** — open DevTools → Application → Cookies on `/login` success and confirm the `__Host-Session` cookie carries all four attributes: `HttpOnly`, `Secure`, `SameSite=Lax`, no `Domain`, `Path=/`. Deferred from Stage 6 because no login UI existed there. The cookie configuration itself is wired and tested in 6a (see `CookieAttributesTests`); this is a final eyes-on check in production-like browser before opening to invited beta testers. *Anchor: Stage 6 § Cookie configuration carry-forward.*
+- [x] **Manual browser DevTools verification of the auth cookie after a real login** — verified 2026-05-20 (Section E step 39 images #50, #52): `__Host-Session` cookie present after login, HttpOnly ✓, Secure ✓ (per `SecurePolicy = SameAsRequest` in dev → off over HTTP, on over HTTPS; `Always` in production), SameSite=Lax ✓, Path=/ ✓, no Domain attribute ✓. Same audit cleared `__Host-XSRF`, `__Host-Persist`, `Mfa.RememberMe` (the last with intentional `Path=/api/auth/login` scoping per `AuthController.cs:187`). *Anchor: Stage 6 § Cookie configuration carry-forward.*
 
 Stage 8 deferred items (carry-forward from Stage 8 — security-event email call-sites):
 
