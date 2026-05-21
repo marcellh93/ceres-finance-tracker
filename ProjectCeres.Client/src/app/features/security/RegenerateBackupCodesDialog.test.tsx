@@ -98,6 +98,66 @@ describe('RegenerateBackupCodesDialog', () => {
     );
   });
 
+  it('on success, refetches /api/auth/me so consumers see the fresh backupCodesRemaining', async () => {
+    // Regression: regeneration succeeded but the dashboard
+    // BackupCodeLoginBanner kept rendering because the auth context's
+    // cached MeResponse still held the old low count. Fix calls
+    // auth.refresh() before transitioning to the success state, which
+    // re-fires GET /api/auth/me through apiFetch.
+    let regenerateCount = 0;
+    let meCallCountAfterRegenerate = 0;
+    let regenerateResolved = false;
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        if (regenerateResolved) meCallCountAfterRegenerate += 1;
+        return new Response(
+          JSON.stringify({
+            userId: '00000000-0000-0000-0000-000000000001',
+            email: 'a@b.test',
+            twoFactorEnabled: true,
+            lastReauthAt: Math.floor(Date.now() / 1000),
+            backupCodesRemaining: regenerateResolved ? 10 : 3,
+            usedBackupCodeAtLastLogin: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/csrf') {
+        return new Response(null, { status: 204, headers: { 'X-XSRF-TOKEN': 'tok' } });
+      }
+      if (typeof url === 'string' && url === '/api/auth/mfa/backup-codes/regenerate') {
+        regenerateCount += 1;
+        regenerateResolved = true;
+        return new Response(
+          JSON.stringify({
+            backupCodes: [
+              'AAAA-BBBB-CCCC-DD11', 'AAAA-BBBB-CCCC-DD22', 'AAAA-BBBB-CCCC-DD33',
+              'AAAA-BBBB-CCCC-DD44', 'AAAA-BBBB-CCCC-DD55', 'AAAA-BBBB-CCCC-DD66',
+              'AAAA-BBBB-CCCC-DD77', 'AAAA-BBBB-CCCC-DD88', 'AAAA-BBBB-CCCC-DD99',
+              'AAAA-BBBB-CCCC-DDAA',
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(null, { status: 204 });
+    });
+
+    const user = userEvent.setup();
+    mount();
+    await user.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
+    await user.click(await screen.findByRole('button', { name: /^regenerate codes$/i }));
+
+    // The dialog should transition to the showCodes state (one of the new
+    // codes appears in the DOM).
+    await waitFor(() => {
+      expect(screen.getByText('AAAA-BBBB-CCCC-DD11')).toBeInTheDocument();
+    });
+
+    expect(regenerateCount).toBe(1);
+    expect(meCallCountAfterRegenerate).toBeGreaterThanOrEqual(1);
+  });
+
   it('Cancel button works even AFTER Confirm has been clicked (pending state cancellable)', async () => {
     // Regression: Cancel was a no-op when state==='pending' because the
     // onOpenChange handler only reset state from 'confirming'. Users who

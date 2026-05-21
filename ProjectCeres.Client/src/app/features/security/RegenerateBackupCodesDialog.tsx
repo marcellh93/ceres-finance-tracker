@@ -27,7 +27,7 @@ type State =
 
 export function RegenerateBackupCodesDialog({ onReauthRequired }: Props) {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [state, setState] = useState<State>({ kind: 'idle' });
 
   const onConfirm = async () => {
@@ -38,6 +38,12 @@ export function RegenerateBackupCodesDialog({ onReauthRequired }: Props) {
         { method: 'POST', body: {} },
       );
       if (result.ok && result.data?.backupCodes) {
+        // Refresh the auth context so consumers reading
+        // backupCodesRemaining (e.g. the dashboard BackupCodeLoginBanner)
+        // see the fresh count of 10. Without this, the banner stays
+        // visible after a successful regenerate because the cached
+        // MeResponse still reports the old low number.
+        await refresh();
         setState({ kind: 'showCodes', codes: result.data.backupCodes });
         return;
       }
