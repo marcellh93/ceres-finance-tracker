@@ -36,18 +36,26 @@ const path = require("path");
 // with an image-reference signal in the same message — that conjunction is
 // what distinguishes a real finding-claim from neutral text mentioning the
 // same words.
+//
+// 2026-05-21 audit: tightened after a 100% production-misfire rate. The
+// previous version included bare verbs (`/wraps?/`, `/overlaps?/`,
+// `/touching/`, `/colliding/`, `/is missing/`) that match backend prose
+// (the assistant wraps an API; lockout windows overlap; validation is
+// missing) with no visual meaning. Those have been dropped or anchored
+// to visual nouns within the same regex.
 const FINDING_PHRASES = [
   // First-person observation verbs
   /\bI (can )?see\b[\s\S]{0,80}\b(image|screenshot|#\d|\.png)/i,
   /\b(the )?image (shows|reveals|has|carries|is missing|contains)\b/i,
   /\b(the )?screenshot (shows|reveals|has|carries|is missing|contains)\b/i,
-  // Layout-break verbs that are nearly always claims about visual content
-  /\b(overflows?|overflowing|clipping|clipped|clips at|crops at|cropped at|cut off|pushed off-screen|pushes into|crashes into|crammed|crashing)\b/i,
-  /\b(overlaps?|overlapping|touching|colliding|collides with|wraps? mid-word|wraps awkwardly)\b/i,
-  // Element-presence claims phrased as observation
-  /\b(is|are) (missing|absent|cropped|cut off|cut|hidden|not visible|not rendered|not shown)\b/i,
+  // Layout-break verbs anchored with a visual subject within ~40 chars.
+  // Keeps `the button overflows the card`; drops bare `the function overflows`.
+  /\b(button|label|input|cell|row|column|card|tile|stepper|dropdown|menu|modal|dialog|sheet|toast|banner|heading|text|copy|icon|avatar|tab|chip|badge|drawer)\b[\s\S]{0,40}\b(overflows?|clipping|clipped|clips at|crops at|cropped at|cut off|pushed off-screen|pushes into|crashes into|crammed)\b/i,
+  /\b(button|label|input|cell|row|column|card|tile|stepper|dropdown|menu|modal|dialog|sheet|toast|banner|heading|text|copy|icon|avatar|tab|chip|badge|drawer)\b[\s\S]{0,40}\b(overlaps?|overlapping|touching|colliding|collides with|wraps mid-word|wraps awkwardly)\b/i,
+  // Element-presence claims anchored with a visual noun in the same sentence.
+  /\b(button|link|label|icon|cell|input|toggle|dropdown|menu|modal|dialog|tab|chip|badge|drawer|stepper|sheet|toast|banner|heading|avatar)\b[\s\S]{0,40}\b(is|are) (missing|absent|cropped|cut off|cut|hidden|not visible|not rendered|not shown)\b/i,
   /\b(no|zero) (button|link|label|icon|cell|input|toggle) (visible|appears|shows up|present)\b/i,
-  // Findings list shapes — F1/F2/Finding N with image references
+  // Findings list shapes — F1/F2/Finding N. Co-required with image refs below.
   /^\s*[*-]?\s*F\d+\s*[—-]/m,
   /^\s*[*-]?\s*Finding\s+\d+\s*[—:-]/im,
   /^\s*###\s*F\d+\b/m,
@@ -57,10 +65,15 @@ const FINDING_PHRASES = [
 
 // Image-reference signals — at least one must appear in the message for the
 // finding to be image-grounded.
+//
+// 2026-05-21 audit: removed the bare `/\(?#\d+\)?/` regex. It matched any
+// `#NN` token — GitHub issue refs, PR numbers, tool-use IDs, internal
+// ticket IDs — producing a 100% misfire rate on production traffic by
+// always satisfying the image-ref gate even when no image was in scope.
+// Only explicit-token forms remain.
 const IMAGE_REFS = [
-  /\bImage\s*#?\s*\d+/i,                            // harness's own "Image #59"
+  /\bImage\s*#\s*\d+/i,                             // harness's own "Image #59"
   /\bscreenshot\s*#?\s*\d+/i,
-  /\(?#\d+\)?/,                                     // bare "#60"
   /\b\d+\.(png|jpg|jpeg|webp|gif)\b/i,              // bare filename
   /image-cache\/[^\s)]+/,                           // image-cache path fragment
 ];

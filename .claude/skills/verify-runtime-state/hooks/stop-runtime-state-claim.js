@@ -92,6 +92,32 @@ const USER_AUTH = [
   /\b(already|i) (checked|verified|confirmed) (that|the (db|row|value))\b/i,
 ];
 
+// 2026-05-21 audit added guards 4 + 5 after a 50% production misfire rate.
+//
+// Guard 4 — STRUCTURAL-CONTEXT: the matched identifier appears in
+// schema/code-structure discussion ("IsActive is a bool", "TwoFactorEnabled
+// is the column we just added"), not in a claim about a specific runtime
+// row value. If any of these markers is present in the message, the hook
+// exits 0 — the claim is about the type/column/migration, not the row.
+const STRUCTURAL_CONTEXT_MARKERS = [
+  /\b(column|field|property|attribute) (called |named |is )?[A-Z][A-Za-z]+/i,
+  /\b(the (type|schema|model|entity|migration|column|field)|EF defines|in the entity|nullable|not nullable|non-nullable|default value)\b/i,
+  /\b(bool|string|int|Guid|DateTime|DateOnly|enum)\s+(not\s+)?nullable\b/i,
+  /\bbacking (column|field)\b/i,
+];
+
+// Guard 5 — META-CONTEXT: the message is discussing the hook itself, not
+// asserting a runtime claim. Quoting the matched phrase to talk about why
+// the hook fired (or didn't) re-fires the hook recursively. Skip in that
+// case.
+const META_CONTEXT_MARKERS = [
+  /\bthe (hook|regex|guard|matcher) (fired|matched|caught|missed)\b/i,
+  /\bfalse[- ]positive\b/i,
+  /\baudit trail\b/i,
+  /\b(this|that) (will|would|did) (re-?)?fire the hook\b/i,
+  /\bhook recursion\b/i,
+];
+
 const SESSION_BYPASS = process.env.CERES_SKIP_RUNTIME_STATE_HOOK === "1";
 
 let raw = "";
@@ -158,8 +184,16 @@ process.stdin.on("end", () => {
   const evidenceCoLocated = EVIDENCE_MARKERS.some((re) => re.test(lastAssistantText));
   const explicitAssumption = ASSUMPTION_MARKERS.some((re) => re.test(lastAssistantText));
   const userAuthorized = USER_AUTH.some((re) => re.test(lastUserText));
+  const structuralContext = STRUCTURAL_CONTEXT_MARKERS.some((re) => re.test(lastAssistantText));
+  const metaContext = META_CONTEXT_MARKERS.some((re) => re.test(lastAssistantText));
 
-  const guardsPassed = evidenceCoLocated || explicitAssumption || userAuthorized || SESSION_BYPASS;
+  const guardsPassed =
+    evidenceCoLocated ||
+    explicitAssumption ||
+    userAuthorized ||
+    structuralContext ||
+    metaContext ||
+    SESSION_BYPASS;
 
   const outcome = SESSION_BYPASS ? "bypassed" : guardsPassed ? "passed" : "blocked";
   try {
@@ -175,6 +209,8 @@ process.stdin.on("end", () => {
         evidenceCoLocated,
         explicitAssumption,
         userAuthorized,
+        structuralContext,
+        metaContext,
         passed: guardsPassed,
       },
       assistantSnippet: lastAssistantText.slice(0, 320),
@@ -192,10 +228,12 @@ process.stdin.on("end", () => {
     "",
     `Matched patterns: ${matched.join(", ")}`,
     "",
-    "Three guards were checked AND ALL FAILED:",
+    "Five guards were checked AND ALL FAILED:",
     `  • Evidence-co-located guard: ${evidenceCoLocated ? "PASS" : "fail"} (your message contains no psql / EF / file-read / tool-output marker backing the claim)`,
     `  • Explicit-assumption guard: ${explicitAssumption ? "PASS" : "fail"} (your message does not hedge the claim or propose a verification command)`,
     `  • User-authorization guard: ${userAuthorized ? "PASS" : "fail"} (user did not waive verification in their last message)`,
+    `  • Structural-context guard: ${structuralContext ? "PASS" : "fail"} (the matched identifier appears as a runtime-value claim, not as schema/type discussion)`,
+    `  • Meta-context guard: ${metaContext ? "PASS" : "fail"} (the message asserts runtime state, not discusses the hook itself)`,
     "",
     "The `verify-runtime-state` skill applies to ANY claim about a runtime value",
     "(database row, env var, file contents on disk, process state). Code",

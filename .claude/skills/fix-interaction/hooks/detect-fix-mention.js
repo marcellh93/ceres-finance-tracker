@@ -18,6 +18,17 @@ const fs = require("fs");
 const path = require("path");
 
 // === Fix-mention phrase list (mirrors SKILL.md §6) ===
+//
+// 2026-05-21 audit: tightened to reduce predicted misfires before the hook
+// engages on real traffic. Two changes:
+//   1. Dropped `/we need to add/i` outright — it fires on "we need to add
+//      a CHANGELOG entry", "we need to add the migration", "we need to add
+//      this to the spec" etc., none of which are bug-fix language. Replaced
+//      with a narrower variant that requires a fix-adjacent noun.
+//   2. Added a DISCUSSION_MARKERS / QUOTATION negative guard list (applied
+//      below) so brainstorming-mode option proposals and quoted text don't
+//      fire the hook. The phrases themselves stay loose because the hook
+//      is most useful when the language sounds like a commitment.
 const FIX_MENTION_PHRASES = [
   /\bthe fix is\b/i,
   /\bthe right fix\b/i,
@@ -30,12 +41,40 @@ const FIX_MENTION_PHRASES = [
   /\bthis is broken because\b/i,
   /\bwe should fix\b/i,
   /\bwe need to fix\b/i,
-  /\bwe need to add\b/i,
+  /\bwe need to add (a fix|handling|guard|guard rail|check|validation|null check|defensive)\b/i,
   /\bone-line fix\b/i,
   /\bquick fix:?\b/i,
   /\bthe right move is\b/i,
   /\bthe (correct|proper) approach is\b/i,
 ];
+
+// Negative guards — if any of these markers appear in the assistant message,
+// the matched phrase is discussion or quotation, not a fix commitment.
+const DISCUSSION_MARKERS = [
+  /\bbrainstorm(ing)?\b/i,
+  /\boption [A-C]\b/i,
+  /\bA\/B\/C\b/i,
+  /\btrade-?off(s)?\b/i,
+  /\bthe alternatives? (are|include)\b/i,
+  /\bif we chose\b/i,
+  /\blet me think through\b/i,
+  /\bone option\b/i,
+  /\banother option\b/i,
+  /\bweighing (the )?options\b/i,
+];
+
+function inQuotationContext(text, hitPhrase) {
+  // True if the matched phrase appears inside a markdown blockquote or backticks.
+  // We approximate by scanning lines: any line that starts with `> ` and
+  // contains the phrase, or any inline-code/backtick run containing it.
+  if (!hitPhrase) return false;
+  const escaped = hitPhrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const blockquoteRe = new RegExp(`^>\\s.*${escaped}`, "im");
+  if (blockquoteRe.test(text)) return true;
+  const backtickRe = new RegExp("`[^`\\n]*" + escaped + "[^`\\n]*`", "i");
+  if (backtickRe.test(text)) return true;
+  return false;
+}
 
 const STATE_DIR_NAME = path.join("state", "fix-interaction");
 const TTL_HOURS = 24;
@@ -242,6 +281,31 @@ process.stdin.on("end", () => {
     // === Phrase match ===
     const hits = matchedPhrases(lastAssistant.text);
     if (hits.length === 0) process.exit(0);
+
+    // === Discussion-mode guard (2026-05-21) ===
+    // If the message is brainstorming options or weighing trade-offs, the
+    // matched phrase is exploration, not commitment.
+    if (DISCUSSION_MARKERS.some((re) => re.test(lastAssistant.text))) {
+      process.exit(0);
+    }
+
+    // === Quotation guard (2026-05-21) ===
+    // If every matched phrase is inside a blockquote or backticks, the
+    // phrase is being discussed, not asserted. Find one phrase that is NOT
+    // quoted to keep the hook engaged; if all hits are quoted, exit 0.
+    const liveHits = hits.filter((hitStr) => {
+      // hitStr looks like "/the fix is/i" — extract the inner pattern.
+      const m = /^\/(.*)\/[a-z]*$/.exec(hitStr);
+      if (!m) return true;
+      const innerPattern = m[1];
+      // Find the literal text from the assistant message that matched, by
+      // re-running the regex.
+      const re = new RegExp(innerPattern, "i");
+      const match = re.exec(lastAssistant.text);
+      if (!match) return true;
+      return !inQuotationContext(lastAssistant.text, match[0]);
+    });
+    if (liveHits.length === 0) process.exit(0);
 
     // === Match — write state, block Stop ===
     const priorUserMessage = lastUserText(entries.slice(0, lastAssistant.index));
