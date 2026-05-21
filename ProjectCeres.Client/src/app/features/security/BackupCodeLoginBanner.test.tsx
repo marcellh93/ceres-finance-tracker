@@ -70,7 +70,9 @@ describe('BackupCodeLoginBanner', () => {
     await waitFor(() => {
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: /re-enrol authenticator/i })).toBeInTheDocument();
+    const cta = screen.getByRole('link', { name: /re-enrol authenticator/i });
+    expect(cta).toBeInTheDocument();
+    expect(cta).toHaveAttribute('href', '/security');
     expect(screen.getByText(/5 codes left/i)).toBeInTheDocument();
   });
 
@@ -81,7 +83,9 @@ describe('BackupCodeLoginBanner', () => {
     await waitFor(() => {
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: /regenerate backup codes/i })).toBeInTheDocument();
+    const cta = screen.getByRole('link', { name: /regenerate backup codes/i });
+    expect(cta).toBeInTheDocument();
+    expect(cta).toHaveAttribute('href', '/security');
     expect(screen.getByText(/3 left/i)).toBeInTheDocument();
   });
 

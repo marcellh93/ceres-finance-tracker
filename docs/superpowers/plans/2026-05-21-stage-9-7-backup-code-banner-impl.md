@@ -731,7 +731,7 @@ export function BackupCodeLoginBanner() {
       <div className="flex-1 space-y-2">
         <p>{t(`${ns}.body`, { count: user.backupCodesRemaining })}</p>
         <Button asChild variant="link" size="sm" className="h-auto p-0">
-          <Link to="/app/security">{t(`${ns}.cta`)}</Link>
+          <Link to="/security">{t(`${ns}.cta`)}</Link>
         </Button>
       </div>
       <Button

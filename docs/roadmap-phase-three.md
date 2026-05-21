@@ -28,7 +28,8 @@
 10. [Stage 7.6 — Error legibility + OCP cleanup (Batch 3c continued)](#stage-76--error-legibility--ocp-cleanup-batch-3c-continued)
 11. [Stage 8 — Email service + email security (Batch 3d)](#stage-8--email-service--email-security-batch-3d)
 12. [Stage 9 — Auth SPA pages (Batch 3e)](#stage-9--auth-spa-pages-batch-3e)
-13. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
+13. [Stage 9.1.6 — Code-shape cleanup (raw SQL + namespace prefixes)](#stage-916--code-shape-cleanup-raw-sql--namespace-prefixes)
+14. [Stage 11 — Razor + URL cleanup (Batch 4)](#stage-11--razor--url-cleanup-batch-4)
 14. [Stage 11.5 — Import sandbox + admin tooling (Batch 4)](#stage-115--import-sandbox--admin-tooling-batch-4)
 15. [Stage 12 — Sessions + Support SPA pages (Batch 5)](#stage-12--sessions--support-spa-pages-batch-5)
 16. [Stage 13 — GDPR baseline (Batch 5)](#stage-13--gdpr-baseline-batch-5)
@@ -965,7 +966,7 @@ Tests required before Stage 9 begins:
 
 Layout + brand:
 
-- [x] Centered card layout, no app shell (sidebar, top bar absent) — verified at 375px on `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm` during the 2026-05-20 Section E walkthrough. `/app/security` correctly retains the app shell per ADR-0069.
+- [x] Centered card layout, no app shell (sidebar, top bar absent) — verified at 375px on `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm` during the 2026-05-20 Section E walkthrough. `/security` correctly retains the app shell per ADR-0069.
 - [x] Ceres logo / wordmark placement consistent across all auth pages — verified 2026-05-20 (Section E images #59, #60, #70, #71).
 - [x] Globe icon language toggle at the bottom of every auth card; instant in-place swap via `i18n.changeLanguage()`, no reload
 - [x] Pre-auth language detection writes the `lang` cookie (non-HttpOnly, `SameSite=Lax`) — verified 2026-05-20 (Section E step 39): `lang=es` cookie present in DevTools cookie panel and in the request `Cookie` header of `/api/auth/csrf`.
@@ -1013,7 +1014,7 @@ Lockout / unlock:
 - [ ] Token expires after a reasonable window (e.g., 1 hour)
 - [ ] Lockout email also tells the user "valid TOTP codes are still accepted during lockout" (per `security-model.md` § Login)
 
-TOTP setup (entry point: `/app/security` per ADR-0069 — NOT `/login/totp/setup`; the original roadmap URL predated the ADR):
+TOTP setup (entry point: `/security` per ADR-0069 — NOT `/login/totp/setup`; the original roadmap URL predated the ADR):
 
 - [x] QR code displayed (otpauth:// URI) — `qrcode.react` 4.2.0 rendering an `otpauth://totp/Ceres:<email>?secret=<key>&issuer=Ceres&algorithm=SHA1&digits=6&period=30` URI from the server's `POST /api/auth/mfa/enroll` response. Tested in `Security.test.tsx > clicking Enable fires POST /api/auth/mfa/enroll and advances to wizard step 1`.
 - [x] Manual-entry secret displayed below QR (collapsed behind a `<details>` disclosure) for accessibility / desktop authenticators — space-grouped format from the server's `manualEntryKey` field. Copy-to-clipboard button writes the unspaced key. Tested in the same Security test (asserts the manual key text is in the DOM).
@@ -1064,10 +1065,10 @@ Localization:
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — auth surfaces are single-column centered card on every tier):
 
-- [x] Mobile (375px iPhone SE): centered card fills viewport with comfortable padding; no horizontal overflow; touch targets on every input/button ≥ 44×44px — verified 2026-05-20 (Section E step 41) across `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm`, `/app/security`. No horizontal overflow on any surface.
+- [x] Mobile (375px iPhone SE): centered card fills viewport with comfortable padding; no horizontal overflow; touch targets on every input/button ≥ 44×44px — verified 2026-05-20 (Section E step 41) across `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm`, `/security`. No horizontal overflow on any surface.
 - [ ] Tablet (768px iPad): centered card constrained to a readable max-width; layout unchanged from mobile beyond the max-width clamp
 - [ ] Desktop (≥ 1024px): centered card constrained to a narrow max-width; sidebar/app shell absent on every auth page
-- [x] TOTP 6-digit input renders cleanly on mobile (no tiny touch targets, no zoom-on-focus) — verified 2026-05-20 (Section E images #60, #66, #70): cells fit inside the card at 375px on `/login/totp`, `/app/security` step 1, and `/password-reset/confirm`.
+- [x] TOTP 6-digit input renders cleanly on mobile (no tiny touch targets, no zoom-on-focus) — verified 2026-05-20 (Section E images #60, #66, #70): cells fit inside the card at 375px on `/login/totp`, `/security` step 1, and `/password-reset/confirm`.
 - [x] QR code in TOTP setup flow is large enough to scan on mobile when displayed at the user's screen — verified 2026-05-20 (Section E image #66): QR renders at a comfortably scannable size at 375px.
 - [x] Backup codes download offers a `.txt` that copies cleanly on mobile (long press → save / share sheet) — verified 2026-05-20 (Section E images #67/#68 plus user-confirmed Copy all + Download .txt actions appear below the screenshot crop).
 - [x] Language toggle (globe icon) is reachable without scrolling on mobile — verified 2026-05-20 (Section E images #59, #60, #70, #71): globe icon sits at the bottom of every auth card with no scroll required at 375px.
@@ -1143,6 +1144,80 @@ Stage 9.11 — Playwright E2E foundations:
 - [x] 9.1.5.h — EF migration `BackfillIdentityNormalizedToLowercase` exists and is idempotent (re-running on a fully-lowercase table is a no-op — pinned by `Migration_is_idempotent_on_already_lowercase_*` tests per column); migration applied to local dev DB (0 rows changed; manual login verified post-migration); `security-model.md` § ASP.NET Core Identity Hardening carries the standing rule "`ILookupNormalizer` registration changes require a same-commit data-migration that backfills `AspNetUsers.NormalizedEmail` + `NormalizedUserName` + `AspNetRoles.NormalizedName` to the new normalizer's output"; rule cross-referenced from `models.md` § ApplicationUser and from the developer guide `01-aspnetcore-identity.md`; manual login on the local dev DB still works after the migration runs (regression check — confirms the migration didn't re-introduce the case mismatch).
 - [x] 9.1.5.i — `LanguageToggle` reachable from signed-in app shell: visible in `TopBar` desktop controls AND in the `MobileDrawer` bottom section as a segmented `[EN][ES]` radiogroup matching `ThemeDrawerRow`'s shape. Changing language while signed in updates page strings immediately and persists across reload via the existing `lang` cookie. Logout → relogin cycle works (no CSRF 400 on the relogin POST — `auth-context.test.tsx` pins the cache-clear contract). 1 new vitest test in `auth-context.test.tsx` covers the cache-clear; existing 5 `LanguageToggle.test.tsx` tests still pass post-move (only relative-import path changed). Manual browser verification confirmed end-to-end (TopBar dropdown, mobile drawer segmented row, sign-out → re-sign-in without 400).
 - [x] **Batch close-out** ✅ — all sub-stages ticked. Verification commands run 2026-05-17 23:29 UTC: `dotnet test` → 1098 Passed / 0 Failed; `pnpm --dir ProjectCeres.Client test --run` → all green; `pnpm --dir ProjectCeres.Client build` → all chunks within budget; `dotnet build ProjectCeres/ProjectCeres.csproj` → 0 errors. Stage 9.1.5 marked ✅ Done. Phase 2 plan-writing can resume.
+
+---
+
+## Stage 9.1.6 — Code-shape cleanup (raw SQL + namespace prefixes)
+
+**Status: ❌ Pending.** Opened 2026-05-21 after the user noticed two recurring code-shape smells while reading the post-9.1.5 codebase: (1) the project uses EF Core's `ExecuteSqlRaw` / `SqlQueryRaw` family for three call sites where the safer parameterised / interpolated equivalents would communicate intent more clearly, and (2) several `.cs` files trigger IDE0001 "Simplify name" because they reference a type with its full namespace prefix (e.g. `Microsoft.EntityFrameworkCore.DbUpdateException`) even though the same file already has the matching `using`. The batch follows the closed-stage container pattern from 9.1.5 — every discovered code-quality defect either gets fixed inside the batch or queued into a sibling sub-stage; nothing gets deferred to a later phase without a tooling-gap justification per `feedback_no_flag_without_action` + the `no-unjustified-deferrals` gate.
+
+> **Goal:** silence IDE0001 across the .NET projects AND replace every production `ExecuteSqlRaw`/`SqlQueryRaw` call with a `FromSqlInterpolated` / `ExecuteSqlInterpolatedAsync` equivalent (or, where the SQL is identifier-driven and cannot be parameterised, an explicit allow-list comment that pins the constants as non-user-input). Test-only raw-SQL usage in `BackfillIdentityNormalizedToLowercaseTests.cs` and `Group1_BypassCaseTests.cs` is **out of scope** — those tests deliberately exercise the raw path to verify migration behaviour and the RLS bypass invariant respectively; rewriting them would defeat their purpose.
+
+> **Out of scope:** introducing project-wide `.editorconfig` rule severity for IDE0001 (= "make the IDE warning visible at `dotnet build`"). The audit established that without `EnforceCodeStyleInBuild=true` + an `.editorconfig` IDE0001 is invisible at build time, so a future `Directory.Build.props` + `.editorconfig` addition would be the right way to lock the cleanup. That setup is its own decision (analyser performance budget, CI noise tolerance, treat-as-error policy) and is deferred to a dedicated stage in Batch 5 — tracked here under the verification checklist's "tripwire" bullet so it cannot be forgotten.
+
+### Sub-stages
+
+| # | Sub-stage | Source |
+|---|---|---|
+| 9.1.6.a | Replace `ExecuteSqlRawAsync` in `Tools/SeedDevUser.cs` (lines 223, 381) | `SeedDevUser.cs:223` interpolates table name + sentinel UUID directly into a `UPDATE` statement; `:381` does the same for `COUNT(*)`. Both pull `table` from a hardcoded `UserOwnedTables` array (not user input), so no real injection vector exists today — but the pattern teaches the wrong instinct to future contributors and triggers static-analysis flags. Replace each with `ExecuteSqlInterpolatedAsync` (sentinel as parameter) + keep the table-name interpolation behind a same-line comment that pins it to the hardcoded list. Where EF refuses to accept interpolated table names (which it does), fall back to a regex/whitelist guard that throws if the table name isn't in `UserOwnedTables`. |
+| 9.1.6.b | Replace `SqlQueryRaw<string>` in `Common/Authentication/PreAuthRlsScope.cs:81` | The string is fully constant (`SELECT current_setting('app.current_user_ref', true) AS "Value"`) so injection is impossible by construction, but `SqlQueryRaw` is a sigil that says "I had to bypass EF" when the safer `SqlQueryInterpolated` is available. Switch to `SqlQueryInterpolated` (no parameters needed; the API also accepts pure constants) and add a one-line comment naming why the call is necessary (reading a Postgres GUC, no EF mapping for `current_setting`). |
+| 9.1.6.c | IDE0001 cleanup — `AppDbContext.cs` × 4 (`Microsoft.EntityFrameworkCore.DbUpdateException` in catch clauses) | The user's exact reported pattern. File already has `using Microsoft.EntityFrameworkCore;`. Drop the prefix in all four `catch` clauses (lines 37, 41, 53, 57). |
+| 9.1.6.d | IDE0001 cleanup — `Program.cs` × 3 (`Microsoft.AspNetCore.Mvc.UnprocessableEntityObjectResult` at 47; `System.Security.Claims.ClaimTypes.NameIdentifier` at 376, 395) | `Program.cs` already imports both namespaces. |
+| 9.1.6.e | IDE0001 cleanup — `Common/Authentication/PasswordResetService.cs:327` (`Microsoft.AspNetCore.Identity.TokenOptions.DefaultAuthenticatorProvider`) AND `Controllers/Api/AuthController.cs:152` (`Microsoft.AspNetCore.Identity.SignInResult`) | Both files already import `Microsoft.AspNetCore.Identity`. |
+| 9.1.6.f | IDE0001 cleanup — test fixtures: `AuthTestFixture.cs` × 8 (3× Identity, 2× Http, 3× Authentication, 1× DataProtection); `RateLimitedAuthTestWebApplicationFactory.cs` × 6 (3× Claims, 3× Http); `ArchitectureTests.cs` × 3 (2× Mvc, 1× EF Core partial `Metadata.IEntityType`); `FailedLoginRecorderTests.cs` × 1; `LockoutUnlockIssuanceTests.cs` × 1; `LockoutUnlockConfirmTests.cs` × 1 (`System.Diagnostics.Stopwatch`) | Highest-volume cleanup — test infrastructure. Each file already imports the relevant namespaces; the fully-qualified references are leftover from one-shot edits where the author didn't trust the imports were present. Sub-stage scoped to test files only so the production-code passes (c–e) can ship and verify independently. |
+| 9.1.6.g | Code-simplification sweep — review the codebase for blocks that could be written in fewer lines while doing the same thing | Opened 2026-05-21 on user request: "review code and determine what things we have that could be written in less lines of code but do the same". This sub-stage is **discovery-then-fix**, not a single mechanical pass. It runs the project's `simplify` skill (and the `code-simplifier` subagent it routes to) across the .NET and React codebases, produces a findings table grouped by simplification class (target-typed `new()`, collection expressions, `is null` over `== null`, switch expressions over if-chains, LINQ over hand-rolled loops, primary constructors where they actually shrink the file, `ArgumentNullException.ThrowIfNull`, expression-bodied members where they aid readability, file-scoped namespaces if any C# 9-style nested ones remain, React `useMemo`/`useCallback` removed where the cost exceeds the win per `vercel-react-best-practices`, `?.` chains over null-guards, async `await using` over manual dispose), and then ships the safe-mechanical fixes in one PR per class (or one batched PR if the class is small). The audit's findings table lands inside this sub-stage's verification body so the count is captured before the fixes flatten it. Anything the audit surfaces that is **not** a pure simplification (i.e. it would change behaviour, perf class, or public API) gets queued into the active batch's open `[ ]` list rather than rolled into the simplification pass — per `feedback_no_flag_without_action` + the no-defer gate. |
+
+### Verification checklist
+
+- [ ] 9.1.6.a — `Tools/SeedDevUser.cs:223` and `:381` no longer call `ExecuteSqlRawAsync`. The new call uses `ExecuteSqlInterpolatedAsync` with the sentinel UUID passed as a parameter; the table name is validated against the `UserOwnedTables` constant array via a guard that throws if a caller (now or in the future) supplies anything off-list. The seed CLI still passes its existing end-to-end test (`dotnet run --project ProjectCeres -- --seed-dev-user --email ... --generate-password` produces a usable login on a fresh DB). `dotnet test` green; the IDOR / RLS suites in particular still pass since they exercise the same admin-DB path indirectly.
+- [ ] 9.1.6.b — `PreAuthRlsScope.cs:81` calls `SqlQueryInterpolated<string>` instead of `SqlQueryRaw<string>`. The nested-scope userId-mismatch guard still throws on cross-user nesting (existing test `BeginPreAuthUserScope_NestedDifferentUser_Throws` or equivalent stays green). RLS smoke tests still pass.
+- [ ] 9.1.6.c — `AppDbContext.cs` lines 37, 41, 53, 57 read `catch (DbUpdateException ex)` not `catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)`. `dotnet build` clean.
+- [ ] 9.1.6.d — `Program.cs:47` reads `return new UnprocessableEntityObjectResult(...)`; lines 376, 395 read `FindFirst(ClaimTypes.NameIdentifier)`. App boots, auth tests stay green.
+- [ ] 9.1.6.e — `PasswordResetService.cs:327` reads `TokenOptions.DefaultAuthenticatorProvider`; `AuthController.cs:152` reads `SignInResult signIn;`. Auth integration tests stay green.
+- [ ] 9.1.6.f — `AuthTestFixture.cs`, `RateLimitedAuthTestWebApplicationFactory.cs`, `ArchitectureTests.cs`, `FailedLoginRecorderTests.cs`, `LockoutUnlockIssuanceTests.cs`, `LockoutUnlockConfirmTests.cs` all clear of fully-qualified references whose namespaces are already imported. Full `dotnet test` suite stays green.
+- [ ] 9.1.6.g — code-simplification sweep complete: `simplify` skill (or the `code-simplifier` subagent) has run across `ProjectCeres/`, `ProjectCeres.Tests/`, and `ProjectCeres.Client/src/`; a findings table grouped by simplification class is captured in this stage's body (commit hash referenced); all safe-mechanical fixes shipped behind one PR per class (or one batched PR per language family); every fix preserves observable behaviour (verified by the existing test suite — no test was added, modified, or skipped to make the simplification pass per `feedback_never_skip_tests_to_make_them_pass`); any finding that would have changed behaviour, perf class, or public API was queued into a sibling `[ ]` rather than rolled in. Verification commands: `dotnet build`, `dotnet test`, `pnpm --dir ProjectCeres.Client build`, `pnpm --dir ProjectCeres.Client test --run` all exit 0 with no count regression (test count before == test count after). Per `feedback_dont_handwave_perf_variance`, if the test-suite runtime moves >30% off the prior baseline, re-run once before concluding the simplification changed perf class.
+- [ ] **Tripwire (deferred to its own stage):** open a sibling roadmap entry under Batch 5 (likely a sub-stage of Stage 14 or a new Stage 14.x) titled "Enable `EnforceCodeStyleInBuild` + ship a project-wide `.editorconfig` with IDE0001 promoted to a warning". Without that follow-up, IDE0001 remains invisible at build time and regression of this cleanup will only be caught on next manual code reading. Cross-reference both directions: the new tripwire entry cites this stage as its motivation; this checklist item is unticked until the tripwire is opened with a concrete `[ ]` line.
+- [ ] **Batch close-out** — all sub-stages ticked; `dotnet build ProjectCeres/ProjectCeres.csproj`, `dotnet test`, `pnpm --dir ProjectCeres.Client build`, `pnpm --dir ProjectCeres.Client test --run` all exit 0; tripwire stage opened with its own `[ ]` line. Stage flipped to ✅ Done. Per `feedback_finished_stages_have_no_unchecked_items`, no `[ ]` remains under this heading at close-out.
+
+### Audit notes (2026-05-21 — captured before any implementation)
+
+**Production raw-SQL surface (3 sites, all in scope):**
+
+| File | Line | Call | Risk class |
+|---|---|---|---|
+| `ProjectCeres/Tools/SeedDevUser.cs` | 223 | `ExecuteSqlRawAsync` — interpolated `UPDATE "{table}" SET "UserId" = '{userId}' WHERE "UserId" = '{sentinel}'` | Low (table from hardcoded list; CLI tool; admin context) but bad-shape |
+| `ProjectCeres/Tools/SeedDevUser.cs` | 381 | `ExecuteSqlRawAsync` for `SELECT COUNT(*)` with same interpolation | Same |
+| `ProjectCeres/Common/Authentication/PreAuthRlsScope.cs` | 81 | `SqlQueryRaw<string>` with a fully constant `SELECT current_setting(...)` | None (constant string); pattern-smell only |
+
+**Test-only raw-SQL surface (out of scope, retained intentionally):**
+
+- `ProjectCeres.Tests/Integration/BackfillIdentityNormalizedToLowercaseTests.cs` (15 hits) — these tests deliberately call the migration SQL via `ExecuteSqlRawAsync` to verify the migration's behaviour without applying it; rewriting them would defeat the purpose.
+- `ProjectCeres.Tests/Integration/Rls/Group1_BypassCaseTests.cs` (3 hits) — these tests deliberately use `FromSqlRaw` to verify the RLS invariant that "raw SQL under user B's context still only returns user B's rows" (Stage 7.5 / ADR-0068). Rewriting them would defeat the contract.
+
+**IDE0001 confirmed violations (31 total across 9 files):**
+
+| Namespace | File | Hits |
+|---|---|---|
+| `Microsoft.EntityFrameworkCore` | `ProjectCeres/Data/AppDbContext.cs` | 4 (lines 37, 41, 53, 57 — all `DbUpdateException` in `catch`) |
+| `Microsoft.EntityFrameworkCore` | `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs` | 1 (line 789, partial — simplifies to `Metadata.IEntityType`) |
+| `Microsoft.AspNetCore.Identity` | `ProjectCeres/Common/Authentication/PasswordResetService.cs` | 1 (line 327) |
+| `Microsoft.AspNetCore.Identity` | `ProjectCeres/Controllers/Api/AuthController.cs` | 1 (line 152) |
+| `Microsoft.AspNetCore.Identity` | `ProjectCeres.Tests/Integration/Authentication/FailedLoginRecorderTests.cs` | 1 (line 413) |
+| `Microsoft.AspNetCore.Identity` | `ProjectCeres.Tests/Integration/Authentication/AuthTestFixture.cs` | 3 (lines 272, 295, 300) |
+| `Microsoft.AspNetCore.Identity` | `ProjectCeres.Tests/Integration/Authentication/LockoutUnlockIssuanceTests.cs` | 1 (line 275) |
+| `Microsoft.AspNetCore.Mvc` | `ProjectCeres/Program.cs` | 1 (line 47) |
+| `Microsoft.AspNetCore.Mvc` | `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs` | 2 (lines 845, 846) |
+| `System.Security.Claims` | `ProjectCeres/Program.cs` | 2 (lines 376, 395) |
+| `System.Security.Claims` | `ProjectCeres.Tests/Integration/RateLimitedAuthTestWebApplicationFactory.cs` | 3 (lines 247, 266, 298) |
+| `Microsoft.AspNetCore.Http` | `ProjectCeres.Tests/Integration/RateLimitedAuthTestWebApplicationFactory.cs` | 3 (lines 294, 320, 346) |
+| `Microsoft.AspNetCore.Http` | `ProjectCeres.Tests/Integration/Authentication/AuthTestFixture.cs` | 2 (lines 262, 273) |
+| `Microsoft.AspNetCore.Authentication` | `ProjectCeres.Tests/Integration/Authentication/AuthTestFixture.cs` | 3 (lines 292, 294, 302) |
+| `Microsoft.AspNetCore.DataProtection` | `ProjectCeres.Tests/Integration/Authentication/AuthTestFixture.cs` | 1 (line 297) |
+| `System.Diagnostics` | `ProjectCeres.Tests/Integration/Authentication/LockoutUnlockConfirmTests.cs` | 1 (line 517) |
+
+**Hot-spot files (most violations):** `AuthTestFixture.cs` (8) · `RateLimitedAuthTestWebApplicationFactory.cs` (6) · `AppDbContext.cs` (4) · `ArchitectureTests.cs` (3) · `Program.cs` (3).
+
+**False positives filtered out (NOT in scope):** all `Migrations/*.Designer.cs` matches (EF metadata string literals, not type references); test files using `Microsoft.AspNetCore.Mvc.Testing.*` without importing that namespace; `CategorySeedService.cs:11` inside `<see cref="..."/>` XML doc; sites referencing `System.Text.*` / `Microsoft.AspNetCore.Authentication.Cookies.*` where the file does not import the namespace.
 
 ---
 

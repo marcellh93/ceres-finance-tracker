@@ -33,7 +33,7 @@ export function BackupCodeLoginBanner() {
       <div className="flex-1 space-y-2">
         <p>{t(`${ns}.body`, { count: user.backupCodesRemaining })}</p>
         <Link
-          to="/app/security"
+          to="/security"
           className={cn(buttonVariants({ variant: 'link', size: 'sm' }), 'h-auto p-0 no-underline')}
         >
           {t(`${ns}.cta`)}

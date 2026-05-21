@@ -161,7 +161,7 @@ export function BackupCodeLoginBanner() {
           />
         </p>
         <Button asChild variant="link" size="sm" className="h-auto p-0">
-          <Link to="/app/security">{t(`${ns}.cta`)}</Link>
+          <Link to="/security">{t(`${ns}.cta`)}</Link>
         </Button>
       </div>
       <Button
@@ -184,7 +184,7 @@ Why these choices:
 - `border-warning/30 bg-warning/10 text-warning` — the exact recipe used at `TotpEnrollStep2BackupCodes.tsx:75-77` and `BudgetCreate.tsx:118`. Verified against `docs/design-system.md` § Semantic tokens (line 96 / 234).
 - `variant === 'reenrol' | 'regenerate'` keys the i18n bundle and removes any need for ternaries in the JSX.
 - `<Trans>` is required because the body interpolates `<b>{{count}}</b>` — pure `t()` cannot wrap interpolations in tags.
-- `<Link to="/app/security">` — `react-router-dom`'s declarative link. The Security page already exists.
+- `<Link to="/security">` — `react-router-dom`'s declarative link. The Security page already exists.
 - Local `useState(false)` for dismiss — no `localStorage`. Component remounts (e.g. SPA navigation away and back to `/`) reset the state. Per the user's product decision.
 - Early returns ordered cheapest-first (`dismissed`, `!user`, `backupCodesRemaining > 7`, `!twoFactorEnabled`) — the last guard prevents the banner from rendering for a user who turned MFA off but still has a stale `backupCodesRemaining` value in the auth context.
 
