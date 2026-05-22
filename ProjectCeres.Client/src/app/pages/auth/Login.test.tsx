@@ -241,6 +241,26 @@ describe('Login page', () => {
     );
   });
 
+  it('L-toast: fires the account-unlocked toast when /login?unlocked=1', async () => {
+    render(
+      <I18nextProvider i18n={i18n}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/login?unlocked=1']}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </I18nextProvider>,
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringMatching(/unlocked/i),
+        expect.objectContaining({ id: 'login-account-unlocked' }),
+      ),
+    );
+  });
+
   it('fires the expired-sign-in toast when /login?expired=1', async () => {
     render(
       <I18nextProvider i18n={i18n}>

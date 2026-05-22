@@ -37,6 +37,9 @@ export function Login() {
     if (searchParams.get('reset') === '1') {
       toast(t('auth.login.toasts.passwordResetSuccess'), { id: 'login-password-reset-success' });
     }
+    if (searchParams.get('unlocked') === '1') {
+      toast(t('auth.accountUnlock.toastSucceeded'), { id: 'login-account-unlocked' });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
