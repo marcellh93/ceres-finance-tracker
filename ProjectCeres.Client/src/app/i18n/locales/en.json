@@ -18,11 +18,13 @@
       "forgotPasswordLink": "Forgot password?",
       "createAccountLink": "Create an account",
       "resendVerification": "Resend verification email",
+      "resendSuccess": "If that email is registered, we've sent a new verification link.",
       "errors": {
         "invalidCredentials": "Email or password is incorrect.",
         "accountLocked": "Account locked. Check your email for an unlock link.",
         "emailNotConfirmed": "Verify your email first. Check your inbox.",
-        "resendFailed": "Could not send the email. Try again in a moment."
+        "resendFailed": "Could not send the email. Try again in a moment.",
+        "resendTooMany": "Too many requests. Try again in a moment."
       },
       "toasts": {
         "totpExpired": "Your sign-in expired. Please sign in again.",
@@ -53,6 +55,42 @@
         "title": "Account creation is coming soon",
         "body": "Sign-up isn't available yet. It ships in the next phase of the auth rollout.",
         "backToLogin": "Back to sign in"
+      }
+    },
+    "register": {
+      "title": "Create your account",
+      "description": "Sign up for Ceres. We'll send a verification email to confirm your address.",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "passwordHint": "At least 8 characters. Avoid passwords used in known data breaches.",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "successTitle": "Check your inbox",
+      "successBody": "We've sent a verification link to {{email}}. Click the link to finish creating your account. The link expires in 30 minutes.",
+      "backToSignIn": "Back to sign in",
+      "errors": {
+        "invalidEmail": "Enter a valid email address.",
+        "passwordTooShort": "Password must be at least 8 characters.",
+        "passwordBreached": "This password has appeared in a known data breach. Choose a different one.",
+        "network": "Couldn't reach the server. Try again."
+      }
+    },
+    "emailVerify": {
+      "title": "Verify your email",
+      "verifyingMessage": "Verifying your email address…",
+      "successTitle": "Email verified",
+      "successBody": "Your email is confirmed. You can now sign in.",
+      "signInLink": "Go to sign in",
+      "invalidTitle": "This verification link is invalid",
+      "invalidBody": "The link may have expired or already been used. Request a new verification email below.",
+      "resendButton": "Resend verification email",
+      "resendPromptLabel": "Email",
+      "resendSubmit": "Send link",
+      "resendSubmitting": "Sending…",
+      "resendSuccess": "If that email is registered, we've sent a new verification link.",
+      "errors": {
+        "network": "Couldn't reach the server. Try again.",
+        "resendFailed": "Couldn't resend right now. Try again in a minute."
       }
     },
     "passwordReset": {

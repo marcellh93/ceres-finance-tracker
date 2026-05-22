@@ -18,11 +18,13 @@
       "forgotPasswordLink": "¿Olvidaste tu contraseña?",
       "createAccountLink": "Crear una cuenta",
       "resendVerification": "Reenviar correo de verificación",
+      "resendSuccess": "Si ese correo está registrado, hemos enviado un nuevo enlace de verificación.",
       "errors": {
         "invalidCredentials": "El correo electrónico o la contraseña no son correctos.",
         "accountLocked": "Cuenta bloqueada. Consulta tu correo para un enlace de desbloqueo.",
         "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada.",
-        "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento."
+        "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento.",
+        "resendTooMany": "Demasiadas solicitudes. Inténtalo de nuevo en un momento."
       },
       "toasts": {
         "totpExpired": "Tu sesión caducó. Inicia sesión de nuevo.",
@@ -53,6 +55,42 @@
         "title": "La creación de cuentas estará disponible próximamente",
         "body": "El registro aún no está disponible. Llegará en la siguiente fase del despliegue de autenticación.",
         "backToLogin": "Volver a iniciar sesión"
+      }
+    },
+    "register": {
+      "title": "Crea tu cuenta",
+      "description": "Regístrate en Ceres. Te enviaremos un correo de verificación para confirmar tu dirección.",
+      "emailLabel": "Correo electrónico",
+      "passwordLabel": "Contraseña",
+      "passwordHint": "Al menos 8 caracteres. Evita contraseñas que hayan aparecido en filtraciones conocidas.",
+      "submit": "Crear cuenta",
+      "submitting": "Creando cuenta…",
+      "successTitle": "Revisa tu bandeja de entrada",
+      "successBody": "Hemos enviado un enlace de verificación a {{email}}. Haz clic en el enlace para terminar de crear tu cuenta. El enlace caduca en 30 minutos.",
+      "backToSignIn": "Volver a iniciar sesión",
+      "errors": {
+        "invalidEmail": "Introduce una dirección de correo válida.",
+        "passwordTooShort": "La contraseña debe tener al menos 8 caracteres.",
+        "passwordBreached": "Esta contraseña aparece en una filtración conocida. Elige otra.",
+        "network": "No se pudo conectar con el servidor. Vuelve a intentarlo."
+      }
+    },
+    "emailVerify": {
+      "title": "Verifica tu correo",
+      "verifyingMessage": "Verificando tu correo electrónico…",
+      "successTitle": "Correo verificado",
+      "successBody": "Tu correo electrónico está confirmado. Ya puedes iniciar sesión.",
+      "signInLink": "Ir al inicio de sesión",
+      "invalidTitle": "Este enlace de verificación no es válido",
+      "invalidBody": "Es posible que el enlace haya caducado o que ya se haya usado. Solicita un nuevo correo de verificación más abajo.",
+      "resendButton": "Reenviar correo de verificación",
+      "resendPromptLabel": "Correo electrónico",
+      "resendSubmit": "Enviar enlace",
+      "resendSubmitting": "Enviando…",
+      "resendSuccess": "Si ese correo está registrado, hemos enviado un nuevo enlace de verificación.",
+      "errors": {
+        "network": "No se pudo conectar con el servidor. Vuelve a intentarlo.",
+        "resendFailed": "No se pudo reenviar ahora. Vuelve a intentarlo en un minuto."
       }
     },
     "passwordReset": {
