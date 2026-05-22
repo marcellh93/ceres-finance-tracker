@@ -47,7 +47,7 @@ import { useRecurringLayoutCtx } from './features/recurring/RecurringLayout';
 import { Login } from './pages/auth/Login';
 import { LoginTotp } from './pages/auth/LoginTotp';
 import { PasswordReset } from './pages/auth/PasswordReset';
-import { RegisterPlaceholder } from './pages/auth/RegisterPlaceholder';
+import { Register } from './pages/auth/Register';
 
 function RecurringCreateBridge() {
   const ctx = useRecurringLayoutCtx();
@@ -76,7 +76,7 @@ export function App() {
         <Route path="login" element={<Login />} />
         <Route path="login/totp" element={<LoginTotp />} />
         <Route path="password-reset" element={<PasswordReset />} />
-        <Route path="register" element={<RegisterPlaceholder />} />
+        <Route path="register" element={<Register />} />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}

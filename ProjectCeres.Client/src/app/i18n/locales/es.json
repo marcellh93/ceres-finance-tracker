@@ -50,13 +50,6 @@
         "network": "No se pudo verificar el código. Comprueba tu conexión e inténtalo de nuevo."
       }
     },
-    "placeholders": {
-      "register": {
-        "title": "La creación de cuentas estará disponible próximamente",
-        "body": "El registro aún no está disponible. Llegará en la siguiente fase del despliegue de autenticación.",
-        "backToLogin": "Volver a iniciar sesión"
-      }
-    },
     "register": {
       "title": "Crea tu cuenta",
       "description": "Regístrate en Ceres. Te enviaremos un correo de verificación para confirmar tu dirección.",

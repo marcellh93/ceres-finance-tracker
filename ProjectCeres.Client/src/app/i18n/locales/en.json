@@ -50,13 +50,6 @@
         "network": "Could not verify the code. Check your connection and try again."
       }
     },
-    "placeholders": {
-      "register": {
-        "title": "Account creation is coming soon",
-        "body": "Sign-up isn't available yet. It ships in the next phase of the auth rollout.",
-        "backToLogin": "Back to sign in"
-      }
-    },
     "register": {
       "title": "Create your account",
       "description": "Sign up for Ceres. We'll send a verification email to confirm your address.",
