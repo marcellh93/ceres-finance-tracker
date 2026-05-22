@@ -49,6 +49,7 @@ import { LoginTotp } from './pages/auth/LoginTotp';
 import { EmailVerify } from './pages/auth/EmailVerify';
 import { PasswordReset } from './pages/auth/PasswordReset';
 import { Register } from './pages/auth/Register';
+import { AccountUnlock } from './pages/auth/AccountUnlock';
 
 function RecurringCreateBridge() {
   const ctx = useRecurringLayoutCtx();
@@ -79,6 +80,7 @@ export function App() {
         <Route path="password-reset" element={<PasswordReset />} />
         <Route path="register" element={<Register />} />
         <Route path="email-verify" element={<EmailVerify />} />
+        <Route path="account/unlock" element={<AccountUnlock />} />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}
