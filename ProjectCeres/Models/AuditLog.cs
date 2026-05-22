@@ -32,4 +32,7 @@ public enum AuditLogAction
     LockoutSelfServiceUnlock, // wired in Stage 6.10
     DataExportRequested,      // wired in Stage 13
     GdprErasureRequested,     // wired in Stage 13
+
+    EmailVerificationRequested, // wired in Stage 9.3
+    EmailVerified,              // wired in Stage 9.3
 }

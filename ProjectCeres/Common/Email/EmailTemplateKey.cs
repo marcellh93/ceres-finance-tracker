@@ -11,4 +11,5 @@ public enum EmailTemplateKey
     EmailChangeConfirmedToOld,
     EmailChangeRevokeNotificationToOld,
     LockoutUnlock,
+    RegistrationConfirmation,
 }
