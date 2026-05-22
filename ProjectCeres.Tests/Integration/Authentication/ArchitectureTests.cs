@@ -505,6 +505,8 @@ public class ArchitectureTests
     public void AuditLogAction_enum_values_match_documented_set()
     {
         // Pins the enum against docs/superpowers/specs/2026-05-11-stage-6-14-audit-log-design.md § 3.1.
+        // Stage 9.3 (2026-05-22) added EmailVerificationRequested + EmailVerified for the
+        // registration confirmation flow — both wired by EmailConfirmationService.
         var expected = new[]
         {
             "LoginSucceeded", "LoginSucceededMfa", "LoginSucceededBackupCode",
@@ -514,6 +516,7 @@ public class ArchitectureTests
             "MfaEnrolled", "BackupCodesRegenerated",
             "MfaDisabled", "LockoutSelfServiceUnlock",
             "DataExportRequested", "GdprErasureRequested",
+            "EmailVerificationRequested", "EmailVerified",
         };
         Enum.GetNames<ProjectCeres.Models.AuditLogAction>()
             .Should().BeEquivalentTo(expected);
@@ -675,6 +678,7 @@ public class ArchitectureTests
             "ProjectCeres/Common/Authentication/PasswordResetService.cs",             // token verify before the user is authenticated (no cookie yet)
             "ProjectCeres/Common/Authentication/EmailChangeService.cs",               // token verify before the user is authenticated (no cookie yet)
             "ProjectCeres/Common/Authentication/LockoutUnlockService.cs",             // unlock token candidate scan before the user is authenticated
+            "ProjectCeres/Common/Authentication/EmailConfirmationService.cs",         // email-verification token verify before the user is authenticated (Stage 9.3)
             "ProjectCeres/Common/Authentication/MfaBackupCodeService.cs",             // MFA-pending step: principal not yet committed to the cookie
             "ProjectCeres/Common/Authentication/SessionRevocationValidator.cs",       // runs during cookie validation, before HTTP principal is committed
             "ProjectCeres/Common/Authentication/PersistentCookieRotationMiddleware.cs", // runs before UseAuthentication; resolves session by cookie-embedded id

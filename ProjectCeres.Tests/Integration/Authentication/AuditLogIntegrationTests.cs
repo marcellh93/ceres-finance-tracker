@@ -269,8 +269,17 @@ public class AuditLogIntegrationTests : IAsyncLifetime
             userId = user!.Id;
         }
 
+        // Stage 9.3 (2026-05-22): Register now ALSO issues an email-verification
+        // token via EmailConfirmationService.IssueAsync, which writes a second audit
+        // row (EmailVerificationRequested). The Register-side contract (a Registered
+        // row exists per fresh-create) is unchanged; this test now asserts that the
+        // Registered row exists alongside the new EmailVerificationRequested row.
         var rows = await ReadAuditAsync(_factory, userId);
-        rows.Should().ContainSingle().Which.Action.Should().Be(AuditLogAction.Registered);
+        rows.Select(r => r.Action).Should().BeEquivalentTo(new[]
+        {
+            AuditLogAction.Registered,
+            AuditLogAction.EmailVerificationRequested,
+        });
     }
 
     // ── Password reset ─────────────────────────────────────────────────────

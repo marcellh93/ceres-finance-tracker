@@ -122,6 +122,6 @@ public sealed class EmailComposerTests
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(27, "9 templates × 3 keys each");
+        enKeys.Should().HaveCount(30, "10 templates × 3 keys each (RegistrationConfirmation added in Stage 9.3)");
     }
 }
