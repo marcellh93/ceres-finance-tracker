@@ -252,5 +252,33 @@ describe('apiFetch', () => {
       const result = await apiFetch('/api/dashboard/summary');
       expect(result.ok).toBe(false);
     });
+
+    it('does NOT fire on 401 when the response carries the X-Ceres-Cookie-Rotated header (Remember-Me rotation handshake)', async () => {
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+
+      // PersistentCookieRotationMiddleware returns 401 with this header set
+      // while it issues a fresh session cookie. The browser is expected to
+      // retry with the new cookie on the next request. Firing the unauth
+      // handler here would redirect the user to /login before that retry
+      // ever happens, breaking the Remember-Me silent re-auth.
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+          {
+            status: 401,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Ceres-Cookie-Rotated': 'true',
+            },
+          },
+        ),
+      );
+
+      const result = await apiFetch('/api/dashboard/summary');
+
+      expect(result.ok).toBe(false);
+      expect(handler).not.toHaveBeenCalled();
+    });
   });
 });

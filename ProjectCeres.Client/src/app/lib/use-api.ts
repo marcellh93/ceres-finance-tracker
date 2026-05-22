@@ -48,7 +48,7 @@ export function useApi<T>(url: string): UseApiResult<T> {
           // happened mid-session and RequireAuth stays cached as 'authed'
           // until a hard reload.
           if (response.status === 401) {
-            notifyUnauthenticatedIfApplicable(url);
+            notifyUnauthenticatedIfApplicable(url, response);
           }
           throw new Error(`HTTP ${response.status}`);
         }

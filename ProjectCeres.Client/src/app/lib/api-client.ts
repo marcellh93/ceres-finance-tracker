@@ -23,6 +23,11 @@ type UnauthenticatedHandler = () => void;
 let unauthenticatedHandler: UnauthenticatedHandler | null = null;
 const AUTH_PROBE_URLS = ['/api/auth/me', '/api/auth/csrf'];
 
+// Server header set by PersistentCookieRotationMiddleware on the 401 it
+// intentionally returns while issuing a fresh session cookie. Must match
+// SessionConstants.CookieRotatedHeader on the server.
+export const COOKIE_ROTATED_HEADER = 'x-ceres-cookie-rotated';
+
 export function setOnUnauthenticated(handler: UnauthenticatedHandler | null): void {
   unauthenticatedHandler = handler;
 }
@@ -34,11 +39,17 @@ export function setOnUnauthenticated(handler: UnauthenticatedHandler | null): vo
  * data-fetching) can opt into the same auth-context notification.
  *
  * Safe to call unconditionally on any 401: the function short-circuits on
- * auth-probe URLs and when no handler is registered.
+ * auth-probe URLs, when no handler is registered, AND when the response
+ * carries the X-Ceres-Cookie-Rotated header (the Remember-Me rotation
+ * one-extra-round-trip — see PersistentCookieRotationMiddleware comment at
+ * line 14-20; the server returned 401 specifically so the browser would
+ * retry with the freshly-issued session cookie, NOT because the user is
+ * actually logged out).
  */
-export function notifyUnauthenticatedIfApplicable(url: string): void {
+export function notifyUnauthenticatedIfApplicable(url: string, response?: Response): void {
   if (unauthenticatedHandler === null) return;
   if (AUTH_PROBE_URLS.some((probe) => url === probe || url.startsWith(`${probe}?`))) return;
+  if (response?.headers.get(COOKIE_ROTATED_HEADER) === 'true') return;
   unauthenticatedHandler();
 }
 
@@ -175,11 +186,12 @@ export async function apiFetch<T = unknown>(
   }
 
   // Silently-expired-session signal — any plain 401 (not the re-auth gate, not
-  // an auth-probe URL) means the cookie the browser sent was no longer valid.
-  // Notify the auth context so it can flip status to 'anon'; the matching
-  // RequireAuth render on the next route change will redirect to /login.
+  // an auth-probe URL, not the Remember-Me rotation handshake) means the cookie
+  // the browser sent was no longer valid. Notify the auth context so it can
+  // flip status to 'anon'; the matching RequireAuth render on the next route
+  // change will redirect to /login.
   if (response.status === 401 && code !== 'REAUTH_REQUIRED') {
-    notifyUnauthenticatedIfApplicable(url);
+    notifyUnauthenticatedIfApplicable(url, response);
   }
 
   if (response.status === 422 && envelope) {

@@ -610,8 +610,14 @@ app.UseRouting();
 
 app.UseRateLimiter();
 
-app.UseMiddleware<PersistentCookieRotationMiddleware>();
+// Persistent-cookie rotation runs AFTER UseAuthentication so it can read
+// context.User to detect "request carries cookies but didn't authenticate"
+// (e.g. session-cookie ticket expired but browser still sending it). Must
+// stay BEFORE UseAuthorization so the rotation 401 doesn't get pre-empted
+// by an Authorize challenge. See PersistentCookieRotationMiddleware XML
+// docs for the 2026-05-22 reordering rationale.
 app.UseAuthentication();
+app.UseMiddleware<PersistentCookieRotationMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<UserBlockedIpMiddleware>();
 

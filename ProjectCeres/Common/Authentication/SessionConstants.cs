@@ -18,4 +18,12 @@ public static class SessionConstants
     /// <summary>HttpContext.Items key used by the login + reauth flows to pass the
     /// freshness Unix-seconds string into ApplicationUserClaimsPrincipalFactory.</summary>
     public const string LastReauthAtItemKey = "LastReauthAt";
+
+    /// <summary>Response header set by PersistentCookieRotationMiddleware on the
+    /// 401 it intentionally returns while issuing a fresh session cookie. The SPA's
+    /// silent-401 seam (api-client.notifyUnauthenticatedIfApplicable) checks this
+    /// header and skips the anon-transition dispatch when present — otherwise the
+    /// browser would never get to retry the request with the freshly-issued cookie
+    /// before being redirected to /login.</summary>
+    public const string CookieRotatedHeader = "X-Ceres-Cookie-Rotated";
 }

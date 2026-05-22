@@ -110,6 +110,27 @@ describe('useApi', () => {
 
       expect(handler).not.toHaveBeenCalled();
     });
+
+    it('does NOT fire the handler on 401 when X-Ceres-Cookie-Rotated header is present (Remember-Me rotation)', async () => {
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+      fetchSpy.mockResolvedValue(
+        new Response(null, {
+          status: 401,
+          headers: { 'X-Ceres-Cookie-Rotated': 'true' },
+        }),
+      );
+
+      const { result } = renderHook(() => useApi<{ x: number }>('/api/dashboard/summary'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // The hook still reports the error to its caller (existing contract),
+      // but the auth-context handler must not fire — otherwise the user gets
+      // redirected to /login mid-rotation, never sending the retry that
+      // carries the freshly-issued session cookie.
+      expect(handler).not.toHaveBeenCalled();
+      expect(result.current.error).toBeInstanceOf(Error);
+    });
   });
 
   it('does not call setState after unmount', async () => {
