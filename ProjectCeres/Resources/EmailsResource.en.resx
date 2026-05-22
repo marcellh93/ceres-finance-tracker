@@ -80,4 +80,11 @@ To unlock the account, click the link below within 1 hour:
 
 If this wasn't you, the link still allows you to unlock — change your password immediately after signing in.</value></data>
   <data name="LockoutUnlock.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Too many failed sign-in attempts on your Ceres account from IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Unlock your account&lt;/a&gt;&lt;/p&gt;&lt;p&gt;If this wasn't you, the link still allows you to unlock — change your password immediately after signing in.&lt;/p&gt;</value></data>
+  <data name="RegistrationConfirmation.Subject" xml:space="preserve"><value>Confirm your Ceres email address</value></data>
+  <data name="RegistrationConfirmation.BodyText" xml:space="preserve"><value>Welcome to Ceres. Click the link below within 30 minutes to confirm your email address and finish signing up:
+
+{0}
+
+If you didn't sign up, you can safely ignore this email.</value></data>
+  <data name="RegistrationConfirmation.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Welcome to Ceres. &lt;a href="{0}"&gt;Confirm your email&lt;/a&gt; within 30 minutes to finish signing up.&lt;/p&gt;&lt;p&gt;If you didn't sign up, you can safely ignore this email.&lt;/p&gt;</value></data>
 </root>
