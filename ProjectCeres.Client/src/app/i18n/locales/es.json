@@ -86,6 +86,20 @@
         "resendFailed": "No se pudo reenviar ahora. Vuelve a intentarlo en un minuto."
       }
     },
+    "accountUnlock": {
+      "title": "Desbloquea tu cuenta",
+      "description": "Pulsa el botón para desbloquear tu cuenta. Este enlace solo se puede usar una vez y caduca en 15 minutos.",
+      "submit": "Desbloquear cuenta",
+      "submitting": "Desbloqueando…",
+      "backToSignIn": "Volver a iniciar sesión",
+      "invalidTitle": "Este enlace de desbloqueo no es válido",
+      "invalidBody": "Es posible que el enlace haya caducado o que ya se haya usado. Intenta iniciar sesión — si tu cuenta sigue bloqueada, recibirás un nuevo enlace.",
+      "toastSucceeded": "Tu cuenta está desbloqueada. Inicia sesión para continuar.",
+      "errors": {
+        "network": "No se pudo conectar con el servidor. Vuelve a intentarlo.",
+        "retry": "Volver a intentarlo"
+      }
+    },
     "passwordReset": {
       "request": {
         "title": "Restablecer contraseña",

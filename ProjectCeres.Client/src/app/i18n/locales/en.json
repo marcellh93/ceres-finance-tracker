@@ -86,6 +86,20 @@
         "resendFailed": "Couldn't resend right now. Try again in a minute."
       }
     },
+    "accountUnlock": {
+      "title": "Unlock your account",
+      "description": "Click below to unlock your account. This link can be used once and expires in 15 minutes.",
+      "submit": "Unlock account",
+      "submitting": "Unlocking…",
+      "backToSignIn": "Back to sign in",
+      "invalidTitle": "This unlock link is invalid",
+      "invalidBody": "The link may have expired or already been used. Try signing in — if your account is still locked, you'll receive a new link.",
+      "toastSucceeded": "Your account is unlocked. Sign in to continue.",
+      "errors": {
+        "network": "Couldn't reach the server. Try again.",
+        "retry": "Try again"
+      }
+    },
     "passwordReset": {
       "request": {
         "title": "Reset your password",
