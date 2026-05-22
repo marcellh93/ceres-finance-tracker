@@ -1,6 +1,12 @@
 # Stage 9.3 — `/register` + email verification — design
 
-**Status:** Draft — 2026-05-18. Spec only; implementation runs in a follow-up session per the existing `[ ]` line at `docs/roadmap-phase-three.md:954` (Stage 9 sub-stage 9.3). The roadmap row IS the receiving checkbox + tripwire (Stage 9 close-out cannot complete with 9.3 unticked).
+**Status:** Active — drafted 2026-05-18, revised 2026-05-22. Implementation runs in the same session per the existing `[ ]` line at `docs/roadmap-phase-three.md:954` (Stage 9 sub-stage 9.3). The roadmap row IS the receiving checkbox + tripwire (Stage 9 close-out cannot complete with 9.3 unticked).
+
+**Revision 2026-05-22 deltas:**
+- D1 — Duplicate-email path now re-issues a token **only when `EmailConfirmed = false`**; confirmed-existing branch mirrors the Argon2id token-write cost for timing parity (replaces the earlier "always re-issue" decision).
+- D8 (new) — `Login` gains an `IsNotAllowed && !EmailConfirmed` branch returning `UnauthorizedEnvelope("EMAIL_NOT_CONFIRMED", ...)`. The SPA already has the matching `emailNotConfirmed` state at `Login.tsx:92`; today's server falls through to `INVALID_CREDENTIALS`, making the SPA branch dead code. 9.3 wires it.
+- D-resend — `onResendVerification` reads the email via `form.getValues('email')` and POSTs `{email}` to `/api/auth/email/verify/resend` (spec previously was silent on where the SPA gets the email).
+- Roadmap status code line — 9.3 ships **204** (not 202 as the roadmap originally said); the roadmap line will be updated in the doc-sync pass.
 **Roadmap anchor:** `docs/roadmap-phase-three.md` → Stage 9 → sub-stage 9.3
 **Originating context:** Stage 6a spec § "Why no auto-sign-in?" (the 6a-deferred slice this closes); Stage 8 carry-forward at roadmap lines 1078–1082; `docs/security-model.md` § Registration
 
@@ -143,14 +149,85 @@ public sealed class EmailVerificationController : ControllerBase
 
 ### Wiring into `Register`
 
-`AuthController.cs:75-113`. Currently the handler returns `204` on duplicate-username (anti-enumeration) and on fresh-create. Insert a single call AFTER `await tx.CommitAsync` and BEFORE `return NoContent()`:
+`AuthController.cs:75-113`. Currently the handler returns `204` on duplicate-username (anti-enumeration) and on fresh-create.
+
+**Fresh-create branch:** Insert a single call AFTER `await tx.CommitAsync` and BEFORE `return NoContent()`:
 
 ```csharp
 var verifyUrlBase = $"{Request.Scheme}://{Request.Host}";
 await _emailConfirmation.IssueAsync(user.Id, user.Email!, verifyUrlBase, HttpContext.RequestAborted);
 ```
 
-The duplicate-username path also fires `IssueAsync` for the EXISTING user — same anti-enumeration logic as Stage 6c follow-up at `AuthController.cs:95-97` ("send 'someone tried to register with your email' notice"). For 9.3 scope, this expansion is deferred — the immediate need is the fresh-register path.
+**Duplicate-email branch (D1 revised 2026-05-22):** When `result.Succeeded` is false and `isDuplicateOnly` is true, the duplicate user is loaded via `FindByEmailAsync`. Branch on `user.EmailConfirmed`:
+
+- **`EmailConfirmed = false`** (still unverified): call `_emailConfirmation.IssueAsync(existingUser.Id, existingUser.Email!, verifyUrlBase, ct)` — same code path as fresh-create. The legitimate owner gets a fresh verification link. Anti-enumerating because the fresh-create branch also issues.
+- **`EmailConfirmed = true`** (already verified): do NOT issue a new token. **Mirror the Argon2id token-hash cost** by calling `_argon.RunDummyHash()` for timing parity with the issuing branches. Without this mirror, an attacker can distinguish unconfirmed-existing from confirmed-existing emails by wall-clock time. **Do not** send a "someone tried to register with your email" notice in 9.3 scope — that's its own follow-up (Stage 8 carry-forward already lists the "registration-attempt-on-existing-confirmed-address" template variant).
+
+All three branches return `NoContent()`. Comment in code reflects the three-branch shape so a future reader doesn't restore the older two-branch logic.
+
+### `Login` EMAIL_NOT_CONFIRMED branch (D8, new 2026-05-22)
+
+The SPA already has dead code at `Login.tsx:92` that handles `result.code === 'EMAIL_NOT_CONFIRMED'` — but the server never emits this code. The 9.3 server fix adds the branch:
+
+```csharp
+// After PasswordSignInAsync but before the existing IsLockedOut / Succeeded checks:
+if (signIn.IsNotAllowed)
+{
+    // RequireConfirmedEmail=true + EmailConfirmed=false is the only path that
+    // produces IsNotAllowed in this config. The legitimate user benefits from
+    // knowing why their (correct!) password is being rejected; the small
+    // enumeration leak is acceptable per the security-model.md balance.
+    HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+    var (ip, ua) = RequestContext();
+    await _failedLogins.RecordAsync(
+        request.Email, userStub.Id, FailedLoginReason.EmailNotConfirmed, ip, ua, HttpContext.RequestAborted);
+    return UnauthorizedEnvelope("EMAIL_NOT_CONFIRMED",
+        "Verify your email before signing in. Check your inbox or request a new link.");
+}
+```
+
+`FailedLoginReason` needs a new enum value: `EmailNotConfirmed` (add to the enum + add to the failed-login dashboard if one exists). The branch lands **before** `if (signIn.IsLockedOut)` because `IsNotAllowed` is a terminal state for `RequireConfirmedEmail` — the user can't make progress through any other branch until they verify.
+
+### Resend mechanics (D-resend, 2026-05-22)
+
+The SPA captures the email at the moment of the 401:
+
+```ts
+// In Login.tsx, replacing the placeholder onResendVerification:
+const onResendVerification = async () => {
+  const email = form.getValues('email');
+  if (!email) {
+    setResendError(t('auth.login.errors.resendFailed'));
+    return;
+  }
+  setResending(true);
+  setResendError(null);
+  try {
+    const result = await apiFetch('/api/auth/email/verify/resend', {
+      method: 'POST',
+      body: { email },
+    });
+    if (result.ok) {
+      setResendSucceeded(true);  // shows "If that email is registered, we've sent a new link." block
+      return;
+    }
+    if (result.status === 429) {
+      setResendError(t('auth.login.errors.resendTooMany'));
+      return;
+    }
+    setResendError(t('auth.login.errors.resendFailed'));
+  } catch {
+    setResendError(t('auth.login.errors.resendFailed'));
+  } finally {
+    setResending(false);
+  }
+};
+```
+
+Server-side anti-enumeration: `POST /api/auth/email/verify/resend` returns 204 whether or not the email is registered AND whether or not it's already confirmed. Internally:
+- Unknown email → `_argon.RunDummyHash()` (twice — matches the known-but-unconfirmed branch's two-hash cost) → 204.
+- Known + `EmailConfirmed=false` → issue token, send email, 204.
+- Known + `EmailConfirmed=true` → `_argon.RunDummyHash()` twice → 204 (no email sent; an attacker shouldn't learn confirmation state).
 
 ### Resx entries
 
@@ -190,6 +267,21 @@ Mirror the password-reset format. `{verifyUrlBase}/app/email-verify#token={raw}`
 ---
 
 ## SPA design
+
+### Design-system constraint
+
+`/register` and `/email-verify` are structural twins of the existing 9.2 (`/login/totp`) and 9.4 (`/password-reset`, `/password-reset/confirm`) surfaces:
+- Single centered card on the `AuthLayout` background
+- Title (`text-xl font-semibold tracking-tight`) + description (`text-sm text-muted-foreground`)
+- `<Field>` recipe for every labelled input
+- shadcn `<Button>` + `<Input>` primitives, base-nova variant
+- `<Link>` (react-router) for in-page navigation, `underline-offset-4 hover:underline`
+- `role="alert" aria-live` for error blocks, `role="status"` for success blocks
+- Globe icon at card bottom for language toggle (inherited from `AuthLayout`)
+
+No new visual vocabulary is introduced. The `frontend-orchestrator` Phase 1 discovery (`/impeccable shape`) was deliberately skipped — the auth-card recipe is locked by the 9.1.5.c theme/auth-page-background work and is documented in `docs/design-system.md` § auth recipes. Per the orchestrator's "things explicitly prevented" — running discovery on a structural twin of an existing surface adds no design-system value and risks aesthetic drift.
+
+`/account/unlock` (Stage 9.5) inherits the same constraint and is folded into this spec's design section by reference; the Stage 9.5 spec defers all visual conventions to this section.
 
 ### `/register` page
 
@@ -236,7 +328,7 @@ The existing `onResendVerification` handler at `Login.tsx:90-109` was a Phase-1 
 
 ### Backend integration tests
 
-`ProjectCeres.Tests/Integration/EmailConfirmationTests.cs`. ~10 tests:
+`ProjectCeres.Tests/Integration/EmailConfirmationTests.cs`. ~14 tests:
 
 1. Register → token row exists with non-null `TokenLookup`, non-null `TokenHash`, `ConsumedAt is null`, `ExpiresAt = CreatedAt + 30 min`.
 2. Verify with valid token → 204, `user.EmailConfirmed = true`, `ConsumedAt` set.
@@ -245,9 +337,13 @@ The existing `onResendVerification` handler at `Login.tsx:90-109` was a Phase-1 
 5. Verify with random non-matching token → 401 INVALID_VERIFICATION_TOKEN; constant-time floor (one Argon2id verify against dummy).
 6. Verify with token where TokenHash was tampered → 401 INVALID_VERIFICATION_TOKEN (tamper-resistance: `_tokens.Verify` second-line defence).
 7. Resend with unknown email → 204 (anti-enumeration).
-8. Resend with known email → 204; previous unconsumed token row marked consumed (supersede); new row exists.
-9. Resend rate limit: 6th request in an hour → 429 with `Retry-After` header > 0.
-10. Re-registering same email after the original token expired → 204 + new token row issued (the existing 6c "duplicate path" already returns 204; we now also send a token to the *original* user).
+8. Resend with known + unconfirmed email → 204; previous unconsumed token row marked consumed (supersede); new row exists.
+9. Resend with known + confirmed email → 204; NO new token row created; no email captured.
+10. Resend rate limit: 6th request in an hour → 429 with `Retry-After` header > 0.
+11. Re-registering same email after the original token expired (still `EmailConfirmed=false`) → 204 + new token row issued for the existing user.
+12. Re-registering same email when already confirmed → 204 + NO new token row; `Argon2id` dummy hash invoked once (timing parity).
+13. `Login` for an unconfirmed user with correct password → 401 `EMAIL_NOT_CONFIRMED` + `FailedLoginRecord` with reason `EmailNotConfirmed`.
+14. `Login` for the same user **after** verifying via `/email/verify` → 204 (success), `EmailConfirmed = true` flipped, session cookie issued.
 
 ### SPA tests
 
