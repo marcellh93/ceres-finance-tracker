@@ -68,22 +68,29 @@ its own Read call. One Read per image — not "Read once, comment on five."
 
 ## The rule
 
-**Before listing any finding F1/F2/F-N, Read each cited image.**
+**Every image finding goes inside an explicit `<image-finding>` marker block, and every block must be paired with a Read of the cited image in the same turn.**
 
-Concretely, if a turn ends with text like:
+The marker block carries the image's absolute path as an attribute:
 
-> F2 — `/login/totp` last OTP cell clips at the card's right padding (#60)
+```
+<image-finding image="/Users/.../image-cache/<session>/60.png">
+F2 — `/login/totp` last OTP cell clips at the card's right padding.
+</image-finding>
+```
 
-then the same turn must contain a tool call equivalent to:
+The same turn must contain a tool call equivalent to:
 
 ```
 Read(file_path: "/Users/.../image-cache/<session>/60.png")
 ```
 
-The Stop hook scans the assistant's last message for finding/observation
-phrases tied to image references, then checks the recent tool-call history
-for a matching Read on an image file. If a finding ships without a Read,
-the Stop is denied.
+The Stop hook (2026-05-22 rewrite, convention-scanning) extracts every `<image-finding>` block from the assistant's last message, then checks the recent tool-call history for a matching `Read` on the declared path. If any cited image was not Read, the Stop is denied — with the missing path(s) named in the deny reason.
+
+### Why a marker block, not prose-scanning
+
+The prior version of this hook scanned assistant prose for verbs like "overflows", "is missing", "F1 —" combined with bare numeric tokens. It had a 100% production misfire rate — backend prose about wrapped APIs, missing validation, or audit findings numbered F1/F2 kept triggering it. The marker block is unambiguous: if you didn't emit `<image-finding>`, the hook won't fire; if you did, the hook knows exactly which image to check.
+
+Findings phrased outside the marker — observations during conversation, descriptive references — don't trigger the hook. The marker is the contract: emit it when you're making a verifiable visual claim that needs evidence backing.
 
 ## Recovery options when the hook fires
 
@@ -105,13 +112,19 @@ the Stop is denied.
 When walking a multi-image set:
 
 - Read **each** image, in the same turn, before any findings.
-- One finding per image at a time. Do not aggregate ("F1–F5 all show the
-  same overflow") without having Read every cited image.
-- If your preflight prediction matches what you see in an image, say so
-  with an anchor ("F2 confirmed in #60: rightmost cell visibly clipped at
-  the card's right border"). If it doesn't match, say so with an anchor
-  ("F2 predicted; #60 shows the cells fitting inside the card with
-  whitespace to the right of cell 6 — prediction wrong").
+- Emit one `<image-finding>` block per image. The hook checks each block's declared path against the turn's Read calls.
+- If your preflight prediction matches what you see in an image, say so with an anchor inside the block:
+  ```
+  <image-finding image="/abs/path/60.png">
+  F2 confirmed: rightmost cell visibly clipped at the card's right border.
+  </image-finding>
+  ```
+  If it doesn't match, say so with an anchor:
+  ```
+  <image-finding image="/abs/path/60.png">
+  F2 predicted; cells fit inside the card with whitespace to the right — prediction wrong.
+  </image-finding>
+  ```
 
 ## Bypass
 

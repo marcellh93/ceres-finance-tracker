@@ -17,6 +17,9 @@
 // would have been caught by this upgrade.
 
 const path = require("path");
+const { stripDiscussionFrames } = require(
+  path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), ".claude/hooks/lib/discussion-frame-strip.js")
+);
 
 const PHRASES = [
   /doesn'?t change (the )?structural/i,
@@ -77,11 +80,10 @@ process.stdin.on("end", () => {
   const text = chunks.join("\n");
   if (!text) process.exit(0);
 
-  // Strip markdown stage headings before regex-testing. These lines preserve
-  // closed stages' titles (e.g. "## Stage 9.1.5 — Phase 1 polish + bugfix
-  // batch") and re-match phrases like /Phase \w+ polish/i on every adjacent
-  // edit. The heading itself is not deferral language.
-  const textForMatching = text.replace(/^##\s+Stage\s+\d+(\.\d+)*\b.*$/gim, "");
+  // Strip discussion frames (stage headings, fenced code, blockquotes,
+  // tool-use payloads) before regex-testing. Same shared helper every
+  // phrase-scanning hook uses, so the matcher discipline stays uniform.
+  const textForMatching = stripDiscussionFrames(text);
 
   const matched = PHRASES.filter((re) => re.test(textForMatching)).map((re) => re.toString());
   if (matched.length === 0) process.exit(0);

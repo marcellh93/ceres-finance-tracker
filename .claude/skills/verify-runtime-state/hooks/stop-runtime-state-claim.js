@@ -31,6 +31,9 @@
 
 const fs = require("fs");
 const path = require("path");
+const { stripDiscussionFrames, isMetaContext } = require(
+  path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), ".claude/hooks/lib/discussion-frame-strip.js")
+);
 
 // TIGHT regex list — runtime-state assertion patterns. Each one is paired
 // with an entity name (table.column, env var, file path) so neutral usage
@@ -106,18 +109,6 @@ const STRUCTURAL_CONTEXT_MARKERS = [
   /\bbacking (column|field)\b/i,
 ];
 
-// Guard 5 — META-CONTEXT: the message is discussing the hook itself, not
-// asserting a runtime claim. Quoting the matched phrase to talk about why
-// the hook fired (or didn't) re-fires the hook recursively. Skip in that
-// case.
-const META_CONTEXT_MARKERS = [
-  /\bthe (hook|regex|guard|matcher) (fired|matched|caught|missed)\b/i,
-  /\bfalse[- ]positive\b/i,
-  /\baudit trail\b/i,
-  /\b(this|that) (will|would|did) (re-?)?fire the hook\b/i,
-  /\bhook recursion\b/i,
-];
-
 const SESSION_BYPASS = process.env.CERES_SKIP_RUNTIME_STATE_HOOK === "1";
 
 let raw = "";
@@ -178,21 +169,29 @@ process.stdin.on("end", () => {
 
   if (!lastAssistantText) process.exit(0);
 
-  const matched = PHRASES.filter((re) => re.test(lastAssistantText)).map((re) => re.toString());
+  // Short-circuit: meta-context discussion (audit-trail explanation, recovery
+  // instructions, "false positive" framing) is not a runtime claim. Exit 0
+  // silently — no log entry, no near-fire signal that could anchor next turn.
+  if (isMetaContext(lastAssistantText)) process.exit(0);
+
+  // Strip code blocks, blockquotes, stage headings, JSON tool-use payloads
+  // before matching. Phrases inside quoted recovery text are echoes, not
+  // assertions.
+  const scanText = stripDiscussionFrames(lastAssistantText);
+
+  const matched = PHRASES.filter((re) => re.test(scanText)).map((re) => re.toString());
   if (matched.length === 0) process.exit(0);
 
   const evidenceCoLocated = EVIDENCE_MARKERS.some((re) => re.test(lastAssistantText));
   const explicitAssumption = ASSUMPTION_MARKERS.some((re) => re.test(lastAssistantText));
   const userAuthorized = USER_AUTH.some((re) => re.test(lastUserText));
-  const structuralContext = STRUCTURAL_CONTEXT_MARKERS.some((re) => re.test(lastAssistantText));
-  const metaContext = META_CONTEXT_MARKERS.some((re) => re.test(lastAssistantText));
+  const structuralContext = STRUCTURAL_CONTEXT_MARKERS.some((re) => re.test(scanText));
 
   const guardsPassed =
     evidenceCoLocated ||
     explicitAssumption ||
     userAuthorized ||
     structuralContext ||
-    metaContext ||
     SESSION_BYPASS;
 
   const outcome = SESSION_BYPASS ? "bypassed" : guardsPassed ? "passed" : "blocked";
@@ -210,7 +209,6 @@ process.stdin.on("end", () => {
         explicitAssumption,
         userAuthorized,
         structuralContext,
-        metaContext,
         passed: guardsPassed,
       },
       assistantSnippet: lastAssistantText.slice(0, 320),
@@ -228,12 +226,11 @@ process.stdin.on("end", () => {
     "",
     `Matched patterns: ${matched.join(", ")}`,
     "",
-    "Five guards were checked AND ALL FAILED:",
+    "Four guards were checked AND ALL FAILED:",
     `  • Evidence-co-located guard: ${evidenceCoLocated ? "PASS" : "fail"} (your message contains no psql / EF / file-read / tool-output marker backing the claim)`,
     `  • Explicit-assumption guard: ${explicitAssumption ? "PASS" : "fail"} (your message does not hedge the claim or propose a verification command)`,
     `  • User-authorization guard: ${userAuthorized ? "PASS" : "fail"} (user did not waive verification in their last message)`,
     `  • Structural-context guard: ${structuralContext ? "PASS" : "fail"} (the matched identifier appears as a runtime-value claim, not as schema/type discussion)`,
-    `  • Meta-context guard: ${metaContext ? "PASS" : "fail"} (the message asserts runtime state, not discusses the hook itself)`,
     "",
     "The `verify-runtime-state` skill applies to ANY claim about a runtime value",
     "(database row, env var, file contents on disk, process state). Code",

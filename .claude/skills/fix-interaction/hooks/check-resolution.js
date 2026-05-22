@@ -98,6 +98,25 @@ function lastAssistantToolUses(entries) {
   return [];
 }
 
+// Collect every tool_use across all assistant entries in the window. Used to
+// detect fixes that landed in a PRIOR assistant turn (e.g. when the user
+// followed up with a question and the current turn has no tool calls).
+// This is the fix for the 2026-05-22 deadlock where the resolution check
+// only inspected the latest assistant message.
+function allAssistantToolUses(entries, sinceTimestamp) {
+  const tools = [];
+  for (const e of entries) {
+    if (e.type !== "assistant") continue;
+    if (sinceTimestamp && e.timestamp && Date.parse(e.timestamp) < sinceTimestamp) continue;
+    const msg = e.message;
+    if (!msg || !Array.isArray(msg.content)) continue;
+    for (const c of msg.content) {
+      if (c.type === "tool_use") tools.push(c);
+    }
+  }
+  return tools;
+}
+
 function toolUseTargetsDocs(toolUse) {
   // Edit/Write/MultiEdit on a file under docs/**.
   if (!/^(Edit|Write|MultiEdit)$/.test(toolUse.name || "")) return false;
@@ -195,7 +214,13 @@ process.stdin.on("end", () => {
     const tools = lastAssistantToolUses(entries);
 
     if (state.awaiting === "fixing") {
-      const landed = tools.some(toolUseIsCodeWrite);
+      // Scan ALL assistant tool_uses since the state was set, not just the
+      // current turn's. Fixes the 2026-05-22 deadlock where the user followed
+      // up with a question after the fix had already landed in the prior
+      // turn, the current turn had no code-write, and the hook re-blocked.
+      const sinceTs = state.started_at ? Date.parse(state.started_at) : 0;
+      const windowTools = allAssistantToolUses(entries, sinceTs);
+      const landed = tools.some(toolUseIsCodeWrite) || windowTools.some(toolUseIsCodeWrite);
       if (landed) {
         const next = {
           ...state,
@@ -252,7 +277,11 @@ process.stdin.on("end", () => {
     }
 
     if (state.awaiting === "documenting") {
-      const landed = tools.some(toolUseTargetsDocs);
+      // Same fix as the fixing branch: scan tool_uses across the window
+      // since state was set, not just the current turn.
+      const sinceTs = state.started_at ? Date.parse(state.started_at) : 0;
+      const windowTools = allAssistantToolUses(entries, sinceTs);
+      const landed = tools.some(toolUseTargetsDocs) || windowTools.some(toolUseTargetsDocs);
       if (landed) {
         const priorMsg = state.prior_user_message || "(prior user message not captured)";
         const ctx = [

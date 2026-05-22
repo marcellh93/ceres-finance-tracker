@@ -16,6 +16,9 @@
 
 const fs = require("fs");
 const path = require("path");
+const { stripDiscussionFrames, isMetaContext } = require(
+  path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), ".claude/hooks/lib/discussion-frame-strip.js")
+);
 
 // === Fix-mention phrase list (mirrors SKILL.md §6) ===
 //
@@ -209,6 +212,10 @@ function assistantHasEditTool(content) {
 }
 
 function matchedPhrases(text) {
+  return matchedPhrasesAgainst(text);
+}
+
+function matchedPhrasesAgainst(text) {
   const hits = [];
   for (const re of FIX_MENTION_PHRASES) {
     if (re.test(text)) hits.push(re.toString());
@@ -278,14 +285,24 @@ process.stdin.on("end", () => {
       process.exit(0);
     }
 
-    // === Phrase match ===
-    const hits = matchedPhrases(lastAssistant.text);
+    // === Meta-context short-circuit (2026-05-22) ===
+    // If the message is discussing a hook (audit-trail explanation, recovery
+    // instructions, "false positive" framing), it cannot be a real fix
+    // commitment regardless of what phrases it contains.
+    if (isMetaContext(lastAssistant.text)) process.exit(0);
+
+    // === Phrase match on stripped text ===
+    // Strip code blocks, blockquotes, stage headings, JSON tool-use payloads
+    // before matching. The matchedPhrases helper runs against this sanitized
+    // version so quoted text doesn't count.
+    const scanText = stripDiscussionFrames(lastAssistant.text);
+    const hits = matchedPhrasesAgainst(scanText);
     if (hits.length === 0) process.exit(0);
 
     // === Discussion-mode guard (2026-05-21) ===
     // If the message is brainstorming options or weighing trade-offs, the
     // matched phrase is exploration, not commitment.
-    if (DISCUSSION_MARKERS.some((re) => re.test(lastAssistant.text))) {
+    if (DISCUSSION_MARKERS.some((re) => re.test(scanText))) {
       process.exit(0);
     }
 

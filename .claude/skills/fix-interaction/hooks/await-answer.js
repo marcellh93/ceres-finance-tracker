@@ -22,8 +22,14 @@ const path = require("path");
 const STATE_DIR_NAME = path.join("state", "fix-interaction");
 const TTL_HOURS = 24;
 
-const ENGAGE_FIX = /\b(fix|do it|now|go ahead|yes do|proceed|right now)\b/i;
-const ENGAGE_DOCUMENT = /\b(document|doc it|doc that|log it|queue it|open a line|track it|file it|note it)\b/i;
+// Engagement matchers — require multi-word phrases that are unambiguously
+// "fix it now" / "document this" engagement. Bare "now" or "yes" or "go" no
+// longer counts: those words occur constantly in normal conversation
+// ("now I'll explain", "yes that's right but...", "go on") and would
+// false-transition the state machine. Pattern C in the 2026-05-22 hook
+// architecture audit.
+const ENGAGE_FIX = /\b(fix (it|that|this|the bug)( now)?|do (it|that) now|go ahead (and fix|with the fix)|yes,? (fix|do it|please fix|let'?s fix)|proceed with the fix|right now,? fix)\b/i;
+const ENGAGE_DOCUMENT = /\b(document (it|this|that|the bug)|doc it|doc that|log it|queue it|open a line|track it|file it|note it|add (a|the) (\[ \]|checkbox) line)\b/i;
 const ENGAGE_WHERE = /\b(stage|roadmap|planning|spec|adr|docs?\/|under|in)\b/i;
 const TOPIC_SHIFT = /\b(actually|let'?s (talk|move|do|switch)|move on|different question|forget that|nevermind|drop it|skip that|something else|new topic|change of subject)\b/i;
 

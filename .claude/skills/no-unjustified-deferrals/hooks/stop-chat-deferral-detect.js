@@ -43,6 +43,9 @@
 
 const fs = require("fs");
 const path = require("path");
+const { stripDiscussionFrames, isMetaContext } = require(
+  path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), ".claude/hooks/lib/discussion-frame-strip.js")
+);
 
 // TIGHT regex list — only phrases that are almost-always deferral intent
 // in chat output. Pairs each potentially-ambiguous verb with a temporal
@@ -185,7 +188,17 @@ process.stdin.on("end", () => {
 
   if (!lastAssistantText) process.exit(0);
 
-  const matched = PHRASES.filter((re) => re.test(lastAssistantText)).map((re) => re.toString());
+  // Short-circuit: meta-context discussion is not a real deferral. Exit
+  // silently so the audit trail isn't polluted with near-fire events that
+  // could anchor the next turn into another false positive.
+  if (isMetaContext(lastAssistantText)) process.exit(0);
+
+  // Strip code blocks, blockquotes, stage headings, JSON tool-use payloads
+  // before matching. Phrases inside quoted recovery text or echoed prior
+  // deny reasons are not assertions.
+  const scanText = stripDiscussionFrames(lastAssistantText);
+
+  const matched = PHRASES.filter((re) => re.test(scanText)).map((re) => re.toString());
   if (matched.length === 0) process.exit(0);
 
   // Apply the three guards.
