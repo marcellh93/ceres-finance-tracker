@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { notifyUnauthenticatedIfApplicable } from './api-client';
 
 type State<T> = {
   data: T | undefined;
@@ -41,6 +42,14 @@ export function useApi<T>(url: string): UseApiResult<T> {
     fetch(url, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) {
+          // Silently-expired-session signal — same path apiFetch uses. The
+          // dashboard's data fetches go through this hook (not apiFetch), so
+          // without this dispatch the AuthContext never learns that a 401
+          // happened mid-session and RequireAuth stays cached as 'authed'
+          // until a hard reload.
+          if (response.status === 401) {
+            notifyUnauthenticatedIfApplicable(url);
+          }
           throw new Error(`HTTP ${response.status}`);
         }
         const data = (await response.json()) as T;

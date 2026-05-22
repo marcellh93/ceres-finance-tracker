@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { useApi } from '@/app/lib/use-api'
 
 interface CategoryBudgetItem {
   id: string
@@ -19,15 +19,8 @@ function statusVariant(pct: number): 'default' | 'secondary' | 'destructive' {
 }
 
 export function CategoryBudgetBars() {
-  const [items, setItems] = useState<CategoryBudgetItem[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetch('/api/dashboard/category-budgets')
-      .then(r => r.json())
-      .then(data => { setItems(data); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data, loading } = useApi<CategoryBudgetItem[]>('/api/dashboard/category-budgets')
+  const items = data ?? []
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading budgets…</p>
   if (items.length === 0) return <p className="text-sm text-muted-foreground">No active category budgets.</p>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { Progress } from '@/components/ui/progress'
+import { useApi } from '@/app/lib/use-api'
 
 interface GoalBudgetItem {
   id: string
@@ -13,15 +13,8 @@ interface GoalBudgetItem {
 }
 
 export function GoalBudgetBars() {
-  const [items, setItems] = useState<GoalBudgetItem[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetch('/api/dashboard/goal-budgets')
-      .then(r => r.json())
-      .then(data => { setItems(data); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data, loading } = useApi<GoalBudgetItem[]>('/api/dashboard/goal-budgets')
+  const items = data ?? []
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading goals…</p>
   if (items.length === 0) return <p className="text-sm text-muted-foreground">No active goal budgets.</p>

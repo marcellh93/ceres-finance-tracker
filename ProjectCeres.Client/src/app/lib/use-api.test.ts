@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useApi } from './use-api';
+import { setOnUnauthenticated } from './api-client';
 
 describe('useApi', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -69,6 +70,46 @@ describe('useApi', () => {
     result.current.refetch();
     await waitFor(() => expect(result.current.data).toEqual({ x: 2 }));
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  describe('silent-401 dispatch (mirrors apiFetch behaviour)', () => {
+    afterEach(() => setOnUnauthenticated(null));
+
+    it('fires the unauthenticated handler when a non-auth-probe URL returns 401', async () => {
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+      fetchSpy.mockResolvedValue(new Response(null, { status: 401 }));
+
+      const { result } = renderHook(() => useApi<{ x: number }>('/api/dashboard/summary'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      // Existing error contract still holds — the hook still reports the error
+      // to its caller so per-component error states keep working.
+      expect(result.current.error).toBeInstanceOf(Error);
+    });
+
+    it('does NOT fire the handler when /api/auth/me returns 401 (auth-probe exemption)', async () => {
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+      fetchSpy.mockResolvedValue(new Response(null, { status: 401 }));
+
+      const { result } = renderHook(() => useApi<{ x: number }>('/api/auth/me'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('does NOT fire the handler on non-401 errors (500, network failure)', async () => {
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+      fetchSpy.mockResolvedValue(new Response('boom', { status: 500 }));
+
+      const { result } = renderHook(() => useApi<{ x: number }>('/api/dashboard/summary'));
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
   });
 
   it('does not call setState after unmount', async () => {

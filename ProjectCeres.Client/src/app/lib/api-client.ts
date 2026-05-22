@@ -27,6 +27,21 @@ export function setOnUnauthenticated(handler: UnauthenticatedHandler | null): vo
   unauthenticatedHandler = handler;
 }
 
+/**
+ * Dispatch the silently-expired-session signal for a 401 response IF the URL
+ * is not an auth-probe and a handler is registered. Public so callers that
+ * don't go through apiFetch (notably useApi, which uses raw fetch for GET
+ * data-fetching) can opt into the same auth-context notification.
+ *
+ * Safe to call unconditionally on any 401: the function short-circuits on
+ * auth-probe URLs and when no handler is registered.
+ */
+export function notifyUnauthenticatedIfApplicable(url: string): void {
+  if (unauthenticatedHandler === null) return;
+  if (AUTH_PROBE_URLS.some((probe) => url === probe || url.startsWith(`${probe}?`))) return;
+  unauthenticatedHandler();
+}
+
 export class NetworkError extends Error {
   cause?: unknown;
   constructor(message: string, cause?: unknown) {
@@ -163,13 +178,8 @@ export async function apiFetch<T = unknown>(
   // an auth-probe URL) means the cookie the browser sent was no longer valid.
   // Notify the auth context so it can flip status to 'anon'; the matching
   // RequireAuth render on the next route change will redirect to /login.
-  if (
-    response.status === 401 &&
-    code !== 'REAUTH_REQUIRED' &&
-    unauthenticatedHandler !== null &&
-    !AUTH_PROBE_URLS.some((probe) => url === probe || url.startsWith(`${probe}?`))
-  ) {
-    unauthenticatedHandler();
+  if (response.status === 401 && code !== 'REAUTH_REQUIRED') {
+    notifyUnauthenticatedIfApplicable(url);
   }
 
   if (response.status === 422 && envelope) {
