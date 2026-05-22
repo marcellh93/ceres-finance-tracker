@@ -87,6 +87,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<EmailConfirmationToken> EmailConfirmationTokens => Set<EmailConfirmationToken>();
     public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
     public DbSet<LockoutUnlockToken> LockoutUnlockTokens => Set<LockoutUnlockToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -101,6 +102,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureSessionEntities(modelBuilder);
         ConfigureMfaEntities(modelBuilder);
         ConfigurePasswordResetEntities(modelBuilder);
+        ConfigureEmailConfirmationEntities(modelBuilder);
         ConfigureEmailChangeEntities(modelBuilder);
         ConfigureLockoutUnlockEntities(modelBuilder);
         ConfigureAuditLogEntities(modelBuilder);
@@ -167,6 +169,19 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     private static void ConfigurePasswordResetEntities(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PasswordResetToken>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.UserId, e.ConsumedAt });
+            b.HasIndex(e => e.ExpiresAt);
+            b.HasIndex(e => e.TokenLookup).IsUnique();
+            b.Property(e => e.TokenLookup).HasMaxLength(32);
+            b.Property(e => e.TokenHash).HasMaxLength(512);
+        });
+    }
+
+    private static void ConfigureEmailConfirmationEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EmailConfirmationToken>(b =>
         {
             b.HasKey(e => e.Id);
             b.HasIndex(e => new { e.UserId, e.ConsumedAt });
