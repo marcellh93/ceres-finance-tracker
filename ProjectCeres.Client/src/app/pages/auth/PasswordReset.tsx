@@ -15,15 +15,7 @@ import {
 } from '../../auth/schemas/password-reset.schema';
 import { apiFetch } from '../../lib/api-client';
 import { getCachedXsrfRequestToken, setCachedXsrfRequestToken } from '../../auth/csrf';
-
-function readTokenFromHash(hash: string): string | null {
-  // Hash format: "#token=<raw>". URLSearchParams accepts the body after the '#'.
-  const stripped = hash.startsWith('#') ? hash.slice(1) : hash;
-  if (!stripped) return null;
-  const params = new URLSearchParams(stripped);
-  const token = params.get('token');
-  return token && token.length > 0 ? token : null;
-}
+import { readTokenFromHash } from '../../lib/url-hash-token';
 
 type ConfirmOutcome =
   | { kind: 'ok' }

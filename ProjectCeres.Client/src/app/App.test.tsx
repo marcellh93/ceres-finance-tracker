@@ -45,7 +45,8 @@ function renderApp(path: string) {
 const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/login',          expectedHeading: 'Sign in' },
   { path: '/password-reset', expectedHeading: 'Reset your password' },
-  { path: '/register',       expectedHeading: 'Account creation is coming soon' },
+  { path: '/register',       expectedHeading: 'Create your account' },
+  { path: '/email-verify',   expectedHeading: 'This verification link is invalid' },
   { path: '/',             expectedHeading: 'Dashboard' },
   { path: '/movements',    expectedHeading: 'Movements' },
   { path: '/review',       expectedHeading: 'Review' },

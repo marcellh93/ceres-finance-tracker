@@ -24,6 +24,7 @@ export function Login() {
   const [serverError, setServerError] = useState<ServerErrorState>({ kind: 'none' });
   const [resending, setResending] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
+  const [resendSucceeded, setResendSucceeded] = useState(false);
 
   useEffect(() => {
     // Sonner's id-based dedup: passing the same id twice collapses to one
@@ -39,15 +40,16 @@ export function Login() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '', rememberMe: false },
+  });
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
-  } = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '', rememberMe: false },
-  });
+  } = form;
 
   const onSubmit = async (values: LoginFormValues) => {
     setServerError({ kind: 'none' });
@@ -117,17 +119,25 @@ export function Login() {
   const onResendVerification = async () => {
     setResending(true);
     setResendError(null);
+    setResendSucceeded(false);
     try {
-      // Resend endpoint ships in Phase 2 (commit 9); this is a placeholder
-      // call that will succeed once that endpoint exists. The button itself
-      // should ship now so the EMAIL_NOT_CONFIRMED UX is complete the
-      // moment Phase 2 lands.
-      const result = await apiFetch('/api/auth/email/verify/resend', { method: 'POST', body: {} });
-      if (!result.ok) {
-        // Phase-1 placeholder: the endpoint doesn't exist until Phase 2, so result.ok is always false.
-        // Generic message keeps the user informed without revealing endpoint shape.
-        setResendError(t('auth.login.errors.resendFailed'));
+      const email = form.getValues('email');
+      const result = await apiFetch('/api/auth/email/verify/resend', {
+        method: 'POST',
+        body: { email },
+      });
+      if (result.ok) {
+        // Server returns 204 regardless of whether the email exists or is
+        // already confirmed (anti-enumeration). UX matches the EmailVerify
+        // page's resend acknowledgement copy.
+        setResendSucceeded(true);
+        return;
       }
+      if (result.status === 429) {
+        setResendError(t('auth.login.errors.resendTooMany'));
+        return;
+      }
+      setResendError(t('auth.login.errors.resendFailed'));
     } catch {
       setResendError(t('auth.login.errors.resendFailed'));
     } finally {
@@ -160,15 +170,21 @@ export function Login() {
 
       {serverError.kind === 'emailNotConfirmed' && (
         <div className="text-sm" role="status">
-          <Button
-            type="button"
-            variant="link"
-            onClick={onResendVerification}
-            disabled={resending}
-            className="px-0"
-          >
-            {t('auth.login.resendVerification')}
-          </Button>
+          {resendSucceeded ? (
+            <p className="text-muted-foreground" aria-live="polite">
+              {t('auth.login.resendSuccess')}
+            </p>
+          ) : (
+            <Button
+              type="button"
+              variant="link"
+              onClick={onResendVerification}
+              disabled={resending}
+              className="px-0"
+            >
+              {t('auth.login.resendVerification')}
+            </Button>
+          )}
           {resendError && (
             <p className="text-xs text-destructive" role="alert">{resendError}</p>
           )}
