@@ -114,7 +114,7 @@ public class LockoutUnlockService
             sem.Release();
         }
 
-        var unlockUrl = $"{unlockUrlBase.TrimEnd('/')}/app/lockout-unlock#token={rawToken}";
+        var unlockUrl = $"{unlockUrlBase.TrimEnd('/')}/account/unlock#token={rawToken}";
 
         try
         {

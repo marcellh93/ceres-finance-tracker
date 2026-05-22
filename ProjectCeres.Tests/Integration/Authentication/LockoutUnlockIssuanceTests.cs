@@ -90,7 +90,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         var unlockEmails = captured.Where(m => m.To.Address == email).ToList();
         unlockEmails.Should().ContainSingle();
         unlockEmails[0].Subject.Should().Contain("locked");
-        unlockEmails[0].BodyText.Should().Contain("#token=");
+        unlockEmails[0].BodyText.Should().Contain("/account/unlock#token=");
     }
 
     [Fact]
