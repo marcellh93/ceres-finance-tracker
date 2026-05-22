@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { apiFetch } from '../lib/api-client';
+import { apiFetch, setOnUnauthenticated } from '../lib/api-client';
 import { setCachedXsrfRequestToken } from './csrf';
 
 export type AuthUser = {
@@ -62,6 +62,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Subscribe to silently-expired-session signals from apiFetch. When any
+  // non-REAUTH_REQUIRED 401 comes back from a non-auth-probe URL (dashboard
+  // chart fetch, movements list, etc.), drop to 'anon' so RequireAuth
+  // redirects on the next render. Separate effect from the refresh() mount —
+  // independent dependency, independent lifecycle.
+  useEffect(() => {
+    setOnUnauthenticated(() => {
+      setUser(null);
+      setStatus('anon');
+      setCachedXsrfRequestToken(null);
+    });
+    return () => setOnUnauthenticated(null);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ status, user, refresh, logout }}>

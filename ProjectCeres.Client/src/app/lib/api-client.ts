@@ -7,6 +7,26 @@ export class ReauthRequiredError extends Error {
   }
 }
 
+// Global subscription seam for "the session expired silently between requests".
+// AuthProvider registers a callback at mount; any non-REAUTH_REQUIRED 401 from
+// apiFetch invokes it so AuthContext can drop to 'anon' and RequireAuth can
+// redirect on the next render. Without this, a session that expires while the
+// user is on a page survives a client-side route change (RequireAuth only
+// re-reads the cached status from context) — the user only gets bounced when
+// /api/auth/me is re-called, which happens on full page reload but not on
+// React Router navigation.
+//
+// /api/auth/me and /api/auth/csrf are exempt: the first IS the auth probe
+// (its 401 is the normal anon path AuthProvider already handles), the second
+// is the CSRF bootstrap and its 401 doesn't carry session-expiry semantics.
+type UnauthenticatedHandler = () => void;
+let unauthenticatedHandler: UnauthenticatedHandler | null = null;
+const AUTH_PROBE_URLS = ['/api/auth/me', '/api/auth/csrf'];
+
+export function setOnUnauthenticated(handler: UnauthenticatedHandler | null): void {
+  unauthenticatedHandler = handler;
+}
+
 export class NetworkError extends Error {
   cause?: unknown;
   constructor(message: string, cause?: unknown) {
@@ -137,6 +157,19 @@ export async function apiFetch<T = unknown>(
 
   if (response.status === 401 && code === 'REAUTH_REQUIRED') {
     throw new ReauthRequiredError(message);
+  }
+
+  // Silently-expired-session signal — any plain 401 (not the re-auth gate, not
+  // an auth-probe URL) means the cookie the browser sent was no longer valid.
+  // Notify the auth context so it can flip status to 'anon'; the matching
+  // RequireAuth render on the next route change will redirect to /login.
+  if (
+    response.status === 401 &&
+    code !== 'REAUTH_REQUIRED' &&
+    unauthenticatedHandler !== null &&
+    !AUTH_PROBE_URLS.some((probe) => url === probe || url.startsWith(`${probe}?`))
+  ) {
+    unauthenticatedHandler();
   }
 
   if (response.status === 422 && envelope) {

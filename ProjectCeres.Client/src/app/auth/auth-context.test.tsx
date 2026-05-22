@@ -134,6 +134,70 @@ describe('AuthProvider', () => {
     expect(getCachedXsrfRequestToken()).toBeNull();
   });
 
+  it('drops to anon when a non-auth-probe API call returns 401 mid-session (silent session expiry)', async () => {
+    // Mount authed, then simulate a dashboard fetch returning 401 because
+    // the server-side session expired silently between requests. The auth
+    // context should transition to 'anon' so RequireAuth redirects on the
+    // next navigation.
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/me')) return AUTHED_ME_RESPONSE.clone();
+      if (url.includes('/api/dashboard/summary')) {
+        return new Response(
+          JSON.stringify({
+            error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' },
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    function ExpiredFetchProbe() {
+      const auth = useAuth();
+      return (
+        <button
+          onClick={async () => {
+            // Import inline to avoid a top-of-file cycle with api-client.
+            const { apiFetch } = await import('../lib/api-client');
+            await apiFetch('/api/dashboard/summary');
+          }}
+        >
+          {auth.status === 'authed' ? 'fetch' : 'anon'}
+        </button>
+      );
+    }
+    render(
+      <AuthProvider>
+        <StatusProbe />
+        <ExpiredFetchProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authed'));
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'fetch' }));
+
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anon'));
+  });
+
+  it('does NOT drop to anon when /api/auth/me itself returns 401 (handled by refresh, not the silent-expiry seam)', async () => {
+    // Belt-and-suspenders: the silent-expiry seam exempts /api/auth/me so it
+    // doesn't double-fire alongside refresh()'s own anon transition. This
+    // test verifies the existing transition still works through the original
+    // path (refresh sees the 401, sets anon) without help from the seam.
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    render(
+      <AuthProvider>
+        <StatusProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anon'));
+  });
+
   it('logout() still clears local state even when server returns 401 (server already lost the session)', async () => {
     fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
