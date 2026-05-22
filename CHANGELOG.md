@@ -6,6 +6,30 @@
 
 #### Added
 
+**Authentication (Stage 9.3 — `/register` + email-verify, 2026-05-22)**
+- New `EmailConfirmationToken` entity + EF migration `AddEmailConfirmationTokens` — mirrors `PasswordResetToken` shape minus `MfaVerifiedAt`. Uses the TokenLookup HMAC-SHA256 indexed-lookup pattern (Stage 6.15 / 9.1.5.a) for O(1) verify, 30-min expiry, single-use
+- New `EmailConfirmationService` with `IssueAsync` / `RequestResendAsync` / `ConfirmAsync` mirroring `PasswordResetService` line-for-line — per-user `SemaphoreSlim`, per-email `MemoryCache` rate gate (5/hour), `PreAuthUserScope` wrapping for RLS-correct writes, Argon2id constant-time mirroring on every anti-enum branch
+- New `EmailVerificationController` exposing `POST /api/auth/email/verify` (consume) and `POST /api/auth/email/verify/resend` (anti-enumerating: 204 whether the email is unknown, known-confirmed, or known-unconfirmed)
+- `AuthController.Register` rewired with three-branch anti-enumeration shape: fresh-create issues a verification token (AFTER `tx.CommitAsync` so send-failures don't roll back user creation); duplicate-unconfirmed re-issues for the existing user (legitimate owner gets a fresh link); duplicate-confirmed runs `_argon.RunDummyHash()` for timing parity (no token, no email)
+- `AuthController.Login` gains an `IsNotAllowed` branch returning `401 EMAIL_NOT_CONFIRMED` — previously this case fell through to `INVALID_CREDENTIALS`, leaving `Login.tsx:92`'s `emailNotConfirmed` state path as dead code. The legitimate user now gets a clear "verify your email" message + a wired Resend Verification button
+- New `EmailTemplateKey.RegistrationConfirmation` + EN/ES resx entries (`Subject`, `BodyText`, `BodyHtml`)
+- New `AuditLogAction` values `EmailVerificationRequested` (on `IssueAsync`) + `EmailVerified` (on successful confirm)
+- New `FailedLoginReason.EmailNotConfirmed` enum value; records the surface for failed-login dashboard
+- New SPA route `/register` replacing the placeholder — react-hook-form + zod + `<Field>` recipe + `<Button>` shadcn primitive; on 204 replaces the form with a "Check your inbox" success block referencing the typed email; 422 maps server validation details to react-hook-form field errors; deletes `RegisterPlaceholder.tsx`
+- New SPA route `/email-verify` consuming `#token=<raw>` from URL fragment — three render states (verifying / success / invalid); invalid state offers an inline resend form (email input + submit) that posts `{email}` to `/api/auth/email/verify/resend` and renders an anti-enum acknowledgement on 204
+- `readTokenFromHash` extracted from `PasswordReset.tsx` into `src/app/lib/url-hash-token.ts` — third caller (AccountUnlock + EmailVerify + PasswordReset) crosses the extraction threshold
+- `Login.tsx`'s `onResendVerification` placeholder wired for real: reads email via `form.getValues('email')`, POSTs `{email}` to `/api/auth/email/verify/resend`, surfaces 429 / network / success states with distinct i18n keys
+- 14 integration tests pin the contract (`EmailConfirmationTests.cs`); 5 vitest tests pin `Register.test.tsx`; 5 vitest tests pin `EmailVerify.test.tsx`
+- Spec: `docs/superpowers/specs/2026-05-18-stage-9-3-register-and-email-verify-design.md` (revised 2026-05-22); plan: `docs/superpowers/plans/2026-05-22-stage-9-3-register-and-email-verify-impl.md`
+
+**Authentication (Stage 9.5 — `/account/unlock` SPA page, 2026-05-22)**
+- New SPA route `/account/unlock` consuming `#token=<raw>` from URL fragment — button-press confirmation (NOT auto-confirm on mount) defends against email link-prefetchers (Microsoft Defender Safe Links, Gmail safe-link scanners). One extra click is cheaper than a burned single-use token + a user re-requesting an email
+- Three render states: idle (Unlock button), invalid (error block + back-to-sign-in), network (retry-able error). On 204 navigates to `/login?unlocked=1` + sonner toast via `Login.tsx`'s `useEffect`
+- `LockoutUnlockService.cs:117` URL substring flipped from `/app/lockout-unlock` to `/account/unlock` so the email link lands on the actual SPA route (the Login.tsx redirect from `ACCOUNT_LOCKED_OUT` and the roadmap line both already pointed at `/account/unlock`)
+- New i18n namespace `auth.accountUnlock.{title, description, submit, submitting, backToSignIn, invalidTitle, invalidBody, toastSucceeded, errors.{network, retry}}` in EN + ES
+- 6 vitest tests pin `AccountUnlock.test.tsx`; 1 added vitest test pins the `?unlocked=1` toast in `Login.test.tsx`; 1 updated integration test in `LockoutUnlockIssuanceTests.cs` (URL substring assertion)
+- Spec: `docs/superpowers/specs/2026-05-22-stage-9-5-lockout-self-service-unlock-design.md`; plan: `docs/superpowers/plans/2026-05-22-stage-9-5-lockout-self-service-unlock-impl.md`
+
 **Authentication (Stage 9.7 — backup-code dashboard banner, 2026-05-21)**
 - New `BackupCodeLoginBanner` component rendered as the first child of the dashboard surface when the signed-in user has MFA enabled and `backupCodesRemaining ≤ 7`. CTA shifts copy based on how the user last authenticated: "Re-enrol authenticator" if the most recent login consumed a backup code; "Regenerate backup codes" if the user has since logged in normally but is still low on codes. Per-pageview dismiss via a small `X` button (React-local state, no persistence) — the banner reappears on reload while the conditions still apply
 - `UserSession.UsedBackupCodeAtLogin` (nullable bool, defaults false) records which second-factor branch authenticated each active session. Written in `AuthController.IssueSessionAndCookiesAsync` (now takes an explicit `usedBackupCode` parameter; password-only and TOTP-app callers pass `false`, backup-code branch passes `true`). `AuthController.Me` looks the value up by the current request's `sid` claim and exposes it on `MeResponse.UsedBackupCodeAtLastLogin` — multi-device-correct, because each session row is independent
@@ -138,6 +162,15 @@
 - `Settings.BudgetPeriodStartDay` (1–31, default 1) — all category-budget actual-spend math respects the configured cycle. Configurable via the existing Razor Settings page (the SPA Settings page migration is a follow-up)
 - 16 typed API endpoints under `/api/category-budgets`, `/api/goal-budgets`, `/api/budgets`, and `/api/currencies` (see `docs/api-contract.md`)
 - Movement form gains a conditional Spending-Goal picker so transactions can be tagged toward Spending goals — visible only when ≥1 active matching goal exists in the transaction's currency
+
+#### Fixed
+
+**Authentication (Stage 9.3 — Register duplicate-unconfirmed RLS-nested-tx, 2026-05-22)**
+- `AuthController.Register`'s duplicate-unconfirmed branch was calling `EmailConfirmationService.IssueAsync` inside the outer plain transaction (which had no `app.current_user_ref` GUC set). `IssueAsync`'s `BeginPreAuthUserScopeAsync` then tripped `PreAuthRlsScope`'s nested-tx mismatch guard and threw `InvalidOperationException` → 500. Fix: capture existing-user state inside the outer tx, commit the outer tx first, then call `IssueAsync` outside it (matches the fresh-create branch's ordering). Caught by `EmailConfirmationTests.Re_register_same_unconfirmed_email_after_expiry_issues_new_token_for_existing_user`
+
+**Authentication (Stage 9.5 — Lockout email copy, 2026-05-22)**
+- `LockoutUnlock.BodyText` / `BodyHtml` (EN + ES) updated to tell the user "valid authenticator codes are still accepted during lockout" per `security-model.md § Login`. Previously silent — MFA-enabled users believed they had to wait the full 15 minutes
+- Same copy update corrects a longstanding bug: the body said "within 1 hour" / "próxima hora" but the actual token lifetime is 15 minutes (Stage 6.10 D2). Both EN + ES now name the 15-min expiry
 
 #### Changed
 
