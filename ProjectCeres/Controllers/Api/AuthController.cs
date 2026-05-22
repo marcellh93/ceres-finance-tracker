@@ -103,20 +103,29 @@ public sealed class AuthController : ControllerBase
                 e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
             if (isDuplicateOnly && result.Errors.Any())
             {
+                // Capture existing-user state inside the outer tx, then commit, then issue.
+                // IssueAsync opens its own PreAuthUserScope; calling it while the outer tx
+                // is still open trips PreAuthRlsScope's nested-tx mismatch guard (the outer
+                // empty tx has no app.current_user_ref GUC set).
                 var existing = await _userManager.FindByEmailAsync(request.Email);
+                var existingId = existing?.Id;
+                var existingEmail = existing?.Email;
+                var existingConfirmed = existing?.EmailConfirmed ?? false;
+
+                await tx.CommitAsync(HttpContext.RequestAborted);
+
                 if (existing is not null)
                 {
-                    if (existing.EmailConfirmed)
+                    if (existingConfirmed)
                     {
                         _argon.RunDummyHash();
                     }
                     else
                     {
                         await _emailConfirmation.IssueAsync(
-                            existing.Id, existing.Email!, verifyUrlBase, HttpContext.RequestAborted);
+                            existingId!.Value, existingEmail!, verifyUrlBase, HttpContext.RequestAborted);
                     }
                 }
-                await tx.CommitAsync(HttpContext.RequestAborted);
                 return NoContent();
             }
 
