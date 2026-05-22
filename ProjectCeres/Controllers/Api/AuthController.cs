@@ -39,6 +39,7 @@ public sealed class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly Services.CategorySeedService _categorySeedService;
     private readonly LockoutCache _lockoutCache;
+    private readonly EmailConfirmationService _emailConfirmation;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -52,7 +53,8 @@ public sealed class AuthController : ControllerBase
         LockoutUnlockService lockoutUnlock,
         ILogger<AuthController> logger,
         Services.CategorySeedService categorySeedService,
-        LockoutCache lockoutCache)
+        LockoutCache lockoutCache,
+        EmailConfirmationService emailConfirmation)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -66,6 +68,7 @@ public sealed class AuthController : ControllerBase
         _logger = logger;
         _categorySeedService = categorySeedService;
         _lockoutCache = lockoutCache;
+        _emailConfirmation = emailConfirmation;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -87,17 +90,35 @@ public sealed class AuthController : ControllerBase
 
         var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
         var result = await _userManager.CreateAsync(user, request.Password);
+
+        var verifyUrlBase = $"{Request.Scheme}://{Request.Host}";
+
         if (!result.Succeeded)
         {
-            // Stage 6b.3 Gap 6: don't leak account existence. If the failure is purely the
-            // duplicate-username case, return 204 same as a fresh registration. All other
-            // failure classes (short password, breached, malformed) still return 422.
-            // Stage 6c follow-up: send "someone tried to register with your email" notice
-            // on the duplicate path once email-send ships.
+            // Stage 9.3: three-branch anti-enumeration on duplicate-email paths.
+            //  - Confirmed-existing user → dummy Argon2id to mirror IssueAsync cost.
+            //  - Unconfirmed-existing user → issue a fresh token (same code path as fresh-create).
+            //  - All other Create failures (short password, breached, malformed) → 422.
             var isDuplicateOnly = result.Errors.All(e =>
                 e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
             if (isDuplicateOnly && result.Errors.Any())
+            {
+                var existing = await _userManager.FindByEmailAsync(request.Email);
+                if (existing is not null)
+                {
+                    if (existing.EmailConfirmed)
+                    {
+                        _argon.RunDummyHash();
+                    }
+                    else
+                    {
+                        await _emailConfirmation.IssueAsync(
+                            existing.Id, existing.Email!, verifyUrlBase, HttpContext.RequestAborted);
+                    }
+                }
+                await tx.CommitAsync(HttpContext.RequestAborted);
                 return NoContent();
+            }
 
             foreach (var error in result.Errors)
             {
@@ -109,6 +130,12 @@ public sealed class AuthController : ControllerBase
         await _categorySeedService.CopyDefaultsForUserAsync(user.Id, HttpContext.RequestAborted);
         await _auditLog.RecordAsync(user.Id, AuditLogAction.Registered, ct: HttpContext.RequestAborted);
         await tx.CommitAsync(HttpContext.RequestAborted);
+
+        // Issue email-verification token AFTER the tx commits so a send failure
+        // does not roll back user creation. Send failures are swallowed inside
+        // IssueAsync per the PasswordResetService.RequestAsync pattern.
+        await _emailConfirmation.IssueAsync(user.Id, user.Email!, verifyUrlBase, HttpContext.RequestAborted);
+
         return NoContent();
     }
 
@@ -188,6 +215,19 @@ public sealed class AuthController : ControllerBase
                     Expires = DateTimeOffset.UtcNow.AddMinutes(10),
                 });
             return Ok(new { requiresTotp = true });
+        }
+
+        if (signIn.IsNotAllowed)
+        {
+            // Stage 9.3: SignInManager flags IsNotAllowed when EmailConfirmed=false
+            // (Identity's RequireConfirmedAccount). Surface a distinct code so the
+            // SPA can render the "verify your email" CTA + resend link.
+            HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(
+                request.Email, userStub.Id, FailedLoginReason.EmailNotConfirmed, ip, ua, HttpContext.RequestAborted);
+            return UnauthorizedEnvelope("EMAIL_NOT_CONFIRMED",
+                "Verify your email before signing in. Check your inbox or request a new link.");
         }
 
         if (signIn.IsLockedOut)

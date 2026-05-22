@@ -19,4 +19,5 @@ public enum FailedLoginReason
     LockedOut,
     UnknownUser,
     PasswordResetUnknownEmail,
+    EmailNotConfirmed,
 }
