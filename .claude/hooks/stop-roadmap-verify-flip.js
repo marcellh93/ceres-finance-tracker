@@ -18,6 +18,15 @@
 //     this turn. That's the moment to check the roadmap — committing is a
 //     definite assistant action, never a brainstorm-Q&A side effect.
 //
+// Scope (2026-05-22 rewrite): touched stages are now derived from the actual
+// roadmap diff, not from commit-message subject parsing. Two sources:
+//   1. Structured close-out markers `<!-- closes: stage-N -->` in the diff
+//      (highest authority — explicit declaration).
+//   2. Stage headings whose section had any line changed.
+// If the commit did not change the roadmap at all, NOTHING closed and the
+// hook exits silently. This replaces the commit-subject regex which was
+// silently bypassed 8 times across 3 sessions per the 2026-05-22 hook audit.
+//
 // Behavior:
 //   1. Read current git HEAD SHA.
 //   2. Read stored SHA from .claude/state/roadmap-verify-flip/last-checked-commit.txt
@@ -143,78 +152,89 @@ process.stdin.on("end", () => {
     process.exit(2);
   }
 
-  // Scope rule: only flag pending lines whose stage is referenced by ONE
-  // of the new commits this turn. This prevents noise from unrelated stages
-  // (e.g. Stage 12 always shows "Pending" until it ships months from now;
-  // a commit on Stage 9.1.5.h should not be blocked by Stage 12's status).
+  // Scope rule: derive touched stages from what the commit ACTUALLY changed in
+  // the roadmap, not from what its commit message says it changed. Two sources,
+  // in order of authority:
   //
-  // Stage IDs in commit messages look like `stage-9.1.5.h` (kebab) or
-  // `Stage 9.1.5.h` (titled). Extract the numeric path and stem-match.
+  //   1. Structured close-out markers `<!-- closes: stage-N -->` added to the
+  //      roadmap diff. If a commit's diff added this marker, it's an
+  //      explicit declaration of which stage closed. Highest authority.
+  //
+  //   2. Stage headings (`## Stage X`) whose body had any line modified in the
+  //      commit's diff. If a stage's section wasn't touched, it can't have
+  //      been closed.
+  //
+  // Commit-message subjects are no longer used to derive scope — they pulled in
+  // stages that were merely cross-referenced (2026-05-18 audit), and even
+  // after the strip-numeric-ancestor fix the user silently bypassed 8 times
+  // across 3 sessions, which is the loud signal that the heuristic still
+  // overfires. If the commit didn't change the roadmap at all, NOTHING closed
+  // and the hook exits silently.
   let touchedStages = new Set();
+  let roadmapTouched = false;
   try {
     const range = `${storedHead}..${currentHead}`;
-    // Read SUBJECT LINES only (--format=%s), not full bodies. Commit subjects
-    // name their primary stage; bodies frequently cross-reference other
-    // stages ("deferred to Stage 9.8", "follows Stage 6.4's pattern") which
-    // are NOT in scope of this commit and should not be flagged as pending.
-    //
-    // Origin: 2026-05-18. The 9.6 implementation commit's subject was
-    // `feat(stage-9.6): ...` but its body contained "Closes Stage 9
-    // sub-stage 9.6" and "deferred to Stage 9.8". The hook scanning bodies
-    // pulled in Stage 9 (parent, legitimately Pending) and Stage 9.8 (not
-    // touched, also legitimately Pending), then blocked the Stop with a
-    // false positive.
-    const subjects = execSync(`git log --format=%s ${range}`, {
-      cwd: projectDir,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    const stageRefs = subjects.match(/\b[Ss]tage[-\s]+(\d+(?:\.\d+)*[a-z]?)/g) || [];
-    for (const ref of stageRefs) {
-      const m = ref.match(/(\d+(?:\.\d+)*[a-z]?)/);
-      if (m) {
-        const id = m[1];
-        // Add the exact stage ID AND its immediate parent if the leaf is a
-        // letter suffix (sub-stage). E.g. "9.1.5.h" → also add "9.1.5"
-        // (the batch-stage that 9.1.5.h is a member of), but NOT "9" or
-        // "9.1" (those are separately-statused parents that 9.1.5.h does
-        // not own). This matches the project's convention where sub-stages
-        // a/b/c/.../i belong to a batch like 9.1.5, but 9.1 / 9.X / Stage 9
-        // are independent stages with their own ❌ Pending statuses.
-        touchedStages.add(id);
-        const letterStrip = id.match(/^(.+)\.[a-z]$/);
+    const roadmapRelForDiff = roadmapRel;
+    // Get the unified diff of the roadmap file across the commit range.
+    // -U0 — no context lines, only changed lines; cheaper to scan.
+    const diff = execSync(
+      `git diff -U0 ${range} -- ${roadmapRelForDiff}`,
+      {
+        cwd: projectDir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
+
+    if (!diff.trim()) {
+      // Roadmap not changed in this commit range — nothing closed.
+      // Update the stored SHA and exit clean.
+      try {
+        fs.mkdirSync(sessionsDir, { recursive: true });
+        fs.writeFileSync(stateFile, currentHead);
+      } catch {}
+      process.exit(0);
+    }
+
+    roadmapTouched = true;
+
+    // Source 1: structured close-out markers added by this commit.
+    // Format: `<!-- closes: stage-N -->` (e.g. `<!-- closes: stage-9.1.5 -->`,
+    // `<!-- closes: stage-9.1.5.h -->`).
+    const markerRe = /^\+.*<!--\s*closes:\s*stage-(\d+(?:\.\d+)*[a-z]?)\s*-->/gim;
+    let mm;
+    while ((mm = markerRe.exec(diff)) !== null) {
+      touchedStages.add(mm[1]);
+    }
+
+    // Source 2: stage headings whose section had any change. Walk the diff
+    // and accumulate the current `## Stage X` heading every changed line
+    // appeared under. The diff hunk headers (`@@ -... +... @@ ## Stage X`)
+    // also carry the heading for context — git emits the closest enclosing
+    // section header. Read those.
+    const hunkHeaderRe = /^@@[^@]*@@\s*##\s+Stage\s+(\S+)/gim;
+    let hh;
+    while ((hh = hunkHeaderRe.exec(diff)) !== null) {
+      const id = hh[1].match(/(\d+(?:\.\d+)*[a-z]?)/);
+      if (id) {
+        touchedStages.add(id[1]);
+        const letterStrip = id[1].match(/^(.+)\.[a-z]$/);
         if (letterStrip) touchedStages.add(letterStrip[1]);
       }
     }
 
-    // 2026-05-18 audit fix: subject lines that name BOTH a sub-stage AND its
-    // numeric parent (e.g. `docs(stage-9.10): ... sub-stage of Stage 9 ...`)
-    // pull "9" into touchedStages alongside "9.10". The Stage 9 status
-    // heading at line 944 then matches as `id === t` and the hook blocks the
-    // Stop even though the commit is about Stage 9.10.
-    //
-    // Strip a NUMERIC ancestor only if its descendant is ALSO purely numeric
-    // (e.g. 9.10 → strip 9). This preserves the letter-suffix-batch rule
-    // (9.1.5.h's parent 9.1.5 was added intentionally so the batch line
-    // matches; we must NOT strip it).
-    const idsBefore = Array.from(touchedStages);
-    for (const id of idsBefore) {
-      if (/[a-z]$/.test(id)) continue;          // letter-suffix child → its
-                                                 //   numeric ancestor was
-                                                 //   added intentionally
-      // Walk up: drop the last ".N" segment, delete any numeric-only ancestor
-      // from the set.
-      let parent = id;
-      while (true) {
-        const next = parent.replace(/\.\d+$/, "");
-        if (next === parent || next.length === 0) break;
-        parent = next;
-        if (touchedStages.has(parent)) touchedStages.delete(parent);
-      }
+    // Source 2 fallback: if the hunk-header parse missed (e.g. the change
+    // was right at the file head), scan the ADDED-LINES `## Stage X`
+    // headings directly. Less precise but a safety net.
+    const addedHeadingRe = /^\+\s*##\s+Stage\s+(\d+(?:\.\d+)*[a-z]?)/gim;
+    let ah;
+    while ((ah = addedHeadingRe.exec(diff)) !== null) {
+      touchedStages.add(ah[1]);
+      const letterStrip = ah[1].match(/^(.+)\.[a-z]$/);
+      if (letterStrip) touchedStages.add(letterStrip[1]);
     }
   } catch {
-    // If we can't read the commit range, fall back to checking everything
-    // (safe-but-noisy default). Empty set below would skip ALL lines.
+    // git diff failed — fall back to checking everything (safe-but-noisy).
     touchedStages = null;
   }
 
@@ -315,12 +335,19 @@ process.stdin.on("end", () => {
     "  • `status` kind — change `**Status: ❌ Pending.**` to `**Status: ✅ Done (<date>).**` under the relevant `## Stage X` heading.",
     "Make the edits in the SAME commit chain that closes the stage.",
     "",
-    "This hook fires on commit boundaries (not text patterns) so it's noise-free during brainstorm Q&A.",
+    "This hook fires on commit boundaries (not text patterns) and scopes via",
+    "the actual roadmap diff (not commit-message parsing), so it should only",
+    "ever block when a commit genuinely closed a stage but left items unticked.",
     "",
     "Recovery:",
     "  • Edit the listed line(s): change `- [ ]` to `- [x]` and rewrite the 'pending' text.",
     "  • Commit the roadmap change (a small docs commit is fine).",
     "  • Re-attempt the Stop.",
+    "",
+    "Optional: add an explicit close-out marker to the stage heading:",
+    "  `## Stage 9.1.5.h <!-- closes: stage-9.1.5.h -->`",
+    "Markers are authoritative for scope — when present, the hook only checks",
+    "lines under stages the marker names.",
     "",
     "If a recent commit is unrelated to any pending verification (e.g. a hook/tooling fix made between stages), set CERES_SKIP_ROADMAP_VERIFY_HOOK=1 to bypass for this Stop (logged as outcome=bypassed).",
   ].join("\n");
