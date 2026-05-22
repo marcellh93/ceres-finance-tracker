@@ -75,11 +75,13 @@ Si no iniciaste esta cancelación, contacta con soporte de inmediato.</value></d
   <data name="LockoutUnlock.Subject" xml:space="preserve"><value>Cuenta de Ceres bloqueada</value></data>
   <data name="LockoutUnlock.BodyText" xml:space="preserve"><value>Demasiados intentos fallidos de inicio de sesión en tu cuenta de Ceres desde la IP {1}.
 
-Para desbloquear la cuenta, haz clic en el enlace dentro de la próxima hora:
+Para desbloquear la cuenta, haz clic en el enlace dentro de los próximos 15 minutos:
 {0}
 
+Si tienes activada la verificación en dos pasos, los códigos de tu app autenticadora siguen siendo válidos durante el bloqueo — también puedes iniciar sesión completando ese paso.
+
 Si no fuiste tú, el enlace sigue permitiendo el desbloqueo — cambia tu contraseña inmediatamente después de iniciar sesión.</value></data>
-  <data name="LockoutUnlock.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Demasiados intentos fallidos de inicio de sesión en tu cuenta de Ceres desde la IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Desbloquear cuenta&lt;/a&gt;&lt;/p&gt;&lt;p&gt;Si no fuiste tú, el enlace sigue permitiendo el desbloqueo — cambia tu contraseña inmediatamente después de iniciar sesión.&lt;/p&gt;</value></data>
+  <data name="LockoutUnlock.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Demasiados intentos fallidos de inicio de sesión en tu cuenta de Ceres desde la IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Desbloquear cuenta&lt;/a&gt; — el enlace caduca en 15 minutos.&lt;/p&gt;&lt;p&gt;Si tienes activada la verificación en dos pasos, los códigos de tu app autenticadora siguen siendo válidos durante el bloqueo — también puedes iniciar sesión completando ese paso.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, el enlace sigue permitiendo el desbloqueo — cambia tu contraseña inmediatamente después de iniciar sesión.&lt;/p&gt;</value></data>
   <data name="RegistrationConfirmation.Subject" xml:space="preserve"><value>Confirma tu dirección de correo en Ceres</value></data>
   <data name="RegistrationConfirmation.BodyText" xml:space="preserve"><value>Te damos la bienvenida a Ceres. Haz clic en el siguiente enlace dentro de los próximos 30 minutos para confirmar tu correo electrónico y terminar tu registro:
 

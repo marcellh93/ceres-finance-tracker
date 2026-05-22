@@ -46,6 +46,7 @@
     - [AuditLog](#auditlog-phase-3-stage-614)
     - [PasswordResetToken](#passwordresettoken-phase-3-stage-6c1)
     - [LockoutUnlockToken](#lockoutunlocktoken-phase-3-stage-610)
+    - [EmailConfirmationToken](#emailconfirmationtoken-phase-3-stage-93)
 
 ---
 
@@ -1203,6 +1204,40 @@ One row per active or recently-consumed lockout-unlock token. Issued by `AuthCon
 **Multi-tenancy:** scoped per user. Stage 7 adds the global query filter + FK alongside every other user-owned entity. Until then, all queries explicitly filter by `UserId`.
 
 **Retention:** the `(ExpiresAt)` index supports a future Stage 7+ flat cleanup sweep (`DELETE WHERE ConsumedAt IS NOT NULL OR ExpiresAt < now() - interval '1 day'`); not in 6.10 (no background-runner abstraction until Stage 7).
+
+### EmailConfirmationToken (Phase 3, Stage 9.3)
+
+One row per active or recently-consumed email-confirmation token issued at registration. Issued by `AuthController.Register` on a fresh-create AND on the duplicate-unconfirmed branch (the legitimate owner gets a fresh verification link); the confirmed-existing branch issues NO new token and runs a dummy Argon2id to mirror the issue cost for timing parity. Confirmed via `POST /api/auth/email/verify`, which sets `ApplicationUser.EmailConfirmed = true` in the same transaction as `ConsumedAt`.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | → AspNetUsers.Id. FK added in Stage 7. |
+| TokenLookup | bytea | NOT NULL, unique | HMAC-SHA256(serverSecret, rawToken). Unique index supports O(1) lookup at `/email/verify` time instead of Argon2id-O(N) over candidates. Stage 6.15 / 9.1.5.a pattern. |
+| TokenHash | varchar(512) | NOT NULL | Argon2id PHC string of the raw 256-bit base64url token. Same hasher pinned to `m=19456 t=2 p=1` as passwords + password-reset/email-change/lockout-unlock tokens + persistent-cookie tokens + backup codes. |
+| CreatedAt | timestamp with time zone | NOT NULL | When the token was issued. |
+| ExpiresAt | timestamp with time zone | NOT NULL | `CreatedAt + 30min`. Verify rejects tokens past this with `INVALID_VERIFICATION_TOKEN`. |
+| ConsumedAt | timestamp with time zone | nullable | Set on first successful verify OR on supersession by a new issuance. Single-use. |
+
+**No `MfaVerifiedAt`** — email confirmation never gates on TOTP.
+
+**Indexes:** `(UserId)` for the supersede-prior-unused query (`Where(t => t.UserId == x && t.ConsumedAt == null).ExecuteUpdateAsync(...)`); unique `(TokenLookup)` for the O(1) verify lookup. No `(ExpiresAt)` index in the 9.3 migration — added in a future cleanup-sweep stage alongside the other token tables.
+
+**Token format:** raw token is 32 bytes from `RandomNumberGenerator.GetBytes(32)`, encoded as base64url (≈43 chars). Carried in the verification URL fragment (`/email-verify#token=<base64url>`) so it never appears in server logs or `Referer` headers per `security-model.md` § Logging and PII Redaction.
+
+**Lifecycle:**
+- `EmailConfirmationService.IssueAsync` is called by `AuthController.Register` on the fresh-create path (AFTER `tx.CommitAsync` — email-send failures must not roll back user creation) AND on the duplicate-unconfirmed path (AFTER the same commit; the user already exists in the DB). It is also called by `RequestResendAsync` when the resend endpoint resolves a known-but-unconfirmed user.
+- `IssueAsync` opens a `PreAuthUserScope` (RLS scope for the userId), bulk-supersedes any prior unconsumed tokens for the user, generates + hashes the new value, computes the TokenLookup, inserts the row, then sends the email outside the lock. Email-send failures are logged but do NOT roll back the token write.
+- `ConfirmAsync` looks up the row by `TokenLookup` via `AdminDbContext` (BYPASSRLS, because the userId isn't known until after the lookup), Argon2-verifies the `TokenHash` defence-in-depth, opens a `PreAuthUserScope(match.UserId)`, re-reads the row inside the per-user semaphore, sets `EmailConfirmed = true` on the user, stamps `ConsumedAt` via `ExecuteUpdateAsync`, and writes `AuditLogAction.EmailVerified`.
+- `RequestResendAsync` is anti-enumerating: unknown email → two dummy Argon2 hashes → 204; known + confirmed → two dummy Argon2 hashes → 204 (no token issued); known + unconfirmed → call `IssueAsync` → 204. Per-email rate limit: 5 requests / 1 hour (MemoryCache `RateBucket` pattern shared with `PasswordResetService`).
+
+**Constant-time discipline:** All paths in `RequestResendAsync` pay the same Argon2id cost (two hashes) regardless of outcome. `ConfirmAsync` runs at least one Argon2 verify even when zero candidates match.
+
+**Side effects of confirm:** sets `ApplicationUser.EmailConfirmed = true`. Does NOT revoke sessions (no sessions exist yet for an unconfirmed user — `RequireConfirmedEmail = true` blocks `/login` until verification). Does NOT regenerate `SecurityStamp`. Does NOT log the user in. The user is expected to navigate to `/login` after verification.
+
+**Multi-tenancy:** scoped per user. Stage 7 adds the global query filter + FK alongside every other user-owned entity. Until then, all queries explicitly filter by `UserId` AND use `IgnoreQueryFilters()` because the pre-auth context has no `app.current_user_ref` set when the resend endpoint is invoked.
+
+**Retention:** future cleanup sweep deferred to Stage 7+ (same posture as `PasswordResetToken` and `LockoutUnlockToken`).
 
 ### EmailDeliveryEvent (Phase 3, Stage 8e)
 

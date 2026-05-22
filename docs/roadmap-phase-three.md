@@ -993,10 +993,10 @@ Layout + brand:
 
 `/register`:
 
-- [ ] Email + password fields; password meets policy (≥ 8 chars, no max < 64) per Stage 6
-- [ ] Submit returns 202 Accepted with "Check your email to verify your address" — no enumeration leak (same response if email already registered)
-- [ ] Verification email sent with single-use 256-bit token, hashed, 30-min expiry
-- [ ] `/email-verify?token=...` page accepts the token, marks email verified, redirects to `/login/totp/setup`
+- [x] Email + password fields; password meets policy (≥ 8 chars, no max < 64) per Stage 6 — `Register.tsx` uses `registerSchema` (zod) for the client-side length floor; server runs HIBP breach screening + length policy and surfaces `422 VALIDATION_ERROR` with per-field details. Tested in `Register.test.tsx > zod: password < 8 chars` + `Register.test.tsx > 422 password policy violation`. (Stage 9.3)
+- [x] Submit returns `204 No Content` (NOT `202` — roadmap line predated the locked controller contract; 204 ships per spec D2) with "Check your inbox" success block — no enumeration leak. Three-branch shape: fresh-create issues token, duplicate-unconfirmed re-issues, duplicate-confirmed runs dummy Argon2id (timing parity). Tested in `EmailConfirmationTests.cs > Register_writes_token_row_*`, `> Re_register_same_unconfirmed_email_*`, `> Re_register_same_email_when_already_confirmed_*`. (Stage 9.3)
+- [x] Verification email sent with single-use 256-bit token, Argon2id-hashed in `EmailConfirmationTokens`, 30-min expiry. `EmailConfirmationService.IssueAsync` uses the `TokenLookup` (HMAC-SHA256) O(1) indexed-lookup pattern. EN + ES resx templates (`RegistrationConfirmation.{Subject,BodyText,BodyHtml}`). (Stage 9.3)
+- [x] `/email-verify#token=...` (fragment, not query — per project URL convention) accepts the token, sets `EmailConfirmed = true`, renders success block with sign-in link. **Note:** does NOT redirect to `/login/totp/setup` — per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md), MFA is opt-in and TOTP setup is only reachable from `/security`. First-run onboarding redirect (if needed) is Stage 15.5's owner. Tested in `EmailVerify.test.tsx` (5 tests) + `EmailConfirmationTests.cs > Verify_*` (6 tests). (Stage 9.3)
 
 `/password-reset` (request) + `/password-reset/confirm` (action):
 
@@ -1009,10 +1009,10 @@ Layout + brand:
 
 Lockout / unlock:
 
-- [ ] After 10 failed login attempts, account is locked + email sent with self-service unlock link
-- [ ] `/account/unlock?token=...` accepts the signed token, unlocks the account, redirects to `/login` with success toast
-- [ ] Token expires after a reasonable window (e.g., 1 hour)
-- [ ] Lockout email also tells the user "valid TOTP codes are still accepted during lockout" (per `security-model.md` § Login)
+- [x] After 10 failed login attempts, account is locked + email sent with self-service unlock link — server shipped in Stage 6.10 (`LockoutUnlockService.IssueAsync` called on lockout transition only, email-DoS guard ensures one email per lockout window). Tested in `LockoutUnlockIssuanceTests.cs` (5 [Fact]s). (Stage 6.10 + Stage 9.5 URL flip)
+- [x] `/account/unlock#token=...` (fragment per project URL convention — original roadmap line said `?token=` but the project pattern is fragments) accepts the signed token, unlocks the account, redirects to `/login?unlocked=1` with success toast. Button-press confirmation (NOT auto-confirm on mount) defends against email link-prefetchers per spec D-mount. Tested in `AccountUnlock.test.tsx` (6 tests U1–U6) + `Login.test.tsx > fires the account-unlocked toast when /login?unlocked=1`. (Stage 9.5)
+- [x] Token expires after a reasonable window — **15 minutes** (matches lockout duration per Stage 6.10 D2). Tested in `LockoutUnlockConfirmTests.cs > Confirm_with_expired_token_returns_401`. (Stage 6.10)
+- [x] Lockout email also tells the user "valid TOTP codes are still accepted during lockout" (per `security-model.md` § Login) — added to both EN and ES `LockoutUnlock.BodyText` + `BodyHtml` in 2026-05-22 sync-docs commit. Same commit also fixed an existing bug: the body said "within 1 hour" but the actual token lifetime is 15 minutes (Stage 6.10 D2). Both EN + ES now name the 15-min expiry. (Stage 9.5)
 
 TOTP setup (entry point: `/security` per ADR-0069 — NOT `/login/totp/setup`; the original roadmap URL predated the ADR):
 
