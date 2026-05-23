@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
@@ -149,6 +151,122 @@ public class PersistentCookieRotationTests : IAsyncLifetime
 
         // The response MUST also carry the rotated __Host-Persist.
         firstSetCookies.Should().Contain(c => c.StartsWith($"{SessionConstants.PersistentCookieName}="),
+            "rotation must issue the new __Host-Persist cookie");
+    }
+
+    [Fact]
+    public async Task StaleSessionTicket_AfterRealExpiry_WithPersistCookie_StillRotatesAndAuthenticates()
+    {
+        // Reproduces the user-reported 2026-05-22 bug: log in with Remember Me,
+        // wait past ExpireTimeSpan, browser sends BOTH the (now-stale) session
+        // ticket AND the still-valid persist cookie. The middleware MUST rotate.
+        //
+        // This is different from the StaleSessionCookieWithValidPersist test
+        // above — that one sends a BOGUS session cookie value. This one sends
+        // a REAL session ticket that was issued legitimately and only became
+        // stale by clock-time. The cookie auth pipeline will attempt to
+        // decrypt and validate it, fail (expired), and then we observe what
+        // the middleware does on this request.
+
+        // Build a factory variant where the application cookie expires in 1 second
+        // and does NOT slide, so we can force the expiry deterministically.
+        await using var shortTtlFactory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                services.PostConfigure<CookieAuthenticationOptions>(
+                    IdentityConstants.ApplicationScheme,
+                    opts =>
+                    {
+                        opts.ExpireTimeSpan = TimeSpan.FromSeconds(1);
+                        opts.SlidingExpiration = false;
+                    });
+            });
+        });
+
+        var user = await AuthTestFixture.RegisterUserAsync(shortTtlFactory, "ticketexpiry@persist-test.local");
+
+        // Log in with Remember Me — get both __Host-Session (real, signed) and __Host-Persist.
+        var loginClient = shortTtlFactory.CreateClient();
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(
+            shortTtlFactory, loginClient, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = true });
+        loginResp.EnsureSuccessStatusCode();
+
+        var loginSetCookies = loginResp.Headers.GetValues("Set-Cookie").ToList();
+        var sessionValue = ExtractCookie(loginSetCookies, SessionConstants.SessionCookieName);
+        var persistValue = ExtractCookie(loginSetCookies, SessionConstants.PersistentCookieName);
+        sessionValue.Should().NotBeNull();
+        persistValue.Should().NotBeNull();
+
+        // Wait past the 1-second ExpireTimeSpan so the session ticket is provably
+        // stale at the server's clock.
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        // Make an authenticated request with BOTH cookies — the browser's real behaviour.
+        var client = shortTtlFactory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/categories");
+        req.Headers.Add(
+            "Cookie",
+            $"{SessionConstants.SessionCookieName}={sessionValue}; " +
+            $"{SessionConstants.PersistentCookieName}={persistValue}");
+        var resp = await client.SendAsync(req);
+
+        // The middleware MUST issue a fresh __Host-Session cookie.
+        var respSetCookies = resp.Headers.TryGetValues("Set-Cookie", out var c) ? c.ToList() : new List<string>();
+        respSetCookies.Should().Contain(s => s.StartsWith($"{SessionConstants.SessionCookieName}="),
+            "the stale session ticket made the request unauthenticated, persist was valid — " +
+            "middleware MUST rotate and issue a fresh __Host-Session for the next request");
+        respSetCookies.Should().Contain(s => s.StartsWith($"{SessionConstants.PersistentCookieName}="),
+            "rotation MUST also issue the new __Host-Persist");
+
+        // The 401 must carry the X-Ceres-Cookie-Rotated marker header — the SPA's
+        // silent-401 seam keys on this to NOT fire the unauthenticated handler
+        // for rotation-handshake 401s. Without it, the SPA would drop to 'anon'
+        // and redirect to /login before the browser ever sent the retry that
+        // carries the freshly-issued session cookie.
+        resp.Headers.Contains(SessionConstants.CookieRotatedHeader).Should().BeTrue(
+            $"the rotation 401 MUST carry the {SessionConstants.CookieRotatedHeader} header " +
+            "so the SPA distinguishes rotation-handshake from genuine session expiry");
+    }
+
+    [Fact]
+    public async Task StaleSessionCookieWithValidPersist_RotatesAndIssuesFreshSession()
+    {
+        // This is the bug the user hit on 2026-05-22 / 23: idle past 30 min with
+        // Remember Me ticked. The browser keeps sending __Host-Session even after
+        // its server-side ticket (ExpireTimeSpan) has lapsed, because ExpireTimeSpan
+        // is the ticket validity, not the cookie's browser-side Expires attribute.
+        // The middleware must rotate anyway when the session cookie no longer
+        // authenticates the request AND __Host-Persist is still valid.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "stale@persist-test.local");
+        var loginClient = _factory.CreateClient();
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, loginClient, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = true });
+        loginResp.EnsureSuccessStatusCode();
+
+        var setCookies = loginResp.Headers.GetValues("Set-Cookie").ToList();
+        var persistValue = ExtractCookie(setCookies, SessionConstants.PersistentCookieName);
+        persistValue.Should().NotBeNull();
+
+        // Construct a request that sends BOTH cookies, where __Host-Session is a
+        // bogus / stale value (simulating an expired ticket the browser still has).
+        // The middleware must NOT short-circuit just because the session cookie
+        // header is present — it must check whether the request actually
+        // authenticated, then rotate when persist is valid.
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/categories");
+        req.Headers.Add(
+            "Cookie",
+            $"{SessionConstants.SessionCookieName}=stale-encrypted-payload-no-longer-valid; " +
+            $"{SessionConstants.PersistentCookieName}={persistValue}");
+        var resp = await client.SendAsync(req);
+
+        // The response must carry a fresh __Host-Session cookie (rotation happened).
+        var respSetCookies = resp.Headers.TryGetValues("Set-Cookie", out var c) ? c.ToList() : new List<string>();
+        respSetCookies.Should().Contain(s => s.StartsWith($"{SessionConstants.SessionCookieName}="),
+            "rotation must issue a fresh __Host-Session cookie even when the stale session cookie was also sent");
+        respSetCookies.Should().Contain(s => s.StartsWith($"{SessionConstants.PersistentCookieName}="),
             "rotation must issue the new __Host-Persist cookie");
     }
 

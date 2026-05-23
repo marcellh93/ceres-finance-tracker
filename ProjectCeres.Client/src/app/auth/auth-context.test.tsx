@@ -65,8 +65,11 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('user-email').textContent).toBe('a@b.test');
   });
 
-  it('transitions to anon when /api/auth/me returns 401', async () => {
-    fetchSpy.mockResolvedValueOnce(
+  it('transitions to anon when /api/auth/me returns 401 on both initial and retry', async () => {
+    // refresh() retries once on non-ok to honor the Remember-Me rotation
+    // handshake (see auth-context.tsx:refresh comment). For a genuine logout,
+    // both calls return 401 and we drop to anon.
+    fetchSpy.mockResolvedValue(
       new Response(
         JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
@@ -179,12 +182,64 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anon'));
   });
 
+  it('retries /api/auth/me once on first-call 401 (Remember-Me rotation handshake) and stays authed when retry succeeds', async () => {
+    // First /api/auth/me returns 401 — simulates the browser sending a stale
+    // session cookie alongside a valid persist cookie, server rotating and
+    // returning 401 with Set-Cookie. The browser stores the new cookie. Second
+    // /api/auth/me is the retry; it carries the rotated cookie and succeeds.
+    // AuthProvider must end in 'authed', not 'anon'.
+    let callCount = 0;
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/me')) {
+        callCount++;
+        if (callCount === 1) {
+          return new Response(null, {
+            status: 401,
+            headers: { 'X-Ceres-Cookie-Rotated': 'true' },
+          });
+        }
+        return AUTHED_ME_RESPONSE.clone();
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    render(
+      <AuthProvider>
+        <StatusProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authed'));
+    expect(callCount).toBe(2);
+  });
+
+  it('drops to anon when both /api/auth/me calls return 401 (genuine session expiry)', async () => {
+    // Both the first call AND the retry return 401 — no rotation happened, the
+    // user is genuinely logged out. AuthProvider must end in 'anon'.
+    let callCount = 0;
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/auth/me')) {
+        callCount++;
+        return new Response(null, { status: 401 });
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+    render(
+      <AuthProvider>
+        <StatusProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anon'));
+    expect(callCount).toBe(2);
+  });
+
   it('does NOT drop to anon when /api/auth/me itself returns 401 (handled by refresh, not the silent-expiry seam)', async () => {
     // Belt-and-suspenders: the silent-expiry seam exempts /api/auth/me so it
     // doesn't double-fire alongside refresh()'s own anon transition. This
     // test verifies the existing transition still works through the original
     // path (refresh sees the 401, sets anon) without help from the seam.
-    fetchSpy.mockResolvedValueOnce(
+    // refresh() retries once; mockResolvedValue (unconditional) covers both calls.
+    fetchSpy.mockResolvedValue(
       new Response(
         JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
