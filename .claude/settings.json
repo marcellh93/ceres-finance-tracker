@@ -277,6 +277,24 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/claim-without-research.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/repeat-scope-commits.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/detect-fix-mention.js\""
           }
         ]

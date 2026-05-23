@@ -23,6 +23,24 @@ const TRIGGER_PHRASES = [
   /please (actually|really) (read|think|research)/i,
   /not surface[- ]level/i,
   /properly research/i,
+  // 2026-05-23 audit additions — the user typed all of the following across
+  // the Remember-Me debug session before frustration-detect fired (it didn't;
+  // none of the original phrases matched). Each shipped a sub-fix that
+  // didn't address the root cause because deep-fix wasn't engaged. Cover
+  // the actual lexicon the user reaches for when frustrated.
+  /\bstill (kicking|disconnecting|logging) me out\b/i,
+  /\b(are you|were you) (still )?guessing\b/i,
+  /\bdo (the |your )?research( properly)?\b/i,
+  /\bresearch (it )?properly\b/i,
+  /\bdeal with it\b/i,
+  /\b(no more|stop) guessing\b/i,
+  /\bhalf[- ]?ass(ed)?\b/i,
+  /\bfix it properly\b/i,
+  /\bnot working( completely)?\b/i,
+  /\bdoesn'?t work( either)?\b/i,
+  /\bhasn'?t worked( for a while)?\b/i,
+  /\bseveral workarounds\b/i,
+  /\b(came|come) back .{0,40}(logged out|kicked out)\b/i,
 ];
 
 let raw = "";
