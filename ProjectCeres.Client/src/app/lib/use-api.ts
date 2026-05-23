@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { notifyUnauthenticatedIfApplicable } from './api-client';
+import { COOKIE_ROTATED_HEADER, notifyUnauthenticatedIfApplicable } from './api-client';
 
 type State<T> = {
   data: T | undefined;
@@ -39,23 +39,35 @@ export function useApi<T>(url: string): UseApiResult<T> {
     const controller = new AbortController();
     setState((prev) => ({ data: prev.data, error: undefined, loading: true }));
 
-    fetch(url, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          // Silently-expired-session signal — same path apiFetch uses. The
-          // dashboard's data fetches go through this hook (not apiFetch), so
-          // without this dispatch the AuthContext never learns that a 401
-          // happened mid-session and RequireAuth stays cached as 'authed'
-          // until a hard reload.
-          if (response.status === 401) {
-            notifyUnauthenticatedIfApplicable(url, response);
-          }
-          throw new Error(`HTTP ${response.status}`);
+    const sendOnce = () => fetch(url, { signal: controller.signal });
+
+    (async () => {
+      let response = await sendOnce();
+
+      // Remember-Me rotation handshake (mirrors apiFetch): when the server
+      // returns 401 with the rotation header, fresh cookies are now in the
+      // browser. Transparent retry — the second attempt carries the new
+      // __Host-Session and authenticates. Without this, dashboard tile data
+      // would render as error state after rotation even though the user
+      // is signed in for the next request.
+      if (
+        response.status === 401 &&
+        response.headers.get(COOKIE_ROTATED_HEADER) === 'true'
+      ) {
+        response = await sendOnce();
+      }
+
+      if (!response.ok) {
+        // Genuine 401 — let the auth-context know so RequireAuth can redirect.
+        if (response.status === 401) {
+          notifyUnauthenticatedIfApplicable(url, response);
         }
-        const data = (await response.json()) as T;
-        if (!mountedRef.current) return;
-        setState({ data, error: undefined, loading: false });
-      })
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = (await response.json()) as T;
+      if (!mountedRef.current) return;
+      setState({ data, error: undefined, loading: false });
+    })()
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         if (!mountedRef.current) return;

@@ -33,19 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const refresh = useCallback(async () => {
-    // Try once; if the first call returns non-ok, retry once. On the first
-    // request of a fresh tab session after Remember-Me expiry, the browser
-    // sends the stale __Host-Session alongside the still-valid __Host-Persist;
-    // PersistentCookieRotationMiddleware returns 401 + Set-Cookie with a
-    // fresh __Host-Session. The retry now carries the rotated cookie and
-    // succeeds — without it, AuthProvider would flip to 'anon' and the SPA
-    // would redirect to /login even though the user was about to be silently
-    // re-authenticated. On genuine session expiry both calls return 401 and
-    // we drop to 'anon' as before.
-    let result = await apiFetch<AuthUser>('/api/auth/me');
-    if (!result.ok) {
-      result = await apiFetch<AuthUser>('/api/auth/me');
-    }
+    // apiFetch transparently retries the request once when the 401 carries
+    // X-Ceres-Cookie-Rotated, so the Remember-Me handshake is invisible to
+    // this caller — we either see 200 (rotation succeeded or never needed)
+    // or a genuine 401 (real logout).
+    const result = await apiFetch<AuthUser>('/api/auth/me');
     if (result.ok && result.data) {
       setUser(result.data);
       setStatus('authed');

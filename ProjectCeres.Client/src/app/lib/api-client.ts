@@ -151,17 +151,36 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...init,
-      method,
-      headers,
-      body,
-      credentials: 'include',
-    });
-  } catch (err) {
-    throw new NetworkError('Network request failed', err);
+  const sendOnce = async (): Promise<Response> => {
+    try {
+      return await fetch(url, {
+        ...init,
+        method,
+        headers,
+        body,
+        credentials: 'include',
+      });
+    } catch (err) {
+      throw new NetworkError('Network request failed', err);
+    }
+  };
+
+  let response = await sendOnce();
+
+  // Remember-Me rotation handshake: when the server returns 401 with
+  // X-Ceres-Cookie-Rotated, it has set fresh __Host-Session + __Host-Persist
+  // cookies on the response. Transparent retry — the browser will attach the
+  // new session cookie to this second attempt and authenticate. Without this
+  // retry the caller sees the 401 and (for auth-probe URLs like /api/auth/me)
+  // immediately drops to 'anon', redirecting to /login despite the user being
+  // about to be silently re-authenticated. The retry is scoped to this single
+  // rotation case so it can't loop indefinitely — the server only emits the
+  // header once per rotation.
+  if (
+    response.status === 401 &&
+    response.headers.get(COOKIE_ROTATED_HEADER) === 'true'
+  ) {
+    response = await sendOnce();
   }
 
   if (response.status === 204) {

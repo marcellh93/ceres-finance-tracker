@@ -55,10 +55,7 @@ describe('RequireAuth — anonymous redirect', () => {
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, 'fetch');
-    // refresh() in auth-context retries /api/auth/me once on non-ok to honor
-    // the Remember-Me rotation handshake (see auth-context.tsx:refresh
-    // comment). Use mockResolvedValue (unconditional) so both calls return 401.
-    fetchSpy.mockResolvedValue(
+    fetchSpy.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },

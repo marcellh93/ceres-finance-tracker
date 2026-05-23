@@ -253,32 +253,65 @@ describe('apiFetch', () => {
       expect(result.ok).toBe(false);
     });
 
-    it('does NOT fire on 401 when the response carries the X-Ceres-Cookie-Rotated header (Remember-Me rotation handshake)', async () => {
+    it('transparently retries on 401 with X-Ceres-Cookie-Rotated (Remember-Me rotation handshake) and returns the retry result', async () => {
       const handler = vi.fn();
       setOnUnauthenticated(handler);
 
-      // PersistentCookieRotationMiddleware returns 401 with this header set
-      // while it issues a fresh session cookie. The browser is expected to
-      // retry with the new cookie on the next request. Firing the unauth
-      // handler here would redirect the user to /login before that retry
-      // ever happens, breaking the Remember-Me silent re-auth.
-      fetchSpy.mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
-          {
-            status: 401,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Ceres-Cookie-Rotated': 'true',
+      // First call: PersistentCookieRotationMiddleware returned 401 with the
+      // rotation marker (fresh cookies set via Set-Cookie). Browser stores them.
+      // Second call: the retry carries the new cookies and succeeds with 200.
+      // apiFetch must transparently retry and report the retry's success, NOT
+      // fire the unauth handler.
+      fetchSpy
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Ceres-Cookie-Rotated': 'true',
+              },
             },
-          },
-        ),
-      );
+          ),
+        )
+        .mockResolvedValueOnce(jsonResponse({ result: 'ok' }, { status: 200 }));
+
+      const result = await apiFetch<{ result: string }>('/api/dashboard/summary');
+
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data).toEqual({ result: 'ok' });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('returns the second 401 (no further retry) when the retry itself also 401s', async () => {
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+
+      // Defense against retry loops: even if the second response also 401s
+      // (with or without the rotation header), apiFetch must not retry again.
+      // Two fetch calls total — first plus one retry — and the unauth handler
+      // fires for the FINAL 401 if it lacks the rotation marker.
+      fetchSpy
+        .mockResolvedValueOnce(
+          new Response(null, {
+            status: 401,
+            headers: { 'X-Ceres-Cookie-Rotated': 'true' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
 
       const result = await apiFetch('/api/dashboard/summary');
 
       expect(result.ok).toBe(false);
-      expect(handler).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(handler).toHaveBeenCalledTimes(1);
     });
   });
 });
