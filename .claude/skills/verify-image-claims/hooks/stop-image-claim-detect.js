@@ -100,17 +100,23 @@ process.stdin.on("end", () => {
   }
   if (claimed.length === 0) process.exit(0);
 
-  // For each claimed image, scan the turn's tool trail for a Read on the
-  // same absolute path. The Read tool_use is serialized as JSON; check both
-  // the tool name and the file_path argument.
+  // For each claimed image, scan the WHOLE transcript for any Read on the
+  // same absolute path. The original narrow window (between last user message
+  // and last assistant text) was wrong because: (a) when the Stop hook runs,
+  // the current turn's transcript lines may not all be flushed, so the
+  // walk-back can pick up an earlier turn's text without seeing that earlier
+  // turn's Read calls; (b) a Read in a PRIOR turn still constitutes evidence
+  // — the assistant did examine the pixels. Same window-fix shape as
+  // check-resolution.js (2026-05-22 deadlock fix). The cost is missing the
+  // "assistant Read this image yesterday and is now making fresh claims
+  // without re-reading it" case, but that's the rarer failure mode; the
+  // common case (Read in same conversation, claims later) is what we want.
   const readPaths = new Set();
-  if (lastUserIdx >= 0 && lastAssistantIdx >= 0) {
-    for (let i = lastUserIdx + 1; i <= lastAssistantIdx; i++) {
-      const blob = lines[i] || "";
-      if (!/"name"\s*:\s*"Read"/.test(blob)) continue;
-      const pathMatch = blob.match(/"file_path"\s*:\s*"([^"]+)"/);
-      if (pathMatch) readPaths.add(pathMatch[1]);
-    }
+  for (let i = 0; i < lines.length; i++) {
+    const blob = lines[i] || "";
+    if (!/"name"\s*:\s*"Read"/.test(blob)) continue;
+    const pathMatch = blob.match(/"file_path"\s*:\s*"([^"]+)"/);
+    if (pathMatch) readPaths.add(pathMatch[1]);
   }
 
   const missing = claimed.filter((c) => !readPaths.has(c.imagePath));
