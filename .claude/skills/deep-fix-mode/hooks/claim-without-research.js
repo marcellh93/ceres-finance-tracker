@@ -65,6 +65,26 @@ const WEB_TOOLS = ["WebFetch", "WebSearch"];
 const AGENT_TOOLS = ["Agent", "Task"];
 const AGENT_RESEARCH_DESC = /\b(research|audit|investigate|verify|check)\b/i;
 
+// 2026-05-24 false-positive guard — commit-reference / past-tense / already-
+// validated context. The hook fired twice on phrases like "that's the one"
+// and "the bug is" being used to REFER to an already-committed and user-
+// validated fix, not to assert a fresh diagnosis. Match common shapes:
+//   - 7-40 char hex SHA near the matched phrase
+//   - "validated", "verified", "shipped", "landed", "committed" with the bug
+//   - Past tense "was" / "kept" / "had been" near the bug noun
+//   - "the validated fix" / "the fix that addresses" idiom
+// Each indicates the assistant is summarising / referring rather than
+// freshly diagnosing. Sibling to isMetaContext (which catches hook-talk).
+const PAST_TENSE_OR_REFERENCE_MARKERS = [
+  /\b[0-9a-f]{7,40}\b/,                                   // commit SHA
+  /\b(committed|landed|shipped|validated|verified|merged|already (committed|landed|shipped|fixed|addressed)) (as |in |the |that |which )/i,
+  /\b(the |that |which ) ?(validated|shipped|landed|committed|merged) (fix|commit|change|patch)\b/i,
+  /\bthe bug (was|that|that kept|that caused|that broke|whose root)\b/i,
+  /\b(the |this )(actual |real )?(fix|change|patch|commit) (that |which )(addressed|fixed|landed|shipped|closed)\b/i,
+  /\b(addressed|closed|resolved) (by|in|via) (commit |PR |pr )?[`#]?[0-9a-f]{6,}/i,
+  /\bcommit (`|')?[0-9a-f]{6,}/i,
+];
+
 const SESSION_BYPASS = process.env.CERES_SKIP_CLAIM_WITHOUT_RESEARCH_HOOK === "1";
 
 let raw = "";
@@ -125,6 +145,15 @@ process.stdin.on("end", () => {
   // Short-circuit on meta-context — talking ABOUT a hook fire shouldn't
   // trigger another fire. Same shape as stop-runtime-state-claim.js.
   if (isMetaContext(lastAssistantText)) process.exit(0);
+
+  // Short-circuit on past-tense / commit-reference context. When the message
+  // is summarising an already-shipped fix (commit SHA present, "the validated
+  // fix", "the bug that kept you logged out was..."), the confidence phrase
+  // is referring to a settled diagnosis, not asserting a fresh one. Pattern
+  // C from the 2026-05-24 false-positive log.
+  if (PAST_TENSE_OR_REFERENCE_MARKERS.some((re) => re.test(lastAssistantText))) {
+    process.exit(0);
+  }
 
   // Strip discussion frames so quoted "found it" inside a code block or
   // blockquote doesn't fire.
