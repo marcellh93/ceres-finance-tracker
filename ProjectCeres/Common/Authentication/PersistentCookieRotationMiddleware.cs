@@ -17,6 +17,13 @@ namespace ProjectCeres.Common.Authentication;
 ///
 /// 2026-05-22 — previously gated on "session cookie absent"; that missed the case where
 /// the browser keeps sending __Host-Session after its server-side ticket expired.
+///
+/// 2026-05-24 — switched from AppDbContext to AdminDbContext. The lookup runs pre-auth,
+/// so app.current_user_ref GUC isn't set; with ceres_app (NOBYPASSRLS) the row was
+/// invisible at the database level even though it exists. Same pattern + same fix as
+/// SessionRevocationValidator (read its class XML doc for the canonical rationale).
+/// Integration tests passed previously because the test connection used a role with
+/// BYPASSRLS, masking the issue.
 /// </summary>
 public sealed class PersistentCookieRotationMiddleware
 {
@@ -31,7 +38,7 @@ public sealed class PersistentCookieRotationMiddleware
 
     public async Task InvokeAsync(
         HttpContext context,
-        AppDbContext db,
+        AdminDbContext db,
         PersistentTokenService tokens,
         SignInManager<ApplicationUser> signInManager)
     {
