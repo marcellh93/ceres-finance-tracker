@@ -68,6 +68,36 @@ namespace Test
     }
 
     [Fact]
+    public async Task NoFire_When_File_Is_PreAuthRlsScope_cs()
+    {
+        var source = @"
+using System.Threading.Tasks;
+using ProjectCeres.Analyzers.Annotations;
+
+namespace ProjectCeres.Analyzers.Annotations
+{
+    public class PreAuthScopeAttribute : System.Attribute { }
+}
+
+namespace Test
+{
+    public class FakeDb { public FakeDatabase Database => new(); }
+    public class FakeDatabase { public Task BeginTransactionAsync() => Task.CompletedTask; }
+
+    [ProjectCeres.Analyzers.Annotations.PreAuthScope]
+    public class MarkedClass
+    {
+        private readonly FakeDb _db = new();
+        public async Task Bar() => await _db.Database.BeginTransactionAsync();
+    }
+}
+";
+        var test = new Verifier.Test();
+        test.TestState.Sources.Add(("PreAuthRlsScope.cs", source));
+        await test.RunAsync();
+    }
+
+    [Fact]
     public async Task NoFire_When_PreAuthScope_Class_Uses_BeginPreAuthUserScopeAsync()
     {
         var source = @"

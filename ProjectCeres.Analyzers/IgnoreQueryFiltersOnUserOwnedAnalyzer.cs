@@ -44,25 +44,25 @@ public sealed class IgnoreQueryFiltersOnUserOwnedAnalyzer : DiagnosticAnalyzer
 
         // Check the containing DbContext type — must be AppDbContext (not AdminDbContext)
         // Find the enclosing field/property receiver and check its type
+        //
+        // Scope-limitation: GetEnclosingSymbol as IMethodSymbol returns null for property
+        // getters / setters, auto-property initialisers, lambdas, and local functions.
+        // The analyzer silently exits in those cases — CER002 cannot fire there today.
+        // CER006 (planned for 9.5g) is expected to surface this gap.
         var containingType = invocation.SemanticModel?.GetEnclosingSymbol(invocation.Syntax.SpanStart) as IMethodSymbol;
         if (containingType is null) return;
 
-        // Walk the containing class's fields/properties to find which DbContext is in use
+        // Walk the containing class's fields/properties/constructors via short-circuit ||
         var containingClass = containingType.ContainingType;
-        var usesAppDbContext = containingClass?.GetMembers()
-            .OfType<IFieldSymbol>()
-            .Any(f => f.Type.ToDisplayString() == AppDbContextFullName) == true
-            || containingClass?.GetMembers()
-                .OfType<IPropertySymbol>()
-                .Any(p => p.Type.ToDisplayString() == AppDbContextFullName) == true;
-
-        // Also check primary-constructor parameters (modern C# pattern)
-        if (!usesAppDbContext && containingClass?.InstanceConstructors.Any() == true)
-        {
-            usesAppDbContext = containingClass.InstanceConstructors
+        var usesAppDbContext = containingClass != null && (
+            containingClass.GetMembers().OfType<IFieldSymbol>()
+                .Any(f => f.Type.ToDisplayString() == AppDbContextFullName)
+            || containingClass.GetMembers().OfType<IPropertySymbol>()
+                .Any(p => p.Type.ToDisplayString() == AppDbContextFullName)
+            || containingClass.InstanceConstructors
                 .SelectMany(c => c.Parameters)
-                .Any(p => p.Type.ToDisplayString() == AppDbContextFullName);
-        }
+                .Any(p => p.Type.ToDisplayString() == AppDbContextFullName)
+        );
 
         if (!usesAppDbContext) return;
 

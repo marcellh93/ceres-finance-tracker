@@ -127,6 +127,26 @@ namespace ProjectCeres.Services
         await Verifier.VerifyAnalyzerAsync(source, expected);
     }
 
+    // (f) File under /Migrations/ path → no fire
+    [Fact]
+    public async Task NoFire_When_File_Is_Under_Migrations_Path()
+    {
+        var source = @"
+using System;
+
+namespace ProjectCeres.Migrations
+{
+    public class SomeMigration
+    {
+        public DateTime Stamp() => DateTime.UtcNow;
+    }
+}
+";
+        var test = new Verifier.Test();
+        test.TestState.Sources.Add(("/Migrations/20240101_AddSomething.cs", source));
+        await test.RunAsync();
+    }
+
     // Constructor with [AllowsWallClock] → no fire
     [Fact]
     public async Task NoFire_When_Constructor_Has_AllowsWallClock()
