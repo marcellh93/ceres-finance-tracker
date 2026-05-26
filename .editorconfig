@@ -1,0 +1,20 @@
+root = true
+
+[*.cs]
+# C# minimal defaults — matches existing implicit conventions
+indent_style = space
+indent_size = 4
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+
+# ─────────────────────────────────────────────────────────────────────────
+# Per-analyzer baseline-suppression sections (Stage 9.5c, per C-3)
+# Each entry has a one-line reason. Suppressed lines drain to zero before
+# the warning→error flip at N+M+1 per C-2.
+# ─────────────────────────────────────────────────────────────────────────
+
+# CER004 — Stage 9.5c baseline. Sites pending TimeProvider migration.
+# Drain progress: grep -c 'dotnet_diagnostic.CER004' .editorconfig
+# Baseline at N+2: 0 suppressed sites. Task 5 retro-decoration was complete.
+# No per-file suppression entries required.
