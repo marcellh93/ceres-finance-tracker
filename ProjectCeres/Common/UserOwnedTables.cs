@@ -73,5 +73,6 @@ public static class UserOwnedTables
         new UserOwnedTable("EmailChangeTokens",   typeof(EmailChangeToken)),
         new UserOwnedTable("LockoutUnlockTokens", typeof(LockoutUnlockToken)),
         new UserOwnedTable("AuditLogs",           typeof(AuditLog)),
+        new UserOwnedTable("EmailConfirmationTokens", typeof(EmailConfirmationToken)),
     };
 }
