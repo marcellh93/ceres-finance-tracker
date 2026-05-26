@@ -147,7 +147,7 @@ PID_FILE="$RUNTIME_DIR/$SCHEMA.pid"
   nohup dotnet run \
     --project "$REPO_ROOT/ProjectCeres" \
     --launch-profile Smoke \
-    --urls "http://localhost:$PORT" \
+    --urls "http://127.0.0.1:$PORT" \
     >"$APP_LOG" 2>&1 &
   echo $! >"$PID_FILE"
 ) </dev/null
@@ -164,7 +164,7 @@ PID="$(cat "$PID_FILE")"
 # ──────────────────────────────────────────────────────────────────────────
 # Step 7. Poll /api/health (or fallback /) for up to 30s.
 # ──────────────────────────────────────────────────────────────────────────
-HEALTH_URL="http://localhost:$PORT/api/health"
+HEALTH_URL="http://127.0.0.1:$PORT/api/health"
 DEADLINE=$(( $(date +%s) + 30 ))
 HEALTHY=0
 while (( $(date +%s) < DEADLINE )); do
@@ -195,6 +195,6 @@ printf 'SCHEMA=%s\n' "$SCHEMA"
 printf 'PORT=%s\n' "$PORT"
 printf 'PID=%s\n' "$PID"
 printf 'APP_LOG=%s/%s.app.log\n' "$RUNTIME_REL" "$SCHEMA"
-printf 'APP_URL=http://localhost:%s\n' "$PORT"
+printf 'APP_URL=http://127.0.0.1:%s\n' "$PORT"
 
 exit 0

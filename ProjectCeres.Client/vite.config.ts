@@ -124,6 +124,11 @@ export default defineConfig({
       },
     },
     setupFiles: ['./src/test-setup.ts'],
+    // Vitest's default exclude does NOT cover `e2e/` — and that directory
+    // contains Playwright specs imported from `@playwright/test`, which fails
+    // when picked up by Vitest's runner. Keep them separate (Vitest = unit/
+    // integration, Playwright = browser e2e).
+    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', 'e2e/**'],
     // The suite is ~152 test files / ~929 tests across heavy portal-rendered
     // UI (base-ui dropdowns, popovers, dialogs) plus axe-core a11y passes.
     // Vitest defaults to one worker per CPU core, which on an 8-core box
