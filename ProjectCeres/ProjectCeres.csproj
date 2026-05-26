@@ -22,6 +22,9 @@
     <PackageReference Include="Vite.AspNetCore" Version="2.4.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ProjectCeres.Analyzers.Annotations\ProjectCeres.Analyzers.Annotations.csproj" />
+  </ItemGroup>
 
   <Target Name="BuildTailwind" BeforeTargets="Build">
     <Exec Command="pnpm run build:css" WorkingDirectory="$(ProjectDir)" />
