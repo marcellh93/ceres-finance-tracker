@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Common.Authentication;
 
+[PreAuthScope]
 public class AuditLogWriter : IAuditLogWriter
 {
     private readonly IServiceScopeFactory _scopeFactory;

@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Common.Authentication;
 
+[PreAuthScope]
 public sealed class TotpReplayGuard
 {
     private readonly AppDbContext _db;

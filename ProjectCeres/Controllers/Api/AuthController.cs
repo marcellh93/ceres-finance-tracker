@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
@@ -17,6 +18,7 @@ namespace ProjectCeres.Controllers.Api;
 
 [ApiController]
 [Route("api/auth")]
+[PreAuthScope]
 public sealed class AuthController : ControllerBase
 {
     // Per-user semaphore: serializes concurrent PasswordSignInAsync calls for the same

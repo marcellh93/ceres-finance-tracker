@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -15,6 +16,7 @@ namespace ProjectCeres.Common.Authentication;
 /// branches. Per-user semaphore serialises supersede+insert; per-email rate
 /// gate is MemoryCache-backed (5/hour); per-IP gate is controller-side.
 /// </summary>
+[PreAuthScope]
 public sealed class EmailConfirmationService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(30);

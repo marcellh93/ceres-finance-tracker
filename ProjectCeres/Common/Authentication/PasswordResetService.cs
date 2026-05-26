@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -14,6 +15,7 @@ namespace ProjectCeres.Common.Authentication;
 /// Per-user semaphore serialises the token supersede+insert. Per-email rate gate is service-side
 /// (MemoryCache); per-IP gate is the existing AuthLoginByIp policy applied at the controller.
 /// </summary>
+[PreAuthScope]
 public sealed class PasswordResetService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(15);

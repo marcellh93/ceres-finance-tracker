@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -20,6 +21,7 @@ namespace ProjectCeres.Common.Authentication;
 /// the audit row. No MFA gate, no session revocation, no SecurityStamp regen —
 /// the unlock is an undo of a failed-login side effect, not a credential change.
 /// </summary>
+[PreAuthScope]
 public class LockoutUnlockService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(15);

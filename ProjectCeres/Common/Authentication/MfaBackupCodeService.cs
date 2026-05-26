@@ -3,11 +3,13 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Common.Authentication;
 
+[PreAuthScope]
 public sealed class MfaBackupCodeService
 {
     // Per-user semaphore: serializes concurrent VerifyAndConsumeAsync calls for the same user
