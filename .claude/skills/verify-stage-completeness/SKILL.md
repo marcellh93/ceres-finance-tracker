@@ -96,7 +96,22 @@ The gap on U1 + U2 is the exact pair the Stage 9.3 close-out shipped silently. W
 - Does not detect bugs inside the entity's own code (RLS-aware service implementation correctness). The Stage 9.10 RLS-pre-auth-write audit covers that.
 - Does not block code commits — only roadmap close-out edits. The implementation can ship gappy and tests can pass against `ceres_admin`; the gate fires only when someone tries to call the stage done.
 
-## 7 — Linked memory
+## 7 — Auxiliary tool: turn-shape.json generator
+
+`lib/turn-shape-generator.js` is a standalone Node script (no npm deps) that emits a `turn-shape.json` evidence-bundle slot. It scans the assistant's text in the latest turn of the Claude Code JSONL transcript for three claim types — **fix mentions** (verbal-promise gap), **confidence claims** (research-before-confidence gap), and **runtime assertions** (Field=value claims) — and records whether each one has a co-located tool call (Edit/Write/MultiEdit for fixes; WebFetch/WebSearch/Agent for confidence; Bash with psql/curl/cat/etc. or a matching Read for runtime). False-positive avoidance follows the `discussion-frame-strip` precedent: code blocks, blockquotes, diagnosis-template headings, and quote-introducing prefixes are stripped before pattern matching.
+
+Manual invocation (once `tools/agent-env/finalize.sh` lands, this becomes one line of that script):
+
+```bash
+node .claude/skills/verify-stage-completeness/lib/turn-shape-generator.js \
+  --transcript "$CLAUDE_TRANSCRIPT_PATH" \
+  --stage-id "9.5a" \
+  --output ".claude/state/evidence/stage-9.5a/turn-shape.json"
+```
+
+The consumer is the evidence-bundle Stop hook (sibling sub-task #33).
+
+## 8 — Linked memory
 
 - `feedback_iuserowned_requires_five_registries` — the underlying rule this skill enforces.
 - `feedback_finished_stages_have_no_unchecked_items` — sibling gate at Phase E (this skill is the structural-completeness sibling of the unchecked-items completeness check).
