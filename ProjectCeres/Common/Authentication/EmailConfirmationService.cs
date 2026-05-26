@@ -85,6 +85,7 @@ public sealed class EmailConfirmationService
             => RetryAfterSeconds = retryAfterSeconds;
     }
 
+    [RlsBypassJustified("CER-1001")]
     public async Task IssueAsync(
         Guid userId, string email, string verifyUrlBase, CancellationToken ct)
     {
@@ -215,6 +216,7 @@ public sealed class EmailConfirmationService
         public int Count { get; set; }
     }
 
+    [RlsBypassJustified("CER-1002")]
     public async Task<EmailConfirmationConfirmOutcome> ConfirmAsync(string rawToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(rawToken))

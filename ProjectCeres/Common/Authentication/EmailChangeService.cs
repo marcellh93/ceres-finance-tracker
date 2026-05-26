@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -77,6 +78,7 @@ public sealed class EmailChangeService
             => RetryAfterSeconds = retryAfterSeconds;
     }
 
+    [RlsBypassJustified("CER-1003")]
     public async Task<EmailChangeRequestOutcome> RequestAsync(
         Guid userId, string newEmail,
         string ip, string userAgent,
@@ -222,6 +224,7 @@ public sealed class EmailChangeService
         return new EmailChangeRequestOutcome.Accepted();
     }
 
+    [RlsBypassJustified("CER-1004")]
     public async Task<EmailChangeConfirmOutcome> ConfirmAsync(string rawToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
@@ -375,6 +378,7 @@ public sealed class EmailChangeService
         }
     }
 
+    [RlsBypassJustified("CER-1005")]
     public async Task<EmailChangeRevokeOutcome> RevokeAsync(string rawToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(rawToken))

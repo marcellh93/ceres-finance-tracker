@@ -65,6 +65,7 @@ public sealed class MfaBackupCodeService
         }
     }
 
+    [RlsBypassJustified("CER-1008")]
     private async Task<bool> VerifyAndConsumeLockedAsync(
         Guid userId, string submittedCode, string clientIp, CancellationToken ct)
     {
@@ -102,6 +103,7 @@ public sealed class MfaBackupCodeService
         return false;
     }
 
+    [RlsBypassJustified("CER-1009")]
     public async Task<IReadOnlyList<string>> RegenerateAsync(Guid userId, CancellationToken ct)
     {
         // Cross-tenant by design: called via authenticated session; userId from session claim. Stage 10 allow-lists this file.
@@ -114,6 +116,7 @@ public sealed class MfaBackupCodeService
     /// Called from `POST /api/auth/mfa/disable` so that turning MFA off invalidates any codes
     /// the user still has on paper. If the user re-enrols later, fresh codes are generated.
     /// </summary>
+    [RlsBypassJustified("CER-1010")]
     public async Task PurgeAsync(Guid userId, CancellationToken ct)
     {
         // Cross-tenant by design: called via authenticated session; userId from session claim. Stage 10 allow-lists this file.

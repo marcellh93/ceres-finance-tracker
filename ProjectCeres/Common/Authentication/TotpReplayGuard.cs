@@ -50,6 +50,7 @@ public sealed class TotpReplayGuard
         }
     }
 
+    [RlsBypassJustified("CER-1013")]
     private async Task<bool> TryAcceptLockedAsync(Guid userId, string code, CancellationToken ct)
     {
         var threshold = DateTime.UtcNow - MfaConstants.ReplayWindow;

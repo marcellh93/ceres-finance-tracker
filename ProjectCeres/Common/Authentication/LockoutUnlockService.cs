@@ -69,6 +69,7 @@ public class LockoutUnlockService
         _lockoutCache = lockoutCache;
     }
 
+    [RlsBypassJustified("CER-1006")]
     public virtual async Task IssueAsync(
         Guid userId, string userEmail, string ip, string userAgent,
         string unlockUrlBase, CancellationToken ct)
@@ -133,6 +134,7 @@ public class LockoutUnlockService
         }
     }
 
+    [RlsBypassJustified("CER-1007")]
     public async Task<LockoutUnlockOutcome> ConfirmAsync(string rawToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(rawToken))

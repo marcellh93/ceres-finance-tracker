@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -16,6 +17,7 @@ namespace ProjectCeres.Services;
 // virtual-test-double pattern as Argon2idPasswordHasher.
 public class CategorySeedService(AppDbContext db)
 {
+    [RlsBypassJustified("CER-1015")]
     public virtual async Task CopyDefaultsForUserAsync(Guid userId, CancellationToken ct = default)
     {
         // Idempotency: the cross-tenant query is intentional here — we're checking whether

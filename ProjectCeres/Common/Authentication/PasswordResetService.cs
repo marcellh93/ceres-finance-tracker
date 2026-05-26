@@ -95,6 +95,7 @@ public sealed class PasswordResetService
             => RetryAfterSeconds = retryAfterSeconds;
     }
 
+    [RlsBypassJustified("CER-1011")]
     public async Task RequestAsync(
         string email, string ip, string userAgent, string resetUrlBase, CancellationToken ct)
     {
@@ -233,6 +234,7 @@ public sealed class PasswordResetService
         public int Count { get; set; }
     }
 
+    [RlsBypassJustified("CER-1012")]
     public async Task<PasswordResetConfirmOutcome> ConfirmAsync(
         string rawToken, string newPassword, string? totpCode, CancellationToken ct)
     {

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
@@ -19,6 +20,7 @@ public sealed class LanguageResolver : ILanguageResolver
 
     public LanguageResolver(AppDbContext db) => _db = db;
 
+    [RlsBypassJustified("CER-1014")]
     public async Task<CultureInfo> ResolveForUserAsync(Guid userId, CancellationToken ct)
     {
         // Cross-tenant by design: this is consulted from pre-auth call sites (e.g.
