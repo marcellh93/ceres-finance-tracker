@@ -12,7 +12,9 @@
     "test": "pnpm lint:tests && vitest run",
     "test:ci": "pnpm lint:tests && vitest run",
     "test:watch": "vitest",
-    "check-size": "node scripts/check-bundle-size.mjs"
+    "check-size": "node scripts/check-bundle-size.mjs",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "agent-walk": "tsx e2e/agent-walk.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -43,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -60,6 +63,7 @@
     "jsdom": "^29.1.1",
     "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.22.3",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.59.3",
     "vite": "^8.0.12",
