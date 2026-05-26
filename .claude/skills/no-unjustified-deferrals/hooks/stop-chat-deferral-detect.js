@@ -1,14 +1,26 @@
 #!/usr/bin/env node
 // Stop hook — scans the assistant's MOST RECENT message for conversational
-// deferral language and BLOCKS the Stop event when the deferral is unauthorized
-// and not paired with fix-context.
+// deferral OR bug-age-deflection language and BLOCKS the Stop event when the
+// framing is unauthorized and not paired with fix-context.
 //
-// Why this hook exists:
-//   The existing pre-write-deferral.js hook only fires on docs/* writes. The
-//   actual failure mode the user caught (2026-05-17, post-9.1.5.f) was a
-//   chat-only deferral ("Filed for later" / "queue it" / "separate scope") —
-//   none of which were docs writes, so the pre-write hook never had a chance.
-//   This hook fills that gap.
+// Two failure modes in scope (same anti-pattern, different vocabulary —
+// both transfer work to the user without consent):
+//
+//   (a) Conversational deferral — scope-dodging verbs ("queue this for later",
+//       "separate stage's worth of work", "Phase X polish"). User caught this
+//       2026-05-17, post-9.1.5.f. Original motivation for this hook.
+//   (b) Bug-age deflection — historical-framing nouns ("pre-existing bug",
+//       "predates my changes", "latent failure"). User caught this 2026-05-23
+//       and asked it be wired into the hook: "Why is saying 'pre-existing
+//       bug' relevant? It is still a bug. You need to add that affirmation
+//       to the skill/hook."
+//
+// Why one file instead of two: same guards (fix-context, user-authorization,
+// decision-question), same log format, same bypass envelope, same recovery
+// instructions. Splitting would mean two regex lists to drift apart, two log
+// files to inspect, two bypass env vars to remember. The pre-write-deferral.js
+// hook covers a different surface (docs writes); this hook covers the chat
+// surface for BOTH scope-dodge verbs and bug-age-dodge nouns.
 //
 // Architecture (after 2026-05-17 false-positive minimization audit):
 //   - On Stop, read both:
@@ -85,6 +97,30 @@ const PHRASES = [
   // (e) "this is the only thing in this session that violates X" — naming the
   //     rule I'm breaking and breaking it anyway is itself the bypass.
   /\b(only thing in (this|the) session that|with full transparency that I'?m doing so) (violates|breaks|bypasses)\b/i,
+  // ─── 2026-05-23 additions — bug-age-as-deflection vocabulary ──────────
+  // Sibling pattern to the deferral verbs above: instead of dodging scope
+  // with a verb ("queue this") the assistant dodges responsibility with a
+  // historical-framing noun ("pre-existing bug"). User caught this in the
+  // 9.3 close-out turn and required it be wired in: "It is still a bug.
+  // You need to add that affirmation to the skill/hook." Same guards as
+  // the verbs above — fix-context, user-auth, decision-question.
+  //
+  // (f) "pre-existing bug/failure/issue/defect/problem/gap" — exact phrase
+  //     the user named.
+  /\bpre[- ]existing (bug|failure|issue|test failure|defect|problem|gap)\b/i,
+  // (g) "predates my changes" / "predates this session" / "predates 9.X"
+  /\bpre[- ]?dates? (my|this|the) (changes?|work|session|stage \d|9\.\d|implementation)\b/i,
+  // (h) "not (caused|introduced) by my (work|session|changes)" — explicit
+  //     exculpation regardless of "pre-existing" framing
+  /\bnot (caused|introduced) by (my|this) (work|session|changes?)\b/i,
+  // (i) "didn't introduce this bug" / "I didn't cause this"
+  /\b(didn'?t|did not) (cause|introduce|create) (this|that) (bug|issue|failure|defect|problem)\b/i,
+  // (j) "latent bug/failure/issue" — sibling deflection noun
+  /\blatent (bug|failure|issue|defect|problem)\b/i,
+  // (k) "the bug pre-dates / is older than this session / existed before"
+  /\bthe (bug|issue|failure) (is older than|pre[- ]?dates|existed before)\b/i,
+  // (l) "would have failed before my changes too" / "even without my work"
+  /\bwould have failed (before|even without) (my|this) (work|changes?|session)\b/i,
 ];
 
 // User-authorization markers — if user's last message contains any of these,

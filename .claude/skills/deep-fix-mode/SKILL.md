@@ -162,6 +162,7 @@ This skill re-fires. The failed-attempts table from this round becomes the *firs
 - Citing your own training data as the authoritative source → no (Anchoring bias in LLMs paper, Lou & Sun 2024: "CoT prompting, reflection methods, prove insufficient" against anchoring — you cannot reason your way out, you must check external evidence)
 - "Let me try one more thing while you read this" → no
 - Producing two candidate fixes "to be safe" → no (Self-Consistency paper: diversity comes from sampling, not from hedging in the final answer)
+- **Calling a bug "pre-existing" / "predates my changes" / "not caused by this session's work"** → no. The age of a bug is irrelevant to whether it needs fixing. The user hit it; it's real; fix it. Sibling of `feedback_no_flag_without_action` at the diagnosis surface — labeling a bug's history is a soft deflection ("this isn't really my problem") even when it's factually true. State the root cause and the fix; do not editorialize about whose work introduced it.
 
 ## Why this skill exists — the evidence
 
