@@ -89,6 +89,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/stage-completeness-check.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-stage-close-gate.js\""
           }
         ]

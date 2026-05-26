@@ -154,6 +154,35 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 ---
 
+### Phase E′ — `verify-stage-completeness` (HARD)
+
+**Gating event.** PreToolUse Edit/Write/MultiEdit on `docs/roadmap-phase-*.md` where the new_string flips a `- [ ]` stage header to `- [x]` OR adds `✅ Done` near a stage header. **Same trigger as Phase E.** Wired BEFORE Phase E in `settings.json` so its deny short-circuits Phase E.
+
+**Required chain.** For every NEW file added during the stage's commit range, every NEW resx template key, and every NEW enum value, the audit verifies presence in EVERY required downstream registry:
+
+| Item type | Required registries |
+|---|---|
+| `IUserOwned` entity | DbSet (#1), OnModelCreating (#2), `UserOwnedTables.All` (#3), `CREATE POLICY user_isolation` migration (#4) |
+| Non-`IUserOwned` entity | DbSet (#1), OnModelCreating (#2) |
+| Service class | DI registration in `Program.cs` (#5), `IgnoreQueryFilters` allow-list in `ArchitectureTests.cs` if it calls `IgnoreQueryFilters` (#6) |
+| Resx template (key.Subject in `EmailsResource.en.resx`) | 3 keys in `en.resx` (#7), 3 keys in `es.resx` (#7), value in `EmailTemplateKey` enum (#8) |
+| `AuditLogAction` enum value | listed in `AuditLogAction_enum_values_match_documented_set` architecture test (#9) |
+| `FailedLoginReason` enum value | referenced in at least one `_failedLogins.RecordAsync` call site (#10) |
+
+**Enforcement.** HARD via `verify-stage-completeness/hooks/stage-completeness-check.js`. The hook enumerates every entity / service / template / enum value **as the codebase stands right now** — no git, no diff. A broken cross-reference is a gap whether it was introduced this commit or two years ago. Any ✗ denies the close-out edit. Rationale: a diff-scoped audit would let pre-existing gaps slip through forever (every close-out skips them); a live-state audit catches them at the next stage that runs.
+
+**Origin.** 2026-05-23. Stage 9.3 close-out shipped `EmailConfirmationTokens` with `rowsecurity = false` because the entity was added to `AppDbContext` but NOT to `UserOwnedTables.All` — the Stage 7.5 RLS migration loop never covered it. The ParityTests pass (they only verify list → DB, not DB → list) and the integration suite passes (it routes through `ceres_admin` BYPASSRLS). The gap was only caught by a real browser registration attempt that hit `ceres_app`. This phase exists to catch the same class of bug at stage-close time.
+
+**What counts as fired.** A passing audit (every check ✓ or `n/a`). No skill-fire state-file entry required — the hook is purely diff-driven.
+
+**Per-session bypass.** `CERES_SKIP_STAGE_COMPLETENESS_HOOK=1`.
+
+**Consumes / produces.**
+- Consumes: a roadmap edit closing a stage + the stage's commit-range diff.
+- Produces: either the edit proceeds (then Phase E runs) OR a hard-block with a ✓/✗ table naming each missing registry entry.
+
+---
+
 ### Phase E — `pre-stage-close` (HARD)
 
 **Gating event.** PreToolUse Edit/Write/MultiEdit where the edit changes `- [ ]` to `- [x]` for a stage header in a roadmap doc (`docs/roadmap-phase-*.md`), OR adds `✅ Done` near a stage header.
