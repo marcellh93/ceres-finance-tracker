@@ -19,14 +19,14 @@ public class TransferReviewServiceTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
         var attachmentMock          = new Mock<IFileAttachmentService>().Object;
         var transactionService      = new TransactionService(
-            _fixture.Db, accountService, liabilityPaymentService, attachmentMock, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var transferService         = new TransferService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+            _fixture.Db, accountService, liabilityPaymentService, attachmentMock, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        var transferService         = new TransferService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
 
-        _service = new TransferReviewService(_fixture.Db, transferService, transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _service = new TransferReviewService(_fixture.Db, transferService, transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
 
         var a = new Account { Id = Guid.NewGuid(), Name = "A", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var b = new Account { Id = Guid.NewGuid(), Name = "B", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

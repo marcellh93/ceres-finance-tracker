@@ -33,14 +33,14 @@ public class ImportServiceIntegrationTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
-        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
 
-        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var stagedTransactionService = new ImportStagedTransactionService(_fixture.Db, transactionService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
-        _service = new ImportService(parserFactory, _fixture.Db, transactionService, stagedTransactionService: stagedTransactionService);
+        _service = new ImportService(parserFactory, TimeProvider.System, _fixture.Db, transactionService, stagedTransactionService: stagedTransactionService);
 
         var account = new Account
         {

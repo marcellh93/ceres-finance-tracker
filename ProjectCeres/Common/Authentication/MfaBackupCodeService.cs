@@ -23,11 +23,13 @@ public sealed class MfaBackupCodeService
 
     private readonly AppDbContext _db;
     private readonly Argon2idPasswordHasher _hasher;
+    private readonly TimeProvider _timeProvider;
 
-    public MfaBackupCodeService(AppDbContext db, Argon2idPasswordHasher hasher)
+    public MfaBackupCodeService(AppDbContext db, Argon2idPasswordHasher hasher, TimeProvider timeProvider)
     {
         _db = db;
         _hasher = hasher;
+        _timeProvider = timeProvider;
     }
 
     public async Task<IReadOnlyList<string>> GenerateAndPersistAsync(Guid userId, CancellationToken ct)
@@ -42,7 +44,7 @@ public sealed class MfaBackupCodeService
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 CodeHash = hash,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
             });
             codes.Add(Format(raw));
         }
@@ -93,7 +95,7 @@ public sealed class MfaBackupCodeService
             var result = _hasher.VerifyHashedPassword(new ApplicationUser(), row.CodeHash, normalized);
             if (result is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded)
             {
-                row.UsedAt = DateTime.UtcNow;
+                row.UsedAt = _timeProvider.GetUtcNow().UtcDateTime;
                 row.UsedFromIp = clientIp;
                 await _db.SaveChangesAsync(ct);
                 await scope.CommitAsync(ct);

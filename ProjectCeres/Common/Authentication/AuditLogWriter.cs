@@ -11,15 +11,17 @@ public class AuditLogWriter : IAuditLogWriter
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly TimeProvider _timeProvider;
 
     // Mirrors FailedLoginRecorder's fresh-scope discipline. Each RecordAsync
     // call resolves its own AppDbContext from a private scope to insulate
     // the writer from a request DbContext that may have been left holding
     // a stale tracked entity after an Identity-internal concurrency race.
-    public AuditLogWriter(IServiceScopeFactory scopeFactory, IHttpContextAccessor httpContextAccessor)
+    public AuditLogWriter(IServiceScopeFactory scopeFactory, IHttpContextAccessor httpContextAccessor, TimeProvider timeProvider)
     {
         _scopeFactory = scopeFactory;
         _httpContextAccessor = httpContextAccessor;
+        _timeProvider = timeProvider;
     }
 
     public virtual async Task RecordAsync(
@@ -46,7 +48,7 @@ public class AuditLogWriter : IAuditLogWriter
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
-            OccurredAt = DateTime.UtcNow,
+            OccurredAt = _timeProvider.GetUtcNow().UtcDateTime,
             IpAddress = string.IsNullOrEmpty(ip) ? "unknown" : ip,
         };
 

@@ -16,7 +16,7 @@ public sealed class UserBlockedIpMiddleware
 
     public UserBlockedIpMiddleware(RequestDelegate next) => _next = next;
 
-    public async Task InvokeAsync(HttpContext context, AppDbContext db)
+    public async Task InvokeAsync(HttpContext context, AppDbContext db, TimeProvider timeProvider)
     {
         if (context.User?.Identity?.IsAuthenticated == true
             && Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
@@ -26,7 +26,7 @@ public sealed class UserBlockedIpMiddleware
                 .AnyAsync(b => b.UserId == userId && b.IpAddress == ip);
             if (blocked)
             {
-                var now = DateTime.UtcNow;
+                var now = timeProvider.GetUtcNow().UtcDateTime;
                 await db.UserSessions
                     .Where(s => s.UserId == userId && s.IpCreatedAt == ip && s.RevokedAt == null)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.RevokedAt, now));

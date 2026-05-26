@@ -15,16 +15,19 @@ public class FileAttachmentService : IFileAttachmentService
     private readonly AppDbContext db;
     private readonly ICurrentUserAccessor user;
     private readonly string _root;
+    private readonly TimeProvider _timeProvider;
 
     public FileAttachmentService(
         AppDbContext db,
         IWebHostEnvironment env,
         ICurrentUserAccessor user,
+        TimeProvider timeProvider,
         IOptions<FileAttachmentOptions>? options = null)
     {
         this.db   = db;
         this.user = user;
         _root     = options?.Value.RootPath ?? env.ContentRootPath;
+        _timeProvider = timeProvider;
     }
 
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
@@ -102,7 +105,7 @@ public class FileAttachmentService : IFileAttachmentService
             StoredPath    = relativePath,
             ContentType   = detectedMime,
             FileSizeBytes = bytes.Length,
-            UploadedAt    = DateTime.UtcNow
+            UploadedAt    = _timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.TransactionAttachments.Add(attachment);
@@ -179,7 +182,7 @@ public class FileAttachmentService : IFileAttachmentService
             StoredPath    = relativePath,
             ContentType   = detectedMime,
             FileSizeBytes = bytes.Length,
-            UploadedAt    = DateTime.UtcNow
+            UploadedAt    = _timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.TransferAttachments.Add(attachment);

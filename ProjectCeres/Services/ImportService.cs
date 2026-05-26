@@ -11,6 +11,7 @@ namespace ProjectCeres.Services;
 
 public class ImportService(
     ImportParserFactory parserFactory,
+    TimeProvider timeProvider,
     AppDbContext? db = null,
     ITransactionService? transactionService = null,
     ITransferDetectionService? transferDetectionService = null,
@@ -123,7 +124,7 @@ public class ImportService(
                         db.ImportStagedTransactions.Add(new ImportStagedTransaction
                         {
                             Id                   = Guid.NewGuid(),
-                            ImportedAt           = DateTime.UtcNow,
+                            ImportedAt           = timeProvider.GetUtcNow().UtcDateTime,
                             AccountId            = accountId,
                             RawDate              = row.Date,
                             RawAmount            = row.Amount,

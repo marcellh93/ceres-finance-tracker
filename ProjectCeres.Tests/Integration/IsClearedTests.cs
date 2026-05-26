@@ -31,11 +31,11 @@ public class IsClearedTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
         var attachmentService = new Mock<IFileAttachmentService>().Object;
-        _txService = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        _trService = new TransferService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _txService = new TransactionService(_fixture.Db, _accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        _trService = new TransferService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
 
         var a1 = new Account { Id = Guid.NewGuid(), Name = $"IsCleared A1 {Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var a2 = new Account { Id = Guid.NewGuid(), Name = $"IsCleared A2 {Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

@@ -1,4 +1,5 @@
 // ProjectCeres/Services/TransferDetectionService.cs
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
@@ -132,6 +133,7 @@ public class TransferDetectionService : ITransferDetectionService
         return normalizedExclusions.Any(p => lower.Contains(p));
     }
 
+    [AllowsWallClock("entity construction inside pure-functional detection service; class has no DI surface and adding one is out of 9.5c scope")]
     private static ImportStagedTransfer MakeStagedRow(
         ParsedImportRow row,
         Guid accountId,

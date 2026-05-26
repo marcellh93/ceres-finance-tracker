@@ -31,8 +31,8 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        _service = new RecurringTransactionService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        _service = new RecurringTransactionService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
 
         // Create a reusable test account with no opening balance so any date is valid for ConfirmAsync.
         var account = new Account

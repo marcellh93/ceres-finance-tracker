@@ -22,14 +22,14 @@ public class TransferStagingImportTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
 
-        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var accountService          = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        var liabilityPaymentService = new LiabilityPaymentService(_fixture.Db, accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
         var attachmentService       = new Mock<IFileAttachmentService>().Object;
-        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var transactionService      = new TransactionService(_fixture.Db, accountService, liabilityPaymentService, attachmentService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
         var detectionService        = new TransferDetectionService();
 
         var parserFactory = new ImportParserFactory(new CsvImportParser(), new ExcelImportParser());
-        _service = new ImportService(parserFactory, _fixture.Db, transactionService, detectionService);
+        _service = new ImportService(parserFactory, TimeProvider.System, _fixture.Db, transactionService, detectionService);
 
         var a = new Account { Id = Guid.NewGuid(), Name = "Account A", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
         var b = new Account { Id = Guid.NewGuid(), Name = "Account B", AccountTypeId = 1, CurrencyId = 1, IsActive = true };

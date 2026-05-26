@@ -6,7 +6,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class RecurringTransactionService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : IRecurringTransactionService
+public class RecurringTransactionService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user, TimeProvider timeProvider) : IRecurringTransactionService
 {
     public async Task<IEnumerable<RecurringTransaction>> GetAllAsync(bool includeInactive = false)
     {
@@ -230,7 +230,7 @@ public class RecurringTransactionService(AppDbContext db, IAccountService accoun
             Description = request.Description ?? reminder.Name,
             AccountId   = reminder.AccountId,
             CategoryId  = reminder.CategoryId,
-            CreatedAt   = DateTime.UtcNow
+            CreatedAt   = timeProvider.GetUtcNow().UtcDateTime
         };
         db.Transactions.Add(transaction);
         reminder.NextDueDate = AdvanceDueDate(reminder, confirmDate: request.Date, nextDueDate: request.NextDueDate);

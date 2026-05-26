@@ -25,8 +25,8 @@ public class TransferValidationTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
-        _service = new TransferService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _accountService = new AccountService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
+        _service = new TransferService(_fixture.Db, _accountService, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

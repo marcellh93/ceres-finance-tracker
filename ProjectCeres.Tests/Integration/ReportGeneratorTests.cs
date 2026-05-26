@@ -37,7 +37,7 @@ public class ReportGeneratorTests : IAsyncLifetime
     {
         await _fixture.InitAsync();
         var sentinel = new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001"));
-        _accountService         = new AccountService(_fixture.Db, sentinel);
+        _accountService         = new AccountService(_fixture.Db, sentinel, TimeProvider.System);
         var settingsService     = new SettingsService(_fixture.Db, sentinel);
         _categoryBudgetService  = new CategoryBudgetService(_fixture.Db, settingsService, sentinel);
     }

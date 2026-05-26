@@ -9,7 +9,8 @@ namespace ProjectCeres.Services;
 public class ImportStagedTransactionService(
     AppDbContext db,
     ITransactionService transactionService,
-    ICurrentUserAccessor user) : IImportStagedTransactionService
+    ICurrentUserAccessor user,
+    TimeProvider timeProvider) : IImportStagedTransactionService
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
@@ -35,7 +36,7 @@ public class ImportStagedTransactionService(
             return Result.Fail("NOT_FOUND", "Staged transaction not found.");
 
         staged.Status     = StagedTransactionStatus.Confirmed;
-        staged.ResolvedAt = DateTime.UtcNow;
+        staged.ResolvedAt = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync();
         return Result.Ok();
     }
@@ -50,7 +51,7 @@ public class ImportStagedTransactionService(
         foreach (var staged in pending)
         {
             staged.Status     = StagedTransactionStatus.Confirmed;
-            staged.ResolvedAt = DateTime.UtcNow;
+            staged.ResolvedAt = timeProvider.GetUtcNow().UtcDateTime;
         }
 
         await db.SaveChangesAsync();
@@ -80,7 +81,7 @@ public class ImportStagedTransactionService(
             await transactionService.MarkNeedsReviewAsync(txId, needsReview: true);
 
             staged.Status     = StagedTransactionStatus.Disputed;
-            staged.ResolvedAt = DateTime.UtcNow;
+            staged.ResolvedAt = timeProvider.GetUtcNow().UtcDateTime;
             await db.SaveChangesAsync();
             return Result.Ok();
         }

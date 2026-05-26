@@ -284,7 +284,7 @@ internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
         Microsoft.Extensions.Logging.ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog,
         LockoutCache lockoutCache)
-        : base(userManager, db, argon, tokens, lookupHasher, email, composer, recipients, languages, logger, auditLog, lockoutCache) { }
+        : base(userManager, db, argon, tokens, lookupHasher, email, composer, recipients, languages, logger, auditLog, lockoutCache, TimeProvider.System) { }
 
     public override Task IssueAsync(
         Guid userId, string userEmail, string ip, string userAgent,

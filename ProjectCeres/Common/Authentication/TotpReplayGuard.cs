@@ -12,6 +12,7 @@ public sealed class TotpReplayGuard
 {
     private readonly AppDbContext _db;
     private readonly Argon2idPasswordHasher _hasher;
+    private readonly TimeProvider _timeProvider;
 
     // Per-user semaphore: serializes concurrent TryAcceptAsync calls for the same user
     // within this app process. Without serialization, two simultaneous requests with the
@@ -21,10 +22,11 @@ public sealed class TotpReplayGuard
     // the dictionary itself is held in a static field (process-lifetime).
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _userLocks = new();
 
-    public TotpReplayGuard(AppDbContext db, Argon2idPasswordHasher hasher)
+    public TotpReplayGuard(AppDbContext db, Argon2idPasswordHasher hasher, TimeProvider timeProvider)
     {
         _db = db;
         _hasher = hasher;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>
@@ -53,7 +55,7 @@ public sealed class TotpReplayGuard
     [RlsBypassJustified("CER-1013")]
     private async Task<bool> TryAcceptLockedAsync(Guid userId, string code, CancellationToken ct)
     {
-        var threshold = DateTime.UtcNow - MfaConstants.ReplayWindow;
+        var threshold = _timeProvider.GetUtcNow().UtcDateTime - MfaConstants.ReplayWindow;
 
         // Stage 9.6.1 (2026-05-18) — wrap the read+write sequence in an explicit
         // transaction with SET LOCAL app.current_user_ref. Without this, the
@@ -86,7 +88,7 @@ public sealed class TotpReplayGuard
             Id = Guid.NewGuid(),
             UserId = userId,
             CodeHash = _hasher.HashPassword(new ApplicationUser(), code),
-            AcceptedAt = DateTime.UtcNow,
+            AcceptedAt = _timeProvider.GetUtcNow().UtcDateTime,
         });
         // Cross-tenant by design: purge of expired replay entries; retention sweep operates across all users. Stage 10 architecture test allow-lists this file.
         await _db.TotpReplayEntries

@@ -39,6 +39,7 @@ public sealed class EmailChangeService
     private readonly ILogger<EmailChangeService> _logger;
     private readonly IAuditLogWriter _auditLog;
     private readonly ILookupNormalizer _normalizer;
+    private readonly TimeProvider _timeProvider;
 
     public EmailChangeService(
         UserManager<ApplicationUser> userManager,
@@ -53,7 +54,8 @@ public sealed class EmailChangeService
         IMemoryCache cache,
         ILogger<EmailChangeService> logger,
         IAuditLogWriter auditLog,
-        ILookupNormalizer normalizer)
+        ILookupNormalizer normalizer,
+        TimeProvider timeProvider)
     {
         _userManager = userManager;
         _db = db;
@@ -68,6 +70,7 @@ public sealed class EmailChangeService
         _auditLog = auditLog;
         _logger = logger;
         _normalizer = normalizer;
+        _timeProvider = timeProvider;
     }
 
     public sealed class RateLimitedException : Exception
@@ -151,7 +154,7 @@ public sealed class EmailChangeService
             await _db.EmailChangeTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             verifyRaw = _tokens.Generate();
             revokeRaw = _tokens.Generate();
@@ -160,7 +163,7 @@ public sealed class EmailChangeService
             var verifyLookup = _lookupHasher.ComputeLookup(verifyRaw);
             var revokeLookup = _lookupHasher.ComputeLookup(revokeRaw);
 
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _db.EmailChangeTokens.Add(new EmailChangeToken
             {
                 Id = Guid.NewGuid(),
@@ -236,7 +239,7 @@ public sealed class EmailChangeService
         // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
         // Purpose filter is defence-in-depth — a raw token must never match across
         // purposes because each /request issues distinct VerifyNew + RevokeOld tokens.
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
         // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
         var match = await _db.EmailChangeTokens
@@ -267,7 +270,7 @@ public sealed class EmailChangeService
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
-            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
+            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= _timeProvider.GetUtcNow().UtcDateTime)
             {
                 return new EmailChangeConfirmOutcome.InvalidToken();
             }
@@ -314,7 +317,7 @@ public sealed class EmailChangeService
             await _db.EmailChangeTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.Id == match.Id)
-                .ExecuteUpdateExactlyAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct: ct);
+                .ExecuteUpdateExactlyAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct: ct);
 
             // Consume sibling RevokeOld row.
             // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
@@ -324,14 +327,14 @@ public sealed class EmailChangeService
                          && t.Purpose == EmailChangeTokenPurpose.RevokeOld
                          && t.NewEmail == match.NewEmail
                          && t.ConsumedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             // Bulk-revoke all sessions for this user.
             // Cross-tenant by design: token-based pre-auth operation. Stage 10 allow-lists this file.
             await _db.UserSessions
                 .IgnoreQueryFilters()
                 .Where(s => s.UserId == user.Id && s.RevokedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             // SecurityStamp regen — invalidates any in-flight Identity cookies via SecurityStampValidator.
             await _userManager.UpdateSecurityStampAsync(user);
@@ -388,7 +391,7 @@ public sealed class EmailChangeService
         }
 
         // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
         // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
         var match = await _db.EmailChangeTokens
@@ -419,7 +422,7 @@ public sealed class EmailChangeService
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
-            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
+            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= _timeProvider.GetUtcNow().UtcDateTime)
             {
                 return new EmailChangeRevokeOutcome.InvalidToken();
             }
@@ -431,7 +434,7 @@ public sealed class EmailChangeService
                 .Where(t => t.UserId == match.UserId
                          && t.NewEmail == match.NewEmail
                          && t.ConsumedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             // Notify the OLD address only. The change is cancelled; user.Email is unchanged.
             var user = await _userManager.FindByIdAsync(match.UserId.ToString());
@@ -467,22 +470,22 @@ public sealed class EmailChangeService
         // No per-email semaphore: MemoryCache is thread-safe and a tiny race on Count is intentional.
         var key = $"emailchange:rate:{normalizedNewEmail}";
         var entry = _cache.Get<RateBucket>(key);
-        if (entry is null || entry.WindowStart + EmailRateWindow <= DateTime.UtcNow)
+        if (entry is null || entry.WindowStart + EmailRateWindow <= _timeProvider.GetUtcNow().UtcDateTime)
         {
-            entry = new RateBucket { WindowStart = DateTime.UtcNow, Count = 1 };
+            entry = new RateBucket { WindowStart = _timeProvider.GetUtcNow().UtcDateTime, Count = 1 };
             _cache.Set(key, entry, EmailRateWindow);
             return;
         }
 
         if (entry.Count >= EmailRateLimit)
         {
-            var elapsed = DateTime.UtcNow - entry.WindowStart;
+            var elapsed = _timeProvider.GetUtcNow().UtcDateTime - entry.WindowStart;
             var remaining = (int)Math.Ceiling((EmailRateWindow - elapsed).TotalSeconds);
             throw new RateLimitedException(Math.Max(remaining, 1));
         }
 
         entry.Count += 1;
-        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - DateTime.UtcNow);
+        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - _timeProvider.GetUtcNow().UtcDateTime);
     }
 
     private sealed class RateBucket

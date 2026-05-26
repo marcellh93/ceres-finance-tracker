@@ -40,7 +40,8 @@ public sealed class PersistentCookieRotationMiddleware
         HttpContext context,
         AdminDbContext db,
         PersistentTokenService tokens,
-        SignInManager<ApplicationUser> signInManager)
+        SignInManager<ApplicationUser> signInManager,
+        TimeProvider timeProvider)
     {
         if (context.User.Identity?.IsAuthenticated == true)
         {
@@ -94,7 +95,7 @@ public sealed class PersistentCookieRotationMiddleware
 
             // Rotate. Issue new cookie in {base64url(sessionIdBytes)}.{secret} format (Gap 3).
             // Hash only the secret; the session ID is stored plaintext in the cookie and indexed in DB.
-            match.RevokedAt = DateTime.UtcNow;
+            match.RevokedAt = timeProvider.GetUtcNow().UtcDateTime;
 
             var newSessionId = Guid.NewGuid();
             var newSecret = tokens.Generate();
@@ -105,8 +106,8 @@ public sealed class PersistentCookieRotationMiddleware
                 PersistentTokenHash = tokens.Hash(newSecret),
                 IpCreatedAt = context.Connection.RemoteIpAddress?.ToString() ?? "",
                 UserAgent = context.Request.Headers.UserAgent.ToString(),
-                CreatedAt = DateTime.UtcNow,
-                LastUsedAt = DateTime.UtcNow,
+                CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
+                LastUsedAt = timeProvider.GetUtcNow().UtcDateTime,
                 IsPersistent = true,
             };
             db.UserSessions.Add(newSession);

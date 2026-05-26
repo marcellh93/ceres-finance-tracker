@@ -21,7 +21,7 @@ public class ImportProfileServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
-        _service = new ImportProfileService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _service = new ImportProfileService(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();

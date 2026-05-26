@@ -36,7 +36,7 @@ public class TransferAttachmentServiceTests : IAsyncLifetime
         var env = new Mock<IWebHostEnvironment>();
         env.Setup(e => e.ContentRootPath).Returns(_tempRoot);
 
-        _service = new FileAttachmentService(_fixture.Db, env.Object, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        _service = new FileAttachmentService(_fixture.Db, env.Object, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")), TimeProvider.System);
 
         // Two accounts needed for a valid transfer.
         var source = new Account

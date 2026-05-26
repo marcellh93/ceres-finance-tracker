@@ -6,7 +6,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class LiabilityPaymentService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : ILiabilityPaymentService
+public class LiabilityPaymentService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user, TimeProvider timeProvider) : ILiabilityPaymentService
 {
     public async Task<LiabilityPayment?> GetByIdAsync(Guid id) =>
         await db.LiabilityPayments
@@ -29,7 +29,7 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
             LiabilityAccountId = vm.LiabilityAccountId!.Value,
             Description        = vm.Description,
             IsCleared          = vm.IsCleared,
-            CreatedAt          = DateTime.UtcNow
+            CreatedAt          = timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.LiabilityPayments.Add(payment);

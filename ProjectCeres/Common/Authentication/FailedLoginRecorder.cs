@@ -9,6 +9,7 @@ public class FailedLoginRecorder
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILookupNormalizer _normalizer;
+    private readonly TimeProvider _timeProvider;
 
     // Use IServiceScopeFactory so each RecordAsync call gets a fresh, isolated
     // DbContext scope. When PasswordSignInAsync races under concurrency, Identity's
@@ -18,10 +19,11 @@ public class FailedLoginRecorder
     // that same context would re-attempt the failed update and throw again, silently
     // swallowing the FailedLoginAttempt insert. Creating a private scope here avoids
     // the contaminated context entirely.
-    public FailedLoginRecorder(IServiceScopeFactory scopeFactory, ILookupNormalizer normalizer)
+    public FailedLoginRecorder(IServiceScopeFactory scopeFactory, ILookupNormalizer normalizer, TimeProvider timeProvider)
     {
         _scopeFactory = scopeFactory;
         _normalizer = normalizer;
+        _timeProvider = timeProvider;
     }
 
     public virtual async Task RecordAsync(
@@ -43,7 +45,7 @@ public class FailedLoginRecorder
             IpAddress = string.IsNullOrEmpty(ipAddress) ? "unknown" : ipAddress,
             UserAgent = Truncate(userAgent ?? "", 512),
             Reason = reason,
-            OccurredAt = DateTime.UtcNow,
+            OccurredAt = _timeProvider.GetUtcNow().UtcDateTime,
         };
         db.FailedLoginAttempts.Add(entry);
         await db.SaveChangesAsync(ct);

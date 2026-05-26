@@ -40,6 +40,7 @@ public class LockoutUnlockService
     private readonly ILogger<LockoutUnlockService> _logger;
     private readonly IAuditLogWriter _auditLog;
     private readonly LockoutCache _lockoutCache;
+    private readonly TimeProvider _timeProvider;
 
     public LockoutUnlockService(
         UserManager<ApplicationUser> userManager,
@@ -53,7 +54,8 @@ public class LockoutUnlockService
         ILanguageResolver languages,
         ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog,
-        LockoutCache lockoutCache)
+        LockoutCache lockoutCache,
+        TimeProvider timeProvider)
     {
         _userManager = userManager;
         _db = db;
@@ -67,6 +69,7 @@ public class LockoutUnlockService
         _logger = logger;
         _auditLog = auditLog;
         _lockoutCache = lockoutCache;
+        _timeProvider = timeProvider;
     }
 
     [RlsBypassJustified("CER-1006")]
@@ -90,12 +93,12 @@ public class LockoutUnlockService
             await _db.LockoutUnlockTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.UserId == userId && t.ConsumedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             rawToken = _tokens.Generate();
             var hash = _tokens.Hash(rawToken);
             var lookup = _lookupHasher.ComputeLookup(rawToken);
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _db.LockoutUnlockTokens.Add(new LockoutUnlockToken
             {
                 Id = Guid.NewGuid(),
@@ -143,7 +146,7 @@ public class LockoutUnlockService
             return new LockoutUnlockOutcome.InvalidToken();
         }
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
         // Cross-tenant by design: token-based pre-auth operation; caller is not in session.
         // Stage 10 architecture test allow-lists this file. Stage 9.1.5.a: indexed lookup
@@ -174,7 +177,7 @@ public class LockoutUnlockService
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
-            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
+            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= _timeProvider.GetUtcNow().UtcDateTime)
             {
                 return new LockoutUnlockOutcome.InvalidToken();
             }
@@ -200,7 +203,7 @@ public class LockoutUnlockService
             await _db.LockoutUnlockTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.Id == match.Id)
-                .ExecuteUpdateExactlyAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct: ct);
+                .ExecuteUpdateExactlyAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct: ct);
 
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LockoutSelfServiceUnlock, ct: ct);
 

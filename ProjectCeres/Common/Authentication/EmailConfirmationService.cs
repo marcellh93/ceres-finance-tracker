@@ -44,6 +44,7 @@ public sealed class EmailConfirmationService
     private readonly ILogger<EmailConfirmationService> _logger;
     private readonly IAuditLogWriter _auditLog;
     private readonly ILookupNormalizer _normalizer;
+    private readonly TimeProvider _timeProvider;
 
     public EmailConfirmationService(
         UserManager<ApplicationUser> userManager,
@@ -59,7 +60,8 @@ public sealed class EmailConfirmationService
         IMemoryCache cache,
         ILogger<EmailConfirmationService> logger,
         IAuditLogWriter auditLog,
-        ILookupNormalizer normalizer)
+        ILookupNormalizer normalizer,
+        TimeProvider timeProvider)
     {
         _userManager = userManager;
         _db = db;
@@ -75,6 +77,7 @@ public sealed class EmailConfirmationService
         _logger = logger;
         _auditLog = auditLog;
         _normalizer = normalizer;
+        _timeProvider = timeProvider;
     }
 
     public sealed class RateLimitedException : Exception
@@ -102,13 +105,13 @@ public sealed class EmailConfirmationService
             await _db.EmailConfirmationTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.UserId == userId && t.ConsumedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             rawToken = _tokens.Generate();
             var hash = _tokens.Hash(rawToken);
             var lookup = _lookupHasher.ComputeLookup(rawToken);
 
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _db.EmailConfirmationTokens.Add(new EmailConfirmationToken
             {
                 Id = Guid.NewGuid(),
@@ -192,22 +195,22 @@ public sealed class EmailConfirmationService
         // limiter is the hard defence against abuse.
         var key = $"emailconfirm:rate:{normalizedEmail}";
         var entry = _cache.Get<RateBucket>(key);
-        if (entry is null || entry.WindowStart + EmailRateWindow <= DateTime.UtcNow)
+        if (entry is null || entry.WindowStart + EmailRateWindow <= _timeProvider.GetUtcNow().UtcDateTime)
         {
-            entry = new RateBucket { WindowStart = DateTime.UtcNow, Count = 1 };
+            entry = new RateBucket { WindowStart = _timeProvider.GetUtcNow().UtcDateTime, Count = 1 };
             _cache.Set(key, entry, EmailRateWindow);
             return;
         }
 
         if (entry.Count >= EmailRateLimit)
         {
-            var elapsed = DateTime.UtcNow - entry.WindowStart;
+            var elapsed = _timeProvider.GetUtcNow().UtcDateTime - entry.WindowStart;
             var remaining = (int)Math.Ceiling((EmailRateWindow - elapsed).TotalSeconds);
             throw new RateLimitedException(Math.Max(remaining, 1));
         }
 
         entry.Count += 1;
-        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - DateTime.UtcNow);
+        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - _timeProvider.GetUtcNow().UtcDateTime);
     }
 
     private sealed class RateBucket
@@ -225,7 +228,7 @@ public sealed class EmailConfirmationService
             return new EmailConfirmationConfirmOutcome.InvalidToken();
         }
 
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
         // AdminDbContext (BYPASSRLS) for the initial pre-userId lookup. IgnoreQueryFilters
         // bypasses the EF-level per-user global filter that AdminDbContext inherits.
@@ -260,7 +263,7 @@ public sealed class EmailConfirmationService
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
-            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
+            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= _timeProvider.GetUtcNow().UtcDateTime)
             {
                 return new EmailConfirmationConfirmOutcome.InvalidToken();
             }
@@ -278,7 +281,7 @@ public sealed class EmailConfirmationService
             await _db.EmailConfirmationTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.Id == match.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             await _auditLog.RecordAsync(user.Id, AuditLogAction.EmailVerified, ct: ct);
 

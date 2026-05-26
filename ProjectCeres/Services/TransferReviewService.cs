@@ -10,7 +10,8 @@ public class TransferReviewService(
     AppDbContext db,
     ITransferService transferService,
     ITransactionService transactionService,
-    ICurrentUserAccessor user) : ITransferReviewService
+    ICurrentUserAccessor user,
+    TimeProvider timeProvider) : ITransferReviewService
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");
@@ -59,7 +60,7 @@ public class TransferReviewService(
         }
 
         staged.Status     = StagedTransferStatus.Linked;
-        staged.ResolvedAt = DateTime.UtcNow;
+        staged.ResolvedAt = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync();
         return Result.Ok();
     }
@@ -94,7 +95,7 @@ public class TransferReviewService(
         }
 
         staged.Status     = StagedTransferStatus.CreatedAsTransfer;
-        staged.ResolvedAt = DateTime.UtcNow;
+        staged.ResolvedAt = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync();
         return Result.Ok();
     }
@@ -138,13 +139,13 @@ public class TransferReviewService(
                 {
                     Id                 = Guid.NewGuid(),
                     DescriptionPattern = normalized,
-                    CreatedAt          = DateTime.UtcNow
+                    CreatedAt          = timeProvider.GetUtcNow().UtcDateTime
                 });
             }
         }
 
         staged.Status     = StagedTransferStatus.DismissedAsTransaction;
-        staged.ResolvedAt = DateTime.UtcNow;
+        staged.ResolvedAt = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync();
         return Result.Ok();
     }

@@ -42,6 +42,7 @@ public sealed class AuthController : ControllerBase
     private readonly Services.CategorySeedService _categorySeedService;
     private readonly LockoutCache _lockoutCache;
     private readonly EmailConfirmationService _emailConfirmation;
+    private readonly TimeProvider _timeProvider;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -56,7 +57,8 @@ public sealed class AuthController : ControllerBase
         ILogger<AuthController> logger,
         Services.CategorySeedService categorySeedService,
         LockoutCache lockoutCache,
-        EmailConfirmationService emailConfirmation)
+        EmailConfirmationService emailConfirmation,
+        TimeProvider timeProvider)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -71,6 +73,7 @@ public sealed class AuthController : ControllerBase
         _categorySeedService = categorySeedService;
         _lockoutCache = lockoutCache;
         _emailConfirmation = emailConfirmation;
+        _timeProvider = timeProvider;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -433,8 +436,8 @@ public sealed class AuthController : ControllerBase
             UserId = user.Id,
             IpCreatedAt = ip,
             UserAgent = ua,
-            CreatedAt = DateTime.UtcNow,
-            LastUsedAt = DateTime.UtcNow,
+            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
+            LastUsedAt = _timeProvider.GetUtcNow().UtcDateTime,
             IsPersistent = rememberMe,
             UsedBackupCodeAtLogin = usedBackupCode,
         };
@@ -570,7 +573,7 @@ public sealed class AuthController : ControllerBase
             var session = await _db.UserSessions.FirstOrDefaultAsync(s => s.Id == sid);
             if (session is not null && session.RevokedAt is null)
             {
-                session.RevokedAt = DateTime.UtcNow;
+                session.RevokedAt = _timeProvider.GetUtcNow().UtcDateTime;
                 await _db.SaveChangesAsync();
             }
         }
@@ -589,7 +592,7 @@ public sealed class AuthController : ControllerBase
 
                 if (match is not null && _tokens.Verify(p.secret, match.PersistentTokenHash!))
                 {
-                    match.RevokedAt = DateTime.UtcNow;
+                    match.RevokedAt = _timeProvider.GetUtcNow().UtcDateTime;
                     await _db.SaveChangesAsync();
                 }
             }

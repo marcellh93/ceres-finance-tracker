@@ -63,7 +63,7 @@ public class PreAuthWritesUnderRlsTests
                 new ProjectCeres.Common.Authentication.Argon2idOptions
                 {
                     MemorySizeKb = 8192, Iterations = 1, Parallelism = 1,
-                })));
+                })), TimeProvider.System);
 
         // Pre-fix this throws RlsPolicyViolationException on the INSERT.
         var firstAccept = await guard.TryAcceptAsync(userId, "654987", CancellationToken.None);

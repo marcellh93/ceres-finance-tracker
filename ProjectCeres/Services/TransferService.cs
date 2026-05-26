@@ -6,7 +6,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class TransferService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user) : ITransferService
+public class TransferService(AppDbContext db, IAccountService accountService, ICurrentUserAccessor user, TimeProvider timeProvider) : ITransferService
 {
     public async Task<IEnumerable<Transfer>> GetAllAsync() =>
         await db.Transfers
@@ -40,7 +40,7 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
             DestAccountId   = vm.DestAccountId!.Value,
             Description     = vm.Description,
             IsCleared       = vm.IsCleared,
-            CreatedAt       = DateTime.UtcNow
+            CreatedAt       = timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.Transfers.Add(transfer);

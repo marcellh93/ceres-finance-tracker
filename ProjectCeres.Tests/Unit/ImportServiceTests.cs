@@ -51,7 +51,7 @@ public class ImportServiceTests
     [Fact]
     public async Task ParseAsync_ValidCsv_Returns10RowsWithCorrectFields()
     {
-        var service = new ImportService(BuildFactory());
+        var service = new ImportService(BuildFactory(), TimeProvider.System);
         var file    = FileFromFixture("valid_import.csv");
         var mappings = StandardMappings();
 
@@ -68,7 +68,7 @@ public class ImportServiceTests
     {
         // Per spec 2026-04-29 the parser no longer flips signs. Direction is inferred
         // downstream from the raw signed amount; the flip used to invert classification.
-        var service  = new ImportService(BuildFactory());
+        var service  = new ImportService(BuildFactory(), TimeProvider.System);
         var mappings = new ImportColumnMappings
         {
             DateColumn        = "Date",
@@ -98,7 +98,7 @@ public class ImportServiceTests
     [Fact]
     public async Task ParseAsync_ColumnMappingApplied_MapsFromCorrectColumns()
     {
-        var service  = new ImportService(BuildFactory());
+        var service  = new ImportService(BuildFactory(), TimeProvider.System);
         var mappings = new ImportColumnMappings
         {
             DateColumn        = "Txn Date",
@@ -133,7 +133,7 @@ public class ImportServiceTests
         // xlsx_attempt.xlsx is a valid ZIP but has no worksheets — ClosedXML will throw.
         // The important thing is that it is no longer rejected as "unsupported format";
         // it is handed off to ExcelImportParser.
-        var service  = new ImportService(BuildFactory());
+        var service  = new ImportService(BuildFactory(), TimeProvider.System);
         var file     = FileFromFixture("xlsx_attempt.xlsx");
         var mappings = StandardMappings();
 
@@ -148,7 +148,7 @@ public class ImportServiceTests
     [Fact]
     public void GenerateFingerprint_SameInputs_ReturnsSameDeterministicHash()
     {
-        var service = new ImportService(BuildFactory());
+        var service = new ImportService(BuildFactory(), TimeProvider.System);
         var accountId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
         var date = new DateOnly(2024, 1, 1);
 
@@ -162,7 +162,7 @@ public class ImportServiceTests
     [Fact]
     public void GenerateFingerprint_DifferentAmount_ReturnsDifferentHash()
     {
-        var service = new ImportService(BuildFactory());
+        var service = new ImportService(BuildFactory(), TimeProvider.System);
         var accountId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
         var date = new DateOnly(2024, 1, 1);
 

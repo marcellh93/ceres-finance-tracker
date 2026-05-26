@@ -8,7 +8,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : IImportProfileService
+public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user, TimeProvider timeProvider) : IImportProfileService
 {
     private static readonly JsonSerializerOptions JsonOpts =
         new() { PropertyNameCaseInsensitive = true };
@@ -26,7 +26,7 @@ public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : 
 
     public async Task<IEnumerable<ImportProfileViewModel>> GetRecentlyDeletedAsync()
     {
-        var cutoff = DateTime.UtcNow.AddDays(-90);
+        var cutoff = timeProvider.GetUtcNow().UtcDateTime.AddDays(-90);
 
         var profiles = await db.ImportProfiles
             .Owned(user)
@@ -52,7 +52,7 @@ public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : 
             Format         = format,
             SheetName      = mappings.SheetName,
             ColumnMappings = JsonSerializer.Serialize(mappings),
-            CreatedAt      = DateTime.UtcNow
+            CreatedAt      = timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.ImportProfiles.Add(profile);
@@ -76,7 +76,7 @@ public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : 
         var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id)
             ?? throw new InvalidOperationException($"Import profile {id} not found.");
 
-        profile.DeletedAt = DateTime.UtcNow;
+        profile.DeletedAt = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync();
     }
 
@@ -108,7 +108,7 @@ public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : 
             Format         = format,
             SheetName      = mappings.SheetName,
             ColumnMappings = JsonSerializer.Serialize(mappings),
-            CreatedAt      = DateTime.UtcNow
+            CreatedAt      = timeProvider.GetUtcNow().UtcDateTime
         };
         db.ImportProfiles.Add(profile);
         await db.SaveChangesAsync();
@@ -137,7 +137,7 @@ public class ImportProfileService(AppDbContext db, ICurrentUserAccessor user) : 
     {
         var profile = await db.ImportProfiles.Owned(user).FirstOrDefaultAsync(p => p.Id == id);
         if (profile is null) return Result.Fail("NOT_FOUND", "Import profile not found.");
-        profile.DeletedAt = DateTime.UtcNow;
+        profile.DeletedAt = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync();
         return Result.Ok();
     }

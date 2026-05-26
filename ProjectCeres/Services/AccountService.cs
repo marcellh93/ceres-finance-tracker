@@ -6,7 +6,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
-public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccountService
+public class AccountService(AppDbContext db, ICurrentUserAccessor user, TimeProvider timeProvider) : IAccountService
 {
     // Opening Balance category is seeded with this known Guid (see AppDbContext seed data).
     private static readonly Guid OpeningBalanceCategoryId = new("20000000-0000-0000-0000-000000000001");
@@ -287,7 +287,7 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
                 Description = "Opening Balance",
                 AccountId   = account.Id,
                 CategoryId  = OpeningBalanceCategoryId,
-                CreatedAt   = DateTime.UtcNow,
+                CreatedAt   = timeProvider.GetUtcNow().UtcDateTime,
                 UserId      = user.UserId,
             });
         }
@@ -347,7 +347,7 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user) : IAccou
                 Description = "Opening Balance",
                 AccountId   = id,
                 CategoryId  = OpeningBalanceCategoryId,
-                CreatedAt   = DateTime.UtcNow,
+                CreatedAt   = timeProvider.GetUtcNow().UtcDateTime,
                 UserId      = user.UserId,
             });
         }

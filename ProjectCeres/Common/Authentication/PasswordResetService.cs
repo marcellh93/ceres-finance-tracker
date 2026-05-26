@@ -48,6 +48,7 @@ public sealed class PasswordResetService
     private readonly ILogger<PasswordResetService> _logger;
     private readonly IAuditLogWriter _auditLog;
     private readonly ILookupNormalizer _normalizer;
+    private readonly TimeProvider _timeProvider;
 
     public PasswordResetService(
         UserManager<ApplicationUser> userManager,
@@ -66,7 +67,8 @@ public sealed class PasswordResetService
         IMemoryCache cache,
         ILogger<PasswordResetService> logger,
         IAuditLogWriter auditLog,
-        ILookupNormalizer normalizer)
+        ILookupNormalizer normalizer,
+        TimeProvider timeProvider)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -85,6 +87,7 @@ public sealed class PasswordResetService
         _logger = logger;
         _auditLog = auditLog;
         _normalizer = normalizer;
+        _timeProvider = timeProvider;
     }
 
     public sealed class RateLimitedException : Exception
@@ -155,13 +158,13 @@ public sealed class PasswordResetService
             await _db.PasswordResetTokens
                 .IgnoreQueryFilters()
                 .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             rawToken = _tokens.Generate();
             var hash = _tokens.Hash(rawToken);
             var lookup = _lookupHasher.ComputeLookup(rawToken);
 
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _db.PasswordResetTokens.Add(new PasswordResetToken
             {
                 Id = Guid.NewGuid(),
@@ -210,22 +213,22 @@ public sealed class PasswordResetService
         // a lock on the string (no unbounded ConcurrentDictionary growth).
         var key = $"pwreset:rate:{normalizedEmail}";
         var entry = _cache.Get<RateBucket>(key);
-        if (entry is null || entry.WindowStart + EmailRateWindow <= DateTime.UtcNow)
+        if (entry is null || entry.WindowStart + EmailRateWindow <= _timeProvider.GetUtcNow().UtcDateTime)
         {
-            entry = new RateBucket { WindowStart = DateTime.UtcNow, Count = 1 };
+            entry = new RateBucket { WindowStart = _timeProvider.GetUtcNow().UtcDateTime, Count = 1 };
             _cache.Set(key, entry, EmailRateWindow);
             return;
         }
 
         if (entry.Count >= EmailRateLimit)
         {
-            var elapsed = DateTime.UtcNow - entry.WindowStart;
+            var elapsed = _timeProvider.GetUtcNow().UtcDateTime - entry.WindowStart;
             var remaining = (int)Math.Ceiling((EmailRateWindow - elapsed).TotalSeconds);
             throw new RateLimitedException(Math.Max(remaining, 1));
         }
 
         entry.Count += 1;
-        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - DateTime.UtcNow);
+        _cache.Set(key, entry, entry.WindowStart + EmailRateWindow - _timeProvider.GetUtcNow().UtcDateTime);
     }
 
     private sealed class RateBucket
@@ -248,7 +251,7 @@ public sealed class PasswordResetService
         // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
         // Replaces the candidate-loop pattern that ran Argon2id verify against every
         // unconsumed unexpired row (Argon2id-amplification DoS on /confirm).
-        var now = DateTime.UtcNow;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
         // Stage 9.6.1 (2026-05-19): the UserId isn't known yet, so we cannot set
         // app.current_user_ref before this SELECT. Without the GUC set, the
@@ -300,7 +303,7 @@ public sealed class PasswordResetService
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
-            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= DateTime.UtcNow)
+            if (current is null || current.ConsumedAt != null || current.ExpiresAt <= _timeProvider.GetUtcNow().UtcDateTime)
             {
                 return new PasswordResetConfirmOutcome.InvalidToken();
             }
@@ -371,15 +374,15 @@ public sealed class PasswordResetService
                     .IgnoreQueryFilters()
                     .Where(t => t.Id == match.Id)
                     .ExecuteUpdateAsync(s => s
-                        .SetProperty(t => t.ConsumedAt, DateTime.UtcNow)
-                        .SetProperty(t => t.MfaVerifiedAt, DateTime.UtcNow), ct);
+                        .SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime)
+                        .SetProperty(t => t.MfaVerifiedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
             }
             else
             {
                 await _db.PasswordResetTokens
                     .IgnoreQueryFilters()
                     .Where(t => t.Id == match.Id)
-                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
             }
 
             // Bulk-revoke all sessions for this user.
@@ -387,7 +390,7 @@ public sealed class PasswordResetService
             await _db.UserSessions
                 .IgnoreQueryFilters()
                 .Where(s => s.UserId == user.Id && s.RevokedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, DateTime.UtcNow), ct);
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
             // Cancel any pending email-change for this user. Reasoning: a password reset
             // is itself a recovery/compromise signal. If an attacker initiated /email-change/request
@@ -402,7 +405,7 @@ public sealed class PasswordResetService
                 await _db.EmailChangeTokens
                     .IgnoreQueryFilters()
                     .Where(t => t.UserId == user.Id && t.ConsumedAt == null)
-                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, DateTime.UtcNow), ct);
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
 
                 try
                 {

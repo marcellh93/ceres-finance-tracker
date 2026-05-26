@@ -60,6 +60,7 @@ builder.Services.AddControllers()
 // does the per-flow isolation; the holder is process-wide. IUserJobRunner is scoped
 // because it depends on the scoped AppDbContext.
 builder.Services.AddSingleton<IUserScope, UserScope>();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IBackgroundJobScope, BackgroundJobScope>();
 builder.Services.AddScoped<IUserJobRunner, UserJobRunner>();
 

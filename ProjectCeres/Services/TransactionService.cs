@@ -11,7 +11,8 @@ public class TransactionService(
     IAccountService accountService,
     ILiabilityPaymentService liabilityPaymentService,
     IFileAttachmentService attachmentService,
-    ICurrentUserAccessor user) : ITransactionService
+    ICurrentUserAccessor user,
+    TimeProvider timeProvider) : ITransactionService
 {
     public async Task<IEnumerable<TransactionListItemViewModel>> GetRecentAsync(
         Guid? accountId = null,
@@ -192,7 +193,7 @@ public class TransactionService(
             CategoryId  = vm.CategoryId!.Value,
             BudgetId    = vm.BudgetId,
             IsCleared   = vm.IsCleared,
-            CreatedAt   = DateTime.UtcNow
+            CreatedAt   = timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.Transactions.Add(transaction);

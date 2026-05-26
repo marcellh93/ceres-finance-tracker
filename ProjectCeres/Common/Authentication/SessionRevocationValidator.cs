@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Common.Authentication;
@@ -15,6 +16,7 @@ namespace ProjectCeres.Common.Authentication;
 /// </summary>
 public static class SessionRevocationValidator
 {
+    [AllowsWallClock("static security-stamp revalidation helper called from cookie validation; TimeProvider injection requires conversion to instance class registered in DI — out of 9.5c scope")]
     public static async Task ValidateAsync(CookieValidatePrincipalContext ctx)
     {
         var sid = ctx.Principal?.FindFirstValue(SessionConstants.SessionIdClaim);
