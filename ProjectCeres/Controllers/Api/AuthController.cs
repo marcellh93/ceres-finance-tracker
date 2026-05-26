@@ -86,9 +86,15 @@ public sealed class AuthController : ControllerBase
         // (DB blip, request cancellation, seeding bug) leaves an orphan AspNetUsers
         // row, and re-registration silently returns 204 per anti-enumeration —
         // permanently locking the email out.
-        await using var tx = await _db.Database.BeginTransactionAsync(HttpContext.RequestAborted);
+        //
+        // RLS: Categories carries a user_isolation policy that gates inserts on
+        // app.current_user_ref = NEW."UserId". Pre-generate user.Id so the
+        // PreAuthUserScope can set the GUC before CategorySeedService inserts the
+        // default categories. EF preserves a non-default Guid set on the entity;
+        // Identity.CreateAsync uses Add+SaveChanges and does not regenerate it.
+        var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = request.Email, Email = request.Email };
+        await using var tx = await _db.BeginPreAuthUserScopeAsync(user.Id, HttpContext.RequestAborted);
 
-        var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
         var result = await _userManager.CreateAsync(user, request.Password);
 
         var verifyUrlBase = $"{Request.Scheme}://{Request.Host}";
