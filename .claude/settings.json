@@ -6,15 +6,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/frustration-detect.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/decision-mode/hooks/decision-detect.js\""
           }
         ]
@@ -45,18 +36,18 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-touch-detect.js\""
           }
         ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/await-answer.js\""
-          }
-        ]
       }
     ],
     "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-protected-path-gate.js\""
+          }
+        ]
+      },
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
@@ -232,33 +223,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/stop-chat-deferral-detect.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-runtime-state/hooks/stop-runtime-state-claim.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-runtime-state/hooks/stop-manual-test-handoff.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-image-claims/hooks/stop-image-claim-detect.js\""
           }
         ]
@@ -268,52 +232,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-roadmap-verify-flip.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/check-resolution.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/claim-without-research.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/repeat-scope-commits.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/fix-interaction/hooks/detect-fix-mention.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/evidence-bundle-check.js\""
           }
         ]
       }

@@ -95,16 +95,13 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 **Required chain.** Both of the following must be in the session state file:
 
 1. `superpowers:brainstorming` (established the design)
-2. The matching verify skill(s) (audited the design against project conventions) — tiered per the spec's proposed content:
-   - **Backend signals only** in the proposed content (e.g. mentions of `ProjectCeres/`, `Program.cs`, EF Core, HTTP status codes, ASP.NET pipeline) → `verify-backend`.
-   - **Frontend signals only** (e.g. mentions of `ProjectCeres.Client/`, `shadcn`, `base-ui`, Tailwind, design-system primitives) → `verify-frontend`.
-   - **Both signals** OR **no detectable signals** (default-safe) → BOTH `verify-backend` AND `verify-frontend`. Invoking the legacy `verify-against-codebase` router satisfies both.
+2. `verify-against-codebase` (audited the design against project conventions). The skill is internally tiered: it reads only the backend or frontend audit sections relevant to the proposed spec's content, or both for mixed/ambiguous specs.
 
-**Enforcement.** HARD via `playbook/hooks/pre-spec-write-gate.js`. **Replaces** the existing `require-verify-against-codebase-before-spec.js` (whose scope is a subset of this gate). Bypass: the file already exists (rewrite of an existing spec).
+**Enforcement.** HARD via `playbook/hooks/pre-spec-write-gate.js`. Bypass: the file already exists (rewrite of an existing spec).
 
-**What counts as fired.** A `Skill` tool call with the required skill name recorded in state, OR an explicit mention of `verify-backend` / `verify-frontend` / `verify-against-codebase` in the assistant transcript (preserves the bypass behavior of today's hook).
+**What counts as fired.** A `Skill` tool call with `verify-against-codebase` recorded in state, OR an explicit mention of `verify-against-codebase` in the assistant transcript (preserves the bypass behavior of today's hook).
 
-**Why tiered.** A pure frontend spec (Stage 9.x theme-toggle-shaped work) gains nothing from running through `verify-backend`'s §1–§5 — those steps inspect `Program.cs`, EF models, and API conventions that the spec doesn't touch. A pure backend spec gains nothing from `verify-frontend`'s shadcn / design-system audit. Splitting keeps the audit proportional to the spec without weakening either side. Origin: 2026-05-17 review session after the `8c8aab9` ThemeToggle commit's audit pipeline ran irrelevant backend checks.
+**History.** 9.5a (2026-05-26) merged the split `verify-backend` + `verify-frontend` siblings back into the unified `verify-against-codebase` skill. The tiering is now internal — the skill reads only the section relevant to the diff. The split was introduced 2026-05-17 after the `8c8aab9` ThemeToggle commit's audit pipeline ran irrelevant backend checks; the merge undid the orchestration overhead now that the audit is one skill that reads in tiers.
 
 **Why HARD not ADVISORY.** The originating motivation for the existing hook was the Stage 6b.1 incident where Claude proposed a homegrown `MfaTicketService` that duplicated framework features. That class of error is high-cost — caught pre-dispatch it's a re-plan; caught mid-execution it's a subagent round trip plus rework. The tiering doesn't weaken that — it just routes to the half of the audit that can catch the relevant class of conflict.
 
@@ -118,19 +115,16 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 **Gating event.** Continuous — fires throughout the build phase via the existing hooks. No additional `playbook` hook needed here; this phase is the existing trio plus two HARD Stop-event gates added 2026-05-18 and 2026-05-20:
 
-1. `deep-fix-mode` — auto-fires on circling signals via `frustration-detect.js`, `loop-fingerprint.js`, `same-target-edit-count.js`.
+1. `deep-fix-mode` — auto-fires on circling signals via `loop-fingerprint.js`, `same-target-edit-count.js` (the `frustration-detect.js` UserPromptSubmit advisory was removed in 9.5a — its phrase-regex over user prose was a doom-loop input rather than independent evidence; circling signals now surface via tool-fingerprint repetition, which is harness-observable).
 2. `decision-mode` — auto-fires on decision-asking prompts via `decision-detect.js`.
 3. `no-unjustified-deferrals` — auto-fires on deferral language and pushback via `pre-write-deferral.js`, `pushback-detect.js`. Phase D escalates this to HARD.
-4. **`verify-runtime-state` (HARD)** — auto-fires on Stop when the assistant's final message asserts a runtime-state value (database row, env var, file contents on disk, process state) without co-located evidence from an actual query. Enforced by `verify-runtime-state/hooks/stop-runtime-state-claim.js`. Three guards (evidence-co-located, explicit-assumption, user-authorization); if all fail, the Stop is blocked with `exit 2`. Origin: 2026-05-18 — assistant claimed `AspNetUsers.TwoFactorEnabled = false` based on the absence of a grep hit in `SeedDevUser.cs`. Code inspection ≠ runtime state.
-5. **`fix-interaction` (HARD)** — auto-fires on Stop when the assistant's final message mentions a fix (per the phrase list in `fix-interaction/hooks/detect-fix-mention.js`) AND no `Edit`/`Write`/`MultiEdit` tool call landed in the same turn. Forces an explicit "fix now or document?" → "where?" → action → resume-prior-thread interaction via a five-state machine (`none → fix-or-document → where → documenting/fixing → resume → none`) coordinated by three hooks (`detect-fix-mention.js` on Stop, `await-answer.js` on UserPromptSubmit, `check-resolution.js` on Stop). Five dead-lock defenses (TTL, atomic state writes, fail-open on hook error, topic-shift detection, three-way escape) sourced from primary-source workflow-orchestration literature — see `fix-interaction/references/dead-lock-defenses.md`. FIX-CONTEXT guard skips the hook when the fix landed in the same turn. Per-session bypass: `CERES_SKIP_FIX_INTERACTION_HOOK=1` or `/fix-interaction-reset`. Origin: 2026-05-20 — 10-scenario simulation scored 0/10 on proactive action (every response described the fix instead of doing it); user's framing: *"the important part is not pointing the fix or the issue out, is acting proactively on it."*
+4. **Evidence bundle (HARD)** — runtime-state claims, fix-mentions without action, manual-test handoffs without prerequisite audits, and chat-deferrals without action are ALL handled by a single Stop-event mechanism: the `verify-stage-completeness/hooks/evidence-bundle-check.js` hook, which checks `.claude/state/evidence/<stage>/` for required tool-output slots (Playwright trace + console + network JSON, curl transcript, psql RLS audit, build matrix, registry sweep, turn-shape JSON). The `turn-shape.json` slot specifically captures: (a) every fix-mention has a co-located Edit, (b) every confidence claim has a co-located WebFetch/Agent, (c) every runtime-state assertion has co-located query output. Stop is blocked if any required slot is missing or stale. Replaces — in one mechanism — the prior `verify-runtime-state/stop-*`, `fix-interaction/*`, `claim-without-research`, `stop-chat-deferral-detect`, `bug-age-deflection-detect`, `stop-roadmap-verify-flip` regex-over-prose Stop hooks (all deleted in 9.5a). Origin: 9.5a Phase 1 cleanup, 2026-05-26 — the prose-reading Stop hooks were a doom-loop layer (Huang et al. arXiv:2310.01798: self-correction degrades on reasoning tasks); replaced with a single tool-grounded artifact gate.
 
-**Enforcement.** Items 1-3 are ADVISORY today (Phase D escalates #3 to HARD). Items 4 and 5 are HARD at the Stop event, regardless of which subsystem the claim or fix-mention touches — they're cross-cutting message-shape gates, not phase-specific.
+**Enforcement.** Items 1-3 are ADVISORY (Phase D escalates #3 to HARD on write). Item 4 is HARD at the Stop event when a code-touching turn produces commits — the gate checks file existence and freshness, NOT assistant prose.
 
 **Consumes / produces.**
-- Consumes: in-progress build state (edits, tool calls, user prompts, assistant outgoing messages).
-- Produces: advisory `additionalContext` reminders (items 1-3); a hard-block on the Stop event when item 4's evidence guard fails or item 5's FIX-CONTEXT guard fails.
-
-**Item 5 hand-off.** When the user answers "document", the state machine transitions to `where`, then `documenting`. The required `[ ]` line written in the destination doc hands to `no-unjustified-deferrals` (Phase D) if the deferral-phrase regex matches the new content — both gates can fire on the same write, and the well-formed-deferral guard's three fields are the natural completion for a `[ ]` opened by `fix-interaction`.
+- Consumes: in-progress build state (edits, tool calls) and the evidence directory `.claude/state/evidence/<stage>/`.
+- Produces: advisory `additionalContext` reminders (items 1-3); a hard-block on the Stop event when the evidence bundle is missing required slots or any slot is stale (item 4).
 
 ---
 
@@ -210,9 +204,7 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 **Required chain.** Tiered by what the staged diff actually touches:
 
-- **Backend-only staged diff** (`.cs` / `.csproj` files only, no `.ts` / `.tsx`, no `.sln`) → `verify-backend` must have fired this session against the latest diff.
-- **Frontend-only staged diff** (`.ts` / `.tsx` files only, no `.cs` / `.csproj`, no `.sln`) → `verify-frontend` must have fired this session against the latest diff.
-- **Mixed diff** (both sides touched) OR **`.sln` present** → BOTH `verify-backend` AND `verify-frontend` must have fired this session. Invoking the legacy `verify-against-codebase` router satisfies both. `.sln` escalates to mixed because solution-file edits can ripple either side.
+- **Any code-touching staged diff** (`.cs`, `.csproj`, `.ts`, `.tsx`, `.sln`) → `verify-against-codebase` must have fired this session against the latest diff. The skill internally tiers on diff content (backend / frontend / both); the gate accepts a single skill fire as proof of audit.
 
 **Enforcement.** HARD via `playbook/hooks/pre-commit-gate.js`. **Path-based bypass (Option C, resolved 2026-05-17):** pure documentation / config / gitignore diffs (`*.md`, `*.json`, `.gitignore`, `*.txt`) skip the gate. Rationale: the verify skills exist to catch code-convention conflicts — they have nothing meaningful to say about doc-only commits.
 
