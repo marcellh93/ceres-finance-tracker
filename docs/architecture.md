@@ -52,7 +52,7 @@ A fourth layer wraps the three above: **Roslyn analyzers**, shipped via `Project
 - **CER010** — `[RlsBypassJustified(ticket)]` ticket argument must match `^(CER\|TICKET\|ADR)-\d+$` (a `Style` invariant: catches lazy justifications).
 - **CER020** — EN/ES resx file parity (a `Localization` invariant; shipped at `error` severity from day 1).
 
-Architecture tests in `ProjectCeres.Tests/Unit/Architecture/` remain the right tool for runtime invariants (DI registrations match expected services, every IUserOwned entity has an RLS migration, every controller action declares authz intent). The two enforcement mechanisms are complementary: analyzers catch the syntactically-locatable invariants at compile time; architecture tests catch the runtime-observable invariants at test time.
+Architecture tests in `ProjectCeres.Tests/Integration/Authentication/` remain the right tool for runtime invariants (DI registrations match expected services, every IUserOwned entity has an RLS migration, every controller action declares authz intent). The two enforcement mechanisms are complementary: analyzers catch the syntactically-locatable invariants at compile time; architecture tests catch the runtime-observable invariants at test time.
 
 Decision record: `docs/decisions/ADR-0077-roslyn-analyzers-for-invariant-enforcement.md`.
 

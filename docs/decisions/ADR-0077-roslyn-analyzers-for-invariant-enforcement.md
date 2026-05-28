@@ -23,7 +23,7 @@ A fourth concern: **EN/ES resx parity** — both `EmailsResource.{en,es}.resx` s
 Existing tooling layers that could have caught these:
 - **`dotnet test`**: misses class 1 because the test fixture uses `ceres_admin` (no RLS). Misses class 2 entirely (no architecture test enforces `[RlsBypassJustified]`). Misses class 3 (no enforcement of `TimeProvider` injection). Misses class 4 (one existing one-test count check fires AT BUILD time, not AT spec-write time — and only verifies count, not content).
 - **`pnpm test`**: frontend only.
-- **Architecture tests in `ProjectCeres.Tests/Unit/Architecture/`**: catch the `IgnoreQueryFilters` allow-list at runtime but produce no IDE feedback and require running tests to discover violations.
+- **Architecture tests in `ProjectCeres.Tests/Integration/Authentication/`**: catch the `IgnoreQueryFilters` allow-list at runtime but produce no IDE feedback and require running tests to discover violations.
 - **Lexical-prose Stop hooks (deleted in 9.5a)**: read the agent's own output to detect violations — fundamentally limited to whatever the agent wrote, not what the agent's tool calls actually did.
 
 ## Decision
@@ -49,7 +49,7 @@ A fourth attribute (`[RequiresAdminContext]`) is reserved for Stage 9.5b's archi
 
 ## Alternatives considered
 
-### Alternative 1 — Architecture-test-only enforcement (extend existing `ProjectCeres.Tests/Unit/Architecture/`)
+### Alternative 1 — Architecture-test-only enforcement (extend existing `ProjectCeres.Tests/Integration/Authentication/`)
 
 Rejected. Architecture tests:
 - Don't surface in the IDE — developer must run `dotnet test` to discover violations.
@@ -77,7 +77,7 @@ Rejected per Roslyn SDK research (2026-05-26): no major published analyzer (Mezi
 
 - **Compile-time guarantee:** the three class-of-bugs are now caught by the compiler, not by tests, browsers, or production observability. Once warning→error flips at N+M+1, `dotnet build` exits non-zero on any new violation.
 - **IDE feedback:** Visual Studio + Rider + VS Code all surface CER warnings/errors in real time. Developer sees the violation as they type, not at PR review time.
-- **Documented bypass intent:** every retroactive bypass site now carries a justification ticket (15 `[RlsBypassJustified]` decorations) or wall-clock reason (5 `[AllowsWallClock]` decorations). Future readers can grep for the ticket to find the explanation; the architecture-test allow-list pattern that previously documented bypasses in a single file (`ProjectCeres.Tests/Unit/Architecture/ArchitectureTests.cs`) remains in place as a defence-in-depth layer.
+- **Documented bypass intent:** every retroactive bypass site now carries a justification ticket (15 `[RlsBypassJustified]` decorations) or wall-clock reason (5 `[AllowsWallClock]` decorations). Future readers can grep for the ticket to find the explanation; the architecture-test allow-list pattern that previously documented bypasses in a single file (`ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs`) remains in place as a defence-in-depth layer.
 - **`TimeProvider` injection unlocks deterministic time** in integration tests. Stage 9.1.5.a's auth-tier flake class is structurally prevented from recurring; future time-sensitive tests can swap in a fake clock.
 - **Cross-cutting cleanup as side-effect:** 21 services migrated to `TimeProvider`, 15 methods documented with `[RlsBypassJustified]`, 7 classes marked `[PreAuthScope]`. The retro-decoration phase produced consistent enforcement of conventions that previously lived in mental models.
 
