@@ -279,6 +279,27 @@ RLS remains a secondary control — application-layer IDOR prevention via EF glo
 
 See `roadmap-phase-three.md` § Stage 7.5 for the full sub-stage breakdown and verification checklist.
 
+### Compile-time invariant enforcement (Roslyn analyzers — Stage 9.5c, shipped 2026-05-27)
+
+The cross-cutting security rules above are now enforced at compile time by four Roslyn analyzers + one source generator, shipped via `ProjectCeres.Analyzers` and wired into `ProjectCeres` as a `<ProjectReference OutputItemType="Analyzer">`. Compile-time enforcement complements the existing runtime layers (EF query filters + Postgres RLS + architecture tests); a violation surfaces in the IDE as the developer types and fails `dotnet build` once the warning→error flip lands (scheduled for ~2026-05-29 after the 48h soak completes per condition C-2).
+
+| Diagnostic | Enforces | Escape attribute |
+|---|---|---|
+| **CER001** (Reliability) | `[PreAuthScope]`-marked classes must use `BeginPreAuthUserScopeAsync(userId, ct)`, not plain `BeginTransactionAsync` (otherwise pre-auth writes hit Postgres RLS `42501`) | n/a — the marker IS the contract |
+| **CER002** (Security) | `IgnoreQueryFilters()` on `IUserOwned`-entity queries via `AppDbContext` requires `[RlsBypassJustified("CER-NNNN")]` on the enclosing method | `[RlsBypassJustified("ticket")]` — ticket regex enforced by CER010 |
+| **CER004** (Reliability) | `DateTime.UtcNow` / `DateTime.Now` in production code requires `[AllowsWallClock("reason")]`; excludes `ProjectCeres.Models` property initialisers + `Migrations/` | `[AllowsWallClock("reason")]` |
+| **CER010** (Style) | `[RlsBypassJustified(ticket)]` ticket argument must match `^(CER\|TICKET\|ADR)-\d+$` (catches lazy "temp"/"TODO" justifications) | n/a — the regex IS the contract |
+| **CER020** (Localization, error from day 1) | EN/ES `*.resx` parity — compile-time error if either culture is missing a key its sibling has | n/a |
+
+Three classes that retroactively carry escape attributes after the Stage 9.5c retro-decoration sweep (commits `ae42c17`, `6f9802c`, `a9b2379`):
+- **`[PreAuthScope]`** — `AuthController`, `AuditLogWriter`, `EmailConfirmationService`, `LockoutUnlockService`, `MfaBackupCodeService`, `PasswordResetService`, `TotpReplayGuard` (7 classes).
+- **`[RlsBypassJustified("CER-1001..CER-1015")]`** — 15 methods across `Common/Authentication/` services + `Common/Email/LanguageResolver.cs` + `Services/CategorySeedService.cs`. Ticket-to-method mapping in `docs/superpowers/specs/2026-05-26-stage-9-5c-roslyn-analyzers-design.md` Appendix A.
+- **`[AllowsWallClock("...")]`** — `SessionRevocationValidator` (static class), `CsvImportProfileViewModel` (DTO), `TransferDetectionService` (no DI surface), `ApplicationUser.CreatedAt` (entity property initialiser — analyzer-excluded by namespace but decorated defensively).
+
+**`TimeProvider.System` is registered in DI** (`Program.cs`, Stage 9.5c). Production services constructor-inject `TimeProvider` to read the clock via `_timeProvider.GetUtcNow().UtcDateTime` instead of `DateTime.UtcNow` directly. Integration tests pass `TimeProvider.System` at construction; future time-sensitive tests can swap in a fake clock for deterministic time control.
+
+Decision record: `docs/decisions/ADR-0077-roslyn-analyzers-for-invariant-enforcement.md`.
+
 ---
 
 ## Authentication and Session Rules

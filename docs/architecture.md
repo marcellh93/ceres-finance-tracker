@@ -42,6 +42,20 @@ graph TD
 
 Controllers do not call the database directly. Services do not render HTML. The UI layer does not contain business logic. These constraints are enforced by convention, not by the framework — they must be maintained as the codebase grows.
 
+### Compile-time enforcement (Stage 9.5c, shipped 2026-05-27)
+
+A fourth layer wraps the three above: **Roslyn analyzers**, shipped via `ProjectCeres.Analyzers` and wired into `ProjectCeres` as `<ProjectReference OutputItemType="Analyzer">`. The analyzers run during `csc.exe` execution on every `dotnet build` and surface violations in the IDE in real time. They enforce:
+
+- **CER001** — pre-auth call sites in `[PreAuthScope]`-marked classes must use `BeginPreAuthUserScopeAsync`, not plain `BeginTransactionAsync` (a `Reliability` invariant: pre-auth writes hit Postgres RLS `42501` otherwise).
+- **CER002** — `IgnoreQueryFilters()` on `IUserOwned` entities via `AppDbContext` requires `[RlsBypassJustified("CER-NNNN")]` on the enclosing method (a `Security` invariant; complements ADR-0065's EF query filters + ADR-0068's Postgres RLS).
+- **CER004** — `DateTime.UtcNow` / `DateTime.Now` in production code requires `[AllowsWallClock("reason")]` on the enclosing member (a `Reliability` invariant: forces `TimeProvider` injection elsewhere so integration tests can pin time).
+- **CER010** — `[RlsBypassJustified(ticket)]` ticket argument must match `^(CER\|TICKET\|ADR)-\d+$` (a `Style` invariant: catches lazy justifications).
+- **CER020** — EN/ES resx file parity (a `Localization` invariant; shipped at `error` severity from day 1).
+
+Architecture tests in `ProjectCeres.Tests/Unit/Architecture/` remain the right tool for runtime invariants (DI registrations match expected services, every IUserOwned entity has an RLS migration, every controller action declares authz intent). The two enforcement mechanisms are complementary: analyzers catch the syntactically-locatable invariants at compile time; architecture tests catch the runtime-observable invariants at test time.
+
+Decision record: `docs/decisions/ADR-0077-roslyn-analyzers-for-invariant-enforcement.md`.
+
 ---
 
 ## Request Flow

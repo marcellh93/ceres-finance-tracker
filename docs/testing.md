@@ -88,13 +88,22 @@ Simple presentational components with no logic are not tested — the value is t
 
 ## Types of Tests
 
-| Type        | What it tests                                                         | Database? | Introduced |
-| ----------- | --------------------------------------------------------------------- | --------- | ---------- |
-| Unit        | Individual calculation or business logic method in isolation          | No        | Phase 1    |
-| Integration | EF Core queries and service interactions against a real test database | Yes       | Phase 1    |
-| E2E         | Full browser-driven flows                                             | Yes       | Phase 3    |
+| Type        | What it tests                                                                                                       | Database? | Introduced     |
+| ----------- | ------------------------------------------------------------------------------------------------------------------- | --------- | -------------- |
+| Unit        | Individual calculation or business logic method in isolation                                                        | No        | Phase 1        |
+| Integration | EF Core queries and service interactions against a real test database                                               | Yes       | Phase 1        |
+| Analyzer    | Roslyn `DiagnosticAnalyzer` + source-generator behaviour via `Microsoft.CodeAnalysis.Testing`'s `Verifier<T>`       | No        | Phase 3 (9.5c) |
+| E2E         | Full browser-driven flows                                                                                           | Yes       | Phase 3        |
 
 E2E tests are deferred until Phase 3. The prerequisites — CI/CD pipeline, Testcontainers, and a hosted environment — do not exist until that phase. E2E must also be written after the Phase 2 React migration stabilizes, not before, to avoid investing in tests against a frontend that is about to change.
+
+### Analyzer tests (Stage 9.5c, shipped 2026-05-27)
+
+`ProjectCeres.Analyzers.Tests/` (xUnit, `net10.0`) verifies the five Roslyn analyzers + source generator from Stage 9.5c (`CER001`, `CER002`, `CER004`, `CER010`, `CER020`) using the canonical `Microsoft.CodeAnalysis.CSharp.Analyzer.Testing` + `Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing` packages (the unsuffixed `DefaultVerifier` variant; framework-specific variants are deprecated per the Roslyn SDK). Per-analyzer fixtures cover positive case (diagnostic fires), negative case (diagnostic does not fire), and excluded-path cases (e.g. `CER004` does not fire in `ProjectCeres.Models` property initialisers, `CER001` does not fire on `PreAuthRlsScope.cs` itself).
+
+Test source code is embedded as a string per test method with inline markup syntax: `[|...|]` for single-descriptor spans, `{|CER00X:...|}` for multi-descriptor spans. The `TestState.Sources.Add((path, content))` overload sets the file path so path-exclusion logic (`/Migrations/`, `PreAuthRlsScope.cs`) can be exercised.
+
+Run via `dotnet test ProjectCeres.Analyzers.Tests/`. The Stop hook's tier system runs them as part of the standard `.NET` suite when `.cs` files in `ProjectCeres.Analyzers/` or `ProjectCeres.Analyzers.Tests/` change.
 
 ### E2E Tool: Playwright (TypeScript)
 
