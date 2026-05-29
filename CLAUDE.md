@@ -129,6 +129,14 @@ Three rules the orchestrator inherits from this file:
 - **Show, then approval.** Show the rendered result; wait for the user's explicit approval before committing. Silence ≠ approval.
 - **Verify before claiming done.** After implementing, run the UX/UI verification checklist (`docs/design-system.md` § Working rules): golden path, layout context, empty state, error state, 375px mobile, all navigation links. If browser access is unavailable, say so and hand the checklist to the user with specific URLs. The manual-test handoff Stop gate (Phase H) denies the Stop if you list ≥5 steps without auditing that each step's entry point exists.
 
+## Using subagents
+
+Five codified `ceres-*` strategy roles ship at `.claude/agents/ceres-{architect,tech-lead,pm,cto,security-reviewer}.md`. Dispatch by `subagent_type` during brainstorm/spec/plan when a decision needs an outside perspective with a read-first contract. The five role files + dispatch guidance live in `docs/agents.md`.
+
+**The dispatcher-gate rule (binding on me, the orchestrator):** when I dispatch a `ceres-*` strategy agent, I MUST inspect its response for both preamble sections (`## What I read`, `## Conflicts found`) before synthesizing from its output. If either is missing, OR if the `## What I read` list does not include the role's baseline files plus the files I named in the dispatch prompt, I re-dispatch with a stricter prompt. I do not build on a `ceres-*` response that skipped the read step.
+
+This is the gate the PreToolUse hook cannot be: a strategy agent's deliverable is text, and a PreToolUse hook can only deny tool calls. The dispatcher is the enforcement layer.
+
 ## After Completing Any Stage
 
 Phase E (HARD) blocks the close-out edit if any item under the closing stage's `## Stage N` heading is still unchecked, or if `sync-docs` and `changelog-sync` have not fired this session. The steps below are the human-readable expansion of that gate.
