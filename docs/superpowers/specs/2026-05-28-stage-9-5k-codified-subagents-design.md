@@ -166,7 +166,7 @@ Single commit (no soak, no chain — config + docs):
 | Item | Receiving structure | Why not in 9.5k |
 |---|---|---|
 | 9.5e's 3 review roles (writer / security / playwright-test-audit) | Stage 9.5h sub-stage 9.5e | Per K2: review roles audit a finished diff with a diff-focused read-list (the diff + the spec it claims to implement + the Playwright trace) — a different job from strategy roles. Shipped with 9.5e. |
-| Binding PreToolUse hook for `ceres-*` agents that DO mutate code | Trip-wire-gated follow-up (no `[ ]` opened yet — only opens if advisory proves insufficient) | Per K1 + K5: the dispatcher gate covers the strategy-agent case (text output). A binding hook would only help an agent that goes on to Edit/Write — none of the 5 strategy roles can (their `tools` allowlist excludes mutation). If a future role needs mutation AND read-first enforcement, that's when the hook opens. Documented here so the option isn't lost; not opened as a `[ ]` because there's no current bug it fixes. |
+| Binding PreToolUse hook for `ceres-*` agents that DO mutate code | Trip-wire-gated follow-up (no `[ ]` opened yet — only opens if advisory proves insufficient) | Per K1 + K5: the dispatcher gate covers the strategy-agent case (text output). A binding hook would only help an agent that goes on to Edit/Write — none of the 5 strategy roles can (their `disallowedTools` deny-list removes `Write`/`Edit`/`NotebookEdit`/`Bash`; see §5.1 amendment — originally a `tools` allow-list). If a future role needs mutation AND read-first enforcement, that's when the hook opens. Documented here so the option isn't lost; not opened as a `[ ]` because there's no current bug it fixes. |
 
 ## 13. Open questions
 

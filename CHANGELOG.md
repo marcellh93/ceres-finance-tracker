@@ -165,6 +165,9 @@
 
 #### Fixed
 
+**Subagents (Stage 9.5k — registry comment, 2026-05-30)**
+- Corrected a stale section-comment count in `UserOwnedTables.cs` (`Auth-internal (8)` → `(9)`) surfaced by the smoke-test; the registry already held all 9 entries (verified 1:1 against 25 live-DB RLS-forced tables), so no RLS gap — documentation only
+
 **Authentication (Stage 9.3 — Register duplicate-unconfirmed RLS-nested-tx, 2026-05-22)**
 - `AuthController.Register`'s duplicate-unconfirmed branch was calling `EmailConfirmationService.IssueAsync` inside the outer plain transaction (which had no `app.current_user_ref` GUC set). `IssueAsync`'s `BeginPreAuthUserScopeAsync` then tripped `PreAuthRlsScope`'s nested-tx mismatch guard and threw `InvalidOperationException` → 500. Fix: capture existing-user state inside the outer tx, commit the outer tx first, then call `IssueAsync` outside it (matches the fresh-create branch's ordering). Caught by `EmailConfirmationTests.Re_register_same_unconfirmed_email_after_expiry_issues_new_token_for_existing_user`
 
@@ -173,6 +176,10 @@
 - Same copy update corrects a longstanding bug: the body said "within 1 hour" / "próxima hora" but the actual token lifetime is 15 minutes (Stage 6.10 D2). Both EN + ES now name the 15-min expiry
 
 #### Changed
+
+**Subagents (Stage 9.5k — read-first contract, 2026-05-30)**
+- The 5 `ceres-*` strategy subagents now restrict tools via a `disallowedTools` deny-list instead of a `tools` allow-list. The deny-list states the real invariant (never mutate code), survives future read-tool additions, and avoids the allow-list footgun where a typo'd tool name silently grants all tools. Smoke-test confirmed all 5 roles pass the read-first contract with no mutating-tool use
+- Tightened the response contract: a `ceres-*` reply's first line must now be the `## What I read` heading with no preamble or thinking-aloud, enforced by the dispatcher gate in `CLAUDE.md` § Using subagents — after the smoke-test found 2 of 5 roles opening with prose before the heading
 
 **Settings / Dashboard cycle math**
 - Renamed `Settings.BudgetPeriodStartDay` to `Settings.PeriodStartDay` to reflect that it now drives every monthly view (Cycle to Date, Spending by Category, Income vs. Avg, Budget periods, etc.), not just budgets. UI label is now "Monthly cycle start day."
