@@ -43,7 +43,7 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor CER020_ResxParityMissing = new(
         id: "CER020",
         title: "EN/ES resx parity violated — culture is missing a key its sibling has",
-        messageFormat: "Resource file '{0}' is missing key '{1}' that exists in '{2}'.",
+        messageFormat: "Resource file '{0}' is missing key '{1}' that exists in '{2}'",
         category: "Localization",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
