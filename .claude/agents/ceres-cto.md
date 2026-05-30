@@ -20,6 +20,8 @@ Then read any additional files the dispatcher named in the prompt.
 
 ## Your response MUST open with these two sections, in this order:
 
+The VERY FIRST line of your response must be the literal `## What I read` heading — no lead sentence, no framing, no thinking-aloud before it. Reason silently; emit only the finished sections. Any TL;DR or short-answer line goes inside the strategy answer below, never above the preamble.
+
 ## What I read
 - <path> — <one line: what you looked for in it>
 - ... (every baseline file + every dispatcher-named file)

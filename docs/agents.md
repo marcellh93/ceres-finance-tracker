@@ -20,7 +20,7 @@ The roles use a **deny-list** (`disallowedTools`), not an allow-list (`tools`). 
 
 ## The contract
 
-Every `ceres-*` response opens with two sections in this order:
+Every `ceres-*` response **opens with `## What I read` as its literal first line** — no lead sentence, framing, or thinking-aloud before it — then two sections in this order:
 
 ```
 ## What I read
@@ -38,7 +38,7 @@ The role file's body carries this contract verbatim. It is **advisory** (the pla
 
 ## The dispatcher gate
 
-When the orchestrating agent dispatches a `ceres-*` strategy role, it inspects the response for both preamble sections before synthesizing from the output. If either is missing, OR if the `## What I read` list does not include the role's baseline files plus the files named in the dispatch prompt, the dispatcher re-dispatches with a stricter prompt. The dispatcher does not build on a `ceres-*` response that skipped the read step.
+When the orchestrating agent dispatches a `ceres-*` strategy role, it inspects the response before synthesizing from the output and re-dispatches with a stricter prompt if any fail: (1) the **first non-whitespace line is the literal `## What I read` heading** (no preamble); (2) both preamble sections are present and ordered (`## What I read` → `## Conflicts found` → answer); (3) the `## What I read` list includes the role's baseline files plus the files named in the dispatch prompt. The dispatcher does not build on a `ceres-*` response that skipped the read step or buried it under preamble. The first-line rule was added 2026-05-30 after the 9.5k smoke-test found 2/5 roles opening with prose before the heading.
 
 This gate is codified in `CLAUDE.md` § "Using subagents".
 

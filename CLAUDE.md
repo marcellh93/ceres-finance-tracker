@@ -133,7 +133,13 @@ Three rules the orchestrator inherits from this file:
 
 Five codified `ceres-*` strategy roles ship at `.claude/agents/ceres-{architect,tech-lead,pm,cto,security-reviewer}.md`. Dispatch by `subagent_type` during brainstorm/spec/plan when a decision needs an outside perspective with a read-first contract. The five role files + dispatch guidance live in `docs/agents.md`.
 
-**The dispatcher-gate rule (binding on me, the orchestrator):** when I dispatch a `ceres-*` strategy agent, I MUST inspect its response for both preamble sections (`## What I read`, `## Conflicts found`) before synthesizing from its output. If either is missing, OR if the `## What I read` list does not include the role's baseline files plus the files I named in the dispatch prompt, I re-dispatch with a stricter prompt. I do not build on a `ceres-*` response that skipped the read step.
+**The dispatcher-gate rule (binding on me, the orchestrator):** when I dispatch a `ceres-*` strategy agent, I MUST inspect its response before synthesizing from its output, and re-dispatch with a stricter prompt if any of these fail:
+
+1. The response's **first non-whitespace line is the literal `## What I read` heading** — no lead sentence, framing, or thinking-aloud before it.
+2. Both preamble sections are present and ordered: `## What I read`, then `## Conflicts found`, then the answer.
+3. The `## What I read` list includes the role's baseline files plus the files I named in the dispatch prompt.
+
+I do not build on a `ceres-*` response that skipped the read step or buried it under preamble. (The first-line rule was added 2026-05-30 after the 9.5k smoke-test found 2/5 roles opening with prose before the heading — see `docs/agents.md`.)
 
 This is the gate the PreToolUse hook cannot be: a strategy agent's deliverable is text, and a PreToolUse hook can only deny tool calls. The dispatcher is the enforcement layer.
 
