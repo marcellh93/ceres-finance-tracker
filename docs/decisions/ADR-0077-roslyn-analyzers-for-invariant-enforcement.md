@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-05-27 (analyzers live at `warning` severity; warning→error flip scheduled after 48h soak per condition C-2).
+**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1.
 
 **Phase:** Phase 3 (Hosted Beta) — Stage 9.5h Phase 1 hardening container, sub-stage 9.5c.
 
@@ -45,7 +45,9 @@ Three **escape attributes** ship as a separate `netstandard2.0` csproj (`Project
 
 A fourth attribute (`[RequiresAdminContext]`) is reserved for Stage 9.5b's architecture test (no analyzer fires on it in 9.5c).
 
-**Rollout shape:** four-commit chain — annotations csproj (commit N) → retro-decoration sweeps (commits N+1a/b/d) → analyzers csproj + tests + `.editorconfig` baseline at `warning` severity (commit N+2) → warning→error flip after 48h soak AND baseline drained to zero (commit N+M+1, scheduled for ~2026-05-29).
+**Release tracking (binding for every future CER rule).** The analyzer project registers `AnalyzerReleases.Shipped.md` + `AnalyzerReleases.Unshipped.md` as `<AdditionalFiles>` (added 2026-05-30, commit `c1ea134`). The Roslyn meta-analyzer **RS2008** fails the analyzer build for any `DiagnosticDescriptor` whose ID is not listed in one of those files. **Therefore: every new CER rule (CER005/CER006/… in Stages 9.5f/9.5g and beyond) MUST add a row to `AnalyzerReleases.Unshipped.md` under `### New Rules` in the same commit that declares its descriptor.** The table format is strict — `Rule ID | Category | Severity | Notes` with a plain `--------|...` separator and no column padding (padded headers trip RS2007). `Shipped.md` stays empty until the analyzer set is cut as a versioned release; at that point the unshipped rows move under a `## Release X.Y` header in `Shipped.md`. Related: diagnostic messages take no trailing period (RS1032).
+
+**Rollout shape:** four-commit chain — annotations csproj (commit N) → retro-decoration sweeps (commits N+1a/b/d) → analyzers csproj + tests + `.editorconfig` baseline at `warning` severity (commit N+2) → warning→error flip after 48h soak AND baseline drained to zero (commit N+M+1 = `665f182`, landed 2026-05-30; ~72h after N+2, 0 suppressions, 0 production violations).
 
 ## Alternatives considered
 
@@ -93,7 +95,7 @@ Rejected per Roslyn SDK research (2026-05-26): no major published analyzer (Mezi
 
 - **Spec:** `docs/superpowers/specs/2026-05-26-stage-9-5c-roslyn-analyzers-design.md`
 - **Plan:** `docs/superpowers/plans/2026-05-26-stage-9-5c-roslyn-analyzers-impl.md`
-- **Commit chain (in order):** `9d6b839` → `ae42c17` → `6f9802c` → `a9b2379` → `892cfe7` → `b4a7239`. The warning→error flip will land in a follow-up commit (N+M+1) scheduled for ~2026-05-29 after the 48h soak completes.
+- **Commit chain (in order):** `9d6b839` → `ae42c17` → `6f9802c` → `a9b2379` → `892cfe7` → `b4a7239` (ship at `warning`) → `665f182` (warning→error flip, 2026-05-30) → `c1ea134` (RS2008 release-tracking files + RS1032 message fix).
 - **Roadmap entry:** `docs/roadmap-phase-three.md` § Stage 9.5h sub-stage 9.5c.
 - **Sister stages this enables/defers:**
   - Stage 9.5b (DualContextWebApplicationFactory + RLS-parity assertion) gains compile-time enforcement of the conventions it tests at runtime.
