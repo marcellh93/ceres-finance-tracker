@@ -9,6 +9,17 @@ insert_final_newline = true
 charset = utf-8
 
 # ─────────────────────────────────────────────────────────────────────────
+# Stage 9.5c — Per-analyzer severity flip from warning to error
+# (N+M+1, after 48h soak AND baseline drained per C-2; both verified 2026-05-30:
+#  ~72h since N+2 commit 892cfe7, 0 real suppressions, 0 production CER violations)
+# ─────────────────────────────────────────────────────────────────────────
+dotnet_diagnostic.CER001.severity = error
+dotnet_diagnostic.CER002.severity = error
+dotnet_diagnostic.CER004.severity = error
+dotnet_diagnostic.CER010.severity = error
+# CER020 (resx parity) was already at error from day 1
+
+# ─────────────────────────────────────────────────────────────────────────
 # Per-analyzer baseline-suppression sections (Stage 9.5c, per C-3)
 # Each entry has a one-line reason. Suppressed lines drain to zero before
 # the warning→error flip at N+M+1 per C-2.
