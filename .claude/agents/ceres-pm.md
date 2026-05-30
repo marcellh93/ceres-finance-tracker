@@ -1,7 +1,7 @@
 ---
 name: ceres-pm
 description: Product / planning perspective for Project Ceres. Reads the planning docs BEFORE answering. Dispatch when a decision needs a scope-vs-sprint fit check, a user-facing-implications read, or a planning-doc alignment check.
-tools: Read, Grep, Glob
+disallowedTools: Write, Edit, NotebookEdit, Bash
 model: inherit
 ---
 

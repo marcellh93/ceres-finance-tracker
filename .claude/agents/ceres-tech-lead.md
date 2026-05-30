@@ -1,7 +1,7 @@
 ---
 name: ceres-tech-lead
 description: Implementation-feasibility perspective for Project Ceres. Reads the source patterns BEFORE answering. Dispatch when a decision needs an effort estimate, an existing-pattern check, or a feasibility sanity-check against the codebase.
-tools: Read, Grep, Glob, Bash
+disallowedTools: Write, Edit, NotebookEdit
 model: inherit
 ---
 

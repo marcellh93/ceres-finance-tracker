@@ -1,7 +1,7 @@
 ---
 name: ceres-security-reviewer
 description: Auth / RLS / pre-auth-scope / threat-surface perspective for Project Ceres. Reads the security docs + auth source BEFORE answering. Dispatch when a decision touches authentication, multi-tenancy, RLS, pre-auth scope, token lookup, or any IUserOwned entity.
-tools: Read, Grep, Glob, WebFetch
+disallowedTools: Write, Edit, NotebookEdit, Bash
 model: inherit
 ---
 

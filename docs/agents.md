@@ -8,13 +8,15 @@ Multi-perspective agent passes that scope strategy work were dispatched without 
 
 ## The five roles
 
-| Role (`subagent_type`) | Stance | Always-read baseline | Tools | Dispatch when... |
+| Role (`subagent_type`) | Stance | Always-read baseline | Tool guard (`disallowedTools`) | Dispatch when... |
 |---|---|---|---|---|
-| `ceres-architect` | System-wide design trade-offs, layer boundaries, cross-cutting impact | `CLAUDE.md`, `docs/architecture.md`, `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs`, the most-recent spec under `docs/superpowers/specs/` | `Read, Grep, Glob, WebFetch` | A decision spans multiple subsystems or could conflict with an existing convention |
-| `ceres-tech-lead` | Implementation feasibility, existing source patterns, effort estimate | `CLAUDE.md`, `docs/testing.md`, the active roadmap stage section, the affected source directory (dispatcher-named) | `Read, Grep, Glob, Bash` (read-only) | A decision needs an effort estimate, an existing-pattern check, or a feasibility sanity-check |
-| `ceres-pm` | User-facing implications, scope-vs-sprint fit, planning-doc alignment | `CLAUDE.md`, `docs/planning-phase3.md`, `docs/security-model.md`, the active roadmap stage section | `Read, Grep, Glob` | A decision needs a scope-vs-sprint fit check, a user-facing read, or a planning-doc alignment check |
-| `ceres-cto` | Top-level constraints, trip-wires, phase discipline, autonomy posture | `CLAUDE.md`, `.claude/skills/playbook/references/constitution.md`, `docs/roadmap-phase-three.md`, recent ADRs under `docs/decisions/` | `Read, Grep, Glob, WebFetch` | A decision touches phase discipline, autonomy posture, trip-wires, or the playbook constitution |
-| `ceres-security-reviewer` | Auth / RLS / pre-auth-scope / token-lookup / threat surface | `CLAUDE.md`, `docs/security-model.md`, `docs/multi-tenancy-strategy.md`, `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs`, affected `ProjectCeres/Common/Authentication/` files | `Read, Grep, Glob, WebFetch` | A decision touches authentication, multi-tenancy, RLS, pre-auth scope, token lookup, or any IUserOwned entity |
+| `ceres-architect` | System-wide design trade-offs, layer boundaries, cross-cutting impact | `CLAUDE.md`, `docs/architecture.md`, `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs`, the most-recent spec under `docs/superpowers/specs/` | `Write, Edit, NotebookEdit, Bash` | A decision spans multiple subsystems or could conflict with an existing convention |
+| `ceres-tech-lead` | Implementation feasibility, existing source patterns, effort estimate | `CLAUDE.md`, `docs/testing.md`, the active roadmap stage section, the affected source directory (dispatcher-named) | `Write, Edit, NotebookEdit` (keeps read-only `Bash`) | A decision needs an effort estimate, an existing-pattern check, or a feasibility sanity-check |
+| `ceres-pm` | User-facing implications, scope-vs-sprint fit, planning-doc alignment | `CLAUDE.md`, `docs/planning-phase3.md`, `docs/security-model.md`, the active roadmap stage section | `Write, Edit, NotebookEdit, Bash` | A decision needs a scope-vs-sprint fit check, a user-facing read, or a planning-doc alignment check |
+| `ceres-cto` | Top-level constraints, trip-wires, phase discipline, autonomy posture | `CLAUDE.md`, `.claude/skills/playbook/references/constitution.md`, `docs/roadmap-phase-three.md`, recent ADRs under `docs/decisions/` | `Write, Edit, NotebookEdit, Bash` | A decision touches phase discipline, autonomy posture, trip-wires, or the playbook constitution |
+| `ceres-security-reviewer` | Auth / RLS / pre-auth-scope / token-lookup / threat surface | `CLAUDE.md`, `docs/security-model.md`, `docs/multi-tenancy-strategy.md`, `ProjectCeres.Tests/Integration/Authentication/ArchitectureTests.cs`, affected `ProjectCeres/Common/Authentication/` files | `Write, Edit, NotebookEdit, Bash` | A decision touches authentication, multi-tenancy, RLS, pre-auth scope, token lookup, or any IUserOwned entity |
+
+The roles use a **deny-list** (`disallowedTools`), not an allow-list (`tools`). The role inherits the dispatcher's full read tool set, minus the mutating tools listed. This states the actual invariant — *never mutate code* — directly, survives future read-tool additions without maintenance, and avoids the allow-list typo footgun where a misspelled tool name silently grants all tools. `ceres-tech-lead` omits `Bash` from its deny-list because its role is the only one that runs read-only `Bash` (`dotnet build`, `grep`); its body contract forbids mutating `Bash`. Switched from the original `tools:` allow-list 2026-05-30 after the docs gained a worked `disallowedTools` read-only example (code.claude.com sub-agents page, updated 2026-05-29).
 
 ## The contract
 
@@ -42,14 +44,15 @@ This gate is codified in `CLAUDE.md` § "Using subagents".
 
 ## What these roles do NOT do
 
-- They do not mutate code. The `tools` allowlist excludes `Edit`, `Write`, and (for all but `ceres-tech-lead`) `Bash`. `ceres-tech-lead`'s `Bash` is read-only by role-description contract.
+- They do not mutate code. The `disallowedTools` deny-list removes `Write`, `Edit`, `NotebookEdit`, and (for all but `ceres-tech-lead`) `Bash`. `ceres-tech-lead`'s `Bash` is read-only by role-description contract.
 - They are not the 9.5e review-pipeline roles (`writer` / `security` / `playwright-test-audit`). Those audit a finished diff and ship separately under 9.5e with a diff-focused read-list.
 - They do not spawn other subagents (platform does not support subagent recursion).
 
-## Gotchas (per claude-code-guide research, 2026-05-28)
+## Gotchas (per claude-code-guide research, 2026-05-28; tool-guard finding 2026-05-30)
 
 - Editing a role file on disk requires a session restart to load — or use the `/agents` UI which takes effect immediately.
-- Tool-name typos in the `tools` frontmatter silently grant ALL tools. Validate via `/agents` after any edit.
+- A typo in an allow-list `tools` value can silently grant ALL tools rather than erroring (docs don't specify the failure mode). These roles use a `disallowedTools` deny-list to sidestep that footgun: a typo'd deny entry fails open to *more* restriction-attempts, never to all-tools, and the invariant being asserted (never mutate) is stated directly. Validate the effective set via `/agents` after any edit — there is no documented CLI/log way to audit it otherwise.
+- Composition order (per current docs): inherited tools → `disallowedTools` removed → `tools` allow-list applied if present. These roles set only `disallowedTools`, so they inherit-all-minus-mutating.
 - Identity resolves via the `name:` frontmatter field, not the filename. Duplicate `name` values are silently discarded.
 - Project-scope `.claude/agents/` wins over user-scope `~/.claude/agents/`.
 

@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (recommended for this plan) or superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **SUPERSEDED (tool guard, 2026-05-30):** the `tools: Read, Grep, Glob, ...` allow-list frontmatter shown throughout this plan was replaced by a `disallowedTools: Write, Edit, NotebookEdit[, Bash]` deny-list after the 9.5k smoke-test + follow-up research. The allow-list lines below are the as-executed record; the live config and rationale are in `docs/agents.md` and spec §5.1's amendment. Do not copy the `tools:` lines from this plan.
+
 **Goal:** Ship 5 codified `.claude/agents/ceres-*.md` strategy roles with a read-first contract, plus the discoverability + dispatcher-gate scaffolding, in a single atomic commit.
 
 **Architecture:** Self-contained markdown agent files at `.claude/agents/ceres-{architect,tech-lead,pm,cto,security-reviewer}.md`. Each file's body is the full system prompt for that role (advisory, not binding per K1/K5). Enforcement lives in the dispatcher (me): I inspect each `ceres-*` response for the `## What I read` + `## Conflicts found` preamble before synthesizing, and re-dispatch if missing. The CLAUDE.md § "Using subagents" section codifies that gate; `docs/agents.md` is the discoverability reference.

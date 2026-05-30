@@ -53,18 +53,20 @@ Five self-contained markdown files at `.claude/agents/ceres-{architect,tech-lead
 
 ### 5.1 Frontmatter (per role)
 
+> **AMENDED 2026-05-30 (supersedes the `tools:` allow-list below).** The tool guard switched from a `tools:` allow-list to a `disallowedTools:` deny-list after the 9.5k smoke-test + follow-up research (claude-code-guide, citing the code.claude.com sub-agents page updated 2026-05-29, which gained a worked `disallowedTools` read-only example the spec's original 2026-05-28 research predated). Rationale: (1) the allow-list carries a typo footgun — a misspelled tool name can silently grant ALL tools; (2) a deny-list states the actual invariant (*never mutate code*) directly and survives future read-tool additions without maintenance. Current frontmatter is `disallowedTools: Write, Edit, NotebookEdit, Bash` for the four read-only roles, and `disallowedTools: Write, Edit, NotebookEdit` for `ceres-tech-lead` (which keeps read-only `Bash`). See `docs/agents.md` for the live per-role table. The allow-list spec text below is retained for decision history.
+
 ```yaml
 ---
 name: ceres-architect
 description: System-architecture perspective for Project Ceres design decisions. Reads the codebase BEFORE answering. Use during brainstorm/spec/plan when a decision spans multiple subsystems or could conflict with an existing convention.
-tools: Read, Grep, Glob, WebFetch
+disallowedTools: Write, Edit, NotebookEdit, Bash
 model: inherit
 ---
 ```
 
 - `name`: kebab-case, `ceres-` prefix.
 - `description`: states the stance + the read-first behaviour + when to dispatch (drives auto-delegation + tells future-me which role fits).
-- `tools`: **allowlist excluding mutating tools** (`Edit`, `Write`, `Bash`-mutating). Strategists scope; they don't implement. Exception: `ceres-tech-lead` gets `Bash` for read-only `dotnet build` / `grep` feasibility checks (documented inline as read-only-intended; the role description forbids mutation).
+- `disallowedTools`: **deny-list of mutating tools** (`Write`, `Edit`, `NotebookEdit`, `Bash`). Strategists scope; they don't implement. The role inherits the dispatcher's full read tool set minus these. Exception: `ceres-tech-lead` omits `Bash` from its deny-list for read-only `dotnet build` / `grep` feasibility checks (documented inline as read-only-intended; the role description forbids mutation). ~~Original lock: a `tools:` allow-list (`Read, Grep, Glob, WebFetch`); see the 2026-05-30 amendment above.~~
 - `model: inherit` — the dispatcher picks the model per-invocation.
 
 ### 5.2 Body (the system prompt — copied structure per role)
@@ -113,6 +115,8 @@ to prevent the recurrence.
 
 `ArchitectureTests.cs` is in BOTH ceres-architect and ceres-security-reviewer baselines — the specific CER003 miss structurally can't recur.
 
+> The rightmost column above shows the **original `tools:` allow-list** values (decision history). Per the 2026-05-30 amendment in §5.1, the live tool guard is a `disallowedTools:` deny-list — see `docs/agents.md` for the current per-role values.
+
 ### 5.4 Discoverability doc — `docs/agents.md`
 
 Diataxis: Reference. Lists all 5 roles in a table: role name, stance, baseline read-list, `tools`, and "dispatch this when..." guidance. Cross-referenced from a new CLAUDE.md § "Using subagents" (≤8 lines) that states the dispatcher-gate rule: *when dispatching a `ceres-*` strategy agent, inspect the response for the `## What I read` + `## Conflicts found` preamble before using its output; re-dispatch if missing.*
@@ -132,14 +136,15 @@ Compile-time-equivalent (config-only). The 5 files load at session start; `Agent
 ## 8. Error handling
 
 - **Missing preamble:** dispatcher re-dispatches (the gate). Not a silent acceptance.
-- **Tool-name typo in frontmatter:** would silently grant all tools (research gotcha). Mitigated by the smoke-test in §9 + a spec note to validate via `/agents`.
+- **Tool-name typo in frontmatter:** a typo in an allow-list `tools` value can silently grant all tools (research gotcha). The 2026-05-30 amendment (§5.1) moves to a `disallowedTools` deny-list, which fails toward *more* restriction-attempts rather than all-tools. Still validate via `/agents` after any edit — there is no documented CLI/log audit of the effective set.
 - **Session-restart requirement:** editing a `.claude/agents/` file on disk requires a session restart to load (research gotcha). The plan notes this; the smoke-test runs after a restart (or via the `/agents` UI which takes effect immediately).
 
 ## 9. Testing / verification
 
 - **Smoke-test per role (5 dispatches):** dispatch each role with a trivial real Project Ceres question (e.g. ceres-architect → "should new repository methods take `Guid` or `string` for userId?"). Assert the response opens with `## What I read` listing the role's baseline, then `## Conflicts found`, then the answer. Capture the 5 transcripts in the stage close-out commit message or a `docs/agents.md` appendix.
 - **Discoverability check:** `docs/agents.md` lists all 5 + baselines + dispatch guidance; CLAUDE.md § Using subagents cross-references it and states the dispatcher-gate rule.
-- **Frontmatter validation:** confirm each file's `tools` field has no typos (validate via `/agents` interface per research gotcha).
+- **Frontmatter validation:** confirm each file's `disallowedTools` field has no typos (validate via `/agents` interface per research gotcha).
+- **Smoke-test executed 2026-05-30:** 5/5 roles passed the dispatcher gate (each emitted `## What I read` + `## Conflicts found` + answer in order, all baselines listed, no mutating-tool use). Run via a pipelined dispatch+verify workflow. Two non-fatal observations: a lead sentence before the `## What I read` heading on 2/5 (architect, security-reviewer); and the agents surfaced real doc-drift they read (the `UserOwnedTables.All` `(8)`→`(9)` count comment, fixed same session).
 - **No `dotnet`/`pnpm` test impact** — `.claude/` config + docs only; Stop-hook tier 0 (no .NET-impacting writes).
 
 ## 10. Rollout

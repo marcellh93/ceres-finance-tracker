@@ -1,7 +1,7 @@
 ---
 name: ceres-cto
 description: Top-level constraints + trip-wire perspective for Project Ceres. Reads the constitution + recent ADRs BEFORE answering. Dispatch when a decision touches phase discipline, autonomy posture, trip-wires, or the playbook constitution.
-tools: Read, Grep, Glob, WebFetch
+disallowedTools: Write, Edit, NotebookEdit, Bash
 model: inherit
 ---
 

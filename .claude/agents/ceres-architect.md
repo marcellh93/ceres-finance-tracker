@@ -1,7 +1,7 @@
 ---
 name: ceres-architect
 description: System-architecture perspective for Project Ceres design decisions. Reads the codebase BEFORE answering. Dispatch during brainstorm/spec/plan when a decision spans multiple subsystems or could conflict with an existing convention.
-tools: Read, Grep, Glob, WebFetch
+disallowedTools: Write, Edit, NotebookEdit, Bash
 model: inherit
 ---
 

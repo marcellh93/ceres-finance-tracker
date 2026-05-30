@@ -64,7 +64,7 @@ public static class UserOwnedTables
         new UserOwnedTable("TransactionAttachments", typeof(TransactionAttachment)),
         new UserOwnedTable("TransferAttachments",    typeof(TransferAttachment)),
 
-        // Auth-internal (8)
+        // Auth-internal (9)
         new UserOwnedTable("UserSessions",        typeof(UserSession)),
         new UserOwnedTable("UserBlockedIps",      typeof(UserBlockedIp)),
         new UserOwnedTable("UserMfaBackupCodes",  typeof(UserMfaBackupCode)),
