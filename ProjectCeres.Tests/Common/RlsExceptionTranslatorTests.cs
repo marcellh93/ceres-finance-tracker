@@ -16,6 +16,13 @@ namespace ProjectCeres.Tests.Common;
 /// </summary>
 public class RlsExceptionTranslatorTests
 {
+    // Stage 9.5b: TryTranslate now takes the user-owned table-name set as a parameter
+    // (previously a static field sourced from UserOwnedTables.All). These unit tests
+    // supply a fixed set covering the table names they assert on — "Accounts" is
+    // user-owned, "__EFMigrationsHistory" is not.
+    private static readonly IReadOnlySet<string> UserOwned =
+        new HashSet<string>(StringComparer.Ordinal) { "Accounts", "Transactions", "Budgets" };
+
     [Fact]
     public void Translates_42501_on_a_user_owned_table_to_RlsPolicyViolationException()
     {
@@ -23,7 +30,7 @@ public class RlsExceptionTranslatorTests
         var pg = MakePostgresException("42501", tableName: "Accounts");
         var wrapped = new DbUpdateException("oh no", pg);
 
-        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, out var result);
+        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, UserOwned, out var result);
 
         translated.Should().BeTrue();
         result.Should().NotBeNull();
@@ -41,7 +48,7 @@ public class RlsExceptionTranslatorTests
         var pg = MakePostgresException("42501", tableName: "__EFMigrationsHistory");
         var wrapped = new DbUpdateException("oh no", pg);
 
-        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, out var result);
+        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, UserOwned, out var result);
 
         translated.Should().BeFalse();
         result.Should().BeNull();
@@ -56,7 +63,7 @@ public class RlsExceptionTranslatorTests
         var pg = MakePostgresException("23505", tableName: "Accounts");
         var wrapped = new DbUpdateException("oh no", pg);
 
-        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, out var result);
+        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, UserOwned, out var result);
 
         translated.Should().BeFalse();
         result.Should().BeNull();
@@ -68,7 +75,7 @@ public class RlsExceptionTranslatorTests
         var user = new FakeCurrentUserAccessor(Guid.NewGuid());
         var wrapped = new DbUpdateException("not a pg error", new InvalidOperationException("not pg"));
 
-        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, out var result);
+        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, UserOwned, out var result);
 
         translated.Should().BeFalse();
         result.Should().BeNull();
@@ -87,7 +94,7 @@ public class RlsExceptionTranslatorTests
             messageText: "new row violates row-level security policy for table \"Accounts\"");
         var wrapped = new DbUpdateException("oh no", pg);
 
-        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, out var result);
+        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, UserOwned, out var result);
 
         translated.Should().BeTrue();
         result!.TableName.Should().Be("Accounts");
@@ -102,7 +109,7 @@ public class RlsExceptionTranslatorTests
         var pg = MakePostgresException("42501", tableName: "Accounts");
         var wrapped = new DbUpdateException("oh no", pg);
 
-        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, out var result);
+        var translated = RlsExceptionTranslator.TryTranslate(wrapped, user, UserOwned, out var result);
 
         translated.Should().BeTrue();
         result!.GucUserId.Should().BeNull();

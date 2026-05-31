@@ -24,7 +24,7 @@ public static class UserOwnedModel
     };
 
     /// <summary>Every user-owned table that must carry an RLS policy.</summary>
-    public static IReadOnlyList<UserOwnedTable> RlsTables(IModel model) =>
+    public static IReadOnlyList<UserOwnedTable> RlsTables(IReadOnlyModel model) =>
         model.GetEntityTypes()
             .Where(e => !e.ClrType.IsAbstract
                         && typeof(IUserOwned).IsAssignableFrom(e.ClrType)
@@ -36,6 +36,6 @@ public static class UserOwnedModel
             .ToList();
 
     /// <summary>Finance+attachment subset the dev-seed tool remaps — no auth-internal tables.</summary>
-    public static IReadOnlyList<UserOwnedTable> FinanceTables(IModel model) =>
+    public static IReadOnlyList<UserOwnedTable> FinanceTables(IReadOnlyModel model) =>
         RlsTables(model).Where(t => !AuthInternalTables.Contains(t.PostgresTableName)).ToList();
 }

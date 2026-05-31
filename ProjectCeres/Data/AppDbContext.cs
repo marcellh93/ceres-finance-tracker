@@ -12,6 +12,15 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 {
     private readonly ICurrentUserAccessor _currentUser;
 
+    // Stage 9.5b: the user-owned table-name set used by RlsExceptionTranslator, derived
+    // from the EF model. Lazily computed once per context — Model is finalized by the time
+    // a SaveChanges 42501 catch filter runs.
+    private IReadOnlySet<string>? _userOwnedTableNames;
+    private IReadOnlySet<string> UserOwnedTableNames =>
+        _userOwnedTableNames ??= UserOwnedModel.RlsTables(Model)
+            .Select(t => t.PostgresTableName)
+            .ToHashSet(StringComparer.Ordinal);
+
     public AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserAccessor currentUser)
         : base(options)
     {
@@ -34,7 +43,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         {
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, out var rls))
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, UserOwnedTableNames, out var rls))
         {
             throw rls!;
         }
@@ -50,7 +59,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         {
             return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, out var rls))
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, UserOwnedTableNames, out var rls))
         {
             throw rls!;
         }
@@ -323,10 +332,15 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             nameof(RegisterUserOwnedFilter),
             BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-        foreach (var table in UserOwnedTables.All)
+        // Query-filter set = model-derived RLS set MINUS the attachment tables. Attachments
+        // are RLS-protected at the DB layer (Stage 9.5b) but carry no EF query filter — they
+        // are scoped via their parent in service code. See UserOwnedModel + spec §4.1.
+        foreach (var table in UserOwnedModel.RlsTables(modelBuilder.Model))
         {
             if (typeof(Movement).IsAssignableFrom(table.EntityType))
                 continue; // TPC subtype — covered by Movement above.
+            if (table.PostgresTableName is "TransactionAttachments" or "TransferAttachments")
+                continue; // RLS-protected; scoped via parent at the EF layer (no query filter).
 
             registerMethod
                 .MakeGenericMethod(table.EntityType)

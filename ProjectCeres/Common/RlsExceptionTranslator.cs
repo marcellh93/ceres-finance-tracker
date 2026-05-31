@@ -24,19 +24,17 @@ namespace ProjectCeres.Common;
 /// </summary>
 public static class RlsExceptionTranslator
 {
-    private static readonly HashSet<string> UserOwnedTableNames =
-        UserOwnedTables.All
-            .Select(t => t.PostgresTableName)
-            .ToHashSet(StringComparer.Ordinal);
-
     /// <summary>
     /// Inspects the <see cref="DbUpdateException"/> chain for a Postgres 42501 on a
     /// user-owned table. If found, builds an <see cref="RlsPolicyViolationException"/>;
     /// otherwise returns <c>false</c> and the original exception is left to propagate.
     /// </summary>
+    /// <param name="userOwnedTableNames">The set of user-owned Postgres table names —
+    /// supplied by the caller from <c>UserOwnedModel.RlsTables(db.Model)</c> (Stage 9.5b).</param>
     public static bool TryTranslate(
         DbUpdateException original,
         ICurrentUserAccessor user,
+        IReadOnlySet<string> userOwnedTableNames,
         out RlsPolicyViolationException? translated)
     {
         translated = null;
@@ -50,7 +48,7 @@ public static class RlsExceptionTranslator
         // text). Fall back to message parsing: "new row violates row-level security
         // policy for table \"<TableName>\"".
         var tableName = ExtractTableNameFromMessage(pg.MessageText) ?? pg.TableName;
-        if (string.IsNullOrEmpty(tableName) || !UserOwnedTableNames.Contains(tableName))
+        if (string.IsNullOrEmpty(tableName) || !userOwnedTableNames.Contains(tableName))
             return false;
 
         var gucUserId = user.UserId == Guid.Empty ? (Guid?)null : user.UserId;
