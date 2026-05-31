@@ -51,4 +51,21 @@ public class UserOwnedModelTests
         names.Should().NotContain(new[] { "UserSessions", "AuditLogs", "EmailConfirmationTokens" });
         names.Should().Contain(new[] { "Accounts", "TransactionAttachments" });
     }
+
+    [Fact]
+    public void FinanceTables_matches_the_dev_seed_remap_set_exactly()
+    {
+        // Pins behaviour-preservation for SeedDevUser (Stage 9.5b Task 3): the model-derived
+        // finance subset must equal the 16-table hand-list it replaced, or the dev sentinel
+        // remap would silently start/stop touching a table.
+        var expected = new[]
+        {
+            "Accounts", "Budgets", "Categories", "CategoryBudgets", "ImportProfiles",
+            "ImportStagedTransactions", "ImportStagedTransfers", "ImportTransferExclusions",
+            "LiabilityPayments", "RecurringTransactions", "SavedReports", "Settings",
+            "TransactionAttachments", "Transactions", "TransferAttachments", "Transfers",
+        };
+        var names = UserOwnedModel.FinanceTables(Ctx().Model).Select(t => t.PostgresTableName);
+        names.Should().BeEquivalentTo(expected);
+    }
 }

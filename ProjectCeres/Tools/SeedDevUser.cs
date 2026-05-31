@@ -55,28 +55,6 @@ public static class SeedDevUser
     // at the CLI surface rather than waiting for UserManager to reject the value.
     private const int MinPasswordLength = 15;
 
-    // All 16 user-owned tables: 14 from the original migration + TransactionAttachments
-    // + TransferAttachments (added in Stage 7.5 with attachment support).
-    private static readonly string[] UserOwnedTables =
-    [
-        "Accounts",
-        "Categories",
-        "Transactions",
-        "Transfers",
-        "LiabilityPayments",
-        "CategoryBudgets",
-        "Budgets",
-        "RecurringTransactions",
-        "SavedReports",
-        "ImportProfiles",
-        "ImportStagedTransactions",
-        "ImportStagedTransfers",
-        "ImportTransferExclusions",
-        "Settings",
-        "TransactionAttachments",
-        "TransferAttachments",
-    ];
-
     public static async Task<int> RunAsync(WebApplicationBuilder builder, string[] args)
     {
         // === CLI validation (before touching DI/app) ===
@@ -215,7 +193,10 @@ public static class SeedDevUser
         await using var tx = await adminDb.Database.BeginTransactionAsync();
         try
         {
-            foreach (var table in UserOwnedTables)
+            // Stage 9.5b: the finance/attachment table set is derived from the EF model
+            // (UserOwnedModel.FinanceTables), not a hand-typed list. It excludes the
+            // auth-internal tables — the dev sentinel remap only touches Phase-1/2 data.
+            foreach (var table in UserOwnedModel.FinanceTables(adminDb.Model).Select(t => t.PostgresTableName))
             {
                 var sql = $"""
                     UPDATE "{table}" SET "UserId" = '{userId:D}' WHERE "UserId" = '{sentinelStr}'
@@ -374,7 +355,7 @@ public static class SeedDevUser
     private static async Task<long> CountSentinelRowsAsync(AdminDbContext adminDb, string sentinelStr)
     {
         long total = 0;
-        foreach (var table in UserOwnedTables)
+        foreach (var table in UserOwnedModel.FinanceTables(adminDb.Model).Select(t => t.PostgresTableName))
         {
             // FormattableString overload of FromSql is not available for arbitrary table
             // names. Use ExecuteSqlRaw — sentinel UUID is a constant, not user input.
