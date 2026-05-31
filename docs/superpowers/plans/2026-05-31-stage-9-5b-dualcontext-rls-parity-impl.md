@@ -365,34 +365,25 @@ git commit -m "feat(9.5b): delete UserOwnedTables.All hand-list — model is the
 
 - [ ] **Step 1: Write the boot check.** Boot oracle = model-derived RLS set vs the policies **declared in this assembly's migrations** (NOT live `pg_class`), per D3.
 
+The resolved signature (per the boot-oracle decision below) is `EnsureAppliedUserOwnedTablesAreRlsProtectedAsync` — see the code block in the "Sourcing" note immediately following. Class skeleton:
+
 ```csharp
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace ProjectCeres.Common;
 
 /// <summary>
-/// Refuses to start if any user-owned table (UserOwnedModel.RlsTables) lacks an RLS
-/// policy DECLARED in the assembly's migrations. Deploy-order-independent: it does not
-/// query live pg_class, so a rolling deploy (binary up, migration not yet applied)
-/// does not crash. The live-pg_class comparison runs in the test suite. Stage 9.5b / D3.
+/// Refuses to start if any APPLIED user-owned table (UserOwnedModel.RlsTables whose
+/// table physically exists) lacks forced RLS. Skips tables whose creating migration is
+/// pending (to_regclass null), so a rolling deploy (binary up, migration not yet
+/// applied) does not crash. The full model-vs-DB comparison runs in the test suite.
+/// Stage 9.5b / D3.
 /// </summary>
 public static class RlsParityStartupCheck
 {
-    public static void EnsureEveryUserOwnedTableHasADeclaredPolicy(IModel model, IReadOnlySet<string> tablesWithDeclaredPolicies)
-    {
-        var required = UserOwnedModel.RlsTables(model).Select(t => t.PostgresTableName);
-        var missing = required.Where(t => !tablesWithDeclaredPolicies.Contains(t)).OrderBy(t => t).ToList();
-        if (missing.Count > 0)
-        {
-            throw new InvalidOperationException(
-                "User-owned tables have no RLS policy declared in any migration — refusing to start: "
-                + string.Join(", ", missing)
-                + ". Add an ENABLE ROW LEVEL SECURITY + user_isolation policy migration for each, "
-                + "or re-check IUserOwned. Stage 9.5b RLS-parity check.");
-        }
-    }
+    // EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(model, applicationConnectionString, ct)
+    // — full body in the "Sourcing" note below.
 }
 ```
 
