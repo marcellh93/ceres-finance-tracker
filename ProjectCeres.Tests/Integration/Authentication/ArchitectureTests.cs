@@ -758,32 +758,41 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void UserOwnedTables_All_matches_HasQueryFilter_registrations()
+    public void UserOwnedModel_RlsTables_match_HasQueryFilter_registrations()
     {
-        // Stage 7.6.4: pin that every entity in UserOwnedTables.All has a HasQueryFilter
-        // registration on the runtime EF model (either directly, or via TPC inheritance from
-        // a base type that has the filter — that's the Transaction/Transfer/LiabilityPayment
-        // case, where Movement carries the filter). UserOwnedTables.All is the source of
-        // truth used by the Stage 7.5 RLS parity test and the migration generator;
+        // Stage 7.6.4 (repointed to UserOwnedModel in Stage 9.5b): pin that every
+        // user-owned RLS table has a HasQueryFilter registration on the runtime EF model
+        // (either directly, or via TPC inheritance from a base type that has the filter —
+        // the Transaction/Transfer/LiabilityPayment case, where Movement carries the
+        // filter). The model-derived UserOwnedModel.RlsTables is the source of truth;
         // ConfigureGlobalQueryFilters loops it via a generic helper. This test fails the
-        // build if any future addition to UserOwnedTables.All slips through without an
-        // EF-side filter — closing the OCP gap.
+        // build if any future user-owned entity slips through without an EF-side filter.
+        //
+        // Stage 9.5b / §4.1: the two attachment tables (TransactionAttachment,
+        // TransferAttachment) are in the RLS set but deliberately have NO EF query filter —
+        // they carry no UserId at the EF layer and are scoped via their parent in service
+        // code, then RLS-protected at the DB layer. So they are excluded here. The
+        // FailedLoginAttempt_has_no_global_query_filter test and the UserOwnedModelTests
+        // unit suite pin the surrounding invariants.
+        var attachmentsWithoutEfFilter = new[] { "TransactionAttachments", "TransferAttachments" };
         var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
         try
         {
             using var scope = factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
 
-            var missing = ProjectCeres.Common.UserOwnedTables.All
+            var missing = ProjectCeres.Common.UserOwnedModel.RlsTables(db.Model)
+                .Where(t => !attachmentsWithoutEfFilter.Contains(t.PostgresTableName))
                 .Where(t => !HasFilterOnSelfOrBase(db.Model.FindEntityType(t.EntityType)))
                 .Select(t => t.EntityType.Name)
                 .ToList();
 
             missing.Should().BeEmpty(
-                "Every entry in UserOwnedTables.All must have a HasQueryFilter registration on " +
-                "the EF model (directly or via TPC inheritance). Stage 7.5's RLS parity test " +
-                "catches the migration-side drift; this test catches the EF-side drift. " +
-                "Add the missing entity to ConfigureGlobalQueryFilters in AppDbContext.cs.");
+                "Every user-owned RLS table except the attachment tables must have a " +
+                "HasQueryFilter registration on the EF model (directly or via TPC " +
+                "inheritance). Stage 7.5's RLS parity test catches the migration-side " +
+                "drift; this test catches the EF-side drift. Add the missing entity to " +
+                "ConfigureGlobalQueryFilters in AppDbContext.cs.");
         }
         finally
         {

@@ -7,7 +7,9 @@ namespace ProjectCeres.Tests.Integration.Rls;
 /// <summary>
 /// Stage 7.5 / ADR-0068 — the parity test. Connects to the actual database and
 /// queries <c>pg_policies</c>; asserts the set of tables with a <c>user_isolation</c>
-/// policy installed matches <see cref="UserOwnedTables.All"/> exactly. Fails the
+/// policy installed matches <see cref="UserOwnedModel.RlsTables"/> exactly (Stage 9.5b:
+/// the model-derived set, closing the Hole B blind spot where the parity oracle derived
+/// its expectation from the same hand-list a missing entity was absent from). Fails the
 /// build if a new <see cref="IUserOwned"/> entity ships without an accompanying
 /// RLS policy in a migration.
 /// </summary>
@@ -37,7 +39,7 @@ public class ParityTests
                 installed.Add(reader.GetString(0));
         }
 
-        var expected = UserOwnedTables.All.Select(t => t.PostgresTableName).OrderBy(n => n).ToList();
+        var expected = UserOwnedModel.RlsTables(admin.Model).Select(t => t.PostgresTableName).OrderBy(n => n).ToList();
         installed.Should().BeEquivalentTo(expected,
             "every user-owned entity must have an RLS user_isolation policy installed by a migration, and no extra policies should exist");
     }
@@ -71,7 +73,7 @@ public class ParityTests
                 forced.Add(reader.GetString(0));
         }
 
-        var expected = UserOwnedTables.All.Select(t => t.PostgresTableName).OrderBy(n => n).ToList();
+        var expected = UserOwnedModel.RlsTables(admin.Model).Select(t => t.PostgresTableName).OrderBy(n => n).ToList();
         forced.Should().BeEquivalentTo(expected,
             "every user-owned table must have both ENABLE ROW LEVEL SECURITY and FORCE ROW LEVEL SECURITY");
     }
