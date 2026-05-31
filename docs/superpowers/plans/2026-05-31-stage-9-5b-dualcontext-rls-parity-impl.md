@@ -396,7 +396,33 @@ public static class RlsParityStartupCheck
 }
 ```
 
-> **Sourcing `tablesWithDeclaredPolicies`:** derive from the migrations assembly's recorded operations. The most robust approach: scan `IMigrationsAssembly.Migrations` for `migrationBuilder.Sql` text containing `ENABLE ROW LEVEL SECURITY` per table is brittle; instead, maintain a small generated/curated set is what we're deleting. **Recommended:** read the set from `pg_class` of the connection the app would use for migrations IS the live-DB form (rejected by D3). The deploy-order-independent source is the migration history *in the assembly*. If extracting policy declarations from `MigrationBuilder` operations proves impractical at impl time, the fallback that still honors D3 is: assert against the live DB but ONLY for tables whose creating-migration is already in `__EFMigrationsHistory` (i.e. skip tables whose migration is pending) — surface this decision to the user before coding, as it changes the check's shape. Pin the chosen mechanism in the test (Task 9).
+> **Sourcing `tablesWithDeclaredPolicies` (RESOLVED 2026-05-31 — user decision):** query live `pg_class`, but require a policy ONLY for tables whose creating migration is already applied (present in `__EFMigrationsHistory`). A user-owned table whose RLS migration is still pending is **skipped, not failed** — so a rolling deploy (new binary up, migration not yet applied) cannot crash the boot. This honors D3's deploy-race-safety with a robust real API instead of brittle SQL text-scanning. Mechanism: (1) read applied migration ids from `__EFMigrationsHistory`; (2) for each `UserOwnedModel.RlsTables` entry, find the migration that creates its table (the entity's `GetTableName()` → the `CreateTable` migration; for RLS-only tables the policy migration); if that migration is NOT yet applied, skip the table; (3) for the remaining (applied) tables, require `relrowsecurity = true AND relforcerowsecurity = true` in `pg_class`. Throw listing any applied-but-unprotected table.
+
+So the signature changes from the Step-1 sketch to take the live connection + the applied-migrations set:
+
+```csharp
+public static async Task EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(
+    IModel model, string applicationConnectionString, CancellationToken ct = default)
+{
+    await using var conn = new Npgsql.NpgsqlConnection(applicationConnectionString);
+    await conn.OpenAsync(ct);
+    var applied = await ReadAppliedMigrationsAsync(conn, ct);          // __EFMigrationsHistory.MigrationId set
+    var unprotected = new List<string>();
+    foreach (var t in UserOwnedModel.RlsTables(model))
+    {
+        if (!IsCreatingMigrationApplied(t.PostgresTableName, applied)) continue;  // pending → skip (no deploy-race crash)
+        var (rls, force) = await ReadPgClassFlagsAsync(conn, t.PostgresTableName, ct);
+        if (!rls || !force) unprotected.Add(t.PostgresTableName);
+    }
+    if (unprotected.Count > 0)
+        throw new InvalidOperationException(
+            "Applied user-owned tables lack forced RLS — refusing to start: "
+            + string.Join(", ", unprotected.OrderBy(x => x))
+            + ". Add ENABLE + FORCE ROW LEVEL SECURITY + user_isolation policy. Stage 9.5b.");
+}
+```
+
+> `IsCreatingMigrationApplied` maps a table name to the migration that creates it. Simplest robust form: a table is "applied" if it physically exists (`SELECT to_regclass('public."Name"') IS NOT NULL`) — a pending CreateTable migration means the table isn't there yet, so `to_regclass` returns null and we skip it. This sidesteps parsing migration→table mapping entirely. Use `to_regclass` as the applied-probe.
 
 - [ ] **Step 2: Wire it into `Program.cs`** beside the existing check (after `var app = builder.Build();`, ~line 540), under the same gate:
 
@@ -408,8 +434,8 @@ if (!app.Configuration.GetValue<bool>("Stage75:SkipPrivilegeLeakCheck"))
 
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    RlsParityStartupCheck.EnsureEveryUserOwnedTableHasADeclaredPolicy(
-        db.Model, ResolveDeclaredPolicyTables(scope)); // per Step 1 mechanism
+    await RlsParityStartupCheck.EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(
+        db.Model, app.Configuration.GetConnectionString("ApplicationConnection")!);
 }
 ```
 
@@ -507,19 +533,29 @@ namespace ProjectCeres.Tests.Integration.Rls;
 public class RlsParityMetaTests
 {
     [Fact]
-    public void StartupCheck_throws_when_a_user_owned_table_has_no_declared_policy()
+    public async Task StartupCheck_throws_when_an_applied_user_owned_table_lacks_forced_rls()
     {
-        // The declared-policy set deliberately OMITS one required table.
-        var model = /* resolve AppDbContext.Model from the fixture */ null!;
-        var declared = UserOwnedModel.RlsTables(model)
-            .Select(t => t.PostgresTableName).Skip(1)            // drop one → simulate a forgotten policy
-            .ToHashSet(StringComparer.Ordinal);
-
-        var act = () => RlsParityStartupCheck
-            .EnsureEveryUserOwnedTableHasADeclaredPolicy(model, declared);
-
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*refusing to start*");
+        // Meta-test (ship-gate): point the check at a connection where one applied
+        // user-owned table has had its RLS turned OFF, and assert it throws. This is
+        // the input the OLD parity test got wrong (a present-but-unprotected table).
+        var model = /* fixture AppDbContext.Model */ null!;
+        await using (var admin = /* AdminContextFactory / fixture admin conn */ null!)
+        {
+            // Turn FORCE RLS off on one table inside a rolled-back tx so the live DB
+            // is mutated only for the duration of the assertion, then restored.
+            await admin.Database.ExecuteSqlRawAsync("ALTER TABLE \"Accounts\" NO FORCE ROW LEVEL SECURITY;");
+        }
+        try
+        {
+            var act = async () => await RlsParityStartupCheck
+                .EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(model, TestDbFixture.AppConnectionString);
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*refusing to start*Accounts*");
+        }
+        finally
+        {
+            await using var admin2 = /* fixture admin conn */ null!;
+            await admin2.Database.ExecuteSqlRawAsync("ALTER TABLE \"Accounts\" FORCE ROW LEVEL SECURITY;");
+        }
     }
 
     [Fact]
