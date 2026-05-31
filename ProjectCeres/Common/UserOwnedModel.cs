@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace ProjectCeres.Common;
 
-// The UserOwnedTable record type is declared in UserOwnedTables.cs (the hand-list this
-// helper supersedes). Reused here to avoid a duplicate type during the 9.5b cutover;
-// it moves into this file when UserOwnedTables.cs is deleted (Task 6).
+// UserOwnedTable record type is declared in UserOwnedTables.cs (the hand-list this
+// helper supersedes). Reused here to avoid CS0101; it moves into this file when
+// UserOwnedTables.cs is deleted (Task 6).
 
 /// <summary>
 /// Single source of truth for the set of user-owned tables, derived from the EF
