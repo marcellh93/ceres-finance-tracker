@@ -18,8 +18,9 @@ namespace ProjectCeres.Migrations
     ///         because the policies on <c>TransactionAttachments</c> and
     ///         <c>TransferAttachments</c> reference <c>UserId</c>.</item>
     ///   <item><b>Phase B.</b> Enable RLS + FORCE RLS + add <c>user_isolation</c>
-    ///         policy on all 24 user-owned tables (iterated from
-    ///         <see cref="UserOwnedTables.All"/>).</item>
+    ///         policy on all 24 user-owned tables (iterated from the migration's own
+    ///         frozen <c>FrozenUserOwnedTables</c> array — Stage 9.5b / D5: migrations
+    ///         must emit identical SQL forever, so this list is self-contained).</item>
     ///   <item><b>Phase C.</b> Verify <c>ceres_admin</c> retains <c>BYPASSRLS</c>;
     ///         <c>RAISE EXCEPTION</c> if not — a defensive idempotency check.</item>
     /// </list>
@@ -32,6 +33,24 @@ namespace ProjectCeres.Migrations
     /// </summary>
     public partial class AddRowLevelSecurityPolicies : Migration
     {
+        // Stage 9.5b / D5: frozen at this migration's authoring time (Stage 7.5). A
+        // migration must emit byte-identical SQL forever, so it does NOT read the live
+        // EF model or UserOwnedModel — it carries its own list. These are the 24 tables
+        // that existed when this migration shipped. EmailConfirmationTokens is
+        // deliberately ABSENT — it got its policy in the later 20260526054514 migration.
+        // Future user-owned tables get their policy via their own new migration; this
+        // list never grows.
+        private static readonly string[] FrozenUserOwnedTables =
+        {
+            "Accounts", "Budgets", "Categories", "CategoryBudgets", "ImportProfiles",
+            "ImportStagedTransactions", "ImportStagedTransfers", "ImportTransferExclusions",
+            "RecurringTransactions", "SavedReports", "Settings",
+            "Transactions", "Transfers", "LiabilityPayments",
+            "TransactionAttachments", "TransferAttachments",
+            "UserSessions", "UserBlockedIps", "UserMfaBackupCodes", "TotpReplayEntries",
+            "PasswordResetTokens", "EmailChangeTokens", "LockoutUnlockTokens", "AuditLogs",
+        };
+
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -77,7 +96,7 @@ namespace ProjectCeres.Migrations
             // someone else's rows. (See ADR-0068 § Rationale.)
             // ----------------------------------------------------------------
 
-            foreach (var table in UserOwnedTables.All)
+            foreach (var table in FrozenUserOwnedTables)
             {
                 // NULLIF(..., '') guards against Postgres's `DISCARD ALL` behavior on
                 // pooled connection return — DISCARD ALL resets custom GUCs to their
@@ -87,11 +106,11 @@ namespace ProjectCeres.Migrations
                 // with it, both cases collapse to NULL and the policy evaluates to false
                 // (zero rows / WITH CHECK fail) — the fail-closed property holds.
                 migrationBuilder.Sql($@"
-                    ALTER TABLE ""{table.PostgresTableName}"" ENABLE ROW LEVEL SECURITY;
-                    ALTER TABLE ""{table.PostgresTableName}"" FORCE ROW LEVEL SECURITY;
+                    ALTER TABLE ""{table}"" ENABLE ROW LEVEL SECURITY;
+                    ALTER TABLE ""{table}"" FORCE ROW LEVEL SECURITY;
 
-                    DROP POLICY IF EXISTS user_isolation ON ""{table.PostgresTableName}"";
-                    CREATE POLICY user_isolation ON ""{table.PostgresTableName}""
+                    DROP POLICY IF EXISTS user_isolation ON ""{table}"";
+                    CREATE POLICY user_isolation ON ""{table}""
                       USING (""UserId"" = NULLIF(current_setting('app.current_user_ref', true), '')::uuid)
                       WITH CHECK (""UserId"" = NULLIF(current_setting('app.current_user_ref', true), '')::uuid);
                 ");
@@ -119,12 +138,12 @@ namespace ProjectCeres.Migrations
         {
             // Drop policies in reverse order. The attachment UserId columns are NOT
             // reversed: down migrations don't drop data (standard EF practice).
-            foreach (var table in UserOwnedTables.All)
+            foreach (var table in FrozenUserOwnedTables)
             {
                 migrationBuilder.Sql($@"
-                    DROP POLICY IF EXISTS user_isolation ON ""{table.PostgresTableName}"";
-                    ALTER TABLE ""{table.PostgresTableName}"" NO FORCE ROW LEVEL SECURITY;
-                    ALTER TABLE ""{table.PostgresTableName}"" DISABLE ROW LEVEL SECURITY;
+                    DROP POLICY IF EXISTS user_isolation ON ""{table}"";
+                    ALTER TABLE ""{table}"" NO FORCE ROW LEVEL SECURITY;
+                    ALTER TABLE ""{table}"" DISABLE ROW LEVEL SECURITY;
                 ");
             }
         }
