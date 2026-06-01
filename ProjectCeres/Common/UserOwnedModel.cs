@@ -3,9 +3,12 @@ using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace ProjectCeres.Common;
 
-// UserOwnedTable record type is declared in UserOwnedTables.cs (the hand-list this
-// helper supersedes). Reused here to avoid CS0101; it moves into this file when
-// UserOwnedTables.cs is deleted (Task 6).
+/// <summary>
+/// A user-owned table and the concrete entity it maps to. Movement is the abstract TPC
+/// root (no table); the three concrete subtypes (Transactions, Transfers,
+/// LiabilityPayments) each carry their own entry.
+/// </summary>
+public sealed record UserOwnedTable(string PostgresTableName, Type EntityType);
 
 /// <summary>
 /// Single source of truth for the set of user-owned tables, derived from the EF

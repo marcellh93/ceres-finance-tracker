@@ -4,7 +4,7 @@ namespace ProjectCeres.Common.Exceptions;
 
 /// <summary>
 /// Thrown when a database write hits Postgres SqlState <c>42501</c> on one of the
-/// user-owned tables in <see cref="UserOwnedTables.All"/>. Wraps the original
+/// user-owned tables in <see cref="UserOwnedModel.RlsTables"/>. Wraps the original
 /// <see cref="PostgresException"/> and carries the diagnostic data needed to
 /// distinguish an RLS policy rejection from any other 42501 (missing GRANT,
 /// read-only table, etc.).

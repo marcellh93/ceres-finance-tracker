@@ -252,7 +252,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     {
         // Stage 8e: Resend webhook events. Cross-tenant by design (the webhook is pre-auth;
         // events may also arrive for addresses without a matching user). Does NOT implement
-        // IUserOwned and is intentionally NOT in UserOwnedTables.All — same precedent as
+        // IUserOwned and is intentionally NOT in UserOwnedModel.RlsTables — same precedent as
         // FailedLoginAttempt (ADR-0067). Payload is jsonb for future ad-hoc inspection;
         // the (EmailAddress, OccurredAt DESC) index supports the most-recent-event-by-address
         // lookup pattern that the operational tooling will use.
@@ -313,8 +313,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     /// </summary>
     private void ConfigureGlobalQueryFilters(ModelBuilder modelBuilder)
     {
-        // Stage 7.6.4: iterate UserOwnedTables.All so adding a new user-owned entity is one
-        // append to that list. The Movement TPC abstract root is registered explicitly first
+        // Stage 9.5b: iterate UserOwnedModel.RlsTables (model-derived) so adding a new user-owned
+        // entity needs no list edit. The Movement TPC abstract root is registered explicitly first
         // — EF rejects HasQueryFilter on TPC subtypes (Transaction / Transfer / LiabilityPayment)
         // because the filter must live on the root and EF propagates it to each concrete table.
         //

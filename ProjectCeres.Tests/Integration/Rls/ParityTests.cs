@@ -21,7 +21,7 @@ public class ParityTests
     public ParityTests(RlsTestFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task UserOwnedTables_All_matches_pg_policies_user_isolation_set()
+    public async Task UserOwnedModel_RlsTables_match_pg_policies_user_isolation_set()
     {
         await using var admin = _fixture.CreateAdminContext();
 
