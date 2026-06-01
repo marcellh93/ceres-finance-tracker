@@ -539,9 +539,17 @@ var app = builder.Build();
 // check is cheap there.
 if (!app.Configuration.GetValue<bool>("Stage75:SkipPrivilegeLeakCheck"))
 {
-    await PrivilegeLeakStartupCheck.EnsureApplicationConnectionLacksDdlAsync(
-        app.Configuration.GetConnectionString("ApplicationConnection")
-            ?? throw new InvalidOperationException("ConnectionStrings:ApplicationConnection is not configured."));
+    var applicationConnection = app.Configuration.GetConnectionString("ApplicationConnection")
+        ?? throw new InvalidOperationException("ConnectionStrings:ApplicationConnection is not configured.");
+
+    await PrivilegeLeakStartupCheck.EnsureApplicationConnectionLacksDdlAsync(applicationConnection);
+
+    // Stage 9.5b / D3 — refuse to start if any applied user-owned table is missing forced
+    // RLS. Pending-migration tables are skipped, so a rolling deploy does not crash.
+    using var rlsParityScope = app.Services.CreateScope();
+    var rlsParityDb = rlsParityScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await RlsParityStartupCheck.EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(
+        rlsParityDb.Model, applicationConnection);
 }
 
 if (!app.Environment.IsDevelopment())
