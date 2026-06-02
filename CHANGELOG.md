@@ -163,6 +163,18 @@
 - 16 typed API endpoints under `/api/category-budgets`, `/api/goal-budgets`, `/api/budgets`, and `/api/currencies` (see `docs/api-contract.md`)
 - Movement form gains a conditional Spending-Goal picker so transactions can be tagged toward Spending goals — visible only when ≥1 active matching goal exists in the transaction's currency
 
+**Data layer / RLS (Stage 9.5b — model-derived user-owned set, 2026-06-02)**
+- `RlsParityStartupCheck` — the app now refuses to start if any user-owned table is missing forced Row-Level Security (`relrowsecurity` + `relforcerowsecurity`), checked against the live database at boot beside the existing privilege-leak check. Tables whose creating migration hasn't been applied yet are skipped, so a rolling deploy (new binary up before the migration runs) doesn't crash. This closes the class of bug where a new user-owned table could ship without its RLS policy
+- `UserOwnedModel.RlsTables(model)` / `FinanceTables(model)` — the set of user-owned tables is now derived from the EF model (any concrete entity implementing `IUserOwned` that maps to a table), replacing the hand-typed list that was the original source of the drift
+- `DualContextWebApplicationFactory` — a test fixture that boots the app as the restricted `ceres_app` database role (RLS active) so tests can observe a missing RLS policy, exposing an RLS-enforced context bound to a specific acting user plus an admin context for cross-user seeding
+- `AdminContextDisciplineTests` — architecture test requiring every consumer of the BYPASSRLS admin context to carry `[RequiresAdminContext]`, so all RLS bypasses are findable by one marker; covers constructor/field, method-parameter, and service-locator injection
+- `RlsParityMetaTests` — proves the boot check actually throws when an applied user-owned table loses forced RLS, plus a cross-user isolation test through the production-booted app role
+
+#### Removed
+
+**Data layer / RLS (Stage 9.5b, 2026-06-02)**
+- `ProjectCeres/Common/UserOwnedTables.cs` (the hand-typed `UserOwnedTables.All` list) — superseded by the model-derived `UserOwnedModel`
+
 #### Fixed
 
 **Subagents (Stage 9.5k — registry comment, 2026-05-30)**
@@ -180,6 +192,10 @@
 **Subagents (Stage 9.5k — read-first contract, 2026-05-30)**
 - The 5 `ceres-*` strategy subagents now restrict tools via a `disallowedTools` deny-list instead of a `tools` allow-list. The deny-list states the real invariant (never mutate code), survives future read-tool additions, and avoids the allow-list footgun where a typo'd tool name silently grants all tools. Smoke-test confirmed all 5 roles pass the read-first contract with no mutating-tool use
 - Tightened the response contract: a `ceres-*` reply's first line must now be the `## What I read` heading with no preamble or thinking-aloud, enforced by the dispatcher gate in `CLAUDE.md` § Using subagents — after the smoke-test found 2 of 5 roles opening with prose before the heading
+
+**Data layer / RLS (Stage 9.5b, 2026-06-02)**
+- The user-owned table set used by the EF query filters, the dev-seed tool (`SeedDevUser`), the RLS-parity tests, and the exception translator is now derived from the EF model rather than a hand-maintained list — adding a new user-owned entity needs no list edit
+- `EmailConfirmationToken` added to `IUserOwnedConformanceTests` (it was missing — a pre-existing test-coverage gap); five docs (`multi-tenancy-strategy.md`, `security-model.md`, the PostgreSQL RLS guide, `planning-phase3.md`, `roadmap-phase-three.md`) de-staled to reflect that attachment + auth tables carry `UserId` + RLS and the set is model-derived
 
 **Settings / Dashboard cycle math**
 - Renamed `Settings.BudgetPeriodStartDay` to `Settings.PeriodStartDay` to reflect that it now drives every monthly view (Cycle to Date, Spending by Category, Income vs. Avg, Budget periods, etc.), not just budgets. UI label is now "Monthly cycle start day."

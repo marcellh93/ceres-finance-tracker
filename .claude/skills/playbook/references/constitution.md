@@ -156,7 +156,7 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 | Item type | Required registries |
 |---|---|
-| `IUserOwned` entity | DbSet (#1), OnModelCreating (#2), `UserOwnedTables.All` (#3), `CREATE POLICY user_isolation` migration (#4) |
+| `IUserOwned` entity | DbSet (#1), OnModelCreating (#2), model-derived membership via `UserOwnedModel.RlsTables` — automatic for any concrete `IUserOwned` entity with a table; the hand-typed `UserOwnedTables.All` was deleted Stage 9.5b (#3), `CREATE POLICY user_isolation` migration (#4) |
 | Non-`IUserOwned` entity | DbSet (#1), OnModelCreating (#2) |
 | Service class | DI registration in `Program.cs` (#5), `IgnoreQueryFilters` allow-list in `ArchitectureTests.cs` if it calls `IgnoreQueryFilters` (#6) |
 | Resx template (key.Subject in `EmailsResource.en.resx`) | 3 keys in `en.resx` (#7), 3 keys in `es.resx` (#7), value in `EmailTemplateKey` enum (#8) |

@@ -91,7 +91,11 @@ function isStageClose(text) {
 function auditEntities() {
   const modelsDir = path.join(PROJECT_DIR, "ProjectCeres", "Models");
   const ctx = readFile("ProjectCeres/Data/AppDbContext.cs");
-  const userOwned = readFile("ProjectCeres/Common/UserOwnedTables.cs");
+  // Stage 9.5b: the user-owned set is derived from the EF model by
+  // UserOwnedModel.RlsTables (the hand-typed UserOwnedTables.All was deleted). A
+  // concrete IUserOwned entity with a DbSet IS in the set by construction — there is
+  // no list to grep. U1 below therefore verifies the structural facts that make an
+  // entity model-derived-covered, not membership in a deleted file.
 
   const results = [];
 
@@ -148,12 +152,17 @@ function auditEntities() {
       });
 
       if (isUserOwned) {
-        // U1 — exact typeof match in UserOwnedTables.All
-        const u1Re = new RegExp(`typeof\\(${typeName}\\)`);
+        // U1 — model-derived membership. UserOwnedModel.RlsTables(model) includes
+        // every concrete IUserOwned entity that maps to a table. This entity is
+        // concrete (abstract skipped at line ~112), IUserOwned (this branch), and has
+        // a DbSet (D1 passed / `continue`d otherwise) — so it IS in the set by
+        // construction. No hand-list to grep (deleted Stage 9.5b). The pass is the
+        // structural fact; the runtime truth (policy installed) is U2 + ParityTests.
+        const u1Pass = isUserOwned && hasDbSet;
         checks.push({
           id: "U1",
-          label: `typeof(${typeName}) in UserOwnedTables.All`,
-          pass: u1Re.test(userOwned),
+          label: `${typeName} is model-derived-covered by UserOwnedModel.RlsTables (concrete IUserOwned + DbSet)`,
+          pass: u1Pass,
         });
 
         // U2 — there must exist a migration with CREATE POLICY user_isolation
@@ -172,23 +181,21 @@ function auditEntities() {
             const mig = fs.readFileSync(path.join(migrationsDir, f), "utf8");
             if (!mig.includes("CREATE POLICY user_isolation")) continue;
             // Two acceptable shapes:
-            //  (a) Explicit: `ON "TableName"` literal in the SQL.
-            //  (b) Stage 7.5 loop: `foreach (var table in UserOwnedTables.All)`
-            //      AND the entity is in UserOwnedTables.All AT MIGRATION TIME.
-            //      The loop covers entries present when the migration runs;
-            //      newer additions to UserOwnedTables.All need their own
-            //      follow-up migration. We approximate "covered by the loop"
-            //      by checking if the migration uses the loop AND the entity
-            //      is currently in the list — the runtime SQL truth (whether
-            //      the policy is installed) is verified by the parity test,
-            //      not by this static check.
+            //  (a) Explicit: `ON "TableName"` literal in the SQL (or the frozen
+            //      table-name list the Stage 7.5 migration now carries — Stage 9.5b
+            //      Task 4 inlined a `FrozenUserOwnedTables` copy so the historical
+            //      migration stays byte-reproducible after the hand-list deletion).
+            //  (b) Loop shape: a migration that iterates a table-name list and emits
+            //      CREATE POLICY user_isolation per entry. The runtime SQL truth
+            //      (whether the policy is actually installed for this table) is
+            //      verified by ParityTests + RlsParityStartupCheck, not this static
+            //      check — here we only confirm a migration plausibly covers it.
             if (mig.includes(`"${tableName}"`)) {
               policyFound = true;
               break;
             }
             if (
-              mig.includes("foreach (var table in UserOwnedTables.All)") &&
-              u1Re.test(userOwned)
+              /foreach\s*\(var\s+table\s+in\s+(FrozenUserOwnedTables|UserOwnedTables\.All)\)/.test(mig)
             ) {
               // Tentative — loop-based. Mark as "loop-covered" and continue
               // searching for an explicit one (explicit wins).
