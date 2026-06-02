@@ -58,6 +58,13 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     /// </summary>
     protected virtual bool UseTestAuthHandler => true;
 
+    /// <summary>
+    /// When true, the WAF wires AppDbContext to the RLS-active ceres_app role instead of
+    /// the BYPASSRLS ceres_admin role. Default false preserves the legacy admin routing all
+    /// existing tests rely on (D7). DualContextWebApplicationFactory overrides it to true.
+    /// </summary>
+    protected virtual bool UseAppRoleConnection => false;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Stage 7.5 — skip the privilege-leak startup probe inside the WAF. The check
@@ -72,7 +79,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         // deletes with `new row violates row-level security policy`. The dedicated
         // RlsTestFixture (under Integration/Rls/) connects as the real ceres_app to
         // exercise the wall directly — that's where Stage 7.5 test coverage lives.
-        builder.UseSetting("ConnectionStrings:ApplicationConnection", AdminConnectionString);
+        builder.UseSetting("ConnectionStrings:ApplicationConnection",
+            UseAppRoleConnection ? AppConnectionString : AdminConnectionString);
         builder.UseSetting("ConnectionStrings:AdminConnection",       AdminConnectionString);
         builder.UseSetting("ConnectionStrings:MigrationConnection",   MigratorConnectionString);
         builder.UseSetting("FileAttachments:RootPath", _uploadsRoot);
