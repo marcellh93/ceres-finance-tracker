@@ -15,6 +15,7 @@ public class IUserOwnedConformanceTests
     [InlineData(typeof(EmailChangeToken))]
     [InlineData(typeof(LockoutUnlockToken))]
     [InlineData(typeof(AuditLog))]
+    [InlineData(typeof(EmailConfirmationToken))]
     public void Auth_internal_entity_implements_IUserOwned(Type t)
     {
         typeof(IUserOwned).IsAssignableFrom(t)

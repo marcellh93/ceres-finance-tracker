@@ -41,8 +41,17 @@ Every entity that represents a user's own data must have a direct `UserId` FK. R
 |--------|--------|
 | `Currency`, `AccountType`, `CategoryType`, `ReportType` | System lookup tables — not user data |
 | `Category` (IsSystem = true rows) | Seeded by the system, shared across all users |
-| `TransactionAttachment` | Scoped through its parent Transaction (which has UserId) |
-| `UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry` | Already scoped to a user via their own FK structure |
+| `EmailDeliveryEvent`, `FailedLoginAttempt` | Cross-user by design (pre-auth / address-keyed); nullable or absent userId (ADR-0067) |
+
+> **Superseded by Stage 7.5 (RLS) + Stage 9.5b (model-derived set).** This table originally
+> listed `TransactionAttachment`/`TransferAttachment` and the auth-internal tables
+> (`UserSession`, `UserBlockedIp`, `UserMfaBackupCode`, `TotpReplayEntry`, …) as "no direct
+> UserId". That is no longer true: Stage 7.5's RLS migration (Phase A) added a denormalized
+> `UserId` column to the attachment tables, and the auth-internal tables implement `IUserOwned`
+> with their own `UserId` + a `user_isolation` RLS policy. The authoritative user-owned set is
+> now **derived from the EF model** by `UserOwnedModel.RlsTables(model)` (25 tables) — not a
+> hand-list — and is boot-verified by `RlsParityStartupCheck` (Stage 9.5b). See § *Row-Level
+> Security* in `security-model.md`.
 
 ---
 
@@ -105,7 +114,7 @@ Audited services:
 - `SettingsService` (per-user post-Stage-7), `DashboardService`
 - `ReportService` + all 8 report generators (`NetWorth`, `IncomeExpense`, `ExpenseBreakdown`, `TransactionHistory`, `BudgetVsActual`, `LargestExpenses`, `MonthlyCashFlow`, `NetWorthOverTime`)
 - `ImportService`, `CsvImportProfileService` (named `ImportProfileService` in code), `TransferReviewService`, `ImportStagedTransactionService`
-- `FileAttachmentService` — scopes via parent Transaction/Transfer's `UserId` (Attachment has no UserId column of its own)
+- `FileAttachmentService` — scopes via parent Transaction/Transfer's `UserId` at the service layer. (Since Stage 7.5 the attachment tables also carry a denormalized `UserId` column + a `user_isolation` RLS policy, so the database enforces isolation independently.)
 
 Deferred (not yet implemented in the project):
 

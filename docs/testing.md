@@ -216,7 +216,7 @@ Stage 7 Commit 1 added a dedicated coverage block under `ProjectCeres.Tests/Inte
 | `Common/UserScopeTests.cs` | `IUserScope` AsyncLocal stack semantics: set/restore, nesting, propagation across `await` |
 | `Common/UserJobRunnerTests.cs` | `IUserJobRunner.ForEachUserAsync` per-user iteration, exception isolation, scope unwinds on throw |
 | `Common/CurrentUserAccessorResolutionTests.cs` | `HttpContextCurrentUserAccessor` resolution order: HTTP claim → `IUserScope.Current` → `Guid.Empty` safe default |
-| `Common/IUserOwnedConformanceTests.cs` | 8 auth-internal entities implement `IUserOwned`; `FailedLoginAttempt` does NOT |
+| `Common/IUserOwnedConformanceTests.cs` | 9 auth-internal entities implement `IUserOwned` (incl. `EmailConfirmationToken`, added 9.5b); `FailedLoginAttempt` does NOT |
 | `Common/CategoriesDefaultsTests.cs` | Canonical 26-entry default-category list shape |
 | `Integration/Authentication/ArchitectureTests § IgnoreQueryFilters_only_appears_in_documented_exception_paths` | Scans `ProjectCeres/**/*.cs`; fails the build if any non-comment `IgnoreQueryFilters(` call site appears outside the allow-list (9 enumerated files + the future `ProjectCeres/Admin/` namespace) |
 | `Integration/Authentication/ArchitectureTests § Every_user_owned_entity_carries_a_global_query_filter` | All 22 expected entities carry a declared global query filter (Movement as TPC root + 11 finance-domain + 10 auth/scopable) |
@@ -228,6 +228,17 @@ Stage 7 Commit 1 added a dedicated coverage block under `ProjectCeres.Tests/Inte
 | `Integration/Authentication/CurrentUserAccessorResolutionTests § Returns_GuidEmpty_when_neither_resolves` | Pins the Stage 7 Task 9 amendment to ADR-0067 (accessor returns `Guid.Empty` rather than throwing when neither HTTP context nor `IUserScope` resolves) |
 
 The 404-not-403 discipline matters: returning 403 leaks the row's existence to the requester, defeating the multi-tenancy isolation. Every cross-tenant assertion must be `HttpStatusCode.NotFound`. The IDOR suite's helpers (`GetAsB`, `DeleteAsB`, `PatchAsB`) attach User B's session cookie + CSRF token per-request so the same test can swap users without context bleed.
+
+### Test-infrastructure RLS parity (Stage 9.5b, decided 2026-06-02)
+
+`WafCollection.cs` defaults `ConnectionStrings:ApplicationConnection` to `ceres_admin` (BYPASSRLS) so legacy integration tests — which resolve `AppDbContext` from DI and do cross-user cleanup — keep working after Postgres RLS turned on. That default is a known coverage gap: under it the Stage 7.5 RLS policies are silently inert, which is how the `EmailConfirmationTokens` gap shipped in Stage 9.3 (no test could observe a missing policy).
+
+The decision (roadmap § Stage 9.10, option (b)) is to **add a real-account capability rather than flip the global default**:
+
+- The base factory exposes a `UseAppRoleConnection` virtual (default `false` — legacy routing unchanged). `DualContextWebApplicationFactory` overrides it to `true`, booting the app through the production DI graph wired to `ceres_app` (RLS-active). It exposes `NewAppContext(Guid actingAs)` (RLS enforced; the acting user's GUC is bound via `IUserScope` before the context resolves) and `NewAdminContext()` (BYPASSRLS, for cross-user seeding).
+- **Setup discipline:** seed via `NewAdminContext`, assert via `NewAppContext(actingAs)`. Under `ceres_app`, an insert without an established user context is rejected (`42501`) and a read returns zero rows — so seeding must go through the admin context.
+- `RlsParityStartupCheck` fail-closes at boot (model-derived user-owned set vs live `pg_class`), and `RlsParityMetaTests` proves the check throws on a missing policy. `RlsTestFixture` (hand-built `ceres_app` contexts) remains for the direct-wall tests under `Integration/Rls/`.
+- The **full** auth-suite switch onto the app role is **Stage 9.5d** (`ProjectCeres.Tests.Integration.AppRole`). Until then, do not flip the `WafCollection` default — new RLS-sensitive tests opt in via `DualContextWebApplicationFactory`.
 
 ### Phase 2 Import Coverage
 
