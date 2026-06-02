@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using Microsoft.AspNetCore.Identity;
@@ -25,6 +26,7 @@ namespace ProjectCeres.Common.Authentication;
 /// Integration tests passed previously because the test connection used a role with
 /// BYPASSRLS, masking the issue.
 /// </summary>
+[RequiresAdminContext]
 public sealed class PersistentCookieRotationMiddleware
 {
     private readonly RequestDelegate _next;

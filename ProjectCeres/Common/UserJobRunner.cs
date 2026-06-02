@@ -1,11 +1,13 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Common;
 
+[RequiresAdminContext]
 public sealed class UserJobRunner(
     AdminDbContext db,
     IBackgroundJobScope backgroundScope,

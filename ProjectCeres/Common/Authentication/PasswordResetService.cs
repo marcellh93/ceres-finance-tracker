@@ -16,6 +16,7 @@ namespace ProjectCeres.Common.Authentication;
 /// (MemoryCache); per-IP gate is the existing AuthLoginByIp policy applied at the controller.
 /// </summary>
 [PreAuthScope]
+[RequiresAdminContext]
 public sealed class PasswordResetService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(15);

@@ -14,6 +14,7 @@ namespace ProjectCeres.Common.Authentication;
 /// load matching UserSession, reject if missing/revoked, otherwise stamp
 /// LastUsedAt = now (debounced to one write per 60 s per session row).
 /// </summary>
+[RequiresAdminContext]
 public static class SessionRevocationValidator
 {
     [AllowsWallClock("static security-stamp revalidation helper called from cookie validation; TimeProvider injection requires conversion to instance class registered in DI — out of 9.5c scope")]

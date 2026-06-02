@@ -17,6 +17,7 @@ namespace ProjectCeres.Common.Authentication;
 /// gate is MemoryCache-backed (5/hour); per-IP gate is controller-side.
 /// </summary>
 [PreAuthScope]
+[RequiresAdminContext]
 public sealed class EmailConfirmationService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(30);
