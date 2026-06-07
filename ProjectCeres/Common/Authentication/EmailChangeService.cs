@@ -17,6 +17,8 @@ namespace ProjectCeres.Common.Authentication;
 /// applied to /confirm and /revoke at the controller. /request is reauth-gated, so it
 /// inherits no extra per-IP rate limit beyond the global rate-limiter middleware.
 /// </summary>
+[PreAuthScope]
+[RequiresAdminContext]
 public sealed class EmailChangeService
 {
     public static readonly TimeSpan VerifyTokenLifetime = TimeSpan.FromMinutes(30);
@@ -28,6 +30,12 @@ public sealed class EmailChangeService
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly AppDbContext _db;
+    // Confirm/Revoke look up the token row by TokenLookup before the userId is
+    // known; the user_isolation RLS policy on ceres_app filters every row when
+    // app.current_user_ref is unset (PreAuth). Read via AdminDbContext (BYPASSRLS)
+    // for the initial lookup, then open a PreAuthUserScope on _db once we have
+    // match.UserId. Same pattern as PasswordResetService.ConfirmAsync.
+    private readonly AdminDbContext _admin;
     private readonly Argon2idPasswordHasher _argon;
     private readonly EmailChangeTokenGenerator _tokens;
     private readonly TokenLookupHasher _lookupHasher;
@@ -44,6 +52,7 @@ public sealed class EmailChangeService
     public EmailChangeService(
         UserManager<ApplicationUser> userManager,
         AppDbContext db,
+        AdminDbContext admin,
         Argon2idPasswordHasher argon,
         EmailChangeTokenGenerator tokens,
         TokenLookupHasher lookupHasher,
@@ -59,6 +68,7 @@ public sealed class EmailChangeService
     {
         _userManager = userManager;
         _db = db;
+        _admin = admin;
         _argon = argon;
         _tokens = tokens;
         _lookupHasher = lookupHasher;
@@ -241,8 +251,9 @@ public sealed class EmailChangeService
         // purposes because each /request issues distinct VerifyNew + RevokeOld tokens.
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
-        // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
-        var match = await _db.EmailChangeTokens
+        // Pre-auth lookup via AdminDbContext (BYPASSRLS) — userId not yet known, so the
+        // ceres_app user_isolation policy would filter every row. Stage 10 allow-lists this file.
+        var match = await _admin.EmailChangeTokens
             .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup
                      && t.Purpose == EmailChangeTokenPurpose.VerifyNew
@@ -265,8 +276,11 @@ public sealed class EmailChangeService
         await sem.WaitAsync(ct);
         try
         {
-            // Cross-tenant by design: re-read inside lock; still pre-auth. Stage 10 architecture test allow-lists this file.
-            var current = await _db.EmailChangeTokens
+            // userId now known: open a PreAuthUserScope on _db so the writes below pass user_isolation.
+            await using var rlsScope = await _db.BeginPreAuthUserScopeAsync(match.UserId, ct);
+
+            // Re-read inside lock via AdminDbContext (BYPASSRLS); another caller may have consumed it.
+            var current = await _admin.EmailChangeTokens
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
@@ -373,6 +387,8 @@ public sealed class EmailChangeService
 
             await _auditLog.RecordAsync(match.UserId, AuditLogAction.EmailChangeConfirmed, ct: ct);
 
+            await rlsScope.CommitAsync(ct);
+
             return new EmailChangeConfirmOutcome.Success();
         }
         finally
@@ -393,8 +409,8 @@ public sealed class EmailChangeService
         // Stage 6.15: O(1) indexed lookup via HMAC-derived TokenLookup column.
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
-        // Cross-tenant by design: lookup by TokenLookup before the caller is authenticated. Stage 10 architecture test allow-lists this file.
-        var match = await _db.EmailChangeTokens
+        // Pre-auth lookup via AdminDbContext (BYPASSRLS) — userId not yet known. Stage 10 allow-lists this file.
+        var match = await _admin.EmailChangeTokens
             .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup
                      && t.Purpose == EmailChangeTokenPurpose.RevokeOld
@@ -417,8 +433,11 @@ public sealed class EmailChangeService
         await sem.WaitAsync(ct);
         try
         {
-            // Cross-tenant by design: re-read inside lock; still pre-auth. Stage 10 architecture test allow-lists this file.
-            var current = await _db.EmailChangeTokens
+            // userId now known: open a PreAuthUserScope on _db so the consume write passes user_isolation.
+            await using var rlsScope = await _db.BeginPreAuthUserScopeAsync(match.UserId, ct);
+
+            // Re-read inside lock via AdminDbContext (BYPASSRLS); another caller may have consumed it.
+            var current = await _admin.EmailChangeTokens
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
@@ -455,6 +474,8 @@ public sealed class EmailChangeService
             }
 
             await _auditLog.RecordAsync(match.UserId, AuditLogAction.EmailChangeRevoked, ct: ct);
+
+            await rlsScope.CommitAsync(ct);
 
             return new EmailChangeRevokeOutcome.Success();
         }
