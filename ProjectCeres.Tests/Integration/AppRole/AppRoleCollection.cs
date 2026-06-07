@@ -32,5 +32,8 @@ public sealed class AppRoleFixture : IAsyncLifetime
     }
 }
 
-[CollectionDefinition("AppRoleTests")]
+// DisableParallelization: these RLS-correctness tests don't need to run in parallel, and
+// their concurrent HTTP+DB load destabilizes the timing-sensitive RateLimitTests under full-
+// suite contention (9.5d flake-check). Matches the RateLimitTests/MfaRateLimitTests precedent.
+[CollectionDefinition("AppRoleTests", DisableParallelization = true)]
 public class AppRoleTestsCollection : ICollectionFixture<AppRoleFixture> { }
