@@ -22,6 +22,7 @@ namespace ProjectCeres.Common.Authentication;
 /// the unlock is an undo of a failed-login side effect, not a credential change.
 /// </summary>
 [PreAuthScope]
+[RequiresAdminContext]
 public class LockoutUnlockService
 {
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(15);
@@ -30,6 +31,11 @@ public class LockoutUnlockService
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly AppDbContext _db;
+    // ConfirmAsync looks up the token by TokenLookup before the userId is known; on
+    // ceres_app the user_isolation policy filters every row while app.current_user_ref
+    // is unset (PreAuth). Read via AdminDbContext (BYPASSRLS), then open a
+    // PreAuthUserScope on _db once we have match.UserId. Same pattern as EmailChangeService.
+    private readonly AdminDbContext _admin;
     private readonly Argon2idPasswordHasher _argon;
     private readonly LockoutUnlockTokenGenerator _tokens;
     private readonly TokenLookupHasher _lookupHasher;
@@ -45,6 +51,7 @@ public class LockoutUnlockService
     public LockoutUnlockService(
         UserManager<ApplicationUser> userManager,
         AppDbContext db,
+        AdminDbContext admin,
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
         TokenLookupHasher lookupHasher,
@@ -59,6 +66,7 @@ public class LockoutUnlockService
     {
         _userManager = userManager;
         _db = db;
+        _admin = admin;
         _argon = argon;
         _tokens = tokens;
         _lookupHasher = lookupHasher;
@@ -148,11 +156,11 @@ public class LockoutUnlockService
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var lookup = _lookupHasher.ComputeLookup(rawToken);
-        // Cross-tenant by design: token-based pre-auth operation; caller is not in session.
-        // Stage 10 architecture test allow-lists this file. Stage 9.1.5.a: indexed lookup
-        // replaces the O(N) Argon2 scan; a single row matches the HMAC-derived TokenLookup
-        // or none does, so we run at most one Argon2 verify per request.
-        var candidate = await _db.LockoutUnlockTokens
+        // Pre-auth lookup via AdminDbContext (BYPASSRLS) — userId not yet known, so the
+        // ceres_app user_isolation policy would filter every row. Stage 10 allow-lists this file.
+        // Stage 9.1.5.a: indexed lookup replaces the O(N) Argon2 scan; a single row matches the
+        // HMAC-derived TokenLookup or none does, so we run at most one Argon2 verify per request.
+        var candidate = await _admin.LockoutUnlockTokens
             .IgnoreQueryFilters()
             .Where(t => t.TokenLookup == lookup && t.ConsumedAt == null && t.ExpiresAt > now)
             .SingleOrDefaultAsync(ct);
@@ -172,8 +180,11 @@ public class LockoutUnlockService
         await sem.WaitAsync(ct);
         try
         {
-            // Cross-tenant by design: re-read inside lock; user identity resolved from token row, not HTTP cookie. Stage 10 architecture test allow-lists this file.
-            var current = await _db.LockoutUnlockTokens
+            // userId now known: open a PreAuthUserScope on _db so the writes below pass user_isolation.
+            await using var rlsScope = await _db.BeginPreAuthUserScopeAsync(match.UserId, ct);
+
+            // Re-read inside lock via AdminDbContext (BYPASSRLS); another caller may have consumed it.
+            var current = await _admin.LockoutUnlockTokens
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.Id == match.Id, ct);
@@ -206,6 +217,8 @@ public class LockoutUnlockService
                 .ExecuteUpdateExactlyAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct: ct);
 
             await _auditLog.RecordAsync(user.Id, AuditLogAction.LockoutSelfServiceUnlock, ct: ct);
+
+            await rlsScope.CommitAsync(ct);
 
             return new LockoutUnlockOutcome.Success();
         }

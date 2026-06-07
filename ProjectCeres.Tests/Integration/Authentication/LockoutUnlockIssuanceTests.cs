@@ -274,6 +274,7 @@ internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
     public ThrowingLockoutUnlockService(
         Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> userManager,
         AppDbContext db,
+        ProjectCeres.Data.AdminDbContext admin,
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
         TokenLookupHasher lookupHasher,
@@ -284,7 +285,7 @@ internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
         Microsoft.Extensions.Logging.ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog,
         LockoutCache lockoutCache)
-        : base(userManager, db, argon, tokens, lookupHasher, email, composer, recipients, languages, logger, auditLog, lockoutCache, TimeProvider.System) { }
+        : base(userManager, db, admin, argon, tokens, lookupHasher, email, composer, recipients, languages, logger, auditLog, lockoutCache, TimeProvider.System) { }
 
     public override Task IssueAsync(
         Guid userId, string userEmail, string ip, string userAgent,
