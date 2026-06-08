@@ -269,5 +269,5 @@ if (require.main === module) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { validateReviewerPipeline };
+  module.exports = { validateReviewerPipeline, SLOT_TABLE };
 }
