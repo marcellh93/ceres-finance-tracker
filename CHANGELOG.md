@@ -6,6 +6,15 @@
 
 #### Added
 
+**Subagents (Stage 9.5e — 3-agent reviewer pipeline, 2026-06-08)**
+- New review-pipeline roles `reviewer-writer` / `reviewer-security` / `reviewer-playwright-test-audit` (`.claude/agents/`) that audit a finished diff touching pre-auth auth code, EF migrations, or user-owned models — dispatched by the main session, each emitting a `VERDICT: pass|block` under the 9.5k read-first contract; documented in `docs/agents.md`
+- New turn-end enforcement: a `reviewer-pipeline.json` evidence slot in the existing evidence-bundle hook requires those three verdicts (three roles present, diff SHA matches HEAD, no surviving `block`) before a diff touching the watched paths can end its turn. Hooks are read-only and can't run agents, so the hook checks the proof the dispatch produces; no new Stop hook (Trip-wire C stays green). Bypass: `CERES_SKIP_REVIEWER_PIPELINE=1`
+- New "Trip-wire A" escalation counter (`.claude/hooks/lib/reviewer-escalation.js`): when the third reviewer catches a mechanical miss the first two passed, twice consecutively for the same rule-class, it writes a `graduate-to-analyzer` marker — the work-order to promote that rule to a Roslyn analyzer / pre-commit hook
+- Spec: `docs/superpowers/specs/2026-06-08-stage-9-5e-reviewer-pipeline-design.md`; plan: `docs/superpowers/plans/2026-06-08-stage-9-5e-reviewer-pipeline-impl.md`
+
+**Tests (Stage 9.5e — migration-drift ship-gate, 2026-06-08)**
+- New `MigrationDriftTests.Model_has_no_pending_migration_changes` (Condition E3) — asserts EF Core's `HasPendingModelChanges()` is false, so an entity-shape change must ship its migration in the same commit. A Unit test (model + snapshot built from the assembly, no DB connection); fails the build on drift regardless of how the change was authored
+
 **Authentication (Stage 9.3 — `/register` + email-verify, 2026-05-22)**
 - New `EmailConfirmationToken` entity + EF migration `AddEmailConfirmationTokens` — mirrors `PasswordResetToken` shape minus `MfaVerifiedAt`. Uses the TokenLookup HMAC-SHA256 indexed-lookup pattern (Stage 6.15 / 9.1.5.a) for O(1) verify, 30-min expiry, single-use
 - New `EmailConfirmationService` with `IssueAsync` / `RequestResendAsync` / `ConfirmAsync` mirroring `PasswordResetService` line-for-line — per-user `SemaphoreSlim`, per-email `MemoryCache` rate gate (5/hour), `PreAuthUserScope` wrapping for RLS-correct writes, Argon2id constant-time mirroring on every anti-enum branch
@@ -181,6 +190,9 @@
 
 #### Fixed
 
+**Tests (Stage 9.5e close-out — rate-limit flake, 2026-06-08)**
+- `Login_LimiterResetsAfterWindow` stabilized under full-suite load — its saturation step fires up to 25 sequential requests, which under CPU contention could take longer than the test's 1-second rate-limit window, so the earliest requests slid off before the bucket tripped and the saturation assertion failed. Switched to the 5-second `WithMediumLoginWindow` (the window the project already sized for multi-request bursts, used by `SlidingWindow_BoundaryAttack_StillBlocked`) + a matching `MediumLoginWindowClearDelay`. No assertion weakened; the test still saturates, waits the real window out, and confirms the rollover
+
 **Authentication (Stage 9.5d — pre-auth-confirm RLS gaps, 2026-06-07)**
 - Email-address-change confirm and revoke would have returned "invalid token" (401) for every user once the app runs under the restricted database role — the token lookup ran before the user was known, so Row-Level Security hid the row. Fixed to look the token up via the admin context, then establish the user's context for the writes (the pattern password-reset and email-confirmation already use). No impact on current behavior; the bug would only have surfaced after the database-role cutover
 - Account-unlock confirm had the identical gap (401 for every locked-out user under the restricted role) and the identical fix. A completeness audit confirmed every other token-confirm path was already correct
@@ -196,6 +208,10 @@
 - Same copy update corrects a longstanding bug: the body said "within 1 hour" / "próxima hora" but the actual token lifetime is 15 minutes (Stage 6.10 D2). Both EN + ES now name the 15-min expiry
 
 #### Changed
+
+**Subagents (Stage 9.5e — dangling-reference cleanup, 2026-06-08)**
+- Retired the undefined "Trip-wire B" and "autonomy level" references in the roadmap's 9.5h container (only Trip-wire C was ever defined; Trip-wire A is now the concrete escalation counter); corrected a false claim in the 9.5k plan and `ceres-cto.md` that the playbook constitution holds the trip-wire definitions
+- Removed a dead `UserOwnedTables.cs` predicate from the evidence-bundle hook (the file was deleted in 9.5b); corrected stale `UserOwnedTables.All` references in the `verify-stage-completeness` skill docs to the model-derived `UserOwnedModel.RlsTables`
 
 **Tests (Stage 9.5d, 2026-06-07)**
 - The `AppRoleTests` collection runs serialized (`DisableParallelization`) — its concurrent load was destabilizing timing-sensitive rate-limit tests under full-suite runs; matches the existing rate-limit collections' setup
