@@ -80,6 +80,10 @@
 - Canonical error codes: `INVALID_EMAIL_CHANGE_TOKEN` (401), `EMAIL_ALREADY_IN_USE` (422), `EMAIL_UNCHANGED` (422)
 - 37-test integration ship-gate under `ProjectCeres.Tests/Integration/Authentication/EmailChange*`
 
+**Tests (Stage 9.5d — AppRole RLS-active auth suite, 2026-06-07)**
+- New `AppRoleTests` suite runs the auth write-flows (register, login, logout, MFA enroll, password-reset, email-confirmation, email-change, lockout-unlock) under the restricted `ceres_app` database role with Row-Level Security active — proving each user-owned write is visible only to its owner. This is coverage the existing admin-context suite couldn't give (it runs with RLS bypassed), and it's the test class that would have caught the Stage 9.3 cross-user gap
+- A fail-fast fixture refuses to run the whole suite if `ceres_app` is misconfigured with BYPASSRLS, so the tests can't pass falsely
+
 **Design System**
 - OKLCH color palette (light + dark) covering background, foreground, card, popover, primary (deep teal), secondary, muted, accent (pale teal), destructive (rose), success (emerald), warning (amber), info (sky), border, input, ring; tokens defined in `src/index.css` and aliased via `@theme inline`
 - Inter Variable + IBM Plex Mono fonts self-hosted via `@fontsource-variable/inter` and `@fontsource/ibm-plex-mono`
@@ -177,6 +181,10 @@
 
 #### Fixed
 
+**Authentication (Stage 9.5d — pre-auth-confirm RLS gaps, 2026-06-07)**
+- Email-address-change confirm and revoke would have returned "invalid token" (401) for every user once the app runs under the restricted database role — the token lookup ran before the user was known, so Row-Level Security hid the row. Fixed to look the token up via the admin context, then establish the user's context for the writes (the pattern password-reset and email-confirmation already use). No impact on current behavior; the bug would only have surfaced after the database-role cutover
+- Account-unlock confirm had the identical gap (401 for every locked-out user under the restricted role) and the identical fix. A completeness audit confirmed every other token-confirm path was already correct
+
 **Subagents (Stage 9.5k — registry comment, 2026-05-30)**
 - Corrected a stale section-comment count in `UserOwnedTables.cs` (`Auth-internal (8)` → `(9)`) surfaced by the smoke-test; the registry already held all 9 entries (verified 1:1 against 25 live-DB RLS-forced tables), so no RLS gap — documentation only
 
@@ -188,6 +196,9 @@
 - Same copy update corrects a longstanding bug: the body said "within 1 hour" / "próxima hora" but the actual token lifetime is 15 minutes (Stage 6.10 D2). Both EN + ES now name the 15-min expiry
 
 #### Changed
+
+**Tests (Stage 9.5d, 2026-06-07)**
+- The `AppRoleTests` collection runs serialized (`DisableParallelization`) — its concurrent load was destabilizing timing-sensitive rate-limit tests under full-suite runs; matches the existing rate-limit collections' setup
 
 **Subagents (Stage 9.5k — read-first contract, 2026-05-30)**
 - The 5 `ceres-*` strategy subagents now restrict tools via a `disallowedTools` deny-list instead of a `tools` allow-list. The deny-list states the real invariant (never mutate code), survives future read-tool additions, and avoids the allow-list footgun where a typo'd tool name silently grants all tools. Smoke-test confirmed all 5 roles pass the read-first contract with no mutating-tool use

@@ -240,6 +240,17 @@ The decision (roadmap § Stage 9.10, option (b)) is to **add a real-account capa
 - `RlsParityStartupCheck` fail-closes at boot (model-derived user-owned set vs live `pg_class`), and `RlsParityMetaTests` proves the check throws on a missing policy. `RlsTestFixture` (hand-built `ceres_app` contexts) remains for the direct-wall tests under `Integration/Rls/`.
 - The **full** auth-suite switch onto the app role is **Stage 9.5d** (`ProjectCeres.Tests.Integration.AppRole`). Until then, do not flip the `WafCollection` default — new RLS-sensitive tests opt in via `DualContextWebApplicationFactory`.
 
+### AppRole suite (Stage 9.5d, shipped 2026-06-07)
+
+`ProjectCeres.Tests/Integration/AppRole/` is a curated suite that runs the auth write-flows under the restricted `ceres_app` role (RLS active), proving the wall holds for those writes — the coverage the admin-context suite structurally cannot give. It is a **collection** (`[CollectionDefinition("AppRoleTests")]`), not a separate `.csproj`, reusing `DualContextWebApplicationFactory` (9.5b).
+
+- **Canonical test shape:** seed via `NewAdminContext()` (BYPASSRLS), drive the flow over HTTP via `CreateClient()` (the request pipeline writes as `ceres_app`), assert via `NewAppContext(actingAs)` with BOTH a positive control (owner sees the row) and a negative control (a different user sees zero). Cleanup always via `NewAdminContext()` — cross-user deletes 42501 under `ceres_app`. `AppRoleTestBase` factors this; `AssertRlsVisibility<T>` is the positive/negative helper.
+- **D1 fail-fast guard:** the `AppRoleFixture` collection fixture asserts `SELECT rolbypassrls FROM pg_roles WHERE rolname='ceres_app'` is false on `InitializeAsync` and throws (refusing the whole collection) if not — so the suite can't pass falsely against a misconfigured role.
+- **Curated flows (11 tests):** register, login (×2: persists + the mechanism pin), logout, MFA enroll, password-reset confirm, email-confirmation verify, email-change (confirm + revoke), lockout-unlock. RLS-orthogonal tests (timing, rate-limit, CSRF-shape) are deliberately not re-run.
+- **Three production gaps caught + fixed in-stage:** `EmailChangeService.ConfirmAsync`/`RevokeAsync` and `LockoutUnlockService.ConfirmAsync` looked their token up via the `ceres_app` `_db` with `IgnoreQueryFilters` on `[PreAuthCallSite]` endpoints (GUC reset → 0 rows → 401 for every user under the restricted role); fixed to the proven admin-lookup-then-`BeginPreAuthUserScopeAsync` pattern (mirrors `PasswordResetService`/`EmailConfirmationService`). Login's session-write was investigated and proven SAFE (a false positive — `SignInManager` populates `HttpContext.User` mid-request, so the GUC resolves). A completeness audit confirmed every `[PreAuthCallSite]` token-consume path is now safe — the gap class is fully closed.
+- **`DisableParallelization = true`:** the collection is serialized (matching `RateLimitTests`/`MfaRateLimitTests`). These RLS-correctness tests don't need parallelism, and their concurrent load destabilizes the timing-sensitive rate-limit tests under full-suite contention.
+- **Stop-hook tier:** rides the existing Tier 2 (full suite) — the AppRole files are `.cs` under `ProjectCeres.Tests/`, no tier-machinery change.
+
 ### Phase 2 Import Coverage
 
 | Service / Class                                | Test file                                                                              |
@@ -278,7 +289,7 @@ public class IntegrationCollection : ICollectionFixture<TestWebApplicationFactor
 - `TestWebApplicationFactory` overrides the connection string in `ConfigureWebHost`, pinning every WAF-based test to `project_ceres_test` regardless of what `appsettings.json` says. This prevents any integration test from accidentally hitting the dev database.
 - Both `TestDbFixture`-based tests and `WebApplicationFactory`-based tests join the same collection, so the entire suite is serialized.
 
-Add `[Collection("IntegrationTests")]` to every new integration test class. Do not create a second collection — a second collection runs in parallel with the first and reintroduces the race condition.
+Add `[Collection("IntegrationTests")]` to most new integration test classes. The project does run **sibling** collections deliberately — `RlsTests`, `RateLimitTests`, `MfaRateLimitTests`, and `AppRoleTests` — when a class needs a different factory/role wiring than the shared `TestWebApplicationFactory`. The real cross-collection safety net is **per-test data isolation by marker** (per-test GUID-suffixed emails / UserIds; see `feedback_filter_test_queries_by_test_data`), not single-collection serialization. A sibling collection whose tests are timing-sensitive OR whose concurrent load destabilizes other collections should carry `DisableParallelization = true` (as `RateLimitTests`/`MfaRateLimitTests`/`AppRoleTests` do). Prefer joining `IntegrationTests` unless you have such a reason.
 
 ---
 
