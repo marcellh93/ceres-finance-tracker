@@ -251,6 +251,13 @@ The decision (roadmap § Stage 9.10, option (b)) is to **add a real-account capa
 - **`DisableParallelization = true`:** the collection is serialized (matching `RateLimitTests`/`MfaRateLimitTests`). These RLS-correctness tests don't need parallelism, and their concurrent load destabilizes the timing-sensitive rate-limit tests under full-suite contention.
 - **Stop-hook tier:** rides the existing Tier 2 (full suite) — the AppRole files are `.cs` under `ProjectCeres.Tests/`, no tier-machinery change.
 
+### Reviewer pipeline + Condition E3 (Stage 9.5e, shipped 2026-06-08)
+
+Two enforcement mechanisms guarding auth / migration / `IUserOwned` diffs.
+
+- **Condition E3 — migration-drift ship-gate.** `ProjectCeres.Tests/Unit/MigrationDriftTests.cs` asserts `DbContext.Database.HasPendingModelChanges()` is `false` — i.e. an entity-shape change must ship its migration in the same commit. It is a **Unit** test (the model + snapshot are built from the assembly; a placeholder `UseNpgsql("Host=localhost")` connection string never opens a connection — same pattern as `UserOwnedModelTests.Ctx()`). Deterministic, runs every suite run; a model/snapshot drift fails the build regardless of how the change was authored. This is the "syntactically locatable, fires every time" case that belongs in a test, not in a reviewer (per the L5 staging-ground rule).
+- **3-agent reviewer pipeline (orchestrator-driven).** On a committed diff touching `ProjectCeres/Common/Authentication/**`, `ProjectCeres/Migrations/**`, or `ProjectCeres/Models/**`, the main session dispatches three review roles (`reviewer-writer` / `reviewer-security` / `reviewer-playwright-test-audit`, see `docs/agents.md`) and serializes their verdicts to `.claude/state/evidence/stage-<id>/reviewer-pipeline.json`. The **turn-end evidence-bundle hook** requires that slot for those diffs (a new `SLOT_TABLE` entry + `validateReviewerPipeline` content-check: three roles present, `diff_sha` matches HEAD, no surviving `verdict: "block"`). Hooks are read-only and cannot run agents — the hook checks the proof artifact; the orchestrator produces it. No new Stop hook (Trip-wire C — Stop-event hooks ≤10 — stays green). Bypass: `CERES_SKIP_REVIEWER_PIPELINE=1`. Spec: `docs/superpowers/specs/2026-06-08-stage-9-5e-reviewer-pipeline-design.md`.
+
 ### Phase 2 Import Coverage
 
 | Service / Class                                | Test file                                                                              |

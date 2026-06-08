@@ -1,6 +1,6 @@
 ---
 name: verify-stage-completeness
-description: Use BEFORE marking a stage Done. Audits the stage's diff for new IUserOwned entities, new services, new resx templates, and new enum values, and verifies each lands in EVERY registry a downstream consumer iterates (DbSet + OnModelCreating + UserOwnedTables.All + RLS migration + DI + IgnoreQueryFilters allow-list + EN/ES resx pair + EmailTemplateKey enum + AuditLogAction documented-set test). Catches the class of bug where a Stage N feature ships entity #1 + service #2 + controller #3 but forgets registry #4, leaving a latent gap (no global query filter, no RLS policy, missing translation, untracked enum value) until a real user hits the wrong code path. HARD-enforced via a PreToolUse hook on the stage-close-out edit; this doc explains the rule so the hook is satisfied in advance.
+description: Use BEFORE marking a stage Done. Audits the stage's diff for new IUserOwned entities, new services, new resx templates, and new enum values, and verifies each lands in EVERY registry a downstream consumer iterates (DbSet + OnModelCreating + model-derived `UserOwnedModel.RlsTables` membership + RLS migration + DI + IgnoreQueryFilters allow-list + EN/ES resx pair + EmailTemplateKey enum + AuditLogAction documented-set test). Catches the class of bug where a Stage N feature ships entity #1 + service #2 + controller #3 but forgets registry #4, leaving a latent gap (no global query filter, no RLS policy, missing translation, untracked enum value) until a real user hits the wrong code path. HARD-enforced via a PreToolUse hook on the stage-close-out edit; this doc explains the rule so the hook is satisfied in advance.
 ---
 
 # verify-stage-completeness
@@ -13,7 +13,7 @@ The project has FIVE+ "single source of truth" registries that every new entity 
 |---|---|---|
 | 1 | `AppDbContext.DbSet<T>` declaration | EF Core for query/save |
 | 2 | `AppDbContext.OnModelCreating` configuration block | EF Core schema mapping |
-| 3 | `UserOwnedTables.All` (`ProjectCeres/Common/UserOwnedTables.cs`) | EF query-filter loop + RLS migration loop + ParityTests |
+| 3 | model-derived membership via `UserOwnedModel.RlsTables` (`ProjectCeres/Common/UserOwnedModel.cs`) — automatic for any concrete `IUserOwned` entity with a table; the hand-typed `UserOwnedTables.All` was deleted in Stage 9.5b | EF query-filter loop + RLS migration loop + ParityTests |
 | 4 | RLS migration installing `CREATE POLICY user_isolation` | Postgres at runtime |
 | 5 | `Program.cs` DI registration | ASP.NET DI container |
 | 6 | `IgnoreQueryFilters()` allow-list (`ArchitectureTests.cs`) — IF the service calls `IgnoreQueryFilters()` | Architecture test |
@@ -39,10 +39,10 @@ The hook at `.claude/skills/verify-stage-completeness/hooks/stage-completeness-c
 
 - Parse every `public class TypeName` declaration. Skip `abstract` classes (TPC roots like `Movement` are intentionally not tables).
 - **Check D1 (HARD):** is there a `DbSet<TypeName>` declaration in `ProjectCeres/Data/AppDbContext.cs`? If no → not a persisted entity, skip the rest of the checks for this class.
-- **Check D2 (advisory):** is there a `modelBuilder.Entity<TypeName>` block in `AppDbContext.cs`? Marked `n/a` if missing — many entities are configured by iteration loops (`foreach var table in UserOwnedTables.All`) rather than per-entity blocks, so a missing explicit block is legitimate.
+- **Check D2 (advisory):** is there a `modelBuilder.Entity<TypeName>` block in `AppDbContext.cs`? Marked `n/a` if missing — many entities are configured by iteration over the model-derived user-owned set (`UserOwnedModel.RlsTables`) rather than per-entity blocks, so a missing explicit block is legitimate.
 - **Conditional checks — only if the type implements `IUserOwned`:**
-  - **Check U1 (HARD):** is `typeof(TypeName)` listed in `UserOwnedTables.All`? If no → gap.
-  - **Check U2 (HARD):** is there a `CREATE POLICY user_isolation` migration under `ProjectCeres/Migrations/` that covers the table — either by an explicit `ON "TableName"` reference, OR by iterating `UserOwnedTables.All` (covers entries present at migration time)? If no → gap.
+  - **Check U1 (HARD):** does the entity appear in the model-derived user-owned set (`UserOwnedModel.RlsTables`)? Since 9.5b this is automatic for any concrete `IUserOwned` entity with a table — so the real failure mode is an entity that should implement `IUserOwned` but doesn't. If the entity is user-owned-by-nature but the marker interface is missing → gap.
+  - **Check U2 (HARD):** is there a `CREATE POLICY user_isolation` migration under `ProjectCeres/Migrations/` that covers the table — either by an explicit `ON "TableName"` reference, OR by iterating the model-derived user-owned set (covers entries present at migration time)? If no → gap.
 
 ### 3.2 — For every `Service.cs` under `ProjectCeres/Common/Authentication/` or `ProjectCeres/Services/`
 
