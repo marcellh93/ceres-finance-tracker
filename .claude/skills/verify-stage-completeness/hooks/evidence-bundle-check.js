@@ -144,9 +144,29 @@ function validateTurnShape(shapePath) {
   return gaps;
 }
 
+function validateReviewerPipeline(slotPath, headSha) {
+  const gaps = [];
+  let data;
+  try { data = JSON.parse(fs.readFileSync(slotPath, "utf8")); }
+  catch (e) { return [`reviewer-pipeline.json: invalid JSON (${e.message})`]; }
+  if (!data || typeof data !== "object") return ["reviewer-pipeline.json: not an object"];
+
+  const roles = Array.isArray(data.reviewers) ? data.reviewers.map((r) => r && r.role) : [];
+  for (const required of ["writer", "security", "playwright-test-audit"]) {
+    if (!roles.includes(required)) gaps.push(`reviewer-pipeline.json: missing reviewer role '${required}'`);
+  }
+  if (headSha && data.diff_sha !== headSha) {
+    gaps.push(`reviewer-pipeline.json: diff_sha '${data.diff_sha || "<unset>"}' does not match HEAD '${headSha}' (reviewers read a stale diff)`);
+  }
+  for (const r of (data.reviewers || [])) {
+    if (r && r.verdict === "block") gaps.push(`reviewer-pipeline.json: reviewer '${r.role}' returned verdict: block (resolve before Stop)`);
+  }
+  return gaps;
+}
+
 function fmtTs(ms) { return ms ? new Date(ms).toISOString() : "<unknown>"; }
 
-(function main() {
+function runMain() {
   // Read & discard stdin payload (Stop event fields not strictly required for the gate logic).
   let payload = {};
   try {
@@ -226,4 +246,12 @@ function fmtTs(ms) { return ms ? new Date(ms).toISOString() : "<unknown>"; }
   ];
   process.stderr.write(lines.join("\n"));
   process.exit(2);
-})();
+}
+
+if (require.main === module) {
+  runMain();
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { validateReviewerPipeline };
+}
