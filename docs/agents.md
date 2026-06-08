@@ -56,6 +56,18 @@ This gate is codified in `CLAUDE.md` § "Using subagents".
 - Identity resolves via the `name:` frontmatter field, not the filename. Duplicate `name` values are silently discarded.
 - Project-scope `.claude/agents/` wins over user-scope `~/.claude/agents/`.
 
+## The 9.5e review-pipeline roles (separate from the five strategy roles)
+
+Three roles audit a **finished diff** (not a forward-looking strategy decision) when it touches pre-auth auth code, migrations, or IUserOwned models. They are dispatched by the orchestrator during the 9.5e reviewer pipeline; their combined verdict is serialized to `.claude/state/evidence/stage-<id>/reviewer-pipeline.json`, which the turn-end evidence-bundle hook requires for those diffs.
+
+| Role (`subagent_type`) | Job | Read-list floor | `disallowedTools` |
+|---|---|---|---|
+| `reviewer-writer` | Did the diff do what the stage spec said? Flag scope drift + half-done work. | `CLAUDE.md`, the active roadmap stage, the stage spec, the diff | `Write, Edit, NotebookEdit, Bash` |
+| `reviewer-security` | Auth / RLS / pre-auth-scope hole? Run the five-registry check on new IUserOwned tables. | `CLAUDE.md`, `docs/security-model.md`, `docs/multi-tenancy-strategy.md`, `ArchitectureTests.cs`, the affected `Common/Authentication/` + `Migrations/` files | `Write, Edit, NotebookEdit, Bash` |
+| `reviewer-playwright-test-audit` | Do the tests assert what the spec claims? Emit the spec-vs-assertion diff (Condition E2). | `CLAUDE.md`, `docs/testing.md`, the stage spec, the test files, any Playwright trace | `Write, Edit, NotebookEdit` (keeps read-only `Bash`) |
+
+Each ends its answer with `VERDICT: pass|block`; a surviving `block` keeps the turn-end hook from allowing Stop until resolved. The same dispatcher-gate as the strategy roles applies (first-line `## What I read`, baselines + dispatcher-named files listed) — re-dispatch on a contract miss. See `docs/superpowers/specs/2026-06-08-stage-9-5e-reviewer-pipeline-design.md`.
+
 ## Cross-references
 
 - **Spec:** `docs/superpowers/specs/2026-05-28-stage-9-5k-codified-subagents-design.md`
