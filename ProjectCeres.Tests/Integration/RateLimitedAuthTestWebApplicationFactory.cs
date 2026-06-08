@@ -85,6 +85,13 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
     public static readonly TimeSpan ShortLoginWindowClearDelay = TimeSpan.FromMilliseconds(1100);
 
     /// <summary>
+    /// 5.5s delay matching the 5s window in <see cref="WithMediumLoginWindow"/> (window + a
+    /// 0.5s margin for the last segment to age out). Use for window-rollover tests whose
+    /// saturation burst is too large for the 1s short window to hold under full-suite load.
+    /// </summary>
+    public static readonly TimeSpan MediumLoginWindowClearDelay = TimeSpan.FromMilliseconds(5500);
+
+    /// <summary>
     /// Returns a derived factory whose AuthLoginByIp policy uses a 5-second window
     /// (instead of production 60s OR the 1s in <see cref="WithShortLoginWindow"/>).
     /// 5s is the smallest window that comfortably accommodates an 11-request test

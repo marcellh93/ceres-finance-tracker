@@ -133,15 +133,22 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Login_LimiterResetsAfterWindow()
     {
-        // Override AuthLoginByIp to use a 1-second window for this test so we can
-        // wait the window out in ~1.1s instead of 70s. This test's whole point is
+        // Override AuthLoginByIp to use the 5-second window for this test so we can
+        // wait the window out in ~5.5s instead of 70s. This test's whole point is
         // "saturate, wait, confirm window rolled over" — we just shrink the wall-clock
         // duration of the rollover instead of using a fresh limiter (which would
         // defeat the test's purpose).
         //
+        // The 5s medium window (not the 1s short window) is required because the
+        // saturation step below fires a SEQUENTIAL burst of up to 25 requests; under
+        // full-suite CPU contention that burst can take >1s of HTTP + Argon2id overhead,
+        // so a 1s window slides off the earliest requests before the threshold lands and
+        // the bucket never trips (the burst-too-slow-for-window flake). 5s is the window
+        // the project sized for exactly such a burst (see WithMediumLoginWindow).
+        //
         // Unregistered email so the burst doesn't trip lockout (Stage 9.1.5.b: lockout
         // would cause OnRejected to surface ACCOUNT_LOCKED_OUT 401 instead of 429).
-        await using var factory = _factory.WithShortLoginWindow();
+        await using var factory = _factory.WithMediumLoginWindow();
         var client = factory.CreateClient();
 
         // Saturate the bucket.
@@ -150,8 +157,8 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
                 new { email = "nouser-reset-window@rl-test.local", password = "x-long-enough-x", rememberMe = false }));
         rejected.Should().NotBeNull();
 
-        // Sliding window is 1s for this test (see WithShortLoginWindow).
-        await Task.Delay(RateLimitedAuthTestWebApplicationFactory.ShortLoginWindowClearDelay);
+        // Sliding window is 5s for this test (see WithMediumLoginWindow).
+        await Task.Delay(RateLimitedAuthTestWebApplicationFactory.MediumLoginWindowClearDelay);
 
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(factory, client, "/api/auth/login",
             new { email = "nouser-reset-window@rl-test.local", password = "x-long-enough-x", rememberMe = false });
