@@ -64,17 +64,24 @@ const SLOT_TABLE = [
     slot: "registry-sweep.json",
     when: (files) => files.some((f) =>
       /^ProjectCeres\/Models\//.test(f) ||
-      /^ProjectCeres\/Common\/UserOwnedTables\.cs$/.test(f) ||
       /^ProjectCeres\/Resources\//.test(f) ||
       /^ProjectCeres\/Common\/Email\/EmailTemplateKey\.cs$/.test(f) ||
       /^ProjectCeres\/Models\/AuditLog\.cs$/.test(f)
     ),
-    reason: "diff touches Models, UserOwnedTables, Resources, EmailTemplateKey, or AuditLog",
+    reason: "diff touches Models, Resources, EmailTemplateKey, or AuditLog",
   },
   {
     slot: "turn-shape.json",
     when: () => true,
     reason: "always required when code changes",
+  },
+  {
+    slot: "reviewer-pipeline.json",
+    when: (files) => files.some((f) =>
+      /^ProjectCeres\/Common\/Authentication\//.test(f) ||
+      /^ProjectCeres\/Migrations\//.test(f) ||
+      /^ProjectCeres\/Models\//.test(f)),
+    reason: "diff touches auth, migrations, or IUserOwned models — 3-agent reviewer pipeline required",
   },
 ];
 
@@ -218,6 +225,12 @@ function runMain() {
   const shapePath = path.join(bundleDir, "turn-shape.json");
   if (fs.existsSync(shapePath)) gaps.push(...validateTurnShape(shapePath));
 
+  const reviewerPath = path.join(bundleDir, "reviewer-pipeline.json");
+  if (required.some((s) => s.slot === "reviewer-pipeline.json") && fs.existsSync(reviewerPath)) {
+    const headSha = safeExec("git rev-parse HEAD 2>/dev/null");
+    gaps.push(...validateReviewerPipeline(reviewerPath, headSha));
+  }
+
   const outcome = gaps.length === 0 ? "allowed" : "blocked";
   appendLog(LOG_PATH, { ts: new Date().toISOString(), sessionId, outcome, gaps, stageId });
 
@@ -240,6 +253,9 @@ function runMain() {
     `  • Run psql -U ceres_app -d project_ceres -c '\\dp public.*' > ${bundleRel}rls-audit.psql`,
     "  • Apply the fix you mentioned in the same turn it's mentioned, OR add a [ ] line in",
     "    the active batch stage and rerun turn-shape generation.",
+    `  • If the diff touches auth/migrations/IUserOwned models: dispatch the 3 reviewers`,
+    `    (reviewer-writer, reviewer-security, reviewer-playwright-test-audit) and write their`,
+    `    verdicts to ${bundleRel}reviewer-pipeline.json (diff_sha = current HEAD, no surviving block).`,
     "",
     "Or bypass: CERES_SKIP_EVIDENCE_BUNDLE_HOOK=1 (logs as bypassed, doesn't block).",
     "",
