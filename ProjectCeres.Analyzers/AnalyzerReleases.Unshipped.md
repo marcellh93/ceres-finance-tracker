@@ -11,3 +11,4 @@ CER004 | Reliability | Warning | Use TimeProvider.GetUtcNow() instead of DateTim
 CER010 | Style | Warning | [RlsBypassJustified] ticket must match the CER/TICKET/ADR-NNNN format
 CER020 | Localization | Error | EN/ES resx parity violated — culture is missing a key its sibling has
 CER005 | Reliability | Warning | *Token classes under ProjectCeres/Models/ implementing IUserOwned must declare a byte[] TokenLookup property
+CER006 | Reliability | Warning | A class that calls BeginPreAuthUserScopeAsync must carry the [PreAuthScope] marker

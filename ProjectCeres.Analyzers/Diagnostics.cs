@@ -57,4 +57,13 @@ internal static class Diagnostics
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "A class named *Token under ProjectCeres.Models implementing IUserOwned represents a stored single-use token row. It must carry a byte[] TokenLookup column (HMAC-SHA256 of the raw token, uniquely indexed) so /confirm locates its row in O(1). Stage 9.1.5.a shipped LockoutUnlockToken without it and regressed the integration suite ~15min. See docs/superpowers/specs/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-design.md.");
+
+    public static readonly DiagnosticDescriptor CER006_PreAuthScopeMarkerMissing = new(
+        id: "CER006",
+        title: "Class calling BeginPreAuthUserScopeAsync must be marked [PreAuthScope]",
+        messageFormat: "Class '{0}' calls BeginPreAuthUserScopeAsync but is not marked [PreAuthScope]. Add [PreAuthScope] to the class so the pre-auth surface stays auditable.",
+        category: "Reliability",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "BeginPreAuthUserScopeAsync opens a per-request user-scoped transaction for pre-authentication writes. Any class that calls it operates on the pre-auth path and must declare [PreAuthScope] so the contract stays enforced from both directions (CER001 covers marked-class-must-use-helper; CER006 covers caller-must-be-marked). See docs/superpowers/specs/2026-06-09-stage-9-5g-cer006-preauthscope-marker-analyzer-design.md.");
 }
