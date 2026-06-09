@@ -73,7 +73,7 @@ namespace ProjectCeres.Analyzers;
 public sealed class TokenLookupDisciplineAnalyzer : DiagnosticAnalyzer
 {
     private const string ModelsNamespacePrefix = "ProjectCeres.Models";
-    private const string UserOwnedFullName = "ProjectCeres.Common.IUserOwned";
+    private const string IUserOwnedFullName = "ProjectCeres.Common.IUserOwned";
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(Diagnostics.CER005_TokenLookupDiscipline);
@@ -94,8 +94,12 @@ public sealed class TokenLookupDisciplineAnalyzer : DiagnosticAnalyzer
 
 - [ ] **Step 4: Build the analyzer + test projects to verify RS2008 is satisfied and everything compiles**
 
-Run: `dotnet build ProjectCeres.Analyzers/ProjectCeres.Analyzers.csproj ProjectCeres.Analyzers.Tests/ProjectCeres.Analyzers.Tests.csproj`
-Expected: **Build succeeded, 0 errors.** Specifically no `RS2008` (descriptor is tracked) and no `RS1032` (no trailing period in title/messageFormat). The analyzer is registered but reports nothing.
+Run (two single-project builds — `dotnet build` takes one project arg at a time):
+```
+dotnet build ProjectCeres.Analyzers/ProjectCeres.Analyzers.csproj
+dotnet build ProjectCeres.Analyzers.Tests/ProjectCeres.Analyzers.Tests.csproj
+```
+Expected: both **Build succeeded, 0 errors.** Specifically no `RS2008` (descriptor is tracked), no `RS1032` (no trailing period in title/messageFormat), no `RS2007` (release-table format). The analyzer is registered but reports nothing. (Pre-existing CA1707 underscore-naming warnings in the Tests project are acceptable; RS-prefixed are not.)
 
 - [ ] **Step 5: Commit**
 
@@ -297,7 +301,7 @@ Replace the entire `AnalyzeNamedType` method (the one with the `// Gate implemen
         if (!ns.StartsWith(ModelsNamespacePrefix, System.StringComparison.Ordinal)) return;
 
         // Q3: implements ProjectCeres.Common.IUserOwned (the user-owned-row marker).
-        var isUserOwned = type.AllInterfaces.Any(i => i.ToDisplayString() == UserOwnedFullName);
+        var isUserOwned = type.AllInterfaces.Any(i => i.ToDisplayString() == IUserOwnedFullName);
         if (!isUserOwned) return;
 
         // Q4: carries a byte[] TokenLookup property. Missing OR wrong-typed -> fire.
