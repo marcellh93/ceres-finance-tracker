@@ -44,14 +44,14 @@ Insert this block immediately after the `CER005_TokenLookupDiscipline` descripto
     public static readonly DiagnosticDescriptor CER006_PreAuthScopeMarkerMissing = new(
         id: "CER006",
         title: "Class calling BeginPreAuthUserScopeAsync must be marked [PreAuthScope]",
-        messageFormat: "Class '{0}' calls BeginPreAuthUserScopeAsync but is not marked [PreAuthScope]. Add [PreAuthScope] to the class so the pre-auth surface stays auditable",
+        messageFormat: "Class '{0}' calls BeginPreAuthUserScopeAsync but is not marked [PreAuthScope]. Add [PreAuthScope] to the class so the pre-auth surface stays auditable.",
         category: "Reliability",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "BeginPreAuthUserScopeAsync opens a per-request user-scoped transaction for pre-authentication writes. Any class that calls it operates on the pre-auth path and must declare [PreAuthScope] so the contract stays enforced from both directions (CER001 covers marked-class-must-use-helper; CER006 covers caller-must-be-marked). See docs/superpowers/specs/2026-06-09-stage-9-5g-cer006-preauthscope-marker-analyzer-design.md.");
 ```
 
-(No trailing period in `title` or `messageFormat` — RS1032. The `description` is prose and may end with a period.)
+**RS1032 note (corrected):** RS1032 requires the message to be *internally consistent* — either a single sentence with no trailing period, OR a multi-sentence message that DOES end with a period. It does NOT mean "never a period." This `messageFormat` is two sentences and ends with a period, exactly matching the house style of CER001/CER002/CER004/CER010 (all multi-sentence, all period-terminated). The `title` is a single phrase with no trailing period. (The earlier draft of this plan said "no trailing period in messageFormat" — that was an over-generalization from CER005's single-sentence message and is wrong for multi-sentence messages.)
 
 - [ ] **Step 2: Add the CER006 row to `AnalyzerReleases.Unshipped.md`**
 
@@ -103,7 +103,7 @@ Run (two single-project builds — `dotnet build` takes one project arg at a tim
 dotnet build ProjectCeres.Analyzers/ProjectCeres.Analyzers.csproj
 dotnet build ProjectCeres.Analyzers.Tests/ProjectCeres.Analyzers.Tests.csproj
 ```
-Expected: both **Build succeeded, 0 errors.** No `RS2008` (descriptor tracked), no `RS1032` (no trailing period in title/messageFormat), no `RS2007` (release-table format). The analyzer is registered but reports nothing. (Pre-existing CA1707 underscore-naming warnings in the Tests project are acceptable; RS-prefixed are not.)
+Expected: both **Build succeeded, 0 errors.** No `RS2008` (descriptor tracked), no `RS1032` (message punctuation consistent — see the RS1032 note above; the two-sentence period-terminated form is correct), no `RS2007` (release-table format). The analyzer is registered but reports nothing. (Pre-existing CA1707 underscore-naming warnings in the Tests project are acceptable; RS-prefixed are not.)
 
 - [ ] **Step 5: Commit**
 
