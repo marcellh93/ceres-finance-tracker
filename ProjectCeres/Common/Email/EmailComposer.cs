@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Text.Encodings.Web;
 using Microsoft.Extensions.Localization;
@@ -25,9 +26,11 @@ public sealed class EmailComposer : IEmailComposer
         CultureInfo.CurrentUICulture = culture;
         try
         {
-            var subjectTpl = _localizer[$"{key}.Subject"].Value;
-            var bodyTextTpl = _localizer[$"{key}.BodyText"].Value;
-            var bodyHtmlTpl = _localizer[$"{key}.BodyHtml"].Value;
+            var (subjectKey, bodyTextKey, bodyHtmlKey) = KeysFor(key);
+
+            var subjectTpl = _localizer[subjectKey].Value;
+            var bodyTextTpl = _localizer[bodyTextKey].Value;
+            var bodyHtmlTpl = _localizer[bodyHtmlKey].Value;
 
             // HTML body sanitizes interpolations. Subject + plain-text bodies don't
             // HTML-encode (would mangle URLs) but strip CR/LF as a header-injection
@@ -46,4 +49,30 @@ public sealed class EmailComposer : IEmailComposer
             CultureInfo.CurrentUICulture = prior;
         }
     }
+
+    // Generated EmailKeys.* constants (from EmailKeysGenerator) — a resx-key rename breaks this switch at compile time.
+    private static (string Subject, string BodyText, string BodyHtml) KeysFor(EmailTemplateKey key) => key switch
+    {
+        EmailTemplateKey.PasswordResetRequest =>
+            (EmailKeys.PasswordResetRequest.Subject, EmailKeys.PasswordResetRequest.BodyText, EmailKeys.PasswordResetRequest.BodyHtml),
+        EmailTemplateKey.PasswordChanged =>
+            (EmailKeys.PasswordChanged.Subject, EmailKeys.PasswordChanged.BodyText, EmailKeys.PasswordChanged.BodyHtml),
+        EmailTemplateKey.PasswordResetCancelledEmailChange =>
+            (EmailKeys.PasswordResetCancelledEmailChange.Subject, EmailKeys.PasswordResetCancelledEmailChange.BodyText, EmailKeys.PasswordResetCancelledEmailChange.BodyHtml),
+        EmailTemplateKey.EmailChangeVerifyNew =>
+            (EmailKeys.EmailChangeVerifyNew.Subject, EmailKeys.EmailChangeVerifyNew.BodyText, EmailKeys.EmailChangeVerifyNew.BodyHtml),
+        EmailTemplateKey.EmailChangeRevokeOld =>
+            (EmailKeys.EmailChangeRevokeOld.Subject, EmailKeys.EmailChangeRevokeOld.BodyText, EmailKeys.EmailChangeRevokeOld.BodyHtml),
+        EmailTemplateKey.EmailChangeConfirmed =>
+            (EmailKeys.EmailChangeConfirmed.Subject, EmailKeys.EmailChangeConfirmed.BodyText, EmailKeys.EmailChangeConfirmed.BodyHtml),
+        EmailTemplateKey.EmailChangeConfirmedToOld =>
+            (EmailKeys.EmailChangeConfirmedToOld.Subject, EmailKeys.EmailChangeConfirmedToOld.BodyText, EmailKeys.EmailChangeConfirmedToOld.BodyHtml),
+        EmailTemplateKey.EmailChangeRevokeNotificationToOld =>
+            (EmailKeys.EmailChangeRevokeNotificationToOld.Subject, EmailKeys.EmailChangeRevokeNotificationToOld.BodyText, EmailKeys.EmailChangeRevokeNotificationToOld.BodyHtml),
+        EmailTemplateKey.LockoutUnlock =>
+            (EmailKeys.LockoutUnlock.Subject, EmailKeys.LockoutUnlock.BodyText, EmailKeys.LockoutUnlock.BodyHtml),
+        EmailTemplateKey.RegistrationConfirmation =>
+            (EmailKeys.RegistrationConfirmation.Subject, EmailKeys.RegistrationConfirmation.BodyText, EmailKeys.RegistrationConfirmation.BodyHtml),
+        _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
+    };
 }
