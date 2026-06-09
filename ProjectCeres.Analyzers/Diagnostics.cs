@@ -48,4 +48,13 @@ internal static class Diagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         description: "Translation keys must exist in every locale before merge. A missing translation surfaces as the literal key string at runtime.");
+
+    public static readonly DiagnosticDescriptor CER005_TokenLookupDiscipline = new(
+        id: "CER005",
+        title: "Token entity must declare a byte[] TokenLookup property",
+        messageFormat: "Token entity '{0}' must declare a 'byte[] TokenLookup' property (HMAC fingerprint with a unique index) so confirm paths look up in O(1) instead of running Argon2id over every candidate",
+        category: "Reliability",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A class named *Token under ProjectCeres.Models implementing IUserOwned represents a stored single-use token row. It must carry a byte[] TokenLookup column (HMAC-SHA256 of the raw token, uniquely indexed) so /confirm locates its row in O(1). Stage 9.1.5.a shipped LockoutUnlockToken without it and regressed the integration suite ~15min. See docs/superpowers/specs/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-design.md.");
 }
