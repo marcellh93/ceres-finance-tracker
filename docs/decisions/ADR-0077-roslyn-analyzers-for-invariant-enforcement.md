@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1. CER005 (token-lookup discipline) added at `warning` 2026-06-09 (Stage 9.5f); `error` flip pending the 48h C-2 soak. CER006 (reverse-direction `[PreAuthScope]` marker) added at `warning` 2026-06-09 (Stage 9.5g); `error` flip pending the 48h C-2 soak.
+**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1. CER005 (token-lookup discipline) added at `warning` 2026-06-09 (Stage 9.5f); `error` flip pending the 48h C-2 soak. CER006 (reverse-direction `[PreAuthScope]` marker) added at `warning` 2026-06-09 (Stage 9.5g); `error` flip pending the 48h C-2 soak. `EmailKeysGenerator` (typed email-key source generator) added 2026-06-09 (Stage 9.5i) — the generator family's first *code-emitting* member (CER020 only emits a parity-check stub); it emits no diagnostic, so it has no soak and shipped closed in one commit.
 
 **Phase:** Phase 3 (Hosted Beta) — Stage 9.5h Phase 1 hardening container, sub-stage 9.5c.
 
@@ -39,6 +39,11 @@ Ship **four Roslyn analyzers + one source generator + three escape attributes** 
 | **CER020** | Localization | `error` from day 1 | EN/ES resx parity — emits compile-time error if either culture is missing a key its sibling has |
 | **CER005** | Reliability | `warning` (flip pending) | A class named `*Token` under `ProjectCeres.Models` implementing `IUserOwned` must declare a `byte[] TokenLookup` property. Property-presence only — the index/migration coupling is owned by the E3 `MigrationDriftTests` (Stage 9.5e), not this analyzer. Added Stage 9.5f (2026-06-09) |
 | **CER006** | Reliability | `warning` (flip pending) | A class that calls `BeginPreAuthUserScopeAsync` must carry the `[PreAuthScope]` marker — the reverse of CER001. Mirrors CER001's syntax-tree walk (`FirstAncestorOrSelf<TypeDeclarationSyntax>`), so it does NOT inherit CER002's `GetEnclosingSymbol` gap; zero exclusion logic. Added Stage 9.5g (2026-06-09) |
+
+**Source generators in the family (not diagnostic rules — no Category/Severity, so not in the table above):**
+
+- **`ResxParityGenerator` (CER020)** — emits a parity-check stub + the `CER020_ResxParityMissing` diagnostic. The original `IIncrementalGenerator`.
+- **`EmailKeysGenerator` (Stage 9.5i, 2026-06-09)** — reads `EmailsResource.en.resx` and emits `EmailKeys.g.cs`: nested `const string` constants per email template (`EmailKeys.PasswordResetRequest.Subject`, …). `EmailComposer.Compose` references them via a `KeysFor` switch, so renaming a resx key is a `CS0117` compile error instead of a silent runtime fallback. The family's first *code-emitting* generator; emits no diagnostic → no `AnalyzerReleases` row, no soak. **Re-scope note:** Stage 9.5i's roadmap line assumed string-key consumers (`_localizer["..."]`) to migrate; the audit found none — the one consumer (`EmailComposer`) was already dynamic-keyed off the `EmailTemplateKey` enum, which matches the resx 1:1. So 9.5i became a typed-key generator (closing the resx↔code rename gap) rather than a string-key migration. Additive to CER020; CER020's parity check is unchanged.
 
 Three **escape attributes** ship as a separate `netstandard2.0` csproj (`ProjectCeres.Analyzers.Annotations`):
 - `[PreAuthScope]` — marks classes that operate on the pre-authentication code path.

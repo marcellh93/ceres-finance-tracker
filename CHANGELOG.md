@@ -22,6 +22,11 @@
 - Shipped at `warning` severity with 0 violations against `main` (all 8 pre-auth callers already carry `[PreAuthScope]`); the `warning`→`error` flip is deferred ≥48h per the C-2 soak. 4-case test matrix (1 fires + 3 exclusions); CER006 row added to `AnalyzerReleases.Unshipped.md` (RS2008); ADR-0077 rule table extended
 - Spec: `docs/superpowers/specs/2026-06-09-stage-9-5g-cer006-preauthscope-marker-analyzer-design.md`; plan: `docs/superpowers/plans/2026-06-09-stage-9-5g-cer006-preauthscope-marker-analyzer-impl.md`
 
+**Analyzers (Stage 9.5i — typed email-key source generator, 2026-06-09)**
+- New `EmailKeysGenerator` source generator — reads the email translation file and emits a typed `EmailKeys.*` constant for every key, so `EmailComposer` references the keys by name instead of building them from strings. Renaming a key in the resx now breaks the build (a `CS0117` compile error) instead of silently falling back at runtime. The generator family's first code-emitting member (CER020 only emits a parity-check stub); additive to CER020, which is unchanged
+- Re-scoped from the roadmap's original "migrate string-key consumers" plan: an audit found no string-key consumers — the one consumer (`EmailComposer`) already derived its keys from the `EmailTemplateKey` enum, which matches the resx 1:1. So 9.5i closes the resx↔code rename gap rather than migrating string literals. Emits no diagnostic → no soak → shipped and closed in one commit. Behavior unchanged (40/40 analyzer + 131/131 email tests green)
+- Spec: `docs/superpowers/specs/2026-06-09-stage-9-5i-typed-localizer-generator-design.md`; plan: `docs/superpowers/plans/2026-06-09-stage-9-5i-typed-localizer-generator-impl.md`
+
 **Tests (Stage 9.5e — migration-drift ship-gate, 2026-06-08)**
 - New `MigrationDriftTests.Model_has_no_pending_migration_changes` (Condition E3) — asserts EF Core's `HasPendingModelChanges()` is false, so an entity-shape change must ship its migration in the same commit. A Unit test (model + snapshot built from the assembly, no DB connection); fails the build on drift regardless of how the change was authored
 
