@@ -154,7 +154,7 @@ namespace ProjectCeres.Models
 ";
         var expected = new DiagnosticResult(Diagnostics.CER005_TokenLookupDiscipline)
             .WithLocation(0)
-            .WithArguments(""FooToken"");
+            .WithArguments("FooToken");
         await Verifier.VerifyAnalyzerAsync(source, expected);
     }
 
@@ -194,7 +194,7 @@ namespace ProjectCeres.Models
 ";
         var expected = new DiagnosticResult(Diagnostics.CER005_TokenLookupDiscipline)
             .WithLocation(0)
-            .WithArguments(""FooToken"");
+            .WithArguments("FooToken");
         await Verifier.VerifyAnalyzerAsync(source, expected);
     }
 
