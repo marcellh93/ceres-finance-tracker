@@ -12,6 +12,11 @@
 - New "Trip-wire A" escalation counter (`.claude/hooks/lib/reviewer-escalation.js`): when the third reviewer catches a mechanical miss the first two passed, twice consecutively for the same rule-class, it writes a `graduate-to-analyzer` marker — the work-order to promote that rule to a Roslyn analyzer / pre-commit hook
 - Spec: `docs/superpowers/specs/2026-06-08-stage-9-5e-reviewer-pipeline-design.md`; plan: `docs/superpowers/plans/2026-06-08-stage-9-5e-reviewer-pipeline-impl.md`
 
+**Analyzers (Stage 9.5f — CER005 TokenLookup discipline, 2026-06-09)**
+- New `CER005` Roslyn analyzer (`TokenLookupDisciplineAnalyzer`) — fires when a class named `*Token` under `ProjectCeres.Models` implementing `IUserOwned` lacks a `byte[] TokenLookup` property (the HMAC fingerprint that lets a token confirm in O(1) instead of running Argon2id over every candidate row). Guards the 9.1.5.a regression class (a token entity shipping without its lookup column). Property-presence only — the index/migration coupling is owned by the E3 `MigrationDriftTests` (9.5e), not this analyzer
+- Shipped at `warning` severity with 0 violations against `main` (the four existing token tables all carry `byte[] TokenLookup`); the `warning`→`error` flip is deferred ≥48h per the C-2 soak. 7-case test matrix (2 fires + 5 exclusions); CER005 row added to `AnalyzerReleases.Unshipped.md` (RS2008); ADR-0077 rule table extended
+- Spec: `docs/superpowers/specs/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-design.md`; plan: `docs/superpowers/plans/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-impl.md`
+
 **Tests (Stage 9.5e — migration-drift ship-gate, 2026-06-08)**
 - New `MigrationDriftTests.Model_has_no_pending_migration_changes` (Condition E3) — asserts EF Core's `HasPendingModelChanges()` is false, so an entity-shape change must ship its migration in the same commit. A Unit test (model + snapshot built from the assembly, no DB connection); fails the build on drift regardless of how the change was authored
 

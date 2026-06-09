@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1.
+**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1. CER005 (token-lookup discipline) added at `warning` 2026-06-09 (Stage 9.5f); `error` flip pending the 48h C-2 soak.
 
 **Phase:** Phase 3 (Hosted Beta) — Stage 9.5h Phase 1 hardening container, sub-stage 9.5c.
 
@@ -37,6 +37,7 @@ Ship **four Roslyn analyzers + one source generator + three escape attributes** 
 | **CER004** | Reliability | `warning` → `error` | `DateTime.UtcNow` / `DateTime.Now` in production code requires `[AllowsWallClock("reason")]` on the enclosing member (excludes `ProjectCeres.Models` property initialisers + `Migrations/`) |
 | **CER010** | Style | `warning` → `error` | `[RlsBypassJustified(ticket)]` ticket argument must match `^(CER\|TICKET\|ADR)-\d+$` |
 | **CER020** | Localization | `error` from day 1 | EN/ES resx parity — emits compile-time error if either culture is missing a key its sibling has |
+| **CER005** | Reliability | `warning` (flip pending) | A class named `*Token` under `ProjectCeres.Models` implementing `IUserOwned` must declare a `byte[] TokenLookup` property. Property-presence only — the index/migration coupling is owned by the E3 `MigrationDriftTests` (Stage 9.5e), not this analyzer. Added Stage 9.5f (2026-06-09) |
 
 Three **escape attributes** ship as a separate `netstandard2.0` csproj (`ProjectCeres.Analyzers.Annotations`):
 - `[PreAuthScope]` — marks classes that operate on the pre-authentication code path.
