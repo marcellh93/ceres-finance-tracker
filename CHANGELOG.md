@@ -17,6 +17,11 @@
 - Shipped at `warning` severity with 0 violations against `main` (the four existing token tables all carry `byte[] TokenLookup`); the `warning`→`error` flip is deferred ≥48h per the C-2 soak. 7-case test matrix (2 fires + 5 exclusions); CER005 row added to `AnalyzerReleases.Unshipped.md` (RS2008); ADR-0077 rule table extended
 - Spec: `docs/superpowers/specs/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-design.md`; plan: `docs/superpowers/plans/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-impl.md`
 
+**Analyzers (Stage 9.5g — CER006 reverse-direction [PreAuthScope] marker, 2026-06-09)**
+- New `CER006` Roslyn analyzer (`PreAuthScopeMarkerAnalyzer`) — the reverse of CER001: it fires when a class calls `BeginPreAuthUserScopeAsync` (the helper that opens a pre-login user-scoped transaction) but its enclosing class is not marked `[PreAuthScope]`. CER001 + CER006 together pin the marker contract from both sides — you can't carry the marker without using the helper (CER001), and you can't use the helper without the marker (CER006). Mirrors CER001's syntax-tree walk, so it does NOT inherit CER002's `GetEnclosingSymbol` blind spot; needs zero exclusion logic
+- Shipped at `warning` severity with 0 violations against `main` (all 8 pre-auth callers already carry `[PreAuthScope]`); the `warning`→`error` flip is deferred ≥48h per the C-2 soak. 4-case test matrix (1 fires + 3 exclusions); CER006 row added to `AnalyzerReleases.Unshipped.md` (RS2008); ADR-0077 rule table extended
+- Spec: `docs/superpowers/specs/2026-06-09-stage-9-5g-cer006-preauthscope-marker-analyzer-design.md`; plan: `docs/superpowers/plans/2026-06-09-stage-9-5g-cer006-preauthscope-marker-analyzer-impl.md`
+
 **Tests (Stage 9.5e — migration-drift ship-gate, 2026-06-08)**
 - New `MigrationDriftTests.Model_has_no_pending_migration_changes` (Condition E3) — asserts EF Core's `HasPendingModelChanges()` is false, so an entity-shape change must ship its migration in the same commit. A Unit test (model + snapshot built from the assembly, no DB connection); fails the build on drift regardless of how the change was authored
 
