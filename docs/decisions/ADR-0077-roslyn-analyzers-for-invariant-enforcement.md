@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1. CER005 (token-lookup discipline) added at `warning` 2026-06-09 (Stage 9.5f); `error` flip pending the 48h C-2 soak. CER006 (reverse-direction `[PreAuthScope]` marker) added at `warning` 2026-06-09 (Stage 9.5g); `error` flip pending the 48h C-2 soak. `EmailKeysGenerator` (typed email-key source generator) added 2026-06-09 (Stage 9.5i) — the generator family's first *code-emitting* member (CER020 only emits a parity-check stub); it emits no diagnostic, so it has no soak and shipped closed in one commit.
+**Status:** Accepted — 2026-05-27; CER001/CER002/CER004/CER010 flipped `warning`→`error` 2026-05-30 after the 48h soak (commit `665f182`). CER020 has been `error` from day 1. CER005 (token-lookup discipline) added at `warning` 2026-06-09 (Stage 9.5f); `error` flip pending the 48h C-2 soak. CER006 (reverse-direction `[PreAuthScope]` marker) added at `warning` 2026-06-09 (Stage 9.5g); `error` flip pending the 48h C-2 soak. `EmailKeysGenerator` (typed email-key source generator) added 2026-06-09 (Stage 9.5i) — the generator family's first *code-emitting* member (CER020 only emits a parity-check stub); it emits no diagnostic, so it has no soak and shipped closed in one commit. Code-fix providers for CER004 (safe) + CER001 (placeholder) added 2026-06-10 (Stage 9.5j); CER010 ships no fix (a format-valid invented ticket would defeat the audit-trail rule) — emit no diagnostic, so no soak.
 
 **Phase:** Phase 3 (Hosted Beta) — Stage 9.5h Phase 1 hardening container, sub-stage 9.5c.
 
@@ -45,6 +45,11 @@ Ship **four Roslyn analyzers + one source generator + three escape attributes** 
 - **`ResxParityGenerator` (CER020)** — emits a parity-check stub + the `CER020_ResxParityMissing` diagnostic. The original `IIncrementalGenerator`.
 - **`EmailKeysGenerator` (Stage 9.5i, 2026-06-09)** — reads `EmailsResource.en.resx` and emits `EmailKeys.g.cs`: nested `const string` constants per email template (`EmailKeys.PasswordResetRequest.Subject`, …). `EmailComposer.Compose` references them via a `KeysFor` switch, so renaming a resx key is a `CS0117` compile error instead of a silent runtime fallback. The family's first *code-emitting* generator; emits no diagnostic → no `AnalyzerReleases` row, no soak. **Re-scope note:** Stage 9.5i's roadmap line assumed string-key consumers (`_localizer["..."]`) to migrate; the audit found none — the one consumer (`EmailComposer`) was already dynamic-keyed off the `EmailTemplateKey` enum, which matches the resx 1:1. So 9.5i became a typed-key generator (closing the resx↔code rename gap) rather than a string-key migration. Additive to CER020; CER020's parity check is unchanged.
 
+**Code-fix providers in the family (Stage 9.5j, 2026-06-10):** two `CodeFixProvider` classes ship in the analyzer assembly (loaded by the IDE from the same `OutputItemType="Analyzer"` reference — no extra wiring). They emit no diagnostic, so no `AnalyzerReleases` row and no soak.
+- **`DateTimeWallClockCodeFixProvider` (CER004)** — a *safe* fix: rewrites the flagged `DateTime.UtcNow`/`.Now` to `_timeProvider.GetUtcNow().UtcDateTime`, offered **only** when the enclosing class already holds an instance field named exactly `_timeProvider` of type `System.TimeProvider` (or a subtype). No such field → no fix offered, so every offered fix compiles.
+- **`PreAuthScopeTransactionCodeFixProvider` (CER001)** — a *placeholder* fix: rewrites `BeginTransactionAsync()` to `BeginPreAuthUserScopeAsync(userId, ct)` with `userId`/`ct` left undeclared and the receiver untouched, yielding deliberate compile errors as the developer's to-do list (a fully-compiling fix would risk shipping an empty user scope).
+- **CER010 ships no fix (re-scope from the roadmap premise).** The 9.5j roadmap line listed CER010 as a "ticket-format completion" fix, but a format-valid invented ticket (`CER-9999`) would pass the analyzer *and* point the bypass-justified audit trail at a non-existent ticket — strictly worse than the `"temp"` the rule catches, because the warning is now gone. Only the human knows the real ticket; nothing is mechanically substitutable. So 9.5j shipped two providers, not three. (CER002/CER003/CER005/CER006/CER020 have no mechanical fix.)
+
 Three **escape attributes** ship as a separate `netstandard2.0` csproj (`ProjectCeres.Analyzers.Annotations`):
 - `[PreAuthScope]` — marks classes that operate on the pre-authentication code path.
 - `[RlsBypassJustified("CER-NNNN")]` — documents intentional EF query-filter bypass on `IUserOwned` queries.
@@ -74,7 +79,7 @@ Rejected. The 9.5a sweep deleted 10 Stop hooks that read assistant prose to dete
 
 ### Alternative 3 — Code-fix providers shipped alongside the analyzers
 
-Deferred to Stage 9.5j (a sub-stage scheduled in `roadmap-phase-three.md` § Stage 9.5h). Code-fix providers add ~2x test surface per analyzer. The diagnostics themselves + their suggested-fix prose are sufficient for the 9.5h close-out; developers can apply manual rewrites. 9.5j upgrades ergonomics on CER001 / CER004 / CER010 (the three diagnostics with mechanical fix shapes).
+Deferred to Stage 9.5j (a sub-stage scheduled in `roadmap-phase-three.md` § Stage 9.5h). Code-fix providers add ~2x test surface per analyzer. The diagnostics themselves + their suggested-fix prose are sufficient for the 9.5h close-out; developers can apply manual rewrites. 9.5j (shipped 2026-06-10) upgraded ergonomics on CER004 (safe fix) and CER001 (placeholder fix); CER010 was re-scoped to no-fix because a format-valid invented ticket would defeat the audit-trail rule (see the "Code-fix providers in the family" note under § Decision).
 
 ### Alternative 4 — One csproj per analyzer
 
