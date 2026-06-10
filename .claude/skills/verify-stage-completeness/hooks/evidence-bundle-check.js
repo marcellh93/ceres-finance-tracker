@@ -23,27 +23,36 @@ const LOG_PATH = path.join(EVIDENCE_DIR, "_log.jsonl");
 const ORPHAN_LOG = path.join(EVIDENCE_DIR, "_orphan", "log.jsonl");
 const TURN_MARKER = path.join(PROJECT_DIR, ".claude", "state", "run-tests", "last.log");
 
+// A file is a user-facing UI surface only if it's a non-test Client/src file or a Controller.
+// A *.test.ts(x) change (e.g. a vitest timing-headroom edit) has no rendered surface to walk.
+const isTestFile = (f) => /\.test\.(ts|tsx)$/.test(f);
+const touchesUiSurface = (files) =>
+  files.some((f) =>
+    (/^ProjectCeres\.Client\/src\//.test(f) && !isTestFile(f)) ||
+    /^ProjectCeres\/Controllers\//.test(f)
+  );
+
 // Diff-shape → required slots. Each predicate runs on the list of changed files.
 const SLOT_TABLE = [
   {
     slot: "walk-summary.json",
-    when: (files) => files.some((f) => /^ProjectCeres\.Client\/src\//.test(f) || /^ProjectCeres\/Controllers\//.test(f)),
-    reason: "diff touches user-facing surface (Client/src or Controllers)",
+    when: touchesUiSurface,
+    reason: "diff touches user-facing surface (non-test Client/src or Controllers)",
   },
   {
     slot: "trace.zip",
-    when: (files) => files.some((f) => /^ProjectCeres\.Client\/src\//.test(f) || /^ProjectCeres\/Controllers\//.test(f)),
-    reason: "diff touches user-facing surface (Client/src or Controllers)",
+    when: touchesUiSurface,
+    reason: "diff touches user-facing surface (non-test Client/src or Controllers)",
   },
   {
     slot: "console.json",
-    when: (files) => files.some((f) => /^ProjectCeres\.Client\/src\//.test(f) || /^ProjectCeres\/Controllers\//.test(f)),
-    reason: "diff touches user-facing surface (Client/src or Controllers)",
+    when: touchesUiSurface,
+    reason: "diff touches user-facing surface (non-test Client/src or Controllers)",
   },
   {
     slot: "network.json",
-    when: (files) => files.some((f) => /^ProjectCeres\.Client\/src\//.test(f) || /^ProjectCeres\/Controllers\//.test(f)),
-    reason: "diff touches user-facing surface (Client/src or Controllers)",
+    when: touchesUiSurface,
+    reason: "diff touches user-facing surface (non-test Client/src or Controllers)",
   },
   {
     slot: "curl-transcript.txt",
