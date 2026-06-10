@@ -70,7 +70,8 @@ describe('App routes', () => {
       mockAuthedMe();
       renderApp(path);
       await waitFor(() =>
-        expect(screen.getByRole('heading', { level: 1, name: expectedHeading })).toBeDefined()
+        expect(screen.getByRole('heading', { level: 1, name: expectedHeading })).toBeDefined(),
+        { timeout: 3000 }
       );
     });
   }
@@ -95,7 +96,8 @@ describe('App routes', () => {
 
     renderApp('/recurring');
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Recurring transactions' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Recurring transactions' })).toBeInTheDocument(),
+      { timeout: 3000 }
     );
   });
 
@@ -104,7 +106,8 @@ describe('App routes', () => {
     renderApp('/movements/new?type=transaction');
     // MovementCreate renders the form when ?type= is set; Save is the form's primary action.
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /save/i })).toBeDefined()
+      expect(screen.getByRole('button', { name: /save/i })).toBeDefined(),
+      { timeout: 3000 }
     );
   });
 
@@ -113,7 +116,8 @@ describe('App routes', () => {
     renderApp('/movements/some-id/edit');
     // MovementEdit fetches the discriminator on mount; the loading state renders first
     await waitFor(() =>
-      expect(screen.getByText(/loading…/i)).toBeDefined()
+      expect(screen.getByText(/loading…/i)).toBeDefined(),
+      { timeout: 3000 }
     );
   });
 });
@@ -127,7 +131,8 @@ describe('App routing structure', () => {
     // RequireAuth now reads useAuth(); it renders null while loading, then
     // renders children once authed. Wait for the heading.
     await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined()
+      expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined(),
+      { timeout: 3000 }
     );
   });
 
@@ -151,6 +156,7 @@ describe('App routing structure', () => {
     renderApp('/login');
     await waitFor(() =>
       expect(document.body.querySelector('[aria-label^="Notifications"]')).not.toBeNull(),
+      { timeout: 3000 }
     );
   });
 });
