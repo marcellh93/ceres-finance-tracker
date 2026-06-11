@@ -1080,7 +1080,7 @@ Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
 
 Stage 8 deferred items (carry-forward from Stage 8 — security-event email call-sites):
 
-- [ ] **Wire registration-confirmation email at `POST /api/auth/register`** — the SPA register flow must call `IEmailComposer.Compose(EmailTemplateKey.RegistrationConfirmation, ...)` with a single-use 256-bit Argon2id-hashed token (30-min expiry) and send via `IEmailService`. Resx key `RegistrationConfirmation.{Subject,BodyText,BodyHtml}` does NOT yet exist in `Emails.en.resx` / `Emails.es.resx` — add EN + ES copy alongside the call-site wiring. Add `RegistrationConfirmation` to the `EmailTemplateKey` enum. *Anchor: Stage 8 § Transactional templates — Registration confirmation.*
+- [x] **Wire registration-confirmation email at `POST /api/auth/register`** — shipped with Stage 9.3: `RegistrationConfirmation` exists in `EmailTemplateKey`, EN+ES resx keys live in `EmailsResource.{en,es}.resx`, and `EmailConfirmationService.IssueAsync` composes + sends on register (pinned by `EmailConfirmationTests.cs`). This line predated 9.3; the "resx does NOT yet exist" claim was true when written, stale since. *Anchor: Stage 8 § Transactional templates — Registration confirmation.*
 - [ ] **Wire TOTP-enrolled security-event email at `POST /api/auth/mfa/enroll/verify`** — on successful enrolment, send a confirmation email so the user is notified if an attacker enrols TOTP on their account. Add `TotpEnrolled` to `EmailTemplateKey` + EN/ES resx keys (`TotpEnrolled.Subject/BodyText/BodyHtml`). Body includes IP + timestamp + "this wasn't me" link per `security-model.md § Security Event Notifications`. *Anchor: Stage 8 § Transactional templates — TOTP enrolled.*
 - [ ] **Wire TOTP-disabled security-event email** — when a TOTP-disable endpoint ships in Stage 9 (or whenever the user can turn MFA off), send a notification email. Add `TotpDisabled` to `EmailTemplateKey` + EN/ES resx keys. Includes "re-enable + revoke all sessions" link. The disable endpoint itself does not exist today; the email wires alongside it. *Anchor: Stage 8 § Transactional templates — TOTP disabled.*
 - [ ] **Wire backup-codes-regenerated email at `POST /api/auth/mfa/backup-codes/regenerate`** — the regeneration endpoint already exists (Stage 6) but currently sends no notification. Add `BackupCodesRegenerated` to `EmailTemplateKey` + EN/ES resx keys, then wire the call into `MfaController.RegenerateBackupCodes`. *Anchor: Stage 8 § Transactional templates — Backup codes regenerated.*
@@ -1418,6 +1418,7 @@ Operational:
 | 12.5 | `SupportTicket` entity + service + API endpoints (if not already present) | (above) |
 | 12.6 | Admin email notification on new ticket | (above) |
 | 12.7 | **Stage 7.5 follow-up.** When the `SupportTicket` entity ships, mark it `: IUserOwned` (the user-owned set is derived from the EF model by `UserOwnedModel.RlsTables` since Stage 9.5b — `UserOwnedTables.cs` was deleted) AND add an `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + `user_isolation` policy in the same migration. The Stage 7.5 parity test (`ParityTests.UserOwnedModel_RlsTables_match_pg_policies_user_isolation_set`) + the Stage 9.5b `RlsParityStartupCheck` will fail the build / refuse to boot until both halves land. | Stage 7.5 / ADR-0068 / 9.5b |
+| 12.8 | Email-change SPA pages: settings entry point (request form, reauth-gated) + `/app/email-change/confirm` + `/app/email-change/revoke` token pages. The Stage 6.12 API has emailed links to these routes since 2026-05-10 with no React page behind them — confirm dead-ends a legitimate email change; revoke dead-ends a security affordance. Queued 2026-06-11 by the Stage 9.11 audit (deferral gate run; tripwire FIXME at `EmailChangeService.cs:208`). | Stage 9.11 spec § 9 / Stage 6.12 |
 
 ### Verification checklist
 
@@ -1462,6 +1463,10 @@ Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
 Stage 8 deferred items (carry-forward from Stage 8 — security-event email call-sites):
 
 - [ ] **Wire new-session/new-device alert email** — when a new `UserSession` is created from an IP not previously seen for that user, send a notification with IP + UA summary + "this wasn't me" link revoking that session. The session-novelty-detection call site lands here (compare new session IP against the user's prior `UserSession.CreatedFromIp` history; first occurrence → fire email). Opt-out by default-enabled, disable from notification preferences in Settings per `planning-phase3.md`. Add `NewSessionAlert` to `EmailTemplateKey` + EN/ES resx keys (`NewSessionAlert.Subject/BodyText/BodyHtml`). *Anchor: Stage 8 § Transactional templates — New-session alert + Stage 8 § Security event notifications — New-device/session login.*
+
+Stage 9.11 deferred item (queued 2026-06-11 — deferral gate run, see Stage 9.11 spec § 9):
+
+- [ ] **Email-change SPA pages (12.8)** — settings request form (reauth-gated) + `/app/email-change/confirm` + `/app/email-change/revoke` token pages, wired to the live Stage 6.12 API. The emailed links currently dead-end on an unmatched SPA route; tripwire `// FIXME: re-surface in Stage 12` at `EmailChangeService.cs:208`. Add link-click E2E coverage to `ProjectCeres.Client/e2e/` in the same sub-stage (Stage 9.11 deliberately scoped it out — no page existed to drive).
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory):
 
