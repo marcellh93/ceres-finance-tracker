@@ -27,7 +27,8 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
-    command: 'bash ../tools/e2e/run-server.sh',
+    // cwd defaults to the config-file dir (e2e/); anchor the script at the repo root.
+    command: 'bash ../../tools/e2e/run-server.sh',
     url: `${APP_URL}/api/health`,
     timeout: 180_000,
     reuseExistingServer: false,

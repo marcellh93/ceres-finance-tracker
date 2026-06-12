@@ -1,8 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
+// ESM (package.json "type": "module") — derive the dir from import.meta.url.
 // From ProjectCeres.Client/e2e/support/ → up 3 → repo root → .e2e/emails
-const SINK_DIR = path.resolve(__dirname, '../../../.e2e/emails')
+const supportDir = path.dirname(fileURLToPath(import.meta.url))
+const SINK_DIR = path.resolve(supportDir, '../../../.e2e/emails')
 const TOKEN_RE = /#token=([A-Za-z0-9_-]{43})/
 
 interface SinkEmail {
