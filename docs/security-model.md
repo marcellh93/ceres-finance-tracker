@@ -1118,6 +1118,8 @@ Use an allowlist approach: define the set of properties that are safe to log. Ev
 - Configure a log scrubber pipeline step that runs before sink writes. Common libraries: `Serilog.Enrichers.Sensitive` or a custom `ILogEventEnricher`.
 - Never call `.ToString()` on an entire request or response object in a log statement — these are too wide and frequently capture credentials.
 
+**E2E test exception (Stage 9.11).** `FileSinkEmailService` deliberately writes full email bodies — including the verify/reset/unlock token URLs the redaction policy otherwise forbids — to a local JSON directory so Playwright can read the links. This is acceptable only because it is `ASPNETCORE_ENVIRONMENT=E2E`-gated: it is registered exclusively under that environment (pinned by an architecture test that asserts it can never resolve under Production/Development), and `E2eDatabaseGuardStartupCheck` refuses to boot the E2E environment against any database other than `project_ceres_e2e`. Production never instantiates it.
+
 ### Log Retention
 
 - Define a maximum retention period per log tier (e.g., diagnostic logs: 30 days; security event logs: 1 year).
