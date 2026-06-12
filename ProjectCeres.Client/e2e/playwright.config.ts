@@ -13,7 +13,7 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: '.',
-  testMatch: /.*\.spec\.ts$/,
+  testMatch: /agent-walk\.spec\.ts$/,
   fullyParallel: false,
   workers: 1, // avoid parallel-against-single-app collisions
   reporter: [['list'], ['json', { outputFile: 'test-results/results.json' }]],

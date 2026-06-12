@@ -13,7 +13,9 @@
     "test:ci": "pnpm lint:tests && vitest run",
     "test:watch": "vitest",
     "check-size": "node scripts/check-bundle-size.mjs",
-    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "e2e": "playwright test --config e2e/playwright.golden.config.ts",
+    "e2e:ui": "playwright test --config e2e/playwright.golden.config.ts --ui",
+    "e2e:walk": "playwright test --config e2e/playwright.config.ts",
     "agent-walk": "tsx e2e/agent-walk.ts"
   },
   "dependencies": {
@@ -61,6 +63,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
+    "otpauth": "^9.5.1",
     "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.22.3",
