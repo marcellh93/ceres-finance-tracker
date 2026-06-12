@@ -109,7 +109,7 @@ public sealed class AuthController : ControllerBase
             // Stage 9.3: three-branch anti-enumeration on duplicate-email paths.
             //  - Confirmed-existing user → dummy Argon2id to mirror IssueAsync cost.
             //  - Unconfirmed-existing user → issue a fresh token (same code path as fresh-create).
-            //  - All other Create failures (short password, breached, malformed) → 422.
+            //  - All other Create failures (short password, breached) → 400 via ValidationProblem(ModelState), which bypasses the 422 factory.
             var isDuplicateOnly = result.Errors.All(e =>
                 e.Code == "DuplicateUserName" || e.Code == "DuplicateEmail");
             if (isDuplicateOnly && result.Errors.Any())

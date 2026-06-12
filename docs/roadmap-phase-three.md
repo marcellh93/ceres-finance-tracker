@@ -1097,17 +1097,17 @@ Stage 9.10 — RLS pre-auth-write audit + test-infrastructure parity:
 
 Stage 9.11 — Playwright E2E foundations:
 
-- [ ] **Install Playwright dev dep** — `pnpm --dir ProjectCeres.Client add -D @playwright/test`. *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates.*
-- [ ] **Author `ProjectCeres.Client/playwright.config.ts`** — `baseURL` pointing at the production-built SPA; `webServer` block that boots `dotnet run --project ProjectCeres` + Vite preview before tests; `projects` matrix for Chromium / Firefox / WebKit; `fullyParallel: true`; trace + screenshot + video on failure; output to `ProjectCeres.Client/playwright-report/`. *Anchor: ADR-0071 § Decision + § Implementation gates.*
-- [ ] **Create `ProjectCeres.Client/e2e/` directory** (separate from `src/**/__tests__/`); `pnpm --dir ProjectCeres.Client e2e` command wired in `package.json` per `docs/testing.md` § E2E Tool: Playwright (TypeScript). *Anchor: `testing.md` lines 99–112.*
-- [ ] **Write the five Stage-9 golden-path suites** under `e2e/auth/`:
-  - [ ] `register-login.spec.ts` — register → email-verification interstitial → login → dashboard
-  - [ ] `password-reset.spec.ts` — forgot-password → reset-link email → new-password → login
-  - [ ] `totp-enrol-and-first-login.spec.ts` — TOTP enrolment from Settings → sign-out → login with TOTP → dashboard
-  - [ ] `lockout-self-service.spec.ts` — N wrong passwords → lockout → unlock-email link → re-login
-  - [ ] `backup-code-recovery.spec.ts` — "lost device" → backup-code consume → dashboard. *Anchor: ADR-0071 § Decision lines 35–38; `planning-phase3.md` line 427.*
-- [ ] **Wire fixture for real PostgreSQL** — E2E suite must run against a real `dotnet run` + Postgres (mirrors xUnit integration-test fixture pattern, but at the browser layer). Decide: shared dev DB with a per-suite reset, or a `project_ceres_e2e` database with the existing migration runner. Document the choice in `testing.md` § E2E. *Anchor: ADR-0071 § Decision line 31.*
-- [ ] **Document local-run instructions** in `docs/testing.md` § Running tests — `pnpm --dir ProjectCeres.Client e2e` (headless), `pnpm --dir ProjectCeres.Client e2e --ui` (Playwright UI Mode), prerequisite of `dotnet run` already going or letting `webServer` boot it. *Anchor: `testing.md` § E2E Tool lines 108–112.*
+- [x] **Install Playwright dev dep** — `pnpm --dir ProjectCeres.Client add -D @playwright/test` (note: `@playwright/test` was already a devDep from 9.5a; `otpauth` was added this stage). *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates.*
+- [x] **Author `ProjectCeres.Client/playwright.golden.config.ts`** — `baseURL` pointing at the production-built SPA; `webServer` boots `tools/e2e/run-server.sh` (production bundle staged into `wwwroot/dist` + `dotnet run` under `ASPNETCORE_ENVIRONMENT=E2E`, not Vite preview); `projects` matrix for Chromium / Firefox / WebKit; `workers: 1` / `fullyParallel: false` (deterministic email-sink + shared loopback rate-limit partition; parallelism/sharding is owned by the already-scheduled Stage 16.16 CI bring-up — see the blockquote below and the Stage 16.16 `[ ]` line); `retries: 0`; trace + screenshot retain-on-failure; output to `e2e/.artifacts/`. *Anchor: ADR-0071 § Decision + § Implementation gates.*
+- [x] **Create `ProjectCeres.Client/e2e/` directory** (separate from `src/**/__tests__/`); `pnpm --dir ProjectCeres.Client e2e` command wired in `package.json` per `docs/testing.md` § E2E Tool: Playwright (TypeScript) (note: directory pre-existed from 9.5a agent-walk; extended this stage with `auth/` + `support/`). *Anchor: `testing.md` lines 99–112.*
+- [x] **Write the five Stage-9 golden-path suites** under `e2e/auth/`:
+  - [x] `register-login.spec.ts` — register → email-verification interstitial → login → dashboard
+  - [x] `password-reset.spec.ts` — forgot-password → reset-link email → new-password → login
+  - [x] `totp-enrol-and-first-login.spec.ts` — TOTP enrolment from Settings → sign-out → login with TOTP → dashboard
+  - [x] `lockout-self-service.spec.ts` — N wrong passwords → lockout → unlock-email link → re-login
+  - [x] `backup-code-recovery.spec.ts` — "lost device" → backup-code consume → dashboard. *Anchor: ADR-0071 § Decision lines 35–38; `planning-phase3.md` line 427.*
+- [x] **Wire fixture for real PostgreSQL** — the decision: a dedicated `project_ceres_e2e` database, created + migrated + wiped by `tools/e2e/run-server.sh` (not the shared dev DB). Documented in `testing.md` § Running E2E locally. *Anchor: ADR-0071 § Decision line 31.*
+- [x] **Document local-run instructions** — landed in `docs/testing.md` § Running E2E locally (there is no "§ Running tests" heading; run docs live per-test-type). `pnpm --dir ProjectCeres.Client e2e` (all five suites × three browsers), `pnpm --dir ProjectCeres.Client e2e:ui` (Playwright UI Mode), single-browser loop, and the agent-walk harness; the `webServer` boots the app automatically. *Anchor: `testing.md` § E2E Tool lines 108–112.*
 
 > **CI wiring is deferred to Stage 16.16** (already-scheduled — see `roadmap-phase-three.md` § Stage 16). The `.github/workflows/ci.yml` file does not exist until Stage 16 ships per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md); GH-Actions wiring for the Playwright suite (`npx playwright install --with-deps` cached, sharded runners, trace + report artefacts on failure) is part of that CI bring-up rather than this stage. Stage 9.11 ships the suite + local-run docs; Stage 16.16 wires it into CI.
 

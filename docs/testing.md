@@ -95,7 +95,7 @@ Simple presentational components with no logic are not tested — the value is t
 | Analyzer    | Roslyn `DiagnosticAnalyzer` + source-generator behaviour via `Microsoft.CodeAnalysis.Testing`'s `Verifier<T>`       | No        | Phase 3 (9.5c) |
 | E2E         | Full browser-driven flows                                                                                           | Yes       | Phase 3        |
 
-E2E tests are deferred until Phase 3. The prerequisites — CI/CD pipeline, Testcontainers, and a hosted environment — do not exist until that phase. E2E must also be written after the Phase 2 React migration stabilizes, not before, to avoid investing in tests against a frontend that is about to change.
+E2E foundations shipped in Stage 9.11 (Playwright/TypeScript) — five auth golden-path suites running locally against a dedicated `project_ceres_e2e` database and the production-built SPA bundle. The fixture uses a real local PostgreSQL plus the EF migration runner (not Testcontainers). CI wiring is deferred to Stage 16.16 — there is no GitHub Actions workflow running the suite until then.
 
 ### Analyzer tests (Stage 9.5c, shipped 2026-05-27)
 
@@ -114,7 +114,7 @@ Run via `dotnet test ProjectCeres.Analyzers.Tests/`. The Stop hook's tier system
 Rationale:
 
 - TypeScript-first — tests live next to the SPA in `ProjectCeres.Client/`. DTO types imported from `src/` keep API-contract regressions inside the test surface, not at runtime.
-- Native test runner with `playwright.config.ts` — `webServer` auto-boots `dotnet run` + Vite preview before tests, `projects` matrix runs Chromium / Firefox / WebKit, `fullyParallel` + `sharding` work first-party.
+- Native test runner with `playwright.config.ts` — `webServer` runs `tools/e2e/run-server.sh`, which builds the SPA, stages it into `ProjectCeres/wwwroot/dist`, and boots `dotnet run` under `ASPNETCORE_ENVIRONMENT=E2E` serving the production bundle (no Vite dev/preview server involved); `projects` matrix runs Chromium / Firefox / WebKit, `fullyParallel` + `sharding` work first-party.
 - UI Mode (`pnpm playwright test --ui`) — time-travel scrubbing, watch mode, locator picker, DOM inspector. The single biggest DX win over the .NET variant.
 - Cross-origin and cookie semantics — Phase 3 uses cookie auth (`SameSite=Lax` + CSRF token per [ADR-0063](decisions/ADR-0063-cookie-samesite-lax-with-csrf-tokens.md)). Playwright's BrowserContext model handles these without workaround.
 - Trace files attach to failed CI runs — debugging across SPA + API + DB boundary is tractable from the GitHub Actions log alone.
@@ -126,11 +126,34 @@ Rationale:
 
 Focus on critical user-facing flows that cross the full stack and are not covered by unit or integration tests:
 
+> **Stage 9.11 shipped the AUTH golden paths** — login + TOTP, register + email-verify, password-reset, lockout self-service unlock, and backup-code recovery. The financial-flow bullets below are aspirational for subsequent stages.
+
 - Login and TOTP authentication flow
 - Account creation and opening balance
 - Recording a transaction and verifying it appears in the account balance
 - Transfer between accounts
 - Budget progress reflected after a transaction is recorded
+
+### Running E2E locally
+
+**Prerequisites:**
+
+- Local PostgreSQL running with the three dev roles (same as the integration suite).
+- Browser binaries installed once via `pnpm --dir ProjectCeres.Client exec playwright install firefox webkit` (chromium ships with `@playwright/test`).
+- No manual DB setup — the wrapper `tools/e2e/run-server.sh` auto-creates, migrates, and wipes `project_ceres_e2e`.
+
+**Commands:**
+
+- `pnpm --dir ProjectCeres.Client e2e` — all five auth suites × chromium / firefox / webkit (golden config; boots the app automatically via the `webServer`).
+- `pnpm --dir ProjectCeres.Client exec playwright test --config e2e/playwright.golden.config.ts --project=chromium` — fast single-browser loop.
+- `pnpm --dir ProjectCeres.Client e2e:ui` — Playwright UI mode (time-travel debugging).
+- `pnpm --dir ProjectCeres.Client e2e:walk` — the agent-walk route-smoke harness (separate config; needs `tools/agent-env/up.sh` to export `APP_URL`).
+
+**Artifacts:** traces + screenshots (retain-on-failure) + HTML report under `ProjectCeres.Client/e2e/.artifacts/`; captured emails (verify / reset / unlock links) as JSON under repo-root `.e2e/emails/`.
+
+**`retries: 0`** — a flake is a failure until root-caused (per § Flaky tests).
+
+**When it runs:** on demand + at auth-touching stage close-outs. Nothing runs it automatically yet — the Stop hook is tier-0 for `.ts`-only writes and the DoD tiers don't invoke Playwright; CI wiring lands in Stage 16.16.
 
 ---
 

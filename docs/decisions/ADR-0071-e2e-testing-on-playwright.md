@@ -66,9 +66,9 @@ Each stage's roadmap entry owns its own checklist. This section stays as the aut
 
 Pre-Stage-9.11-completion must-have:
 
-- [ ] `pnpm --dir ProjectCeres.Client add -D @playwright/test`
-- [ ] `playwright.config.ts` with `baseURL`, `webServer` (boots `dotnet run` + Vite preview), `projects` for Chromium / Firefox / WebKit.
-- [ ] `e2e/auth/register-login.spec.ts` covers the golden path.
+- [x] `pnpm --dir ProjectCeres.Client add -D @playwright/test`
+- [x] `playwright.config.ts` with `baseURL`, `webServer`, `projects` for Chromium / Firefox / WebKit. The `webServer` boots the production bundle via `tools/e2e/run-server.sh` (not "Vite preview"), and the config split into `playwright.golden.config.ts` (golden suites) + the narrowed `playwright.config.ts` (agent-walk smoke).
+- [x] `e2e/auth/register-login.spec.ts` covers the golden path. All FIVE golden-path suites shipped (register-login, password-reset, totp-enrol-and-first-login, lockout-self-service, backup-code-recovery), not just register-login.
 
 Pre-Stage-16.16-completion must-have:
 
