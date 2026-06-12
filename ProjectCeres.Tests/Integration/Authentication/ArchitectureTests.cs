@@ -267,6 +267,43 @@ public class ArchitectureTests
     }
 
     // -----------------------------------------------------------------------
+    // Stage 9.11 §5.4 — only known IBreachedPasswordChecker impls exist
+    // (mirror of IEmailService_impls_are_LogOnly_Noop_or_Resend)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void IBreachedPasswordChecker_impls_are_Hibp_or_E2eStub()
+    {
+        // HaveIBeenPwnedPasswordChecker is the real NIST breach-screening impl (registered
+        // via AddHttpClient outside E2E). AlwaysAllowBreachedPasswordChecker is the E2E-only
+        // stub that treats every password as not-breached — registered ONLY under
+        // ASPNETCORE_ENVIRONMENT=E2E. Any THIRD implementation must be added here
+        // explicitly: a new checker that silently disables NIST breach screening must be
+        // reviewed with the same rigor before it can exist in the production assembly.
+        var asm = typeof(IBreachedPasswordChecker).Assembly;
+        var impls = asm.GetTypes()
+            .Where(t => typeof(IBreachedPasswordChecker).IsAssignableFrom(t)
+                     && !t.IsAbstract
+                     && !t.IsInterface)
+            .ToList();
+
+        var knownCheckers = new[]
+        {
+            typeof(HaveIBeenPwnedPasswordChecker),
+            typeof(AlwaysAllowBreachedPasswordChecker), // Stage 9.11 — E2E-only stub
+        };
+
+        impls.Should().OnlyContain(t => knownCheckers.Contains(t),
+            "only HaveIBeenPwnedPasswordChecker and AlwaysAllowBreachedPasswordChecker may " +
+            "exist in the production assembly — any new implementation must be added to " +
+            "knownCheckers explicitly so a checker that silently disables NIST breach " +
+            "screening gets reviewed before it ships.");
+
+        impls.Should().Contain(typeof(HaveIBeenPwnedPasswordChecker),
+            "HaveIBeenPwnedPasswordChecker must be present as the real breach-screening checker");
+    }
+
+    // -----------------------------------------------------------------------
     // #43 — PasswordResetService public methods accept CancellationToken
     // -----------------------------------------------------------------------
 
