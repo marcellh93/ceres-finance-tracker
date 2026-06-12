@@ -251,6 +251,7 @@ public class ArchitectureTests
             typeof(LogOnlyEmailService),
             typeof(NoopEmailService),
             typeof(ResendEmailService),
+            typeof(FileSinkEmailService), // Stage 9.11 — E2E-only sink
         };
 
         impls.Should().OnlyContain(t => knownImpls.Contains(t),

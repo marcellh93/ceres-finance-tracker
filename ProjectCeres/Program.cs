@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
@@ -168,7 +169,18 @@ builder.Services.AddSingleton<LockoutCache>();
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
 
 var resendApiKey = builder.Configuration["Email:Resend:ApiKey"];
-if (string.IsNullOrWhiteSpace(resendApiKey))
+if (builder.Environment.IsEnvironment("E2E"))
+{
+    // E2E: file-sink so Playwright can read verify/reset/unlock links. Keyed on
+    // environment (not key-absence) so a machine-level Email__Resend__ApiKey can
+    // never flip E2E to real sends. Singleton matches LogOnlyEmailService.
+    var sinkDir = builder.Configuration["Email:FileSink:Directory"]
+        ?? throw new InvalidOperationException("Email:FileSink:Directory is required under E2E.");
+    builder.Services.AddSingleton<IEmailService>(sp =>
+        new FileSinkEmailService(sinkDir,
+            sp.GetRequiredService<ILogger<FileSinkEmailService>>()));
+}
+else if (string.IsNullOrWhiteSpace(resendApiKey))
 {
     if (builder.Environment.IsProduction())
     {
@@ -207,7 +219,14 @@ builder.Services.AddScoped<IAuditLogWriter, AuditLogWriter>();
 builder.Services.AddSingleton<IAuthorizationHandler, RecentAuthRequirementHandler>();
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, RecentAuthMiddlewareResultHandler>();
 
-builder.Services.AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>();
+if (builder.Environment.IsEnvironment("E2E"))
+{
+    builder.Services.AddSingleton<IBreachedPasswordChecker, AlwaysAllowBreachedPasswordChecker>();
+}
+else
+{
+    builder.Services.AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>();
+}
 
 // SecurePolicy: Always in production (browser enforces __Host- prefix Secure attribute);
 // SameAsRequest outside production so WebApplicationFactory tests over HTTP can exercise
@@ -534,6 +553,17 @@ if (args.Length > 0 && args[0] == "--seed-dev-user")
 }
 
 var app = builder.Build();
+
+// Stage 9.11 — under E2E, refuse to start unless pointed at a recognized e2e DB.
+// The wrapper script never sets E2E:SkipDatabaseGuard, so production E2E runs are
+// always guarded; only the DI test sets it (it tests wiring, not the guard).
+if (app.Environment.IsEnvironment("E2E")
+    && !app.Configuration.GetValue<bool>("E2E:SkipDatabaseGuard"))
+{
+    var e2eConnection = app.Configuration.GetConnectionString("ApplicationConnection")
+        ?? throw new InvalidOperationException("ConnectionStrings:ApplicationConnection is not configured.");
+    await E2eDatabaseGuardStartupCheck.EnsureConnectedToE2eDatabaseAsync(e2eConnection);
+}
 
 // Stage 7.5 / ADR-0068 — refuse to start if the runtime role can issue DDL. Skipped
 // when the test harness explicitly opts out via `Stage75:SkipPrivilegeLeakCheck=true`
