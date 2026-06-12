@@ -58,7 +58,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
 
     /// <summary>
     /// Extracts the raw email-verification token from the captured email body. The
-    /// URL is of the form <c>{base}/email-verify#token={raw}</c>. Mirrors
+    /// URL is of the form <c>{base}/app/email-verify#token={raw}</c>. Mirrors
     /// <see cref="AuthTestFixture.ExtractResetTokenFromMessage"/>.
     /// </summary>
     private static string ExtractVerifyTokenFromMessage(EmailMessage message)

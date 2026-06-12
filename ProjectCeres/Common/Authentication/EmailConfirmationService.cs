@@ -131,7 +131,7 @@ public sealed class EmailConfirmationService
             sem.Release();
         }
 
-        var verifyUrl = $"{verifyUrlBase.TrimEnd('/')}/email-verify#token={rawToken}";
+        var verifyUrl = $"{verifyUrlBase.TrimEnd('/')}/app/email-verify#token={rawToken}";
 
         try
         {
