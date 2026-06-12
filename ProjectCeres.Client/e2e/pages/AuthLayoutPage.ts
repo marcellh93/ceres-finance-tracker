@@ -8,7 +8,8 @@ import type { Page } from '@playwright/test';
  * form-specific locators. Grow per feature stage — don't over-engineer 9.5a.
  */
 export class AuthLayoutPage {
-  constructor(protected readonly page: Page) {}
+  protected readonly page: Page;
+  constructor(page: Page) { this.page = page; }
 
   // React Router basename is "/app" (see ProjectCeres.Client/src/app/main.tsx).
   protected readonly basePath = '/app';

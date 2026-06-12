@@ -6,7 +6,8 @@ import type { Page } from '@playwright/test';
  * dashboard tests are written.
  */
 export class DashboardPage {
-  constructor(private readonly page: Page) {}
+  private readonly page: Page;
+  constructor(page: Page) { this.page = page; }
 
   private readonly basePath = '/app';
 
