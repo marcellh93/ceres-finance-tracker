@@ -203,6 +203,15 @@
 - `AdminContextDisciplineTests` — architecture test requiring every consumer of the BYPASSRLS admin context to carry `[RequiresAdminContext]`, so all RLS bypasses are findable by one marker; covers constructor/field, method-parameter, and service-locator injection
 - `RlsParityMetaTests` — proves the boot check actually throws when an applied user-owned table loses forced RLS, plus a cross-user isolation test through the production-booted app role
 
+**Tests / E2E (Stage 9.11 — Playwright foundations, 2026-06-12)**
+- Five browser-driven auth golden-path E2E suites under `ProjectCeres.Client/e2e/auth/` — register→verify→login, password-reset, TOTP-enrol→first-login, lockout→self-service-unlock, and backup-code recovery (single-use edge) — green across Chromium, Firefox, and WebKit
+- New `ASPNETCORE_ENVIRONMENT=E2E` that serves the production-built SPA bundle (staged into `wwwroot/dist`, served via the Vite manifest) against a dedicated `project_ceres_e2e` database. `tools/e2e/run-server.sh` is the Playwright `webServer`: it creates + migrates + wipes the database, builds + stages the bundle, asserts the manifest has the keys the Razor host looks up, then boots over HTTPS
+- `FileSinkEmailService` — an E2E-only `IEmailService` that writes each email as JSON so the suites can read verify/reset/unlock links (tokens are hashed in the DB, so the email is the only way in). Registered exclusively under the E2E environment, pinned by an architecture test + DI test so it can never resolve under Production/Development
+- `E2eDatabaseGuardStartupCheck` — the E2E environment refuses to boot unless the application connection points at `project_ceres_e2e`, collapsing the blast radius of a stray `ASPNETCORE_ENVIRONMENT=E2E` on a real host
+- Config-bound rate limits (`RateLimitOptions`) — login/CSRF/email-per-IP permit counts now bind from config with defaults equal to the prior hardcoded literals; `appsettings.E2E.json` raises them so the single-loopback E2E suite doesn't trip the limiter (a defaults-equal-literals test prevents silent production weakening)
+- E2E test tooling: `playwright.golden.config.ts` (webServer + Chromium/Firefox/WebKit matrix, `workers: 1`, `retries: 0`), `tsconfig.e2e.json` (type-checks `e2e/` via `tsc -b`), `otpauth` dev dep for TOTP code generation, and `pnpm e2e` / `e2e:ui` / `e2e:walk` scripts. The pre-existing agent-walk smoke harness keeps its own config
+- Spec: `docs/superpowers/specs/2026-06-11-stage-9-11-playwright-e2e-foundations-design.md`; plan: `docs/superpowers/plans/2026-06-12-stage-9-11-playwright-e2e-foundations.md`
+
 #### Removed
 
 **Data layer / RLS (Stage 9.5b, 2026-06-02)**
@@ -226,6 +235,10 @@
 **Authentication (Stage 9.5 — Lockout email copy, 2026-05-22)**
 - `LockoutUnlock.BodyText` / `BodyHtml` (EN + ES) updated to tell the user "valid authenticator codes are still accepted during lockout" per `security-model.md § Login`. Previously silent — MFA-enabled users believed they had to wait the full 15 minutes
 - Same copy update corrects a longstanding bug: the body said "within 1 hour" / "próxima hora" but the actual token lifetime is 15 minutes (Stage 6.10 D2). Both EN + ES now name the 15-min expiry
+
+**Authentication (Stage 9.11 — emailed-URL prefix + register status, 2026-06-12)**
+- Verify-email and account-unlock emails built links to root paths (`/email-verify#token=`, `/account/unlock#token=`) that have no server route — a real browser following them got a 404. Both now use the `/app`-prefixed SPA route (`EmailConfirmationService`, `LockoutUnlockService`); the unlock case was a regression from the route rename in commit `98eef2d`. Caught by the register-login and lockout-self-service E2E suites clicking the real links
+- `docs/api-contract.md` + the `AuthController.Register` code comment claimed Identity password-policy failures (too-short, breached) return `422` — they return `400` (the controller calls `ValidationProblem(ModelState)`, which bypasses the 422 factory). Documentation corrected to match the pinned behavior (`RegisterEndpointTests`); model-binding/DataAnnotations failures still return the `422` envelope
 
 #### Changed
 
