@@ -278,6 +278,9 @@ builder.Services.AddAuthorization(options =>
         p.AddRequirements(new RecentAuthRequirement()));
 });
 
+var rateLimitOptions = new ProjectCeres.Common.RateLimiting.RateLimitOptions();
+builder.Configuration.GetSection("RateLimits").Bind(rateLimitOptions);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -344,7 +347,7 @@ builder.Services.AddRateLimiter(options =>
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
         {
-            PermitLimit = 10,
+            PermitLimit = rateLimitOptions.LoginByIpPermitLimit,
             Window = TimeSpan.FromSeconds(60),
             SegmentsPerWindow = 4,
             QueueLimit = 0,
@@ -356,7 +359,7 @@ builder.Services.AddRateLimiter(options =>
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
         {
-            PermitLimit = 60,
+            PermitLimit = rateLimitOptions.CsrfByIpPermitLimit,
             Window = TimeSpan.FromSeconds(60),
             SegmentsPerWindow = 4,
             QueueLimit = 0,
@@ -455,7 +458,7 @@ builder.Services.AddRateLimiter(options =>
         return RateLimitPartition.GetSlidingWindowLimiter($"email-by-ip:{ip}",
             _ => new SlidingWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = rateLimitOptions.EmailByIpPermitLimit,
                 Window = TimeSpan.FromMinutes(60),
                 SegmentsPerWindow = 6,
                 QueueLimit = 0,
