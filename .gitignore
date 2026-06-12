@@ -132,3 +132,6 @@ ProjectCeres/wwwroot/css/site.css
 
 ##Testing
 impeccable-sandbox/
+
+# Stage 9.11 E2E artifacts
+.e2e/
