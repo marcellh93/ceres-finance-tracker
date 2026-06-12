@@ -30,7 +30,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'https://localhost:7001',
+        target: 'https://localhost:7081',
         // The .NET dev server uses a self-signed certificate. Without
         // `secure: false`, the proxy intermittently fails the first request
         // with `Failed to fetch` (TLS verification rejects the cert before
@@ -50,6 +50,10 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         designSystem: path.resolve(__dirname, 'design-system.html'),
         app: path.resolve(__dirname, 'app.html'),
+        // Stage 9.11 — Razor host views resolve these via vite-src in non-Development
+        // (manifest mode). Without them the manifest lacks the keys and the SPA host renders blank.
+        razorAppEntry: path.resolve(__dirname, 'src/app/main.tsx'),
+        razorLayoutEntry: path.resolve(__dirname, 'src/main.tsx'),
       },
       plugins: [
         visualizer({
