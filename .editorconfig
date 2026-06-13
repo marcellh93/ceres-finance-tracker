@@ -19,6 +19,11 @@ dotnet_diagnostic.CER004.severity = error
 dotnet_diagnostic.CER010.severity = error
 # CER020 (resx parity) was already at error from day 1
 
+# Stage 9.5f/9.5g — CER005/CER006 flip from warning to error (descriptors shipped
+# 2026-06-09; ≥48h C-2 soak satisfied, 0 production violations re-verified 2026-06-13).
+dotnet_diagnostic.CER005.severity = error
+dotnet_diagnostic.CER006.severity = error
+
 # ─────────────────────────────────────────────────────────────────────────
 # Per-analyzer baseline-suppression sections (Stage 9.5c, per C-3)
 # Each entry has a one-line reason. Suppressed lines drain to zero before
