@@ -1,10 +1,13 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels.Auth;
 
@@ -17,11 +20,31 @@ public sealed class MfaController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IAuditLogWriter _auditLog;
+    private readonly IEmailComposer _composer;
+    private readonly IEmailService _email;
+    private readonly IEmailRecipientResolver _recipients;
+    private readonly ILanguageResolver _languages;
+    private readonly TimeProvider _timeProvider;
+    private readonly ILogger<MfaController> _logger;
 
-    public MfaController(UserManager<ApplicationUser> userManager, IAuditLogWriter auditLog)
+    public MfaController(
+        UserManager<ApplicationUser> userManager,
+        IAuditLogWriter auditLog,
+        IEmailComposer composer,
+        IEmailService email,
+        IEmailRecipientResolver recipients,
+        ILanguageResolver languages,
+        TimeProvider timeProvider,
+        ILogger<MfaController> logger)
     {
         _userManager = userManager;
         _auditLog = auditLog;
+        _composer = composer;
+        _email = email;
+        _recipients = recipients;
+        _languages = languages;
+        _timeProvider = timeProvider;
+        _logger = logger;
     }
 
     [HttpPost("enroll")]
@@ -77,6 +100,7 @@ public sealed class MfaController : ControllerBase
         var codes = await backupCodes.GenerateAndPersistAsync(user.Id, HttpContext.RequestAborted);
 
         await _auditLog.RecordAsync(user.Id, AuditLogAction.MfaEnrolled, ct: HttpContext.RequestAborted);
+        await SendSecurityEventEmailAsync(user.Id, EmailTemplateKey.TotpEnrolled);
 
         Response.ApplyNoStore();
         return Ok(new { backupCodes = codes });
@@ -97,6 +121,7 @@ public sealed class MfaController : ControllerBase
         var codes = await backupCodes.RegenerateAsync(user.Id, HttpContext.RequestAborted);
 
         await _auditLog.RecordAsync(user.Id, AuditLogAction.BackupCodesRegenerated, ct: HttpContext.RequestAborted);
+        await SendSecurityEventEmailAsync(user.Id, EmailTemplateKey.BackupCodesRegenerated);
 
         Response.ApplyNoStore();
         return Ok(new { backupCodes = codes });
@@ -125,9 +150,30 @@ public sealed class MfaController : ControllerBase
         await backupCodes.PurgeAsync(user.Id, HttpContext.RequestAborted);
 
         await _auditLog.RecordAsync(user.Id, AuditLogAction.MfaDisabled, ct: HttpContext.RequestAborted);
+        await SendSecurityEventEmailAsync(user.Id, EmailTemplateKey.TotpDisabled);
 
         Response.ApplyNoStore();
         return NoContent();
+    }
+
+    // Fire-and-log security-event email. Failures never fail the MFA operation,
+    // which already committed before this runs.
+    private async Task SendSecurityEventEmailAsync(Guid userId, EmailTemplateKey key)
+    {
+        try
+        {
+            var recipient = await _recipients.ResolveAsync(userId, HttpContext.RequestAborted);
+            var culture = await _languages.ResolveForUserAsync(userId, HttpContext.RequestAborted);
+            var timestamp = _timeProvider.GetUtcNow().UtcDateTime
+                .ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+            var msg = _composer.Compose(key, culture, timestamp, ip) with { To = recipient };
+            await _email.SendAsync(msg, HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send {Key} security-event email; the MFA operation already completed.", key);
+        }
     }
 
     private async Task<ApplicationUser?> GetCurrentUserAsync()
