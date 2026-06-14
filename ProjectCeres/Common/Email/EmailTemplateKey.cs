@@ -12,4 +12,7 @@ public enum EmailTemplateKey
     EmailChangeRevokeNotificationToOld,
     LockoutUnlock,
     RegistrationConfirmation,
+    TotpEnrolled,
+    TotpDisabled,
+    BackupCodesRegenerated,
 }

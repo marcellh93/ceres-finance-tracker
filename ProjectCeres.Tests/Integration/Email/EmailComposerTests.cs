@@ -33,7 +33,15 @@ public sealed class EmailComposerTests
     [InlineData(EmailTemplateKey.EmailChangeRevokeNotificationToOld, "es")]
     [InlineData(EmailTemplateKey.LockoutUnlock, "en")]
     [InlineData(EmailTemplateKey.LockoutUnlock, "es")]
-    public void Renders_all_nine_templates_en_and_es(EmailTemplateKey key, string culture)
+    [InlineData(EmailTemplateKey.RegistrationConfirmation, "en")]
+    [InlineData(EmailTemplateKey.RegistrationConfirmation, "es")]
+    [InlineData(EmailTemplateKey.TotpEnrolled, "en")]
+    [InlineData(EmailTemplateKey.TotpEnrolled, "es")]
+    [InlineData(EmailTemplateKey.TotpDisabled, "en")]
+    [InlineData(EmailTemplateKey.TotpDisabled, "es")]
+    [InlineData(EmailTemplateKey.BackupCodesRegenerated, "en")]
+    [InlineData(EmailTemplateKey.BackupCodesRegenerated, "es")]
+    public void Renders_all_templates_en_and_es(EmailTemplateKey key, string culture)
     {
         using var scope = _factory.Services.CreateScope();
         var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
@@ -102,6 +110,31 @@ public sealed class EmailComposerTests
     }
 
     [Fact]
+    public void TotpEnrolled_args_map_to_correct_slots()
+    {
+        // {0} = timestamp (UTC), {1} = IP address. Pin slot order to catch a swap at the call site.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.TotpEnrolled,
+            new CultureInfo("en"),
+            "2026-06-14 12:00",
+            "203.0.113.5");
+
+        // Timestamp ({0}) must appear before IP ({1}) in the plain-text body.
+        var timestampPos = msg.BodyText.IndexOf("2026-06-14 12:00", StringComparison.Ordinal);
+        var ipPos = msg.BodyText.IndexOf("203.0.113.5", StringComparison.Ordinal);
+        timestampPos.Should().BeGreaterThan(-1, "timestamp slot {0} must appear in BodyText");
+        ipPos.Should().BeGreaterThan(-1, "IP slot {1} must appear in BodyText");
+        timestampPos.Should().BeLessThan(ipPos, "timestamp ({0}) must precede IP ({1}) in the body");
+
+        // Both values must also appear in the HTML body.
+        msg.BodyHtml.Should().Contain("2026-06-14 12:00");
+        msg.BodyHtml.Should().Contain("203.0.113.5");
+    }
+
+    [Fact]
     public void All_resx_keys_present_in_both_cultures()
     {
         // Reads both .resx files via ResourceManager and asserts the key set is identical.
@@ -122,6 +155,6 @@ public sealed class EmailComposerTests
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(30, "10 templates × 3 keys each (RegistrationConfirmation added in Stage 9.3)");
+        enKeys.Should().HaveCount(39, "13 templates × 3 keys each (3 security-event emails added Stage 9 close-out)");
     }
 }

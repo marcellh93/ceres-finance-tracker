@@ -73,6 +73,12 @@ public sealed class EmailComposer : IEmailComposer
             (EmailKeys.LockoutUnlock.Subject, EmailKeys.LockoutUnlock.BodyText, EmailKeys.LockoutUnlock.BodyHtml),
         EmailTemplateKey.RegistrationConfirmation =>
             (EmailKeys.RegistrationConfirmation.Subject, EmailKeys.RegistrationConfirmation.BodyText, EmailKeys.RegistrationConfirmation.BodyHtml),
+        EmailTemplateKey.TotpEnrolled =>
+            (EmailKeys.TotpEnrolled.Subject, EmailKeys.TotpEnrolled.BodyText, EmailKeys.TotpEnrolled.BodyHtml),
+        EmailTemplateKey.TotpDisabled =>
+            (EmailKeys.TotpDisabled.Subject, EmailKeys.TotpDisabled.BodyText, EmailKeys.TotpDisabled.BodyHtml),
+        EmailTemplateKey.BackupCodesRegenerated =>
+            (EmailKeys.BackupCodesRegenerated.Subject, EmailKeys.BackupCodesRegenerated.BodyText, EmailKeys.BackupCodesRegenerated.BodyHtml),
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
     };
 }
