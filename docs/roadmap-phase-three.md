@@ -1035,10 +1035,7 @@ Backup-codes recovery flow:
 
 Reauthentication prompts:
 
-- [ ] Reusable `<ReauthenticationDialog>` component prompts for fresh password before sensitive actions
-- [ ] Triggered on: change password, change email, re-enroll TOTP, view active sessions, GDPR erasure (matches `security-model.md` list exactly)
-- [ ] Successful reauthentication grants a 5-minute window scoped to the originating action
-- [ ] Window expires; re-prompt required for the next sensitive action
+> **Moved to Stage 12.9 (2026-06-14).** The reauth-dialog SPA flow was relocated out of Stage 9 because it cannot be built here: the server side shipped in Stage 6c.2 (`POST /api/auth/reauth`, `[RequireRecentAuth]`, 5-min window — `security-model.md` § Reauthentication), but the SPA `useStepUp` hook (`ProjectCeres.Client/src/app/auth/use-step-up.ts`) is a deliberate forward-compatible stub whose own comment defers the dialog, and **three of the five trigger surfaces don't exist until later stages** — change-email + sessions list (Stage 12) and GDPR erasure (Stage 13). Building the dialog now would leave 3 of 5 triggers with nothing to attach to. Receiving line: Stage 12.9 (`[ ]` added in the same commit). Code-side tripwire: the `useStepUp` stub already rethrows `ReauthRequiredError` with a "wire the modal + retry" marker, so the gap is mechanically visible at every gated call site until the dialog lands.
 
 Error states:
 
@@ -1419,6 +1416,7 @@ Operational:
 | 12.6 | Admin email notification on new ticket | (above) |
 | 12.7 | **Stage 7.5 follow-up.** When the `SupportTicket` entity ships, mark it `: IUserOwned` (the user-owned set is derived from the EF model by `UserOwnedModel.RlsTables` since Stage 9.5b — `UserOwnedTables.cs` was deleted) AND add an `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + `user_isolation` policy in the same migration. The Stage 7.5 parity test (`ParityTests.UserOwnedModel_RlsTables_match_pg_policies_user_isolation_set`) + the Stage 9.5b `RlsParityStartupCheck` will fail the build / refuse to boot until both halves land. | Stage 7.5 / ADR-0068 / 9.5b |
 | 12.8 | Email-change SPA pages: settings entry point (request form, reauth-gated) + `/app/email-change/confirm` + `/app/email-change/revoke` token pages. The Stage 6.12 API has emailed links to these routes since 2026-05-10 with no React page behind them — confirm dead-ends a legitimate email change; revoke dead-ends a security affordance. Queued 2026-06-11 by the Stage 9.11 audit (deferral gate run; tripwire FIXME at `EmailChangeService.cs:208`). | Stage 9.11 spec § 9 / Stage 6.12 |
+| 12.9 | **Reauthentication dialog SPA flow** (moved from Stage 9.8, 2026-06-14). Build the reusable `<ReauthenticationDialog>` + wire `useStepUp` to open it on `401 REAUTH_REQUIRED`, collect a fresh password (or TOTP for MFA users), `POST /api/auth/reauth`, then retry the originating action. Server side already shipped (Stage 6c.2). Lands here because Stage 12 introduces the first reauth-gated SPA surface (the sessions list, 12.1) that the dialog must serve; the email-change surfaces (12.8) are also reauth-gated. GDPR-erasure trigger wires in Stage 13. | `security-model.md` § Reauthentication / Stage 6c.2 / Stage 9.8 (moved) |
 
 ### Verification checklist
 
@@ -1467,6 +1465,10 @@ Stage 8 deferred items (carry-forward from Stage 8 — security-event email call
 Stage 9.11 deferred item (queued 2026-06-11 — deferral gate run, see Stage 9.11 spec § 9):
 
 - [ ] **Email-change SPA pages (12.8)** — settings request form (reauth-gated) + `/app/email-change/confirm` + `/app/email-change/revoke` token pages, wired to the live Stage 6.12 API. The emailed links currently dead-end on an unmatched SPA route; tripwire `// FIXME: re-surface in Stage 12` at `EmailChangeService.cs:208`. Add link-click E2E coverage to `ProjectCeres.Client/e2e/` in the same sub-stage (Stage 9.11 deliberately scoped it out — no page existed to drive).
+
+Stage 9.8 moved-in item (relocated 2026-06-14 — see Stage 9 § Reauthentication prompts):
+
+- [ ] **Reauthentication dialog SPA flow (12.9)** — reusable `<ReauthenticationDialog>` that opens on `401 REAUTH_REQUIRED`, collects a fresh password (or TOTP for MFA users), `POST /api/auth/reauth`, and retries the originating action; wire `useStepUp` (`ProjectCeres.Client/src/app/auth/use-step-up.ts`, currently a stub that rethrows) to drive it. Server side shipped Stage 6c.2 (`ReauthController`, `[RequireRecentAuth]`, 5-min window). Triggers: re-enroll TOTP (`/security`, exists today) + the 12.8 email-change surfaces + the 12.1 sessions list; the GDPR-erasure trigger wires in Stage 13. Code-side tripwire already present: the `useStepUp` stub rethrows `ReauthRequiredError` at every gated call site until the dialog lands.
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory):
 
