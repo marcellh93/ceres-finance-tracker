@@ -379,9 +379,11 @@ The following events must always trigger an email notification to the address of
 | Password changed | Timestamp, IP; link to revoke all sessions if unexpected |
 | Email address change initiated | Old + new address; revoke link (7-day TTL) |
 | Email address change confirmed | Confirmation only |
-| TOTP re-enrolled | Timestamp, IP; "This wasn't me" link |
-| TOTP disabled | Timestamp, IP; link to re-enable and revoke all sessions |
-| Backup codes regenerated | Timestamp, IP; link to revoke if unexpected |
+| TOTP enrolled / re-enrolled | Timestamp, IP; reset-password advisory. **Shipped Stage 9 close-out (2026-06-14)** — one `TotpEnrolled` template covers both first-enrol and re-enrol (same `enroll/verify` endpoint, same user-facing event); sent from `MfaController.EnrollVerify`. |
+| TOTP disabled | Timestamp, IP; reset-password advisory. **Shipped Stage 9 close-out** — `TotpDisabled` template sent from `MfaController.Disable`. |
+| Backup codes regenerated | Timestamp, IP; reset-password advisory. **Shipped Stage 9 close-out** — `BackupCodesRegenerated` template sent from `MfaController.RegenerateBackupCodes`. |
+
+> **Divergence from the original "This wasn't me / revoke" link spec (Stage 9 close-out decision, 2026-06-14).** The three MFA security-event emails ship as **plain advisories** — body is "this happened on {timestamp} from {IP}; if it wasn't you, reset your password immediately" pointing at the existing password-reset flow (which revokes all sessions + regenerates the `SecurityStamp`) — rather than a per-event one-click revoke link. Rationale: no per-event revoke endpoint exists, and building one for an MFA-enrolment event overlaps the session-management work scheduled for Stage 12; the password-reset flow is the existing, safe recovery path. The "This wasn't me link that revokes the session" affordance on the **New device/session login** row remains future work tied to that Stage 12 sessions surface. These three sends carry no token and run in-session (`[Authorize]`), so they need no `PreAuthUserScope`.
 | Account locked out | Cause (too many failures), IP, self-service unlock link |
 | Active sessions viewed | Timestamp, IP (this is a high-sensitivity action under reauthentication policy) |
 | GDPR erasure initiated | Confirmation of what will be deleted and when |

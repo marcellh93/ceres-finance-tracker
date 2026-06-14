@@ -527,6 +527,8 @@ Every form in the SPA renders against the project's 422 validation envelope — 
 
 Use `<Field htmlFor>` when the control accepts an `id` (Input, Textarea, native Select, MoneyInput). Omit `htmlFor` for composite controls without a single focusable target (Combobox, DatePickerField — they own their own focus); the label renders as styled text instead of `<Label htmlFor>` (avoids the "no associated control" a11y warning). The `error` slot renders an inline `<p class="text-xs text-destructive">` below the control when set.
 
+**Error association (a11y, Stage 9 close-out 2026-06-14).** When `<Field htmlFor="x">` renders an error, the error `<p>` carries `id="x-error"`. The control inside must point at it: `aria-describedby={hasError ? 'x-error' : undefined}` — advertise the id **only when the error actually renders** (a dangling `aria-describedby` pointing at a non-existent element is itself an a11y violation). If the control also has a static hint (like Register's `password-hint`), pass a space-separated id list: `aria-describedby={hasError ? 'password-hint password-error' : 'password-hint'}`. Pair this with **focus-to-first-error**: after a server-rejection `form.setError(field, { type: 'server' })`, call RHF `form.setFocus(field)` (RHF's auto-focus only fires for client/zod validation, not server errors). Form-level (non-field) errors use the banner below with `role="alert"`.
+
 ### Form-level error banner
 
 For errors that are not bound to a specific field — submit failures, optimistic-locking conflicts, server-side cross-field issues — use a banner above the form actions:
