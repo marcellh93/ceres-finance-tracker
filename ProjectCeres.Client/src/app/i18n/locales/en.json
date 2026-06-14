@@ -24,7 +24,9 @@
         "accountLocked": "Account locked. Check your email for an unlock link.",
         "emailNotConfirmed": "Verify your email first. Check your inbox.",
         "resendFailed": "Could not send the email. Try again in a moment.",
-        "resendTooMany": "Too many requests. Try again in a moment."
+        "resendTooMany": "Too many requests. Try again in a moment.",
+        "network": "Couldn't reach the server. Try again.",
+        "server": "Something went wrong. Please try again."
       },
       "toasts": {
         "totpExpired": "Your sign-in expired. Please sign in again.",

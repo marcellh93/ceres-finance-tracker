@@ -7,14 +7,16 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '../../components/Field';
-import { apiFetch } from '../../lib/api-client';
+import { apiFetch, NetworkError } from '../../lib/api-client';
 import { useAuth } from '../../auth/auth-context';
 import { setCachedXsrfRequestToken } from '../../auth/csrf';
 import { loginSchema, type LoginFormValues } from '../../auth/schemas/login.schema';
 
 type ServerErrorState =
   | { kind: 'none' }
-  | { kind: 'emailNotConfirmed' };
+  | { kind: 'emailNotConfirmed' }
+  | { kind: 'accountLocked' }
+  | { kind: 'server' };
 
 export function Login() {
   const { t } = useTranslation();
@@ -92,7 +94,7 @@ export function Login() {
 
       // Failure path — map known codes to UX.
       if (result.code === 'ACCOUNT_LOCKED_OUT') {
-        navigate('/account/unlock');
+        setServerError({ kind: 'accountLocked' });
         return;
       }
       if (result.code === 'EMAIL_NOT_CONFIRMED') {
@@ -102,6 +104,12 @@ export function Login() {
       if (result.code === 'INVALID_CREDENTIALS') {
         setError('password', { type: 'server', message: t('auth.login.errors.invalidCredentials') });
         setFocus('password');
+        return;
+      }
+      // 5xx — a server fault, not bad credentials. api-client maps any 5xx
+      // with no envelope to code 'HTTP_500'; the status guard covers the rest.
+      if (result.code === 'HTTP_500' || result.status >= 500) {
+        setServerError({ kind: 'server' });
         return;
       }
       // 422 with field-level errors — map each field.
@@ -117,11 +125,15 @@ export function Login() {
       // safer of the two — never leak email-specific information).
       setError('password', { type: 'server', message: result.message });
       setFocus('password');
-    } catch {
-      // Network / 5xx — toast handling lives in a shared error boundary in
-      // a later commit; for now, surface a generic password field error.
-      setError('password', { type: 'server', message: t('auth.login.errors.invalidCredentials') });
-      setFocus('password');
+    } catch (err) {
+      // Lost-connection: distinct from bad credentials. Toast it, don't
+      // mislabel as a wrong password.
+      if (err instanceof NetworkError) {
+        toast(t('auth.login.errors.network'));
+        return;
+      }
+      // Any other unexpected throw is a fault on our side, not the user's.
+      setServerError({ kind: 'server' });
     }
   };
 
@@ -178,6 +190,18 @@ export function Login() {
           {...register('password')}
         />
       </Field>
+
+      {serverError.kind === 'accountLocked' && (
+        <p className="text-sm text-destructive" role="alert">
+          {t('auth.login.errors.accountLocked')}
+        </p>
+      )}
+
+      {serverError.kind === 'server' && (
+        <p className="text-sm text-destructive" role="alert">
+          {t('auth.login.errors.server')}
+        </p>
+      )}
 
       {serverError.kind === 'emailNotConfirmed' && (
         <div className="text-sm" role="status">

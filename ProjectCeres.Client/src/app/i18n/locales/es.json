@@ -24,7 +24,9 @@
         "accountLocked": "Cuenta bloqueada. Consulta tu correo para un enlace de desbloqueo.",
         "emailNotConfirmed": "Primero verifica tu correo. Consulta tu bandeja de entrada.",
         "resendFailed": "No se pudo enviar el correo. Inténtalo de nuevo en un momento.",
-        "resendTooMany": "Demasiadas solicitudes. Inténtalo de nuevo en un momento."
+        "resendTooMany": "Demasiadas solicitudes. Inténtalo de nuevo en un momento.",
+        "network": "No se pudo conectar con el servidor. Inténtalo de nuevo.",
+        "server": "Algo salió mal. Inténtalo de nuevo."
       },
       "toasts": {
         "totpExpired": "Tu sesión caducó. Inicia sesión de nuevo.",

@@ -169,7 +169,7 @@ describe('Login page', () => {
     await waitFor(() => expect(screen.getByText(/email or password is incorrect/i)).toBeDefined());
   });
 
-  it('redirects to /account/unlock on ACCOUNT_LOCKED_OUT', async () => {
+  it('shows inline locked-account message and does not redirect on ACCOUNT_LOCKED_OUT', async () => {
     fetchSpy.mockImplementation(async (url) => {
       if (typeof url === 'string' && url === '/api/auth/me') {
         return new Response(
@@ -191,7 +191,70 @@ describe('Login page', () => {
     await user.type(screen.getByLabelText(/password/i), 'pw');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    await waitFor(() => expect(screen.getByText('unlock page')).toBeDefined());
+    // Inline message renders in place; no navigation to the unlock page.
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Account locked\. Check your email for an unlock link\./i),
+      ).toBeDefined(),
+    );
+    expect(screen.queryByText('unlock page')).toBeNull();
+  });
+
+  it('shows the network error toast on NetworkError', async () => {
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/login') {
+        // apiFetch wraps a thrown fetch in NetworkError; rejecting the
+        // underlying fetch reproduces that path end-to-end.
+        throw new TypeError('Failed to fetch');
+      }
+      return new Response(null, { status: 204 });
+    });
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'a@b.test');
+    await user.type(screen.getByLabelText(/password/i), 'pw');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringMatching(/couldn't reach the server/i),
+      ),
+    );
+    // Must NOT mislabel the network failure as a wrong-password error.
+    expect(screen.queryByText(/email or password is incorrect/i)).toBeNull();
+  });
+
+  it('shows the inline server error on HTTP_500 (not invalidCredentials)', async () => {
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/login') {
+        // 500 with no project envelope → api-client maps to code 'HTTP_500',
+        // status 500.
+        return new Response(null, { status: 500 });
+      }
+      return new Response(null, { status: 204 });
+    });
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'a@b.test');
+    await user.type(screen.getByLabelText(/password/i), 'pw');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/something went wrong\. please try again\./i)).toBeDefined(),
+    );
+    expect(screen.queryByText(/email or password is incorrect/i)).toBeNull();
   });
 
   it('renders the resend-verification link on EMAIL_NOT_CONFIRMED', async () => {
