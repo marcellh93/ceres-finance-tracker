@@ -89,4 +89,19 @@ Si no fuiste tú, el enlace sigue permitiendo el desbloqueo — cambia tu contra
 
 Si no creaste esta cuenta, puedes ignorar este mensaje.</value></data>
   <data name="RegistrationConfirmation.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Te damos la bienvenida a Ceres. &lt;a href="{0}"&gt;Confirma tu correo&lt;/a&gt; dentro de los próximos 30 minutos para terminar tu registro.&lt;/p&gt;&lt;p&gt;Si no creaste esta cuenta, puedes ignorar este mensaje.&lt;/p&gt;</value></data>
+  <data name="TotpEnrolled.Subject" xml:space="preserve"><value>Verificación en dos pasos activada en tu cuenta de Ceres</value></data>
+  <data name="TotpEnrolled.BodyText" xml:space="preserve"><value>La verificación en dos pasos se activó en tu cuenta de Ceres el {0} (UTC) desde la IP {1}.
+
+Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.</value></data>
+  <data name="TotpEnrolled.BodyHtml" xml:space="preserve"><value>&lt;p&gt;La verificación en dos pasos se &lt;strong&gt;activó&lt;/strong&gt; en tu cuenta de Ceres el {0} (UTC) desde la IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.&lt;/p&gt;</value></data>
+  <data name="TotpDisabled.Subject" xml:space="preserve"><value>Verificación en dos pasos desactivada en tu cuenta de Ceres</value></data>
+  <data name="TotpDisabled.BodyText" xml:space="preserve"><value>La verificación en dos pasos se desactivó en tu cuenta de Ceres el {0} (UTC) desde la IP {1}.
+
+Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.</value></data>
+  <data name="TotpDisabled.BodyHtml" xml:space="preserve"><value>&lt;p&gt;La verificación en dos pasos se &lt;strong&gt;desactivó&lt;/strong&gt; en tu cuenta de Ceres el {0} (UTC) desde la IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.&lt;/p&gt;</value></data>
+  <data name="BackupCodesRegenerated.Subject" xml:space="preserve"><value>Se regeneraron los códigos de respaldo de tu cuenta de Ceres</value></data>
+  <data name="BackupCodesRegenerated.BodyText" xml:space="preserve"><value>Los códigos de respaldo de verificación en dos pasos de tu cuenta de Ceres se regeneraron el {0} (UTC) desde la IP {1}. Los códigos anteriores ya no son válidos.
+
+Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.</value></data>
+  <data name="BackupCodesRegenerated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Los códigos de respaldo de verificación en dos pasos de tu cuenta de Ceres se &lt;strong&gt;regeneraron&lt;/strong&gt; el {0} (UTC) desde la IP &lt;strong&gt;{1}&lt;/strong&gt;. Los códigos anteriores ya no son válidos.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.&lt;/p&gt;</value></data>
 </root>

@@ -89,4 +89,19 @@ If this wasn't you, the link still allows you to unlock — change your password
 
 If you didn't sign up, you can safely ignore this email.</value></data>
   <data name="RegistrationConfirmation.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Welcome to Ceres. &lt;a href="{0}"&gt;Confirm your email&lt;/a&gt; within 30 minutes to finish signing up.&lt;/p&gt;&lt;p&gt;If you didn't sign up, you can safely ignore this email.&lt;/p&gt;</value></data>
+  <data name="TotpEnrolled.Subject" xml:space="preserve"><value>Two-factor sign-in enabled on your Ceres account</value></data>
+  <data name="TotpEnrolled.BodyText" xml:space="preserve"><value>Two-factor sign-in was enabled on your Ceres account on {0} (UTC) from IP {1}.
+
+If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.</value></data>
+  <data name="TotpEnrolled.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Two-factor sign-in was &lt;strong&gt;enabled&lt;/strong&gt; on your Ceres account on {0} (UTC) from IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.&lt;/p&gt;</value></data>
+  <data name="TotpDisabled.Subject" xml:space="preserve"><value>Two-factor sign-in turned off on your Ceres account</value></data>
+  <data name="TotpDisabled.BodyText" xml:space="preserve"><value>Two-factor sign-in was turned off on your Ceres account on {0} (UTC) from IP {1}.
+
+If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.</value></data>
+  <data name="TotpDisabled.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Two-factor sign-in was &lt;strong&gt;turned off&lt;/strong&gt; on your Ceres account on {0} (UTC) from IP &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.&lt;/p&gt;</value></data>
+  <data name="BackupCodesRegenerated.Subject" xml:space="preserve"><value>Your Ceres backup codes were regenerated</value></data>
+  <data name="BackupCodesRegenerated.BodyText" xml:space="preserve"><value>Your two-factor backup codes were regenerated on your Ceres account on {0} (UTC) from IP {1}. Any previous backup codes no longer work.
+
+If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.</value></data>
+  <data name="BackupCodesRegenerated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your two-factor backup codes were &lt;strong&gt;regenerated&lt;/strong&gt; on your Ceres account on {0} (UTC) from IP &lt;strong&gt;{1}&lt;/strong&gt;. Any previous backup codes no longer work.&lt;/p&gt;&lt;p&gt;If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.&lt;/p&gt;</value></data>
 </root>
