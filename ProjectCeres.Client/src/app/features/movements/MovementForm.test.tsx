@@ -438,7 +438,9 @@ describe('MovementForm', () => {
     expect(trigger).toBeInTheDocument();
     // Open the popover and verify 'Trip' is listed
     fireEvent.click(trigger);
-    expect(await screen.findByText('Trip')).toBeInTheDocument();
+    // Explicit 3000ms timeout: portal-rendered popover under full-suite CPU
+    // contention can exceed RTL's default 1000ms findBy (see App.test.tsx 802e937).
+    expect(await screen.findByText('Trip', {}, { timeout: 3000 })).toBeInTheDocument();
   });
 
   it('Test 15: Selecting a goal updates values.budgetId on submit', async () => {
@@ -458,7 +460,8 @@ describe('MovementForm', () => {
     // Open the budget combobox and pick 'Trip'
     const trigger = await screen.findByRole('combobox', { name: /^No budget$/i });
     fireEvent.click(trigger);
-    fireEvent.click(await screen.findByText('Trip'));
+    // Explicit 3000ms timeout: same portal-popover contention path as Test 14.
+    fireEvent.click(await screen.findByText('Trip', {}, { timeout: 3000 }));
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
