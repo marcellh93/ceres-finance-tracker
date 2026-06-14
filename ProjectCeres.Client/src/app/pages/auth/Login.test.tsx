@@ -350,6 +350,34 @@ describe('Login page', () => {
     expect(getCachedXsrfRequestToken()).toBeNull();
   });
 
+  it('focuses the password field after INVALID_CREDENTIALS server rejection', async () => {
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/login') {
+        return new Response(
+          JSON.stringify({ error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(null, { status: 204 });
+    });
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText(/email/i), 'a@b.test');
+    await user.type(screen.getByLabelText(/password/i), 'pw');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(
+      () => expect(screen.getByLabelText(/password/i)).toBe(document.activeElement),
+      { timeout: 3000 },
+    );
+  });
+
   it('honours the redirect query param on success', async () => {
     fetchSpy.mockImplementation(async (url) => {
       if (typeof url === 'string' && url === '/api/auth/me') {

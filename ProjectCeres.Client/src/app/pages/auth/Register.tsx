@@ -31,7 +31,9 @@ export function Register() {
         return;
       }
       if (result.status === 422 && 'fieldErrors' in result) {
-        for (const [field, message] of Object.entries(result.fieldErrors)) {
+        const entries = Object.entries(result.fieldErrors);
+        let firstField: keyof RegisterFormValues | null = null;
+        for (const [field, message] of entries) {
           // Server uses PascalCase field names ("Password"); map to camelCase
           // form field. The message is an i18n key (e.g.
           // "auth.register.errors.passwordBreached"), resolved via t() at
@@ -39,7 +41,9 @@ export function Register() {
           const formField =
             (field.charAt(0).toLowerCase() + field.slice(1)) as keyof RegisterFormValues;
           form.setError(formField, { type: 'server', message });
+          if (firstField === null) firstField = formField;
         }
+        if (firstField !== null) form.setFocus(firstField);
         return;
       }
       setErrorMessage(t('auth.register.errors.network'));

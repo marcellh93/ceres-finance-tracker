@@ -227,12 +227,14 @@ function ConfirmForm({ token }: { token: string }) {
         return;
       }
       if (outcome.kind === 'policyViolation') {
-        for (const [field, message] of Object.entries(outcome.fieldErrors)) {
-          form.setError(field as keyof PasswordResetConfirmFormValues, {
-            type: 'server',
-            message,
-          });
+        const entries = Object.entries(outcome.fieldErrors);
+        let firstField: keyof PasswordResetConfirmFormValues | null = null;
+        for (const [field, message] of entries) {
+          const formField = field as keyof PasswordResetConfirmFormValues;
+          form.setError(formField, { type: 'server', message });
+          if (firstField === null) firstField = formField;
         }
+        if (firstField !== null) form.setFocus(firstField);
         return;
       }
       setErrorMessage(t('auth.passwordReset.confirm.errors.network'));

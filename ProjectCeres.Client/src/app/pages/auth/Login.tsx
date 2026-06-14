@@ -52,6 +52,7 @@ export function Login() {
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
+    setFocus,
   } = form;
 
   const onSubmit = async (values: LoginFormValues) => {
@@ -100,22 +101,27 @@ export function Login() {
       }
       if (result.code === 'INVALID_CREDENTIALS') {
         setError('password', { type: 'server', message: t('auth.login.errors.invalidCredentials') });
+        setFocus('password');
         return;
       }
       // 422 with field-level errors — map each field.
       if ('fieldErrors' in result) {
-        for (const [field, message] of Object.entries(result.fieldErrors)) {
+        const fields = Object.entries(result.fieldErrors);
+        for (const [field, message] of fields) {
           setError(field as keyof LoginFormValues, { type: 'server', message });
         }
+        if (fields.length > 0) setFocus(fields[0][0] as keyof LoginFormValues);
         return;
       }
       // Unknown failure — surface as a generic field error on password (the
       // safer of the two — never leak email-specific information).
       setError('password', { type: 'server', message: result.message });
+      setFocus('password');
     } catch {
       // Network / 5xx — toast handling lives in a shared error boundary in
       // a later commit; for now, surface a generic password field error.
       setError('password', { type: 'server', message: t('auth.login.errors.invalidCredentials') });
+      setFocus('password');
     }
   };
 
