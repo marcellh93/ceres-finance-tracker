@@ -158,6 +158,7 @@ export function Login() {
           type="email"
           autoComplete="email"
           autoFocus
+          aria-describedby={errors.email ? 'email-error' : undefined}
           {...register('email')}
         />
       </Field>
@@ -167,6 +168,7 @@ export function Login() {
           id="password"
           type="password"
           autoComplete="current-password"
+          aria-describedby={errors.password ? 'password-error' : undefined}
           {...register('password')}
         />
       </Field>

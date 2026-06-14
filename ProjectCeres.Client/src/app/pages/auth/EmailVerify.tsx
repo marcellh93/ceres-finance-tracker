@@ -136,6 +136,7 @@ function InvalidBlock() {
               type="email"
               autoComplete="email"
               autoFocus
+              aria-describedby={form.formState.errors.email ? 'resend-email-error' : undefined}
               {...form.register('email')}
             />
           </Field>

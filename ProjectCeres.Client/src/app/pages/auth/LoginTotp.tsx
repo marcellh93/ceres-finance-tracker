@@ -264,6 +264,7 @@ export function LoginTotp() {
           type="text"
           autoComplete="one-time-code"
           autoFocus
+          aria-describedby={backupForm.formState.errors.code ? 'backup-code-error' : undefined}
           {...backupForm.register('code')}
           disabled={rateLimited || isSubmitting}
         />

@@ -162,6 +162,7 @@ function RequestForm() {
           type="email"
           autoComplete="email"
           autoFocus
+          aria-describedby={form.formState.errors.email ? 'email-error' : undefined}
           {...form.register('email')}
         />
       </Field>
@@ -278,6 +279,7 @@ function ConfirmForm({ token }: { token: string }) {
           type="password"
           autoComplete="new-password"
           autoFocus
+          aria-describedby={form.formState.errors.newPassword ? 'new-password-error' : undefined}
           {...form.register('newPassword')}
         />
       </Field>
@@ -291,6 +293,7 @@ function ConfirmForm({ token }: { token: string }) {
           id="confirm-password"
           type="password"
           autoComplete="new-password"
+          aria-describedby={form.formState.errors.confirmPassword ? 'confirm-password-error' : undefined}
           {...form.register('confirmPassword')}
         />
       </Field>

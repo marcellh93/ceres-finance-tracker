@@ -32,7 +32,11 @@ export function Field({ label, htmlFor, error, children }: FieldProps) {
         </div>
       )}
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p id={htmlFor ? `${htmlFor}-error` : undefined} className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

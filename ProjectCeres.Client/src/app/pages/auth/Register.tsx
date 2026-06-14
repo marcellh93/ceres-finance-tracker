@@ -89,6 +89,7 @@ export function Register() {
           type="email"
           autoComplete="email"
           autoFocus
+          aria-describedby={form.formState.errors.email ? 'email-error' : undefined}
           {...form.register('email')}
         />
       </Field>
@@ -106,7 +107,7 @@ export function Register() {
           id="password"
           type="password"
           autoComplete="new-password"
-          aria-describedby="password-hint"
+          aria-describedby={form.formState.errors.password ? 'password-hint password-error' : 'password-hint'}
           {...form.register('password')}
         />
         <p id="password-hint" className="text-xs text-muted-foreground">
