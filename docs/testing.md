@@ -56,6 +56,8 @@ Then:
 
 **Tier-up when in doubt.** Picking TIER M when uncertain is fine — picking a smaller tier than the diff warrants is not. The `/verify` slash command implements this check; reach for it instead of running the commands ad-hoc.
 
+**IDE0001 code-style gate (Stage 9.1.6, 2026-06-15).** Redundant namespace prefixes are kept clean by `IDE0001` at `warning` severity. IDE0001 is a `dotnet format`/IDE-only analyzer — it does **not** surface at `dotnet build` even with `EnforceCodeStyleInBuild=true`, so the regression check is `dotnet format style --verify-no-changes --diagnostics IDE0001` (exit non-zero = a prefix crept back). No CI until Stage 16, so this is a manual/pre-commit gate, not a build gate.
+
 ---
 
 ## Stack
