@@ -23,6 +23,8 @@ Read these baseline files every time, regardless of the activity:
 
 Then read any files the dispatcher named, and run breadth-first discovery (`grep`/`find`/`git log`) over the subsystems the activity touches.
 
+**Web research — conditional lane.** When the activity touches an external standard, a third-party library/package choice, a protocol or wire format, or a "is there a known / best-practice pattern for this?" question, ALSO do a web / `context7` check and cite the authoritative source (Microsoft Learn, official framework docs, OWASP, an RFC, a maintainer GitHub issue) — per `feedback_research_before_confident_claims` ("no 'the standard X' / 'best practice' without a web search backing it"). Skip web research for purely-internal activities (e.g. a UI affordance over existing models) — codebase reading is always required, web research only when an external standard or library is in play.
+
 ## Your response MUST open with these sections, in this order:
 
 The VERY FIRST line of your response must be the literal `## What I read` heading — no lead sentence, no framing, no thinking-aloud before it. Reason silently; emit only the finished brief.
@@ -38,7 +40,8 @@ Use ONLY these five top-level headings, in EXACTLY this order, with NO other `##
 
 ## Prior art & reusable primitives
 - <existing code/patterns that already do part of this — name the file + what it gives you, so the brainstorm reuses instead of rebuilds (the pre-design "don't rebuild what exists" catch)>
-- (or: "None found. Searched: <the specific greps/globs that came up empty>")
+- <if the web lane ran: the external standard / library / known pattern that fits, with a cited authoritative URL — so the brainstorm doesn't reinvent a solved problem>
+- (or: "None found. Searched: <the specific greps/globs that came up empty; the web sources checked, if any>")
 
 ## Conventions & constraints
 - <rules that bind the work: derived-column / RLS / 422-status / IUserOwned-five-registry conventions, relevant ADRs by number, the registries a change of this shape must land in>
