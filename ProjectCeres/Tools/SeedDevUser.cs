@@ -210,7 +210,7 @@ public static class SeedDevUser
             var allowedTables = UserOwnedModel.FinanceTables(adminDb.Model)
                 .Select(t => t.PostgresTableName)
                 .ToHashSet(StringComparer.Ordinal);
-            foreach (var table in allowedTables)
+            foreach (var table in UserOwnedModel.FinanceTables(adminDb.Model).Select(t => t.PostgresTableName))
             {
                 AssertKnownTable(table, allowedTables);
                 await adminDb.Database.ExecuteSqlInterpolatedAsync(
@@ -371,7 +371,7 @@ public static class SeedDevUser
         var allowedTables = UserOwnedModel.FinanceTables(adminDb.Model)
             .Select(t => t.PostgresTableName)
             .ToHashSet(StringComparer.Ordinal);
-        foreach (var table in allowedTables)
+        foreach (var table in UserOwnedModel.FinanceTables(adminDb.Model).Select(t => t.PostgresTableName))
         {
             AssertKnownTable(table, allowedTables);
             // EF cannot parameterize an identifier and has no scalar-returning ExecuteSql;
