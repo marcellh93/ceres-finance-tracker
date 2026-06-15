@@ -81,17 +81,21 @@ describe('LanguageToggle', () => {
     expect(englishItem.getAttribute('aria-checked')).toBe('true');
     expect(spanishItem.getAttribute('aria-checked')).toBe('false');
 
-    // Phase 2: click the Spanish radio item — this is the user-driven contract
-    // (clicking flips the active language). base-ui auto-closes the menu after
-    // selection. waitFor (below) handles the requestAnimationFrame-deferred
-    // close/reopen settling under parallel-suite CPU load.
+    // Phase 2: click the Spanish radio item — the user-driven contract (clicking
+    // flips the active language). base-ui auto-closes the menu after selection.
     await user.click(spanishItem);
 
-    // Phase 3: re-open the menu (it auto-closed after click) and verify
-    // Spanish is now checked + English unchecked. The waitFor wrapper absorbs
-    // any rAF-deferred state propagation.
+    // Phase 3: reopen the menu and verify Spanish is now checked + English not.
+    // base-ui unmounts the menu items on close and runs an exit transition, so a
+    // single reopen click can land mid-close and be swallowed (menu stays
+    // aria-expanded=false, no items). Poll the whole reopen-and-read: open only
+    // if currently closed (idempotent — never toggles an open menu shut), then
+    // assert. The conditional open is what absorbs a swallowed click.
     await waitFor(async () => {
-      await user.click(screen.getByRole('button', { name: /cambiar idioma/i }));
+      const trigger = screen.getByRole('button', { name: /cambiar idioma/i });
+      if (trigger.getAttribute('aria-expanded') !== 'true') {
+        await user.click(trigger);
+      }
       const eng = screen.getByRole('menuitemradio', { name: 'English' });
       const esp = screen.getByRole('menuitemradio', { name: 'Español' });
       expect(eng.getAttribute('aria-checked')).toBe('false');
