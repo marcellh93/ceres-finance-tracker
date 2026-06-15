@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -78,7 +78,7 @@ async function submitConfirm(
 
 export function PasswordReset() {
   const location = useLocation();
-  const token = useMemo(() => readTokenFromHash(location.hash), [location.hash]);
+  const token = readTokenFromHash(location.hash);
   return token ? <ConfirmForm token={token} /> : <RequestForm />;
 }
 

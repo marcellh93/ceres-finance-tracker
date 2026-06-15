@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ export function AccountUnlock() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const token = useMemo(() => readTokenFromHash(location.hash), [location.hash]);
+  const token = readTokenFromHash(location.hash);
   const [state, setState] = useState<State>('idle');
 
   const onUnlock = async () => {
