@@ -63,7 +63,7 @@ public class SettingsService(AppDbContext db, ICurrentUserAccessor user) : ISett
         return Result.Ok();
     }
 
-    private static int ClampStartDay(int value) => value < 1 ? 1 : value > 31 ? 31 : value;
+    private static int ClampStartDay(int value) => Math.Clamp(value, 1, 31);
 
     public async Task EnsureExistsAsync()
     {

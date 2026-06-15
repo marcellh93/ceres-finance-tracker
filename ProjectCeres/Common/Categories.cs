@@ -15,8 +15,8 @@ public static class Categories
         bool IsReserved,
         string? LifestyleTag);
 
-    public static IReadOnlyList<DefaultCategory> Defaults { get; } = new[]
-    {
+    public static IReadOnlyList<DefaultCategory> Defaults { get; } =
+    [
         new DefaultCategory("Opening Balance",        1, IsSystem: true,  IsReserved: false, LifestyleTag: null),
         new DefaultCategory("Salary",                 1, IsSystem: false, IsReserved: false, LifestyleTag: null),
         new DefaultCategory("Freelance Income",       1, IsSystem: false, IsReserved: false, LifestyleTag: null),
@@ -43,5 +43,5 @@ public static class Categories
         new DefaultCategory("Other Expenses",         2, IsSystem: false, IsReserved: false, LifestyleTag: null),
         new DefaultCategory("Uncategorized Income",   1, IsSystem: false, IsReserved: true,  LifestyleTag: null),
         new DefaultCategory("Uncategorized Expense",  2, IsSystem: false, IsReserved: true,  LifestyleTag: null),
-    };
+    ];
 }
