@@ -31,6 +31,36 @@
 
 ---
 
+## ⚠️ EXECUTION CORRECTION (2026-06-15) — Task 4 + Task 6 superseded
+
+Resuming after a session close, two assumptions behind Tasks 4 and 6 were proven wrong by direct build evidence (full detail in the spec's § IDE0001 EXECUTION CORRECTION):
+
+1. **`dotnet build` does not emit IDE0001 even when `severity = warning`.** Verified: 0 IDE0001 at build with the severity set + `EnforceCodeStyleInBuild=true`. IDE0001 only surfaces via `dotnet format`. → Task 6's "clean `dotnet build` proves completion" tripwire is invalid.
+2. **Real surface is 163 IDE0001 sites across ~28 files** (154 test, 6 production), not "32 across 6 files."
+
+**User decision (2026-06-15): full sweep + `dotnet format` tripwire.** Tasks 4 and 6 below are SUPERSEDED by:
+
+### Task 4′ (replaces Task 4): full IDE0001 sweep via `dotnet format`
+- [ ] Run the auto-fix: `dotnet format style --diagnostics IDE0001` (from repo root; operates on the whole solution incl. the 2 pre-existing partially-edited files and the 6 production sites). This applies only compiler-verified name-simplifications.
+- [ ] Inspect the diff: `git diff --stat` then spot-read several files — confirm EVERY change is a namespace-prefix simplification / `cref` simplification, NO behavioral edits. If `dotnet format` touched anything beyond IDE0001 simplifications, reset and re-run scoped tighter.
+- [ ] Sanity: confirm the deliberately-qualified `AuthController.cs:199/200` `SignInResult` is UNCHANGED (IDE0001 won't flag it — it's a CS0104 ambiguity, not simplifiable — but verify).
+- [ ] Build clean: `dotnet build 2>&1 | grep -iE "error|CS0104" || echo clean`.
+- [ ] Full suite green, same count: `dotnet test 2>&1 | tail -5`.
+- [ ] Confirm zero IDE0001 remain: `dotnet format style --verify-no-changes --diagnostics IDE0001 2>&1 | grep -c "warning IDE0001"` → expect `0`.
+- [ ] Commit (one commit; large but mechanical): `refactor(9.1.6.f): sweep all 163 IDE0001 name-simplifications via dotnet format`.
+
+### Task 6′ (replaces Task 6): IDE0001 tripwire + close-out
+- [ ] Add `dotnet_diagnostic.IDE0001.severity = warning` to `.editorconfig` after line 25 (the CER006 line). With the sweep already clean, this makes `dotnet format style --verify-no-changes` (default flags) the durable regression tripwire.
+- [ ] Verify the tripwire is green: `dotnet format style --verify-no-changes 2>&1 | grep -c "IDE0001"` → `0`. (Note: this command also reports OTHER style diagnostics; scope with `--diagnostics IDE0001` if the broader set is noisy — but the goal is IDE0001-clean.)
+- [ ] Document the tripwire in `docs/testing.md`: the IDE0001 regression check is `dotnet format style --verify-no-changes --diagnostics IDE0001` (no CI until Stage 16, so this is the documented manual/pre-commit gate, not a build gate — IDE0001 is not a build diagnostic).
+- [ ] Roadmap close-out (Phase E): tick a–g; rewrite the 9.1.6.g checklist line to production-only; add the 9.1.6.h/.i sibling `[ ]` lines (per spec §6); add a note that the IDE0001 cleanup was a full-surface `dotnet format` sweep + format-verify tripwire (scope corrected from the original 6-file estimate).
+- [ ] `dotnet build`, `dotnet test`, `pnpm --dir ProjectCeres.Client build`, `pnpm --dir ProjectCeres.Client test --run` all exit 0.
+- [ ] sync-docs + changelog-sync. Commit close-out.
+
+The original Task 4 and Task 6 sections below are retained for history but are NOT the execution script — follow Task 4′ / Task 6′.
+
+---
+
 ### Task 1: 9.1.6.b — `PreAuthRlsScope` raw→interpolated scalar query
 
 **Files:**

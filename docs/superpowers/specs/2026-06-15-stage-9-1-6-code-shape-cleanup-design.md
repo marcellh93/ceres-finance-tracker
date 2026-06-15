@@ -7,7 +7,7 @@
 **Origin:** User noticed two recurring code-shape smells reading the post-9.1.5 codebase — EF raw-SQL where the interpolated/guarded equivalent communicates intent, and `.cs` files referencing types by full namespace prefix despite the matching `using`. Closed-batch container following the 9.1.5 precedent.
 
 **Locked decisions (user, 2026-06-15):**
-1. **IDE0001 detection** — promote to `warning` in `.editorconfig` (`dotnet_diagnostic.IDE0001.severity = warning`), making the prefix sites build-visible and a permanent regression tripwire.
+1. **IDE0001 detection** — promote to `warning` in `.editorconfig` (`dotnet_diagnostic.IDE0001.severity = warning`) as a permanent regression tripwire. **(Revised 2026-06-15, see § IDE0001 EXECUTION CORRECTION: the tripwire is `dotnet format style --verify-no-changes`, NOT `dotnet build` — IDE0001 is not a build diagnostic. Scope is the full 163-site surface, swept via `dotnet format`, not a 6-file hand-edit.)**
 2. **AuthController `SignInResult`** — keep it fully qualified (load-bearing; disambiguates MVC's `SignInResult`); drop from 9.1.6.e's removal list.
 3. **9.1.6.g simplification sweep** — scope to **`ProjectCeres/` production `.cs` only**; test + React sweeps queued as sibling `[ ]` lines.
 
@@ -67,11 +67,21 @@ Four `catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)` clauses; file 
 
 Discovery-then-fix over `ProjectCeres/` production `.cs` only (per locked decision 3). Classes: target-typed `new()`, collection expressions, `is null`/`is not null`, switch expressions over if-chains, LINQ over hand-rolled loops, primary constructors *where they shrink the file*, `ArgumentNullException.ThrowIfNull`, expression-bodied members where they aid readability, `?.` over null-guards, `await using` over manual dispose. Findings table (grouped by class) captured in the stage body **before** fixes flatten it (commit hash referenced); safe-mechanical fixes shipped one-commit-per-class (or one batched commit if a class is small). **Anything that would change behavior, perf class, or public API → queued sibling `[ ]`, not rolled in.**
 
-### IDE0001 detection — promote to `warning`
+### IDE0001 detection — promote to `warning` + `dotnet format` tripwire
 
 Add `dotnet_diagnostic.IDE0001.severity = warning` to `.editorconfig` (currently unset; `.editorconfig` confirmed present, `EnforceCodeStyleInBuild=true` in `Directory.Build.props:3`).
 
-**Pre-flight correction (🟡):** `Directory.Build.props:5` has **`TreatWarningsAsErrors=false`** — so the promotion makes `dotnet build` show IDE0001 **warnings (yellow), not errors (red)**. The earlier "build goes red mid-stage" framing was wrong. Sequencing still flips the severity **last** (after a–f are clean) so the flip yields a warning-free build and serves as proof-of-completion; but a mid-stage yellow build is the only cost, not a broken one.
+> **⚠️ EXECUTION CORRECTION (2026-06-15, during subagent-driven execution — supersedes the scope/mechanism below).** Resuming after an abrupt session close surfaced two evidence-backed facts that falsify this section's original assumptions:
+>
+> 1. **IDE0001 does NOT surface at `dotnet build`, even when promoted to `warning`.** Tested directly: with `dotnet_diagnostic.IDE0001.severity = warning` set AND `EnforceCodeStyleInBuild=true`, `dotnet build --no-incremental` emits **0** IDE0001 diagnostics. IDE0001 ("Simplify name") is an IDE/`dotnet format`-only analyzer that the build compiler does not run. The 163 sites only surface via `dotnet format style --diagnostics IDE0001`. **Therefore the original Task 6 tripwire ("clean `dotnet build` proves completion") does not work** — it would pass an entirely undone sweep.
+> 2. **The real IDE0001 surface is 163 sites across ~28 files, not "32 across 6."** 154 in `ProjectCeres.Tests/`, 6 in `ProjectCeres/` (3 `Program.cs` sites beyond Task 3's, plus `RecurringTransactionsApiController`, `ResendEmailService`, `LockoutCacheOptions`). IDE0001 fires on `typeof(Fully.Qualified.Name)`, `System.IO.File`, `<see cref>` doc-comments — far beyond the catch-clause-prefix pattern originally enumerated.
+>
+> **User decision (2026-06-15):** full sweep + `dotnet format` tripwire. Revised mechanism:
+> - **Sweep:** `dotnet format style --diagnostics IDE0001` auto-fixes all 163 sites mechanically (compiler-verified simplifications) — deterministic, not 163 hand-edits. This supersedes the per-file hand-edit Task 4. It completes the 2 pre-existing partially-edited files and covers the 6 production sites too.
+> - **Tripwire:** `dotnet format style --verify-no-changes` (returns non-zero on any IDE0001 regression once the severity is `warning`) — this replaces the broken `dotnet build`-clean gate. Documented in `docs/testing.md` as the IDE0001 regression check (no CI until Stage 16, so the durable tripwire is the severity line + the documented format-verify command).
+> - The severity line still ships **last** (after the sweep is clean), and the proof-of-completion is `dotnet format style --verify-no-changes` clean.
+
+**Pre-flight correction (🟡):** `Directory.Build.props:5` has **`TreatWarningsAsErrors=false`** — so the promotion makes `dotnet build` show IDE0001 **warnings (yellow), not errors (red)** *if they appeared at build at all* (per the execution correction above, they do not). Cost of the severity line is in-IDE/format visibility, not a build gate.
 
 ## 3. Sequencing (commit order)
 
