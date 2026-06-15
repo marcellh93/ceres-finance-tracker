@@ -47,6 +47,17 @@ public static class SeedDevUser
     // Sentinel UUID from Phase 1/2 — same as RemapSentinelToFirstUser migration.
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");
 
+    // Table names are interpolated into raw SQL (EF cannot parameterize identifiers).
+    // They come from UserOwnedModel.FinanceTables, never user input — this guard pins
+    // that invariant so a future caller can't introduce an injection vector. (9.1.6.a)
+    public static string AssertKnownTable(string table, ISet<string> allowed)
+    {
+        if (!allowed.Contains(table))
+            throw new InvalidOperationException(
+                $"Refusing to interpolate '{table}': not in the user-owned table allow-list.");
+        return table;
+    }
+
     // 32-char password alphabet: no easily-confused chars (0/O/I/l/1).
     private const string PasswordAlphabet =
         "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*";
@@ -196,12 +207,14 @@ public static class SeedDevUser
             // Stage 9.5b: the finance/attachment table set is derived from the EF model
             // (UserOwnedModel.FinanceTables), not a hand-typed list. It excludes the
             // auth-internal tables — the dev sentinel remap only touches Phase-1/2 data.
-            foreach (var table in UserOwnedModel.FinanceTables(adminDb.Model).Select(t => t.PostgresTableName))
+            var allowedTables = UserOwnedModel.FinanceTables(adminDb.Model)
+                .Select(t => t.PostgresTableName)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var table in allowedTables)
             {
-                var sql = $"""
-                    UPDATE "{table}" SET "UserId" = '{userId:D}' WHERE "UserId" = '{sentinelStr}'
-                    """;
-                await adminDb.Database.ExecuteSqlRawAsync(sql);
+                AssertKnownTable(table, allowedTables);
+                await adminDb.Database.ExecuteSqlInterpolatedAsync(
+                    $"""UPDATE "{table}" SET "UserId" = {userId} WHERE "UserId" = {Sentinel}""");
             }
 
             // Post-check: zero sentinel rows must remain across all 16 tables.
@@ -355,10 +368,14 @@ public static class SeedDevUser
     private static async Task<long> CountSentinelRowsAsync(AdminDbContext adminDb, string sentinelStr)
     {
         long total = 0;
-        foreach (var table in UserOwnedModel.FinanceTables(adminDb.Model).Select(t => t.PostgresTableName))
+        var allowedTables = UserOwnedModel.FinanceTables(adminDb.Model)
+            .Select(t => t.PostgresTableName)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var table in allowedTables)
         {
-            // FormattableString overload of FromSql is not available for arbitrary table
-            // names. Use ExecuteSqlRaw — sentinel UUID is a constant, not user input.
+            AssertKnownTable(table, allowedTables);
+            // EF cannot parameterize an identifier and has no scalar-returning ExecuteSql;
+            // table is guarded above, sentinel is a constant — raw Npgsql is correct here. (9.1.6.a)
             var sql = $"""SELECT COUNT(*) FROM "{table}" WHERE "UserId" = '{sentinelStr}'""";
 
             // EF Core doesn't expose a scalar-returning ExecuteSql; use Npgsql directly
