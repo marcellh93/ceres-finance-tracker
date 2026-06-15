@@ -131,7 +131,7 @@ Three rules the orchestrator inherits from this file:
 
 ## Using subagents
 
-Five codified `ceres-*` strategy roles ship at `.claude/agents/ceres-{architect,tech-lead,pm,cto,security-reviewer}.md`. Dispatch by `subagent_type` during brainstorm/spec/plan when a decision needs an outside perspective with a read-first contract. The five role files + dispatch guidance live in `docs/agents.md`.
+Six codified `ceres-*` strategy roles ship at `.claude/agents/ceres-{architect,tech-lead,pm,cto,security-reviewer,researcher}.md`. Dispatch by `subagent_type` during brainstorm/spec/plan when a decision needs an outside perspective with a read-first contract. `ceres-researcher` is the pre-design fact-finder — dispatch it at stage-start, as brainstorming's first step, before a design exists. The six role files + dispatch guidance live in `docs/agents.md`.
 
 **The dispatcher-gate rule (binding on me, the orchestrator):** when I dispatch a `ceres-*` strategy agent, I MUST inspect its response before synthesizing from its output, and re-dispatch with a stricter prompt if any of these fail:
 
