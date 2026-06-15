@@ -136,7 +136,7 @@ Five codified `ceres-*` strategy roles ship at `.claude/agents/ceres-{architect,
 **The dispatcher-gate rule (binding on me, the orchestrator):** when I dispatch a `ceres-*` strategy agent, I MUST inspect its response before synthesizing from its output, and re-dispatch with a stricter prompt if any of these fail:
 
 1. The response's **first non-whitespace line is the literal `## What I read` heading** — no lead sentence, framing, or thinking-aloud before it.
-2. Both preamble sections are present and ordered: `## What I read`, then `## Conflicts found`, then the answer.
+2. Both preamble sections are present and ordered: `## What I read` first, then the role's **designated second section** — `## Conflicts found` for the review-lens roles (architect / cto / pm / security-reviewer / tech-lead), or `## Subsystems & files touched` for `ceres-researcher` (the pre-design fact-finder, which has no design to find conflicts with) — then the rest of the body.
 3. The `## What I read` list includes the role's baseline files plus the files I named in the dispatch prompt.
 
 I do not build on a `ceres-*` response that skipped the read step or buried it under preamble. (The first-line rule was added 2026-05-30 after the 9.5k smoke-test found 2/5 roles opening with prose before the heading — see `docs/agents.md`.)
