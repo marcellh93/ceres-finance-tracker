@@ -6,6 +6,13 @@
 
 #### Added
 
+**Authentication (Stage 9 close-out — security-event emails, 2026-06-14)**
+- Three security-event notification emails — sent when two-factor sign-in is enabled, turned off, or backup codes are regenerated. Each names the time and IP and advises resetting your password if it wasn't you.
+
+**Authentication (Stage 9 close-out — auth-form accessibility, 2026-06-14)**
+- Inline form errors are now announced to screen readers (each field is linked to its error via `aria-describedby`) and focus moves to the first errored field when the server rejects a submission.
+- Added accessibility (vitest-axe) test coverage for the Register and Password-reset pages.
+
 **Subagents (Stage 9.5e — 3-agent reviewer pipeline, 2026-06-08)**
 - New review-pipeline roles `reviewer-writer` / `reviewer-security` / `reviewer-playwright-test-audit` (`.claude/agents/`) that audit a finished diff touching pre-auth auth code, EF migrations, or user-owned models — dispatched by the main session, each emitting a `VERDICT: pass|block` under the 9.5k read-first contract; documented in `docs/agents.md`
 - New turn-end enforcement: a `reviewer-pipeline.json` evidence slot in the existing evidence-bundle hook requires those three verdicts (three roles present, diff SHA matches HEAD, no surviving `block`) before a diff touching the watched paths can end its turn. Hooks are read-only and can't run agents, so the hook checks the proof the dispatch produces; no new Stop hook (Trip-wire C stays green). Bypass: `CERES_SKIP_REVIEWER_PIPELINE=1`
@@ -218,6 +225,13 @@
 - `ProjectCeres/Common/UserOwnedTables.cs` (the hand-typed `UserOwnedTables.All` list) — superseded by the model-derived `UserOwnedModel`
 
 #### Fixed
+
+**Authentication (Stage 9 close-out — Login error handling, 2026-06-14)**
+- Login no longer reports network failures or server (500) errors as "Email or password is incorrect" — a network error now shows a retry toast (with the form preserved) and a server error shows a distinct message.
+- A locked account now shows an inline "Account locked — check your email for an unlock link" message instead of an abrupt redirect (the previously-unused message is now wired up).
+
+**Tests (Stage 9 close-out — MovementForm flake, 2026-06-14)**
+- Fixed a flaky MovementForm budget-picker test that timed out reading a portal-rendered popover under full-suite CPU load (explicit 3000ms wait, matching the App.test.tsx fix).
 
 **Tests (Stage 9.5e close-out — rate-limit flake, 2026-06-08)**
 - `Login_LimiterResetsAfterWindow` stabilized under full-suite load — its saturation step fires up to 25 sequential requests, which under CPU contention could take longer than the test's 1-second rate-limit window, so the earliest requests slid off before the bucket tripped and the saturation assertion failed. Switched to the 5-second `WithMediumLoginWindow` (the window the project already sized for multi-request bursts, used by `SlidingWindow_BoundaryAttack_StillBlocked`) + a matching `MediumLoginWindowClearDelay`. No assertion weakened; the test still saturates, waits the real window out, and confirms the rollover
