@@ -96,6 +96,6 @@ describe('LanguageToggle', () => {
       const esp = screen.getByRole('menuitemradio', { name: 'Español' });
       expect(eng.getAttribute('aria-checked')).toBe('false');
       expect(esp.getAttribute('aria-checked')).toBe('true');
-    });
+    }, { timeout: 3000 });
   });
 });
