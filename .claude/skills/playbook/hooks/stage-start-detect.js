@@ -46,6 +46,8 @@ process.stdin.on("end", () => {
     "",
     "Memory rule (feedback_brainstorm_spec_plan_execute_flow, pinned 2026-05-15): on 'let's move on with stage X' / 'let's build feature Y', brainstorm first — the user reviews the spec before planning, and reviews the plan before execution.",
     "",
+    "For a non-trivial stage, consider dispatching the `ceres-researcher` agent as brainstorming's first step — a read-first fact-find (subsystems / prior art / conventions / unknowns) so the design starts from evidence. Skip for small/config-only stages, same as the brainstorm skip rule.",
+    "",
     "If the request is genuinely small (e.g. a config-only follow-up), say so explicitly and skip the brainstorm. Otherwise: invoke `superpowers:brainstorming` next.",
   ].join("\n");
 

@@ -32,6 +32,8 @@ State for all gates: `.claude/state/playbook/<session_id>.json` — recorded by 
 
 **Per-link hand-off.** Per `feedback_brainstorm_spec_plan_execute_flow`: "brainstorm → spec → plan → execute, with review at every boundary."
 
+**Optional pre-brainstorm research (advisory).** For a non-trivial stage, `superpowers:brainstorming`'s own step 1 ("explore project context — check files, docs, recent commits") is best done by dispatching the `ceres-researcher` agent — a read-first pre-design fact-find (subsystems / prior art / conventions / unknowns). This is brainstorming's **first internal step, not a step before it**: the brainstorm Skill is still the first thing invoked (per `feedback_brainstorm_spec_plan_execute_flow` — the first tool call is `superpowers:brainstorming`, not `Agent`); the researcher is dispatched from within that flow. Advisory, like the rest of Phase A. Skip for trivial/config-only work, same as the brainstorm skip rule.
+
 ---
 
 ### Phase A′ — `frontend-touch` (advisory)
