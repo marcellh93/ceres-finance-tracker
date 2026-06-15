@@ -332,7 +332,7 @@ public sealed class PasswordResetService
                 }
 
                 var ok = await _userManager.VerifyTwoFactorTokenAsync(
-                    user, Microsoft.AspNetCore.Identity.TokenOptions.DefaultAuthenticatorProvider, totpCode);
+                    user, TokenOptions.DefaultAuthenticatorProvider, totpCode);
                 if (!ok)
                 {
                     return new PasswordResetConfirmOutcome.InvalidTotp();

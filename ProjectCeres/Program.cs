@@ -45,7 +45,7 @@ builder.Services.AddControllers()
                     message = err.ErrorMessage
                 }));
 
-            return new Microsoft.AspNetCore.Mvc.UnprocessableEntityObjectResult(new
+            return new UnprocessableEntityObjectResult(new
             {
                 error = new
                 {
@@ -398,7 +398,7 @@ builder.Services.AddRateLimiter(options =>
         // authenticated MFA request into a single shared bucket.
         var task = httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
         task.Wait();
-        var userId = task.Result.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        var userId = task.Result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                   ?? "anonymous-mfa";
         return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
         {
@@ -417,7 +417,7 @@ builder.Services.AddRateLimiter(options =>
         // TotpByUserPartitioner (which authenticates against TwoFactorUserIdScheme).
         var task = httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
         task.Wait();
-        var userId = task.Result.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        var userId = task.Result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                   ?? "anonymous-reauth";
         return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
         {

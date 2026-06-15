@@ -43,11 +43,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         {
             return base.SaveChanges(acceptAllChangesOnSuccess);
         }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, UserOwnedTableNames, out var rls))
+        catch (DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, UserOwnedTableNames, out var rls))
         {
             throw rls!;
         }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (DbExceptionTranslator.TryTranslate(ex, out var typed))
+        catch (DbUpdateException ex) when (DbExceptionTranslator.TryTranslate(ex, out var typed))
         {
             throw typed!;
         }
@@ -59,11 +59,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         {
             return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, UserOwnedTableNames, out var rls))
+        catch (DbUpdateException ex) when (RlsExceptionTranslator.TryTranslate(ex, _currentUser, UserOwnedTableNames, out var rls))
         {
             throw rls!;
         }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex) when (DbExceptionTranslator.TryTranslate(ex, out var typed))
+        catch (DbUpdateException ex) when (DbExceptionTranslator.TryTranslate(ex, out var typed))
         {
             throw typed!;
         }

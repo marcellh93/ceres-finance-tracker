@@ -196,6 +196,7 @@ public sealed class AuthController : ControllerBase
         // AccessFailedCount between our FindByEmail and our semaphore acquisition.
         var loginSem = _loginLocks.GetOrAdd(userStub.Id, _ => new SemaphoreSlim(1, 1));
         await loginSem.WaitAsync(HttpContext.RequestAborted);
+        // Fully qualified: both Identity and Mvc define SignInResult (CS0104). Do not shorten.
         Microsoft.AspNetCore.Identity.SignInResult signIn;
         bool lockoutTransitioned;
         try
