@@ -78,7 +78,7 @@ public static class PreAuthRlsScope
             // a different principal. Postgres returns the empty string when the
             // GUC was never set on this transaction; treat that as a misuse too.
             var current = await db.Database
-                .SqlQueryRaw<string>("SELECT current_setting('app.current_user_ref', true) AS \"Value\"")
+                .SqlQuery<string>($"SELECT current_setting('app.current_user_ref', true) AS \"Value\"")
                 .FirstAsync(ct);
             if (current != userId.ToString("D"))
             {
