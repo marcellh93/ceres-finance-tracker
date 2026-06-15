@@ -8,7 +8,7 @@ namespace ProjectCeres.Common.Email;
 
 /// <summary>
 /// Production <see cref="IEmailService"/> implementation. Wraps
-/// <see cref="IResend.EmailSendAsync(Resend.EmailMessage, CancellationToken)"/>
+/// <see cref="IResend.EmailSendAsync(ResendEmailMessage, CancellationToken)"/>
 /// with a fixed-delay retry policy:
 /// <list type="bullet">
 ///   <item>3 attempts on transient errors (5xx + 429), delays 250ms / 1s / 4s.</item>

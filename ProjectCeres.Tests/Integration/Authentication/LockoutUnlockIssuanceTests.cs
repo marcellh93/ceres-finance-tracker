@@ -71,7 +71,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
     public async Task Login_transitioning_into_lockout_writes_token_row_AND_queues_email()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"transition-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
         var client = factory.CreateClient();
@@ -97,7 +97,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
     public async Task Login_already_locked_does_NOT_issue_a_second_token()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"already-locked-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
 
@@ -127,7 +127,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
     public async Task LoginTotp_observing_locked_state_does_NOT_issue_token()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"totp-observe-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
         await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
@@ -160,7 +160,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
     public async Task Issue_supersedes_prior_unconsumed_tokens()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"supersede-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
 
@@ -211,7 +211,7 @@ public class LockoutUnlockIssuanceTests : IAsyncLifetime
         throwingMock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
                     .ThrowsAsync(new InvalidOperationException("simulated SMTP failure"));
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(throwingMock.Object);
+        await using var factory = _factory.WithReplacedService(throwingMock.Object);
         var email = $"email-fail-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
         var client = factory.CreateClient();
@@ -272,16 +272,16 @@ public sealed class ThrowingLockoutUnlockServiceFactory : AuthTestWebApplication
 internal sealed class ThrowingLockoutUnlockService : LockoutUnlockService
 {
     public ThrowingLockoutUnlockService(
-        Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> userManager,
+        UserManager<ApplicationUser> userManager,
         AppDbContext db,
-        ProjectCeres.Data.AdminDbContext admin,
+        AdminDbContext admin,
         Argon2idPasswordHasher argon,
         LockoutUnlockTokenGenerator tokens,
         TokenLookupHasher lookupHasher,
         IEmailService email,
-        ProjectCeres.Common.Email.IEmailComposer composer,
-        ProjectCeres.Common.Email.IEmailRecipientResolver recipients,
-        ProjectCeres.Common.Email.ILanguageResolver languages,
+        IEmailComposer composer,
+        IEmailRecipientResolver recipients,
+        ILanguageResolver languages,
         Microsoft.Extensions.Logging.ILogger<LockoutUnlockService> logger,
         IAuditLogWriter auditLog,
         LockoutCache lockoutCache)

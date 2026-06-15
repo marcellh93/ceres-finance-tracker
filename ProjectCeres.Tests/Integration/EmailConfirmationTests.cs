@@ -105,7 +105,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Register_writes_token_row_with_TokenLookup_and_30min_expiry()
     {
         var (mock, _) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var email = $"reg-{Guid.NewGuid():N}@test.local";
@@ -140,7 +140,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Verify_with_valid_token_marks_email_confirmed()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (_, rawToken, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -177,7 +177,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Verify_with_expired_token_returns_401_INVALID_VERIFICATION_TOKEN()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (_, rawToken, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -214,7 +214,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Verify_with_consumed_token_returns_401()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (_, rawToken, _) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -235,7 +235,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Verify_with_random_unknown_token_returns_401_with_constant_time_floor()
     {
         var (mock, _) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(
@@ -261,7 +261,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
         // check is `_tokens.Verify(rawToken, match.TokenHash)` after the TokenLookup
         // match — it must reject even though TokenLookup matched.
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (_, rawToken, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -308,7 +308,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
         // No Setup — strict mock fails if any send is attempted on the unknown branch.
 
         await using var factory = _factory
-            .WithReplacedService<IEmailService>(emailMock.Object)
+            .WithReplacedService(emailMock.Object)
             .WithWebHostBuilder(builder =>
                 builder.ConfigureTestServices(services =>
                 {
@@ -348,7 +348,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     {
         var (mock, captured) = CapturingEmailMock();
         await using var factory = _factory
-            .WithReplacedService<IEmailService>(mock.Object)
+            .WithReplacedService(mock.Object)
             .WithWebHostBuilder(builder =>
                 builder.ConfigureTestServices(services =>
                 {
@@ -400,7 +400,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     {
         var (mock, captured) = CapturingEmailMock();
         await using var factory = _factory
-            .WithReplacedService<IEmailService>(mock.Object)
+            .WithReplacedService(mock.Object)
             .WithWebHostBuilder(builder =>
                 builder.ConfigureTestServices(services =>
                 {
@@ -458,7 +458,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
         // of prior tests sharing the factory.
         var (mock, _) = CapturingEmailMock();
         await using var factory = _factory
-            .WithReplacedService<IEmailService>(mock.Object)
+            .WithReplacedService(mock.Object)
             .WithWebHostBuilder(builder =>
                 builder.ConfigureTestServices(services =>
                 {
@@ -494,7 +494,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Re_register_same_unconfirmed_email_after_expiry_issues_new_token_for_existing_user()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, _, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -542,7 +542,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Re_register_same_email_when_already_confirmed_returns_204_no_new_token()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, _, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -590,7 +590,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Login_for_unconfirmed_user_with_correct_password_returns_401_EMAIL_NOT_CONFIRMED()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, _, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);
@@ -618,7 +618,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
     public async Task Login_for_user_after_verifying_via_email_verify_returns_204()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, rawToken, userId) = await RegisterAndCaptureTokenAsync(factory, client, captured);

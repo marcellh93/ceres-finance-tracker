@@ -288,7 +288,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     public async Task PasswordReset_request_known_email_writes_PasswordResetRequested()
     {
         var (emailMock, _) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var email = $"pwr-req-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
 
@@ -307,7 +307,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     public async Task PasswordReset_request_unknown_email_writes_NO_audit_row()
     {
         var (emailMock, _) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var unknownEmail = $"ghost-{Guid.NewGuid():N}{EmailDomain}";
         var client = factory.CreateClient();
         await AuthTestFixture.PostJsonWithCsrfAsync(_factory, client,
@@ -330,7 +330,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     public async Task PasswordReset_confirm_writes_PasswordResetCompleted()
     {
         var (emailMock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var email = $"pwr-conf-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
 
@@ -358,7 +358,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     public async Task EmailChange_request_writes_EmailChangeRequested()
     {
         var (emailMock, _) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var oldEmail = $"em-req-old-{Guid.NewGuid():N}{EmailDomain}";
         var newEmail = $"em-req-new-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, oldEmail);
@@ -382,7 +382,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     public async Task EmailChange_confirm_writes_EmailChangeConfirmed()
     {
         var (emailMock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var oldEmail = $"em-conf-old-{Guid.NewGuid():N}{EmailDomain}";
         var newEmail = $"em-conf-new-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, oldEmail);
@@ -415,7 +415,7 @@ public class AuditLogIntegrationTests : IAsyncLifetime
     public async Task EmailChange_revoke_writes_EmailChangeRevoked()
     {
         var (emailMock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var oldEmail = $"em-rev-old-{Guid.NewGuid():N}{EmailDomain}";
         var newEmail = $"em-rev-new-{Guid.NewGuid():N}{EmailDomain}";
         var user = await AuthTestFixture.RegisterUserAsync(factory, oldEmail);

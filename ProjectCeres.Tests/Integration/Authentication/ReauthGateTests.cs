@@ -114,7 +114,7 @@ public class ReauthGateTests : IClassFixture<AuthTestWebApplicationFactory>
         var pcf = sp.GetRequiredService<Microsoft.AspNetCore.Identity.IUserClaimsPrincipalFactory<ApplicationUser>>();
         var principal = await pcf.CreateAsync(user);
 
-        var db = sp.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+        var db = sp.GetRequiredService<Data.AppDbContext>();
         db.UserSessions.Add(new UserSession
         {
             Id = sid, UserId = user.Id, IpCreatedAt = "127.0.0.1", UserAgent = "test",
@@ -126,7 +126,7 @@ public class ReauthGateTests : IClassFixture<AuthTestWebApplicationFactory>
             principal,
             new Microsoft.AspNetCore.Authentication.AuthenticationProperties { IsPersistent = false },
             Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme);
-        var dpProvider = sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+        var dpProvider = sp.GetRequiredService<IDataProtectionProvider>();
         var protector = dpProvider.CreateProtector(
             "Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationMiddleware",
             Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme,

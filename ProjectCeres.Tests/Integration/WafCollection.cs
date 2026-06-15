@@ -140,7 +140,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 // with a no-op so non-rate-limit-test classes don't trip it on burst.
                 opts.GlobalLimiter = System.Threading.RateLimiting.PartitionedRateLimiter
                     .Create<Microsoft.AspNetCore.Http.HttpContext, string>(
-                        _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter<string>("test"));
+                        _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter("test"));
             });
 
             if (!UseTestAuthHandler) return;
@@ -153,7 +153,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             var current = services.Where(d => d.ServiceType == typeof(ICurrentUserAccessor)).ToList();
             foreach (var d in current) services.Remove(d);
             services.AddScoped<ICurrentUserAccessor>(_ =>
-                new ProjectCeres.Tests.Common.FakeCurrentUserAccessor(
+                new Common.FakeCurrentUserAccessor(
                     new Guid("00000000-0000-0000-0000-000000000001")));
 
             services.AddAuthentication(TestAuthenticationHandler.SchemeName)
@@ -273,9 +273,9 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
     /// unknownCount.Should().Be(knownCount);
     /// </code>
     /// </summary>
-    public WebApplicationFactory<Program> WithArgon2idCounter(out ProjectCeres.Tests.Common.Argon2idCallCounter counter)
+    public WebApplicationFactory<Program> WithArgon2idCounter(out Common.Argon2idCallCounter counter)
     {
-        var c = new ProjectCeres.Tests.Common.Argon2idCallCounter();
+        var c = new Common.Argon2idCallCounter();
         counter = c;
         return this.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => ConfigureCountingHasher(services, c)));
@@ -289,9 +289,9 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
     /// live on the derived type), so they can't be fluently chained on this factory.
     /// </summary>
     public WebApplicationFactory<Program> WithReplacedServiceAndArgon2idCounter<T>(
-        T replacement, out ProjectCeres.Tests.Common.Argon2idCallCounter counter) where T : class
+        T replacement, out Common.Argon2idCallCounter counter) where T : class
     {
-        var c = new ProjectCeres.Tests.Common.Argon2idCallCounter();
+        var c = new Common.Argon2idCallCounter();
         counter = c;
         return this.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -302,15 +302,15 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
             }));
     }
 
-    private static void ConfigureCountingHasher(IServiceCollection services, ProjectCeres.Tests.Common.Argon2idCallCounter counter)
+    private static void ConfigureCountingHasher(IServiceCollection services, Common.Argon2idCallCounter counter)
     {
         services.RemoveAll<IPasswordHasher<ApplicationUser>>();
-        services.RemoveAll<ProjectCeres.Common.Authentication.Argon2idPasswordHasher>();
+        services.RemoveAll<Argon2idPasswordHasher>();
         services.AddSingleton(counter);
-        services.AddScoped<ProjectCeres.Common.Authentication.Argon2idPasswordHasher,
-                           ProjectCeres.Tests.Common.CountingArgon2idPasswordHasher>();
+        services.AddScoped<Argon2idPasswordHasher,
+                           Common.CountingArgon2idPasswordHasher>();
         services.AddScoped<IPasswordHasher<ApplicationUser>>(sp =>
-            sp.GetRequiredService<ProjectCeres.Common.Authentication.Argon2idPasswordHasher>());
+            sp.GetRequiredService<Argon2idPasswordHasher>());
     }
 }
 

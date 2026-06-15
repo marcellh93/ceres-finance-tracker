@@ -105,7 +105,7 @@ public class RecurringTransactionsApiController(
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
-    private static RecurringTransactionDetailDto ToDetail(ProjectCeres.Models.RecurringTransaction r) => new(
+    private static RecurringTransactionDetailDto ToDetail(Models.RecurringTransaction r) => new(
         r.Id, r.Name, r.EstimatedAmount,
         r.AccountId, r.CategoryId,
         r.Frequency.ToString(), r.DayOfPeriod, r.NextDueDate, r.IsActive, r.ReminderBehaviour.ToString());

@@ -393,7 +393,7 @@ public class FailedLoginRecorderTests : IAsyncLifetime
 /// auth pipeline from AuthTestWebApplicationFactory so Identity, cookies, antiforgery,
 /// and the rest of the controller pipeline behave normally — only the recorder throws.
 /// </summary>
-public sealed class ThrowingRecorderFactory : ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory
+public sealed class ThrowingRecorderFactory : AuthTestWebApplicationFactory
 {
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
@@ -410,7 +410,7 @@ public sealed class ThrowingRecorderFactory : ProjectCeres.Tests.Integration.Aut
 
 internal sealed class ThrowingFailedLoginRecorder : FailedLoginRecorder
 {
-    public ThrowingFailedLoginRecorder(IServiceScopeFactory scopeFactory, Microsoft.AspNetCore.Identity.ILookupNormalizer normalizer)
+    public ThrowingFailedLoginRecorder(IServiceScopeFactory scopeFactory, ILookupNormalizer normalizer)
         : base(scopeFactory, normalizer, TimeProvider.System) { }
 
     public override Task RecordAsync(

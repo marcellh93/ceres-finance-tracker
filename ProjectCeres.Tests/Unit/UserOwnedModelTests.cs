@@ -12,7 +12,7 @@ public class UserOwnedModelTests
     // it does not open a connection, so a placeholder Npgsql connection string is fine.
     private static AppDbContext Ctx() => new AppDbContext(
         new DbContextOptionsBuilder<AppDbContext>().UseNpgsql("Host=localhost").Options,
-        new ProjectCeres.Tests.Common.FakeCurrentUserAccessor(Guid.Empty));
+        new Common.FakeCurrentUserAccessor(Guid.Empty));
 
     [Fact]
     public void RlsTables_includes_the_three_concrete_Movement_tables_and_excludes_the_abstract_root()

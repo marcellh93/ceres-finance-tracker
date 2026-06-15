@@ -15,7 +15,7 @@ public static class CSharpAnalyzerVerifier<TAnalyzer> where TAnalyzer : Diagnost
         }
     }
 
-    public static System.Threading.Tasks.Task VerifyAnalyzerAsync(string source, params DiagnosticResult[] expected)
+    public static Task VerifyAnalyzerAsync(string source, params DiagnosticResult[] expected)
     {
         var test = new Test { TestCode = source };
         test.ExpectedDiagnostics.AddRange(expected);

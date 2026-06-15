@@ -3,7 +3,7 @@ namespace ProjectCeres.Common.Authentication;
 /// <summary>
 /// TTL configuration for <see cref="LockoutCache"/>. The per-email entry's
 /// lifetime is governed by the <c>until</c> value passed to
-/// <see cref="LockoutCache.SetLockoutEnd(string, System.DateTimeOffset)"/>
+/// <see cref="LockoutCache.SetLockoutEnd(string, DateTimeOffset)"/>
 /// (cache TTL = <c>until - UtcNow</c>), so no separate per-email knob is
 /// needed here. <see cref="IpPointerTtl"/> stays because the per-IP pointer's
 /// lifetime is independent of any specific lockout — it tracks "the most

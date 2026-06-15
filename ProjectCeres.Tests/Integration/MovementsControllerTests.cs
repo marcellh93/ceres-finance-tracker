@@ -32,7 +32,7 @@ public class MovementsControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetMovementsRoot_Returns302_RedirectingToAppShell()
     {
-        using var noRedirectClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        using var noRedirectClient = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
         });

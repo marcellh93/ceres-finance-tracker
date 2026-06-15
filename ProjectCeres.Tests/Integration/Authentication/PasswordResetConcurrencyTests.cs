@@ -29,7 +29,7 @@ public class PasswordResetConcurrencyTests : IClassFixture<AuthTestWebApplicatio
         mock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
             .Returns<EmailMessage, CancellationToken>((m, _) => { captured.Add(m); return Task.CompletedTask; });
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
 
         var email = $"concurrent-{Guid.NewGuid():N}@example.com";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
@@ -74,7 +74,7 @@ public class PasswordResetConcurrencyTests : IClassFixture<AuthTestWebApplicatio
         mock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
             .Returns<EmailMessage, CancellationToken>((m, _) => { captured.Add(m); return Task.CompletedTask; });
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var emailA = $"isolation-a-{Guid.NewGuid():N}@example.com";
@@ -114,7 +114,7 @@ public class PasswordResetConcurrencyTests : IClassFixture<AuthTestWebApplicatio
         mock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
             .Returns<EmailMessage, CancellationToken>((m, _) => { captured.Add(m); return Task.CompletedTask; });
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var clientA = factory.CreateClient();
         var clientB = factory.CreateClient();
 

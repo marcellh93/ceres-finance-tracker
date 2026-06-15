@@ -60,7 +60,7 @@ public class PreAuthWritesUnderRlsTests
 
         var guard = new TotpReplayGuard(ctx, new Argon2idPasswordHasher(
             Microsoft.Extensions.Options.Options.Create(
-                new ProjectCeres.Common.Authentication.Argon2idOptions
+                new Argon2idOptions
                 {
                     MemorySizeKb = 8192, Iterations = 1, Parallelism = 1,
                 })), TimeProvider.System);

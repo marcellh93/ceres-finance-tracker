@@ -379,7 +379,7 @@ public class TransactionServiceTests : IAsyncLifetime
 
     private async Task<Guid> CreateSpendingBudgetAsync(int currencyId)
     {
-        var budget = new ProjectCeres.Models.Budget
+        var budget = new Budget
         {
             Id           = Guid.NewGuid(),
             Name         = $"Spending Budget {Guid.NewGuid():N}",

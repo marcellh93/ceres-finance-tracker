@@ -33,7 +33,7 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         emailMock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
                  .Returns(Task.CompletedTask);
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var client = factory.CreateClient();
 
         var email = $"req-known-{Guid.NewGuid():N}@example.com";
@@ -161,7 +161,7 @@ public class PasswordResetRequestTests : IClassFixture<AuthTestWebApplicationFac
         var emailMock = new Mock<IEmailService>(MockBehavior.Strict);
         // No Setup — strict mock fails on any call.
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(emailMock.Object);
+        await using var factory = _factory.WithReplacedService(emailMock.Object);
         var client = factory.CreateClient();
 
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(

@@ -167,7 +167,7 @@ public class MfaSecurityEmailTests : IAsyncLifetime
     public async Task EnrollVerify_sends_TotpEnrolled_email()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"enroll-{Guid.NewGuid():N}{EmailDomain}";
 
         var resp = await RegisterAndEnrollVerifyAsync(factory, email);
@@ -182,7 +182,7 @@ public class MfaSecurityEmailTests : IAsyncLifetime
     public async Task Disable_sends_TotpDisabled_email()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"disable-{Guid.NewGuid():N}{EmailDomain}";
 
         var (client, sessionCookie, user) = await SetupAuthenticatedMfaUserAsync(factory, email);
@@ -200,7 +200,7 @@ public class MfaSecurityEmailTests : IAsyncLifetime
     public async Task RegenerateBackupCodes_sends_BackupCodesRegenerated_email()
     {
         var (mock, captured) = CapturingEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var email = $"regen-{Guid.NewGuid():N}{EmailDomain}";
 
         var (client, sessionCookie, user) = await SetupAuthenticatedMfaUserAsync(factory, email);
@@ -223,7 +223,7 @@ public class MfaSecurityEmailTests : IAsyncLifetime
         throwingMock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
                     .ThrowsAsync(new InvalidOperationException("simulated SMTP failure"));
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(throwingMock.Object);
+        await using var factory = _factory.WithReplacedService(throwingMock.Object);
         var email = $"enroll-fail-{Guid.NewGuid():N}{EmailDomain}";
 
         var resp = await RegisterAndEnrollVerifyAsync(factory, email);

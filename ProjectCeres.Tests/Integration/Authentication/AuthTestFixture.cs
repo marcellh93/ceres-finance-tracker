@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using FluentAssertions;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Data;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
@@ -36,7 +39,7 @@ public static class AuthTestFixture
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var confirmed = await userManager.ConfirmEmailAsync(user, token);
         confirmed.Succeeded.Should().BeTrue();
-        var seed = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.CategorySeedService>();
+        var seed = scope.ServiceProvider.GetRequiredService<Services.CategorySeedService>();
         await seed.CopyDefaultsForUserAsync(user.Id);
         return user;
     }
@@ -59,7 +62,7 @@ public static class AuthTestFixture
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
         var confirmed = await userManager.ConfirmEmailAsync(user, token);
         confirmed.Succeeded.Should().BeTrue();
-        var seed = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.CategorySeedService>();
+        var seed = scope.ServiceProvider.GetRequiredService<Services.CategorySeedService>();
         await seed.CopyDefaultsForUserAsync(user.Id);
         return user;
     }
@@ -190,7 +193,7 @@ public static class AuthTestFixture
         var counterBytes = BitConverter.GetBytes(counter);
         if (BitConverter.IsLittleEndian) Array.Reverse(counterBytes);
 
-        using var hmac = new System.Security.Cryptography.HMACSHA1(key);
+        using var hmac = new HMACSHA1(key);
         var hash = hmac.ComputeHash(counterBytes);
         var offset = hash[^1] & 0x0F;
         var binary = ((hash[offset] & 0x7F) << 24)
@@ -259,25 +262,25 @@ public static class AuthTestFixture
         using var scope = factory.Services.CreateScope();
         var sp = scope.ServiceProvider;
 
-        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext { RequestServices = sp };
+        var http = new DefaultHttpContext { RequestServices = sp };
         if (lastReauthAtUnix is { } v)
         {
             http.Items[SessionConstants.LastReauthAtItemKey] = v.ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
+                CultureInfo.InvariantCulture);
         }
         var sid = Guid.NewGuid();
         http.Items[SessionConstants.PendingSessionItemKey] = sid;
 
         var pcf = sp.GetRequiredService<
-            Microsoft.AspNetCore.Identity.IUserClaimsPrincipalFactory<ApplicationUser>>();
-        var accessor = sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+            IUserClaimsPrincipalFactory<ApplicationUser>>();
+        var accessor = sp.GetService<IHttpContextAccessor>();
         if (accessor is not null) accessor.HttpContext = http;
         var principal = await pcf.CreateAsync(user);
 
         // Insert a UserSession row so SessionRevocationValidator doesn't reject the cookie
         // on first use (the validator looks up the row by sid claim).
-        var db = sp.GetRequiredService<ProjectCeres.Data.AppDbContext>();
-        db.UserSessions.Add(new ProjectCeres.Models.UserSession
+        var db = sp.GetRequiredService<AppDbContext>();
+        db.UserSessions.Add(new UserSession
         {
             Id = sid,
             UserId = user.Id,
@@ -289,17 +292,17 @@ public static class AuthTestFixture
         });
         await db.SaveChangesAsync();
 
-        var ticket = new Microsoft.AspNetCore.Authentication.AuthenticationTicket(
+        var ticket = new AuthenticationTicket(
             principal,
-            new Microsoft.AspNetCore.Authentication.AuthenticationProperties { IsPersistent = false },
-            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme);
+            new AuthenticationProperties { IsPersistent = false },
+            IdentityConstants.ApplicationScheme);
 
-        var dpProvider = sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+        var dpProvider = sp.GetRequiredService<IDataProtectionProvider>();
         var protector = dpProvider.CreateProtector(
             "Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationMiddleware",
-            Microsoft.AspNetCore.Identity.IdentityConstants.ApplicationScheme,
+            IdentityConstants.ApplicationScheme,
             "v2");
-        var format = new Microsoft.AspNetCore.Authentication.TicketDataFormat(protector);
+        var format = new TicketDataFormat(protector);
         return format.Protect(ticket);
     }
 
@@ -321,7 +324,7 @@ public static class AuthTestFixture
         var cookieValue = await MintAuthCookieWithLastReauthAt(factory, user, null);
 
         var client = factory.CreateClient(
-            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            new WebApplicationFactoryClientOptions
             {
                 HandleCookies = false,
             });

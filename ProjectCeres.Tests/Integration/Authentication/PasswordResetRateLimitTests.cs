@@ -184,7 +184,7 @@ public class PasswordResetRateLimitTests : IClassFixture<RateLimitedAuthTestWebA
         mock.Setup(e => e.SendAsync(It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
             .Returns<EmailMessage, CancellationToken>((m, _) => { captured.Add(m); return Task.CompletedTask; });
 
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var email = $"probe-counts-{Guid.NewGuid():N}@example.com";

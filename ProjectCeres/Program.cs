@@ -329,7 +329,7 @@ builder.Services.AddRateLimiter(options =>
         if (context.HttpContext.Request.Path == "/api/auth/login")
         {
             var lockoutCache = context.HttpContext.RequestServices
-                .GetRequiredService<ProjectCeres.Common.Authentication.LockoutCache>();
+                .GetRequiredService<LockoutCache>();
             // Match the AuthLoginByIp rate-limiter partition fallback so the cache key
             // aligns when Connection.RemoteIpAddress is null (e.g. TestServer requests).
             var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -471,7 +471,7 @@ builder.Services.AddRateLimiter(options =>
     {
         var marker = httpContext.GetEndpoint()?.Metadata.GetMetadata<ApplyEmailIpRateLimitAttribute>();
         if (marker is null)
-            return RateLimitPartition.GetNoLimiter<string>("no-email-ip-limit");
+            return RateLimitPartition.GetNoLimiter("no-email-ip-limit");
 
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         return RateLimitPartition.GetSlidingWindowLimiter($"email-by-ip:{ip}",
@@ -692,7 +692,7 @@ internal static class EmailPartitionHelpers
     ///
     /// Body buffering is required: the rate limiter middleware runs before model
     /// binding, so the body stream has not yet been buffered. We call
-    /// <see cref="Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpRequest)"/>
+    /// <see cref="HttpRequestRewindExtensions.EnableBuffering(HttpRequest)"/>
     /// to allow the position to be reset; the body is rewound before returning so
     /// the model binder downstream sees the full payload.
     /// </summary>

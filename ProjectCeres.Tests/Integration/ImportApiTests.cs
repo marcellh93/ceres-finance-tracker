@@ -131,7 +131,7 @@ public class ImportApiTests(TestWebApplicationFactory factory)
         var response = await _client.PostAsync("/api/import/headers", content);
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<ProjectCeres.ViewModels.HeaderDetectionResult>();
+        var body = await response.Content.ReadFromJsonAsync<ViewModels.HeaderDetectionResult>();
         body.Should().NotBeNull();
         body!.Headers.Should().Contain("Fecha");
         body.DateColumn.Should().Be("Fecha");

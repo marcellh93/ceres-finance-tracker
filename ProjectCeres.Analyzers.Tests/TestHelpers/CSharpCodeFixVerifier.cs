@@ -19,7 +19,7 @@ public static class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
 
     // Source flagged, fix applied, fixedSource is the expected result.
     // expectedInFixedCode pins any compiler diagnostics that SURVIVE the fix (placeholder posture).
-    public static System.Threading.Tasks.Task VerifyCodeFixAsync(
+    public static Task VerifyCodeFixAsync(
         string source,
         string fixedSource,
         params DiagnosticResult[] expectedInFixedCode)
@@ -35,7 +35,7 @@ public static class CSharpCodeFixVerifier<TAnalyzer, TCodeFix>
 
     // Source flagged but NO fix is registered: fixedSource == source.
     // Caller passes the analyzer diagnostic(s) that remain (the warning is not fixed).
-    public static System.Threading.Tasks.Task VerifyNoFixAsync(
+    public static Task VerifyNoFixAsync(
         string source,
         params DiagnosticResult[] analyzerDiagnostics)
     {

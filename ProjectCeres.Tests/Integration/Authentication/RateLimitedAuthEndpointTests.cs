@@ -296,7 +296,7 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
 
         rejected.Should().NotBeNull("TOTP per-user rate limiter must fire within 25 attempts");
 
-        var body = await rejected!.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var body = await rejected!.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("error").GetProperty("code").GetString()
             .Should().Be("RATE_LIMITED", "429 body must use envelope shape { error: { code, message } }");
         body.GetProperty("error").GetProperty("message").GetString()

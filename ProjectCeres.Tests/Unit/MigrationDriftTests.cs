@@ -13,7 +13,7 @@ public class MigrationDriftTests
     // (Same pattern as UserOwnedModelTests.Ctx().)
     private static AppDbContext Ctx() => new AppDbContext(
         new DbContextOptionsBuilder<AppDbContext>().UseNpgsql("Host=localhost").Options,
-        new ProjectCeres.Tests.Common.FakeCurrentUserAccessor(System.Guid.Empty));
+        new Common.FakeCurrentUserAccessor(System.Guid.Empty));
 
     [Fact]
     public void Model_has_no_pending_migration_changes()

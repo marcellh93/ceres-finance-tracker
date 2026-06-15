@@ -136,7 +136,7 @@ public class PersistentCookieRotationTests : IAsyncLifetime
         // The middleware rotates the persistent cookie and signs into Identity (issuing a
         // fresh __Host-Session for the next request) — but per Gap 11, this current request
         // should NOT be authenticated. The fallback policy returns 401.
-        var noSessionClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { HandleCookies = false });
+        var noSessionClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         var firstReq = new HttpRequestMessage(HttpMethod.Get, "/api/categories");
         firstReq.Headers.Add("Cookie", $"{SessionConstants.PersistentCookieName}={persistValue}");
 

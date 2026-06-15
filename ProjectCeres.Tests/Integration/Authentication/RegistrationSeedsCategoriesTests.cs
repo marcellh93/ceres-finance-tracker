@@ -69,7 +69,7 @@ public class RegistrationSeedsCategoriesTests : IAsyncLifetime
         var user = await AuthTestFixture.RegisterUserAsync(_factory, $"idem-{Guid.NewGuid():N}{EmailSuffix}");
 
         using var scope = _factory.Services.CreateScope();
-        var seed = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.CategorySeedService>();
+        var seed = scope.ServiceProvider.GetRequiredService<Services.CategorySeedService>();
         await seed.CopyDefaultsForUserAsync(user.Id);
 
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

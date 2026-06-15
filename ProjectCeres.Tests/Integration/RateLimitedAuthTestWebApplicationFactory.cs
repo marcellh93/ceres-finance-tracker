@@ -37,7 +37,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
 
     /// <summary>
     /// Returns a derived factory with a brand-new inner WebHost — and therefore a
-    /// brand-new <see cref="Microsoft.AspNetCore.RateLimiting.RateLimitingMiddleware"/>
+    /// brand-new <see cref="RateLimitingMiddleware"/>
     /// holding fresh, empty rate-limit partition state. Use this at the start of any
     /// test in the RateLimitTests collection that depends on the limiter starting
     /// fresh. Replaces the prior pattern of `Task.Delay(70s)` waiting for the
@@ -57,7 +57,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
         this.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(opts =>
+                services.PostConfigure<RateLimiterOptions>(opts =>
                 {
                     var type = opts.GetType();
                     var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -104,7 +104,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
         this.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.PostConfigure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(opts =>
+                services.PostConfigure<RateLimiterOptions>(opts =>
                 {
                     var type = opts.GetType();
                     var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -137,7 +137,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
         this.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
-                services.PostConfigure<ProjectCeres.Common.Authentication.LockoutCacheOptions>(opts =>
+                services.PostConfigure<LockoutCacheOptions>(opts =>
                 {
                     opts.IpPointerTtl = TimeSpan.FromSeconds(1);
                 });
@@ -298,7 +298,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                             QueueLimit = 0,
                         });
 
-                    static string? AuthenticateAndGetUserId(Microsoft.AspNetCore.Http.HttpContext ctx)
+                    static string? AuthenticateAndGetUserId(HttpContext ctx)
                     {
                         var t = ctx.AuthenticateAsync(IdentityConstants.ApplicationScheme);
                         t.Wait();
@@ -324,12 +324,12 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                 });
 
                 opts.GlobalLimiter = System.Threading.RateLimiting.PartitionedRateLimiter
-                    .Create<Microsoft.AspNetCore.Http.HttpContext, string>(httpContext =>
+                    .Create<HttpContext, string>(httpContext =>
                     {
                         var marker = httpContext.GetEndpoint()?.Metadata
                             .GetMetadata<ApplyEmailIpRateLimitAttribute>();
                         if (marker is null)
-                            return RateLimitPartition.GetNoLimiter<string>("no-email-ip-limit");
+                            return RateLimitPartition.GetNoLimiter("no-email-ip-limit");
 
                         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                         return RateLimitPartition.GetSlidingWindowLimiter($"email-by-ip:{ip}",
@@ -350,7 +350,7 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
     /// production. Lives here because the production helper is <c>internal</c> to
     /// the SUT and the test assembly does not have InternalsVisibleTo. Stage 8d.
     /// </summary>
-    private static string? ReadEmailFromBody(Microsoft.AspNetCore.Http.HttpContext ctx)
+    private static string? ReadEmailFromBody(HttpContext ctx)
     {
         if (ctx.Request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) != true)
             return null;
@@ -373,9 +373,9 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
         return null;
     }
 
-    private static async Task<string> ReadBodyAsync(System.IO.Stream body, CancellationToken ct)
+    private static async Task<string> ReadBodyAsync(Stream body, CancellationToken ct)
     {
-        using var reader = new System.IO.StreamReader(body, leaveOpen: true);
+        using var reader = new StreamReader(body, leaveOpen: true);
         return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
     }
 }

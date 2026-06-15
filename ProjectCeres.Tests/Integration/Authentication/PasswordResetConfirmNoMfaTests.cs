@@ -55,7 +55,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Confirm_no_mfa_succeeds()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token) = await RequestResetAsync(factory, client, captured);
@@ -98,7 +98,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Confirm_clears_lockout()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token) = await RequestResetAsync(factory, client, captured);
@@ -132,7 +132,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Confirm_no_mfa_promotes_EmailConfirmed_when_previously_false()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var email = $"unconfirmed-{Guid.NewGuid():N}@example.com";
@@ -170,7 +170,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
         // Specifically asserts the success path is not gated on lockout —
         // the request itself should not be blocked.
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token) = await RequestResetAsync(factory, client, captured);
@@ -193,7 +193,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Confirm_does_not_consume_token_on_password_policy_failure()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token) = await RequestResetAsync(factory, client, captured);
@@ -266,7 +266,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Confirm_with_no_mfa_user_ignores_extraneous_totpCode()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (_, token) = await RequestResetAsync(factory, client, captured);
@@ -283,7 +283,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Token_replay_after_success_returns_401()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (_, token) = await RequestResetAsync(factory, client, captured);
@@ -306,7 +306,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Expired_token_returns_401()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token) = await RequestResetAsync(factory, client, captured);
@@ -336,7 +336,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task New_request_supersedes_prior_unused_token()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token1) = await RequestResetAsync(factory, client, captured);
@@ -366,7 +366,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Failed_confirm_does_not_revoke_any_sessions()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, _) = await RequestResetAsync(factory, client, captured);
@@ -415,7 +415,7 @@ public class PasswordResetConfirmNoMfaTests : IClassFixture<AuthTestWebApplicati
     public async Task Successful_reset_revokes_persistent_remember_me_cookie_session()
     {
         var (mock, captured) = StrictEmailMock();
-        await using var factory = _factory.WithReplacedService<IEmailService>(mock.Object);
+        await using var factory = _factory.WithReplacedService(mock.Object);
         var client = factory.CreateClient();
 
         var (email, token) = await RequestResetAsync(factory, client, captured);

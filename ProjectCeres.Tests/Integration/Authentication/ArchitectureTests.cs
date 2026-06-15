@@ -7,16 +7,20 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
+using ProjectCeres.Data;
+using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 public class ArchitectureTests
 {
-    private static readonly Assembly App = typeof(global::Program).Assembly;
+    private static readonly Assembly App = typeof(Program).Assembly;
 
     [Fact]
     public void No_api_controller_class_has_AllowAnonymous()
@@ -85,12 +89,12 @@ public class ArchitectureTests
     [Fact]
     public void FailedLoginAttempt_HasRequiredIndexes()
     {
-        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        var factory = new AuthTestWebApplicationFactory();
         try
         {
             using var scope = factory.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
-            var entity = db.Model.FindEntityType(typeof(ProjectCeres.Models.FailedLoginAttempt));
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var entity = db.Model.FindEntityType(typeof(FailedLoginAttempt));
             entity.Should().NotBeNull();
             var indexes = entity!.GetIndexes()
                 .Select(i => i.Properties.Select(p => p.Name).ToArray())
@@ -196,7 +200,7 @@ public class ArchitectureTests
         // The action method is named RequestReset (not Request) to avoid collision with
         // ControllerBase.Request property. Confirm and RequestReset must both carry
         // [AllowAnonymous] and [EnableRateLimiting].
-        var type = typeof(ProjectCeres.Controllers.Api.PasswordResetController);
+        var type = typeof(Controllers.Api.PasswordResetController);
         foreach (var methodName in new[] { "RequestReset", "Confirm" })
         {
             var mi = type.GetMethod(methodName);
@@ -219,10 +223,10 @@ public class ArchitectureTests
     {
         // The controller should depend only on PasswordResetService, never on
         // Argon2idPasswordHasher directly — hashing is the service's responsibility.
-        var type = typeof(ProjectCeres.Controllers.Api.PasswordResetController);
+        var type = typeof(Controllers.Api.PasswordResetController);
         var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
         fields.Select(f => f.FieldType)
-            .Should().NotContain(typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+            .Should().NotContain(typeof(Argon2idPasswordHasher),
                 "the controller must delegate password hashing to PasswordResetService");
     }
 
@@ -310,7 +314,7 @@ public class ArchitectureTests
     [Fact]
     public void PasswordResetService_methods_take_CancellationToken()
     {
-        var type = typeof(ProjectCeres.Common.Authentication.PasswordResetService);
+        var type = typeof(PasswordResetService);
         var publicMethods = type
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(m => m.Name is "RequestAsync" or "ConfirmAsync")
@@ -379,13 +383,13 @@ public class ArchitectureTests
     [Fact]
     public void RequireRecentAuth_attribute_is_only_on_action_methods_not_classes()
     {
-        var asm = typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute).Assembly;
+        var asm = typeof(RequireRecentAuthAttribute).Assembly;
         var controllerTypes = asm.GetTypes()
             .Where(t => typeof(ControllerBase).IsAssignableFrom(t));
 
         foreach (var t in controllerTypes)
         {
-            t.GetCustomAttributes(typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute), inherit: false)
+            t.GetCustomAttributes(typeof(RequireRecentAuthAttribute), inherit: false)
                 .Should().BeEmpty($"{t.Name} carries [RequireRecentAuth] at the class level — must be action-level only");
         }
     }
@@ -397,14 +401,14 @@ public class ArchitectureTests
     [Fact]
     public void RequireRecentAuth_attribute_is_never_combined_with_AllowAnonymous()
     {
-        var asm = typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute).Assembly;
+        var asm = typeof(RequireRecentAuthAttribute).Assembly;
         var actionMethods = asm.GetTypes()
             .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
             .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
         foreach (var m in actionMethods)
         {
-            var hasRecentAuth = m.GetCustomAttributes(typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute), inherit: false).Any();
+            var hasRecentAuth = m.GetCustomAttributes(typeof(RequireRecentAuthAttribute), inherit: false).Any();
             if (!hasRecentAuth) continue;
             var hasAllowAnon = m.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false).Any();
             hasAllowAnon.Should().BeFalse($"{m.DeclaringType!.Name}.{m.Name} carries both [RequireRecentAuth] and [AllowAnonymous] — these are mutually exclusive");
@@ -418,12 +422,12 @@ public class ArchitectureTests
     [Fact]
     public void Three_existing_MFA_endpoints_carry_RequireRecentAuth_attribute()
     {
-        var t = typeof(ProjectCeres.Controllers.Api.MfaController);
+        var t = typeof(Controllers.Api.MfaController);
         foreach (var name in new[] { "Enroll", "EnrollVerify", "RegenerateBackupCodes" })
         {
             var m = t.GetMethod(name);
             m.Should().NotBeNull($"MfaController must expose {name}");
-            m!.GetCustomAttributes(typeof(ProjectCeres.Common.Authentication.RequireRecentAuthAttribute), inherit: false)
+            m!.GetCustomAttributes(typeof(RequireRecentAuthAttribute), inherit: false)
                 .Should().NotBeEmpty($"MfaController.{name} must carry [RequireRecentAuth] (Stage 6c.2)");
         }
     }
@@ -439,7 +443,7 @@ public class ArchitectureTests
         var repoRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "..", ".."));
         var resolved = System.IO.Path.Combine(repoRoot, "ProjectCeres", "Controllers", "Api", fileName);
         if (!System.IO.File.Exists(resolved))
-            throw new System.IO.FileNotFoundException($"Could not resolve controller source: {resolved}");
+            throw new FileNotFoundException($"Could not resolve controller source: {resolved}");
         return resolved;
     }
 
@@ -450,7 +454,7 @@ public class ArchitectureTests
     [Fact]
     public void EmailChangeController_has_correct_attribute_matrix()
     {
-        var type = typeof(ProjectCeres.Controllers.Api.EmailChangeController);
+        var type = typeof(Controllers.Api.EmailChangeController);
 
         // /request: [RequireRecentAuth] (which inherits AuthorizeAttribute and
         // registers the "RecentAuth" policy = RequireAuthenticatedUser + freshness gate).
@@ -485,20 +489,20 @@ public class ArchitectureTests
     {
         // The controller depends only on EmailChangeService — never on Argon2idPasswordHasher
         // directly; hashing is the service's responsibility.
-        var type = typeof(ProjectCeres.Controllers.Api.EmailChangeController);
+        var type = typeof(Controllers.Api.EmailChangeController);
         var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
         fields.Select(f => f.FieldType)
-            .Should().NotContain(typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+            .Should().NotContain(typeof(Argon2idPasswordHasher),
                 "the controller must delegate token hashing to EmailChangeService");
         fields.Select(f => f.FieldType)
-            .Should().NotContain(typeof(ProjectCeres.Common.Authentication.EmailChangeTokenGenerator),
+            .Should().NotContain(typeof(EmailChangeTokenGenerator),
                 "the controller must delegate token generation to EmailChangeService");
     }
 
     [Fact]
     public void EmailChangeService_methods_take_CancellationToken()
     {
-        var type = typeof(ProjectCeres.Common.Authentication.EmailChangeService);
+        var type = typeof(EmailChangeService);
         var publicMethods = type
             .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(m => m.Name is "RequestAsync" or "ConfirmAsync" or "RevokeAsync")
@@ -521,7 +525,7 @@ public class ArchitectureTests
     {
         // Class-level [AllowAnonymous] would defeat the [Authorize] + [RequireRecentAuth]
         // gate on /request. Pin: every action declares its own auth intent.
-        var type = typeof(ProjectCeres.Controllers.Api.EmailChangeController);
+        var type = typeof(Controllers.Api.EmailChangeController);
         type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().BeEmpty("EmailChangeController must NOT carry class-level [AllowAnonymous]");
     }
@@ -532,11 +536,11 @@ public class ArchitectureTests
     public void IAuditLogWriter_has_exactly_one_production_implementation()
     {
         var impls = App.GetTypes()
-            .Where(t => typeof(ProjectCeres.Common.Authentication.IAuditLogWriter).IsAssignableFrom(t)
+            .Where(t => typeof(IAuditLogWriter).IsAssignableFrom(t)
                         && t is { IsClass: true, IsAbstract: false })
             .ToList();
         impls.Should().ContainSingle()
-            .Which.Should().Be(typeof(ProjectCeres.Common.Authentication.AuditLogWriter));
+            .Which.Should().Be(typeof(AuditLogWriter));
     }
 
     [Fact]
@@ -556,7 +560,7 @@ public class ArchitectureTests
             "DataExportRequested", "GdprErasureRequested",
             "EmailVerificationRequested", "EmailVerified",
         };
-        Enum.GetNames<ProjectCeres.Models.AuditLogAction>()
+        Enum.GetNames<AuditLogAction>()
             .Should().BeEquivalentTo(expected);
     }
 
@@ -566,7 +570,7 @@ public class ArchitectureTests
         // security-model.md line 554: "Financial amounts NEVER appear in audit entries."
         // Belt-and-braces: reflection-scan for forbidden names + decimal-typed properties.
         var forbidden = new[] { "Amount", "Balance", "Value", "Total" };
-        var props = typeof(ProjectCeres.Models.AuditLog).GetProperties();
+        var props = typeof(AuditLog).GetProperties();
 
         props.Should().NotContain(p => forbidden.Contains(p.Name, StringComparer.OrdinalIgnoreCase),
             "AuditLog must never carry a financial-amount column.");
@@ -580,7 +584,7 @@ public class ArchitectureTests
     [Fact]
     public void LockoutUnlockController_action_has_AllowAnonymous()
     {
-        var action = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController)
+        var action = typeof(Controllers.Api.LockoutUnlockController)
             .GetMethod("Confirm")!;
         action.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().NotBeEmpty(
@@ -591,7 +595,7 @@ public class ArchitectureTests
     [Fact]
     public void LockoutUnlockController_action_has_AuthLoginByIp_rate_limit()
     {
-        var action = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController)
+        var action = typeof(Controllers.Api.LockoutUnlockController)
             .GetMethod("Confirm")!;
         var rateLimit = action.GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: false)
             .Cast<EnableRateLimitingAttribute>()
@@ -604,7 +608,7 @@ public class ArchitectureTests
     [Fact]
     public void LockoutUnlockController_does_not_have_class_level_AllowAnonymous()
     {
-        var type = typeof(ProjectCeres.Controllers.Api.LockoutUnlockController);
+        var type = typeof(Controllers.Api.LockoutUnlockController);
         type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().BeEmpty("Anonymity must be declared on the action, not the class");
     }
@@ -748,36 +752,36 @@ public class ArchitectureTests
         // concrete subtypes Transaction/Transfer/LiabilityPayment via TPC inheritance).
         // This test pins that contract: any entity removed from ConfigureGlobalQueryFilters
         // breaks the build immediately.
-        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        var factory = new AuthTestWebApplicationFactory();
         try
         {
             using var scope = factory.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             // Direct-filtered entities (filter declared on the entity type itself).
             // Movement is the TPC root — its filter propagates to Transaction/Transfer/LiabilityPayment.
             var expectedDirect = new[]
             {
-                typeof(ProjectCeres.Models.Account),
-                typeof(ProjectCeres.Models.Budget),
-                typeof(ProjectCeres.Models.Category),
-                typeof(ProjectCeres.Models.CategoryBudget),
-                typeof(ProjectCeres.Models.ImportProfile),
-                typeof(ProjectCeres.Models.ImportStagedTransaction),
-                typeof(ProjectCeres.Models.ImportStagedTransfer),
-                typeof(ProjectCeres.Models.ImportTransferExclusion),
-                typeof(ProjectCeres.Models.RecurringTransaction),
-                typeof(ProjectCeres.Models.SavedReport),
-                typeof(ProjectCeres.Models.Settings),
-                typeof(ProjectCeres.Models.Movement),  // TPC root — filter propagates to subtypes
-                typeof(ProjectCeres.Models.UserSession),
-                typeof(ProjectCeres.Models.UserBlockedIp),
-                typeof(ProjectCeres.Models.UserMfaBackupCode),
-                typeof(ProjectCeres.Models.TotpReplayEntry),
-                typeof(ProjectCeres.Models.PasswordResetToken),
-                typeof(ProjectCeres.Models.EmailChangeToken),
-                typeof(ProjectCeres.Models.LockoutUnlockToken),
-                typeof(ProjectCeres.Models.AuditLog),
+                typeof(Account),
+                typeof(Budget),
+                typeof(Category),
+                typeof(CategoryBudget),
+                typeof(ImportProfile),
+                typeof(ImportStagedTransaction),
+                typeof(ImportStagedTransfer),
+                typeof(ImportTransferExclusion),
+                typeof(RecurringTransaction),
+                typeof(SavedReport),
+                typeof(Settings),
+                typeof(Movement),  // TPC root — filter propagates to subtypes
+                typeof(UserSession),
+                typeof(UserBlockedIp),
+                typeof(UserMfaBackupCode),
+                typeof(TotpReplayEntry),
+                typeof(PasswordResetToken),
+                typeof(EmailChangeToken),
+                typeof(LockoutUnlockToken),
+                typeof(AuditLog),
             };
 
             var missing = expectedDirect
@@ -813,11 +817,11 @@ public class ArchitectureTests
         // FailedLoginAttempt_has_no_global_query_filter test and the UserOwnedModelTests
         // unit suite pin the surrounding invariants.
         var attachmentsWithoutEfFilter = new[] { "TransactionAttachments", "TransferAttachments" };
-        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        var factory = new AuthTestWebApplicationFactory();
         try
         {
             using var scope = factory.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var missing = ProjectCeres.Common.UserOwnedModel.RlsTables(db.Model)
                 .Where(t => !attachmentsWithoutEfFilter.Contains(t.PostgresTableName))
@@ -837,7 +841,7 @@ public class ArchitectureTests
             factory.Dispose();
         }
 
-        static bool HasFilterOnSelfOrBase(Microsoft.EntityFrameworkCore.Metadata.IEntityType? et)
+        static bool HasFilterOnSelfOrBase(IEntityType? et)
         {
             while (et is not null)
             {
@@ -855,12 +859,12 @@ public class ArchitectureTests
         // ADR-0067: FailedLoginAttempt is cross-tenant by design. The retention sweep iterates
         // all rows regardless of user. UserId is nullable; users themselves are never queried
         // by UserId on this table (queries are by IpAddress or EmailAttempted).
-        var factory = new ProjectCeres.Tests.Integration.AuthTestWebApplicationFactory();
+        var factory = new AuthTestWebApplicationFactory();
         try
         {
             using var scope = factory.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<ProjectCeres.Data.AppDbContext>();
-            db.Model.FindEntityType(typeof(ProjectCeres.Models.FailedLoginAttempt))!
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Model.FindEntityType(typeof(FailedLoginAttempt))!
                 .GetDeclaredQueryFilters().Should().BeEmpty(
                     "FailedLoginAttempt must remain filter-free per ADR-0067 — retention sweep is cross-tenant by design.");
         }
@@ -893,8 +897,8 @@ public class ArchitectureTests
 
         var controllers = App.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract)
-            .Where(t => typeof(Microsoft.AspNetCore.Mvc.ControllerBase).IsAssignableFrom(t))
-            .Where(t => t.GetCustomAttribute<Microsoft.AspNetCore.Mvc.ApiControllerAttribute>() is not null);
+            .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
+            .Where(t => t.GetCustomAttribute<ApiControllerAttribute>() is not null);
 
         var violations = new List<string>();
 
@@ -902,7 +906,7 @@ public class ArchitectureTests
         {
             foreach (var method in controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             {
-                if (method.GetCustomAttribute<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>() is null)
+                if (method.GetCustomAttribute<AllowAnonymousAttribute>() is null)
                     continue;
 
                 var fullName = $"{controller.FullName}.{method.Name}";

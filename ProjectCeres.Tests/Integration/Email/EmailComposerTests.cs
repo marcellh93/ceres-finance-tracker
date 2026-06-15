@@ -143,7 +143,7 @@ public sealed class EmailComposerTests
         // = manifest base name "ProjectCeres.Resources.EmailsResource".
         var en = new System.Resources.ResourceManager(
             "ProjectCeres.Resources.EmailsResource",
-            typeof(global::ProjectCeres.EmailsResource).Assembly);
+            typeof(EmailsResource).Assembly);
 
         // Enumerate via ResourceSet for both cultures.
         var enSet = en.GetResourceSet(new CultureInfo("en"), createIfNotExists: true, tryParents: false);

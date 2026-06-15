@@ -168,8 +168,8 @@ public class UserIdStampingTests : IAsyncLifetime
     public async Task RecurringTransactionService_CreateAsync_stamps_UserId()
     {
         using var scope = _factory.Services.CreateScope();
-        var svc = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.IRecurringTransactionService>();
-        var request = new ProjectCeres.ViewModels.CreateRecurringTransactionRequest(
+        var svc = scope.ServiceProvider.GetRequiredService<Services.IRecurringTransactionService>();
+        var request = new ViewModels.CreateRecurringTransactionRequest(
             Name:              $"StampedRecurring-{Guid.NewGuid():N}",
             EstimatedAmount:   100m,
             AccountId:         CheckingAccountId,
@@ -195,9 +195,9 @@ public class UserIdStampingTests : IAsyncLifetime
         // TryConfirmAsync converts a recurring template into a real Transaction. The created
         // Transaction must inherit the user's id.
         using var scope = _factory.Services.CreateScope();
-        var svc = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.IRecurringTransactionService>();
+        var svc = scope.ServiceProvider.GetRequiredService<Services.IRecurringTransactionService>();
 
-        var templateResult = await svc.TryCreateAsync(new ProjectCeres.ViewModels.CreateRecurringTransactionRequest(
+        var templateResult = await svc.TryCreateAsync(new ViewModels.CreateRecurringTransactionRequest(
             Name:              $"ConfirmSrc-{Guid.NewGuid():N}",
             EstimatedAmount:   200m,
             AccountId:         CheckingAccountId,
@@ -212,7 +212,7 @@ public class UserIdStampingTests : IAsyncLifetime
         _createdRecurringIds.Add(template.Id);
 
         var confirmResult = await svc.TryConfirmAsync(template.Id,
-            new ProjectCeres.ViewModels.ConfirmRecurringTransactionRequest(
+            new ViewModels.ConfirmRecurringTransactionRequest(
                 Date:        new DateOnly(2026, 6, 1),
                 Amount:      200m,
                 Description: "confirmed",
