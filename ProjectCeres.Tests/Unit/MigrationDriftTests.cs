@@ -11,7 +11,7 @@ public class MigrationDriftTests
     // HasPendingModelChanges diffs the model against AppDbContextModelSnapshot.cs — no
     // connection is opened, so a placeholder Npgsql connection string is fine.
     // (Same pattern as UserOwnedModelTests.Ctx().)
-    private static AppDbContext Ctx() => new AppDbContext(
+    private static AppDbContext Ctx() => new(
         new DbContextOptionsBuilder<AppDbContext>().UseNpgsql("Host=localhost").Options,
         new Common.FakeCurrentUserAccessor(System.Guid.Empty));
 

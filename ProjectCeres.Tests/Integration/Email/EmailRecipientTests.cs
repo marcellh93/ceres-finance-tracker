@@ -59,7 +59,7 @@ public sealed class EmailRecipientTests
             .Select(Path.GetFileName)
             .ToList();
 
-        matches.Should().BeEquivalentTo(new[] { "EmailChangeService.cs" });
+        matches.Should().BeEquivalentTo(["EmailChangeService.cs"]);
     }
 
     /// <summary>

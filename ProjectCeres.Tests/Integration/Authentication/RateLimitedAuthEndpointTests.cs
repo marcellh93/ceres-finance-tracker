@@ -191,7 +191,7 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
         var loginASetCookies = loginA.Headers.TryGetValues("Set-Cookie", out var sc) ? string.Join("; ", sc) : "(none)";
         loginA.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests,
             $"userA login must not be rate-limited; status={loginA.StatusCode}, Set-Cookie={loginASetCookies}, body={loginABody}");
-        ((int)loginA.StatusCode).Should().BeOneOf(new[] { 200, 204 },
+        ((int)loginA.StatusCode).Should().BeOneOf([200, 204],
             $"userA login must succeed; status={loginA.StatusCode}, Set-Cookie={loginASetCookies}, body={loginABody}");
         var mfaCookieA = ExtractSetCookie(loginA, "Identity.TwoFactorUserId");
 

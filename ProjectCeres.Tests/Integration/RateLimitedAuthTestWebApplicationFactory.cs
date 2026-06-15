@@ -62,8 +62,8 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     var type = opts.GetType();
                     var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
                     var policyMap = type.GetProperty("PolicyMap", flags)!.GetValue(opts)!;
-                    var removeFromPolicy = policyMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
-                    removeFromPolicy.Invoke(policyMap, new object[] { AuthRateLimitPolicies.AuthLoginByIp });
+                    var removeFromPolicy = policyMap.GetType().GetMethod("Remove", [typeof(string)])!;
+                    removeFromPolicy.Invoke(policyMap, [AuthRateLimitPolicies.AuthLoginByIp]);
 
                     opts.AddPolicy(AuthRateLimitPolicies.AuthLoginByIp, httpContext =>
                     {
@@ -109,8 +109,8 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     var type = opts.GetType();
                     var flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
                     var policyMap = type.GetProperty("PolicyMap", flags)!.GetValue(opts)!;
-                    var removeFromPolicy = policyMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
-                    removeFromPolicy.Invoke(policyMap, new object[] { AuthRateLimitPolicies.AuthLoginByIp });
+                    var removeFromPolicy = policyMap.GetType().GetMethod("Remove", [typeof(string)])!;
+                    removeFromPolicy.Invoke(policyMap, [AuthRateLimitPolicies.AuthLoginByIp]);
 
                     opts.AddPolicy(AuthRateLimitPolicies.AuthLoginByIp, httpContext =>
                     {
@@ -181,8 +181,8 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                 var policyMap      = policyMapProp.GetValue(opts)!;
                 var unactivatedMap = unactivatedProp.GetValue(opts)!;
 
-                var removeFromPolicy      = policyMap.GetType()     .GetMethod("Remove", new[] { typeof(string) })!;
-                var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
+                var removeFromPolicy      = policyMap.GetType()     .GetMethod("Remove", [typeof(string)])!;
+                var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", [typeof(string)])!;
 
                 foreach (var name in new[]
                 {
@@ -195,8 +195,8 @@ public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplic
                     AuthRateLimitPolicies.EmailByIp,
                 })
                 {
-                    removeFromPolicy.Invoke(policyMap, new object[] { name });
-                    removeFromUnactivated.Invoke(unactivatedMap, new object[] { name });
+                    removeFromPolicy.Invoke(policyMap, [name]);
+                    removeFromUnactivated.Invoke(unactivatedMap, [name]);
                 }
 
                 opts.AddPolicy(AuthRateLimitPolicies.AuthLoginByIp, httpContext =>

@@ -114,8 +114,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 var policyMap      = policyMapProp.GetValue(opts)!;
                 var unactivatedMap = unactivatedProp.GetValue(opts)!;
 
-                var removeFromPolicy     = policyMap.GetType()     .GetMethod("Remove", new[] { typeof(string) })!;
-                var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", new[] { typeof(string) })!;
+                var removeFromPolicy     = policyMap.GetType()     .GetMethod("Remove", [typeof(string)])!;
+                var removeFromUnactivated = unactivatedMap.GetType().GetMethod("Remove", [typeof(string)])!;
 
                 foreach (var name in new[]
                 {
@@ -128,8 +128,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     AuthRateLimitPolicies.EmailByIp,
                 })
                 {
-                    removeFromPolicy.Invoke(policyMap,         new object[] { name });
-                    removeFromUnactivated.Invoke(unactivatedMap, new object[] { name });
+                    removeFromPolicy.Invoke(policyMap,         [name]);
+                    removeFromUnactivated.Invoke(unactivatedMap, [name]);
                     opts.AddPolicy(name,
                         _ => System.Threading.RateLimiting.RateLimitPartition.GetNoLimiter("test"));
                 }

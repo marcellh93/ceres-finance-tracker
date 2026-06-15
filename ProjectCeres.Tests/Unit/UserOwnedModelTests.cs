@@ -10,7 +10,7 @@ public class UserOwnedModelTests
 {
     // Building DbContextOptions and reading .Model only triggers OnModelCreating —
     // it does not open a connection, so a placeholder Npgsql connection string is fine.
-    private static AppDbContext Ctx() => new AppDbContext(
+    private static AppDbContext Ctx() => new(
         new DbContextOptionsBuilder<AppDbContext>().UseNpgsql("Host=localhost").Options,
         new Common.FakeCurrentUserAccessor(Guid.Empty));
 

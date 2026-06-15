@@ -119,6 +119,6 @@ public sealed class ResendEmailServiceTests
             "FromVerifiedUser",
             BindingFlags.Static | BindingFlags.NonPublic);
         factory.Should().NotBeNull("EmailRecipient.FromVerifiedUser must exist");
-        return (EmailRecipient)factory!.Invoke(null, new object[] { email })!;
+        return (EmailRecipient)factory!.Invoke(null, [email])!;
     }
 }

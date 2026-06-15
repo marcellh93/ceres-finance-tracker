@@ -93,7 +93,7 @@ public class RegisterEndpointTests : IAsyncLifetime
         // Framework returns 415 when no Content-Type is set (no JSON binder match),
         // 400/422 when body is present but invalid. All are acceptable — the key
         // contract is that the server does NOT return 500.
-        ((int)resp.StatusCode).Should().BeOneOf(new[] { 400, 415, 422 },
+        ((int)resp.StatusCode).Should().BeOneOf([400, 415, 422],
             "missing body must be rejected gracefully — not a 500");
     }
 

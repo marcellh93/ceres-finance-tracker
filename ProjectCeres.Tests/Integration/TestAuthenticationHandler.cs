@@ -29,12 +29,11 @@ public sealed class TestAuthenticationHandler : AuthenticationHandler<Authentica
     {
         var sid = Guid.NewGuid();
         var identity = new ClaimsIdentity(
-            new[]
-            {
+            [
                 new Claim(ClaimTypes.NameIdentifier, new Guid("00000000-0000-0000-0000-000000000001").ToString()),
                 new Claim(ClaimTypes.Name, "test@local"),
                 new Claim(SessionConstants.SessionIdClaim, sid.ToString()),
-            },
+            ],
             SchemeName);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, SchemeName);

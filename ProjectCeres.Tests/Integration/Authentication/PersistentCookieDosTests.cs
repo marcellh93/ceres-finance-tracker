@@ -67,6 +67,6 @@ public class PersistentCookieDosTests : IAsyncLifetime
 
         // Either 401 from the GET (no auth) or 200 if the endpoint is anonymous — either is fine.
         // The request must NOT have hung on the scan.
-        ((int)junkResp.StatusCode).Should().BeOneOf(new[] { 200, 401, 403 });
+        ((int)junkResp.StatusCode).Should().BeOneOf([200, 401, 403]);
     }
 }

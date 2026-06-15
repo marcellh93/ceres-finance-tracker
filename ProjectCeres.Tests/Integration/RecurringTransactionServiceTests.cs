@@ -134,16 +134,14 @@ public class RecurringTransactionServiceTests : IAsyncLifetime
     // -------------------------------------------------------------------------
 
     private static RecurringTransaction MakeReminder(
-        Frequency frequency, ReminderBehaviour behaviour, int? dayOfPeriod, DateOnly nextDueDate)
-    {
-        return new RecurringTransaction
+        Frequency frequency, ReminderBehaviour behaviour, int? dayOfPeriod, DateOnly nextDueDate) =>
+        new RecurringTransaction
         {
             Id = Guid.NewGuid(), UserId = Guid.NewGuid(),
             Name = "Test", AccountId = Guid.NewGuid(), CategoryId = Guid.NewGuid(),
             Frequency = frequency, ReminderBehaviour = behaviour,
             DayOfPeriod = dayOfPeriod, NextDueDate = nextDueDate, IsActive = true,
         };
-    }
 
     private static DateOnly InvokeSnapToCalendarDay(RecurringTransaction reminder, DateOnly? confirmDate)
     {

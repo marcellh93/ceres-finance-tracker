@@ -93,12 +93,12 @@ public class RowLevelSecurityInterceptorTests
         // Pins option A: the interceptor is the safety-net, not the doorway. Doorway
         // refusal lives in BackgroundJobScope.
         UserContext[] cases =
-        {
+        [
             new UserContext.Resolved(Guid.NewGuid()),
             new UserContext.PreAuth("Some.CallSite"),
             new UserContext.Background("some reason"),
             UserContext.Uninitialized.Instance,
-        };
+        ];
 
         foreach (var ctx in cases)
         {

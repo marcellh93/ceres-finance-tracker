@@ -68,7 +68,7 @@ public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactor
         if (idx < 0)
             throw new InvalidOperationException($"no token marker in body: {message.BodyText}");
         var start = idx + marker.Length;
-        var end = message.BodyText.IndexOfAny(new[] { '\r', '\n', ' ' }, start);
+        var end = message.BodyText.IndexOfAny(['\r', '\n', ' '], start);
         return end < 0 ? message.BodyText[start..] : message.BodyText[start..end];
     }
 
