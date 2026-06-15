@@ -266,6 +266,9 @@
 - Swept 163 redundant fully-qualified namespace references (IDE0001) solution-wide via `dotnet format`; promoted IDE0001 to `warning` with `dotnet format style --verify-no-changes --diagnostics IDE0001` as the regression check (it is a format/IDE-only analyzer and does not surface at `dotnet build`). `AuthController`'s `SignInResult` stays fully qualified (Identity vs MVC name clash)
 - Simplified `SettingsService.ClampStartDay` to `Math.Clamp` and `Categories.Defaults` to a collection expression; the test-project + React simplification sweeps were split to Stage 9.1.7
 
+**Code quality (Stage 9.1.7 — deferred simplification sweeps, 2026-06-15)**
+- Completed the test-project + React simplification sweeps deferred from 9.1.6.g. Both trees were already idiomatic; net 13 safe-mechanical simplifications with no behavior change — collection expressions / target-typed `new()` / one expression body in the test project (count unchanged at 1180 tests), and two redundant primitive `useMemo` wrappers removed in the auth pages (all other React memoization kept as load-bearing)
+
 **Subagents (Stage 9.5e — dangling-reference cleanup, 2026-06-08)**
 - Retired the undefined "Trip-wire B" and "autonomy level" references in the roadmap's 9.5h container (only Trip-wire C was ever defined; Trip-wire A is now the concrete escalation counter); corrected a false claim in the 9.5k plan and `ceres-cto.md` that the playbook constitution holds the trip-wire definitions
 - Removed a dead `UserOwnedTables.cs` predicate from the evidence-bundle hook (the file was deleted in 9.5b); corrected stale `UserOwnedTables.All` references in the `verify-stage-completeness` skill docs to the model-derived `UserOwnedModel.RlsTables`
