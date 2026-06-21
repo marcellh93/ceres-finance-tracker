@@ -15,10 +15,10 @@ Without it, the default failure mode is: reach for `frontend-design`, produce on
 
 ## Source-of-truth choices for this project
 
-Impeccable expects two files at repo root: `PRODUCT.md` (audience, brand voice, anti-references, brand-vs-product register) and `DESIGN.md` (tokens, components, do's/don'ts in Google Stitch format). For this project:
+Impeccable expects two files, `PRODUCT.md` (audience, brand voice, anti-references, brand-vs-product register) and `DESIGN.md` (tokens, components, do's/don'ts in Google Stitch format), at the repo root by default. For this project both live under `docs/` (the impeccable loader's fallback chain resolves them there):
 
 - **`docs/design-system.md` IS the DESIGN.md.** It already documents every token in `ProjectCeres.Client/src/index.css`, every recipe, the do's and don'ts, and the working rules. Do **not** create a parallel `DESIGN.md` at the repo root. Do **not** run `/impeccable document`. When invoking any impeccable command, explicitly tell it: *"Read `docs/design-system.md` instead of looking for `DESIGN.md`. It is the same contract in a different filename."*
-- **`PRODUCT.md` has no local equivalent and DOES need to exist** for impeccable's discovery, critique, and register-aware Refine commands to behave correctly. The skill creates it once via `/impeccable teach` on the first run that needs it.
+- **`PRODUCT.md` has no local equivalent and DOES need to exist** for impeccable's discovery, critique, and register-aware Refine commands to behave correctly. It lives at **`docs/PRODUCT.md`** (created 2026-06-21 via `/impeccable teach`); the repo root is kept clean. The loader resolves it there via its root → `.agents/context/` → `docs/` fallback.
 - **CLAUDE.md's "Frontend Work" section** stays authoritative for project-specific gates (show rendered result, wait for explicit approval before commit, run the UX/UI verification checklist; the manual-test handoff Stop gate / Phase H enforces the last one). This skill calls into that flow — it doesn't replace it.
 - **The design system is a living contract — propose extensions proactively.** When the work suggests a new primitive, token, or recipe would help (a one-off pattern that could be reused, a missing variant, a gap in the empty/error/loading vocabulary, an aesthetic improvement the user hasn't named), surface it as part of the phase output — don't wait to be asked. Treat proposals as opening moves: the user reviews and approves before extraction lands. Phase 6 (system maintenance) is the formal ratification path; this clause sanctions naming candidates from any phase. The goal is to grow `docs/design-system.md`, not to preserve it as a fixed inventory.
 
@@ -26,7 +26,7 @@ Impeccable expects two files at repo root: `PRODUCT.md` (audience, brand voice, 
 
 Before any other phase touches code or runs a critique, check both of these exist:
 
-1. `PRODUCT.md` at repo root. If missing, run `/impeccable teach` and walk the user through the discovery interview. The output is `PRODUCT.md` only — **suppress DESIGN.md creation** by telling teach: *"DESIGN.md already exists at `docs/design-system.md`. Write `PRODUCT.md` only; do not generate a DESIGN.md."*
+1. `docs/PRODUCT.md` exists (this project keeps it under `docs/`, not the repo root — already created as of 2026-06-21, so this gate is satisfied). If it were ever missing, run `/impeccable teach` and walk the user through the discovery interview. The output is `PRODUCT.md` only — **suppress DESIGN.md creation** by telling teach: *"DESIGN.md already exists at `docs/design-system.md`. Write `PRODUCT.md` to `docs/PRODUCT.md` only; do not generate a DESIGN.md."*
 2. `docs/design-system.md` is up to date with anything new the user has shipped since the last edit. If a recent commit added a new primitive that isn't documented there, run the `sync-docs` skill before proceeding — not `/impeccable document`.
 
 After Phase 0, never re-run it. If you find yourself reaching for `/impeccable teach` a second time, stop — `PRODUCT.md` already exists and should be *edited* directly, not regenerated.
