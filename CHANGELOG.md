@@ -231,6 +231,10 @@
 
 #### Fixed
 
+**Frontend / SPA host (Stage 9 close-out — production stylesheet, 2026-06-29)**
+- The single-page app shipped completely unstyled in production (manifest mode): the SPA host page emitted the JavaScript bundle but never emitted a stylesheet `<link>`, so no CSS loaded on any `/app/*` screen. This was invisible during local development, where the Vite dev server injects CSS through JavaScript. Fixed by adding the missing `<link vite-href="~/src/app/main.tsx" rel="stylesheet">` tag to `Views/App/Index.cshtml`. Found during the Stage 9 close-out responsive verification — the first check to render the production build rather than the dev server.
+- New E2E regression guard `ProjectCeres.Client/e2e/auth/spa-stylesheet.spec.ts` — fails if the host stops emitting the stylesheet or if the global styles stop applying on the auth surface.
+
 **Authentication (Stage 9 close-out — Login error handling, 2026-06-14)**
 - Login no longer reports network failures or server (500) errors as "Email or password is incorrect" — a network error now shows a retry toast (with the form preserved) and a server error shows a distinct message.
 - A locked account now shows an inline "Account locked — check your email for an unlock link" message instead of an abrupt redirect (the previously-unused message is now wired up).

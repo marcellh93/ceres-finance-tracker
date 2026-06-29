@@ -130,6 +130,8 @@ Focus on critical user-facing flows that cross the full stack and are not covere
 
 > **Stage 9.11 shipped the AUTH golden paths** — login + TOTP, register + email-verify, password-reset, lockout self-service unlock, and backup-code recovery. The financial-flow bullets below are aspirational for subsequent stages.
 
+> **Visual/styling verification must render the manifest-mode build, never the Vite dev server.** The dev server injects CSS through JavaScript, so a missing production stylesheet `<link>` looks fine in dev and breaks only in the staged bundle. The E2E `webServer` serves the production bundle, which is the only path that exercises the real asset wiring. `e2e/auth/spa-stylesheet.spec.ts` pins this for the SPA host (added at the Stage 9 close-out after the dev server had masked a whole-SPA unstyled-in-production bug — see `roadmap-phase-three.md` § Stage 9).
+
 - Login and TOTP authentication flow
 - Account creation and opening balance
 - Recording a transaction and verifying it appears in the account balance

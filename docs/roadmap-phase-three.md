@@ -943,7 +943,7 @@ Tests required before Stage 9 begins:
 
 ## Stage 9 — Auth SPA pages (Batch 3e)
 
-**Status: ❌ Pending.** First user-visible Phase 3 work. Lands after Stage 8 because every flow depends on a working email service.
+**Status: ✅ Done (closed 2026-06-29).** First user-visible Phase 3 work. All sub-stages shipped across 9.1–9.11 (9.8 reauth relocated to Stage 12.9 with a receiving `[ ]` + code tripwire); the 2026-06-14 close-out commits wired security-event emails, accessibility, and error states. Close-out responsive verification (768px + 1280px, manifest-mode Playwright render) uncovered and fixed a production bug where the SPA host emitted no stylesheet `<link>` — the whole SPA shipped unstyled in manifest mode (see the Desktop responsive checklist item). Lands after Stage 8 because every flow depends on a working email service.
 
 > **Goal:** every auth screen exists in the SPA, designed to a high bar (these are the first thing beta users see), with full localization (EN/ES), accessibility (focus management, `aria-live`), and clear error states.
 
@@ -1059,13 +1059,13 @@ Localization:
 - [x] Every string in every auth page uses `useTranslation()` keyed strings
 - [x] EN + ES translations complete in `en.json` and `es.json`
 - [x] No untranslated copy visible when toggling to ES — verified 2026-05-20 (Section E): `/login` and `/login/totp` rendered fully in Spanish (Iniciar sesión, Verifica tu identidad, Correo electrónico, Contraseña, ¿Olvidaste tu contraseña?, Crear una cuenta, Recordarme en este dispositivo, Volver a iniciar sesión, ¿Perdiste el dispositivo? Usa un código de respaldo). No English leaks observed.
-- [ ] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale — N/A so far: no relative-time strings render on the auth surfaces walked in 2026-05-20 Section E. Leave open until a surface that renders one is exercised.
+- [x] Date/time strings (e.g., "Token expires in 15 minutes") respect the user's locale — N/A: no relative-time strings render on any auth surface (confirmed at close-out 2026-06-29). The standing i18n rule covers any such string a future surface introduces; nothing to verify on the Stage 9 surfaces.
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory — auth surfaces are single-column centered card on every tier):
 
 - [x] Mobile (375px iPhone SE): centered card fills viewport with comfortable padding; no horizontal overflow; touch targets on every input/button ≥ 44×44px — verified 2026-05-20 (Section E step 41) across `/login`, `/login/totp`, `/password-reset`, `/password-reset/confirm`, `/security`. No horizontal overflow on any surface.
-- [ ] Tablet (768px iPad): centered card constrained to a readable max-width; layout unchanged from mobile beyond the max-width clamp
-- [ ] Desktop (≥ 1024px): centered card constrained to a narrow max-width; sidebar/app shell absent on every auth page
+- [x] Tablet (768px iPad): centered card constrained to a readable max-width; layout unchanged from mobile beyond the max-width clamp — verified 2026-06-29 via Playwright manifest-mode render of `/login`, `/register`, `/password-reset` at 768px (centered max-width card, no app shell).
+- [x] Desktop (≥ 1024px): centered card constrained to a narrow max-width; sidebar/app shell absent on every auth page — verified 2026-06-29 via Playwright manifest-mode render at 1280px. **This pass uncovered + fixed a production bug: the SPA host (`Views/App/Index.cshtml`) emitted no stylesheet `<link>` in manifest mode, so the entire SPA shipped unstyled (invisible in dev, where Vite injects CSS via JS). Fixed by adding `<link vite-href="~/src/app/main.tsx" rel="stylesheet">`; guarded by `ProjectCeres.Client/e2e/auth/spa-stylesheet.spec.ts`.**
 - [x] TOTP 6-digit input renders cleanly on mobile (no tiny touch targets, no zoom-on-focus) — verified 2026-05-20 (Section E images #60, #66, #70): cells fit inside the card at 375px on `/login/totp`, `/security` step 1, and `/password-reset/confirm`.
 - [x] QR code in TOTP setup flow is large enough to scan on mobile when displayed at the user's screen — verified 2026-05-20 (Section E image #66): QR renders at a comfortably scannable size at 375px.
 - [x] Backup codes download offers a `.txt` that copies cleanly on mobile (long press → save / share sheet) — verified 2026-05-20 (Section E images #67/#68 plus user-confirmed Copy all + Download .txt actions appear below the screenshot crop).
