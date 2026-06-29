@@ -686,6 +686,13 @@ if (!importAndReviewEnabled)
     });
 }
 
+// Stage 11 Task 7: one-shot 301 for legacy /app/* bookmarks → /*. Must run BEFORE
+// UseRouting — a rewrite is a pre-routing URL transform; placing it after MapControllers
+// breaks endpoint dispatch and lets /api/* fall through to the SPA fallback. Query string
+// is preserved automatically by RewriteMiddleware. The "^app/" pattern never matches /api.
+app.UseRewriter(new RewriteOptions()
+    .AddRedirect("^app/(.*)", "$1", statusCode: StatusCodes.Status301MovedPermanently));
+
 app.UseRouting();
 
 app.UseRateLimiter();
@@ -703,17 +710,20 @@ app.UseMiddleware<UserBlockedIpMiddleware>();
 
 app.MapControllers();
 
-// Stage 11 Task 7: one-shot 301 for legacy /app/* bookmarks → /*
-// Query string is preserved automatically by RewriteMiddleware.
-app.UseRewriter(new RewriteOptions()
-    .AddRedirect("^app/(.*)", "$1", statusCode: StatusCodes.Status301MovedPermanently));
+// API fallthrough (MUST precede the SPA fallback). A /api/* path that matched
+// no controller returns JSON — never the SPA HTML — and stops MapFallbackToFile
+// from shadowing the Web API (dotnet/aspnetcore#41060). NOT AllowAnonymous: the
+// global FallbackPolicy applies, so an anonymous /api/* request is challenged
+// (401) and an authenticated-but-unmatched one falls to the 404 handler. This
+// preserves the pre-Stage-11 behavior where unmatched authed routes 401'd via
+// the fallback policy.
+app.MapFallback("api/{*path}", () => Results.NotFound());
 
-// Stage 11 Task 5: serve the built SPA for any unmatched path.
-// In manifest/E2E mode this resolves to wwwroot/dist/app.html (the
-// Vite-built host carrying hashed asset links). AllowAnonymous is required
-// because the global FallbackPolicy (line ~300) requires authentication on
-// every endpoint — the SPA shell must be publicly accessible so React Router
-// can render the login page and handle its own auth redirects.
+// Stage 11 Task 5: serve the built SPA for any other unmatched path.
+// In manifest/E2E mode this resolves to wwwroot/dist/app.html (the Vite-built
+// host carrying hashed asset links). AllowAnonymous is required because the
+// global FallbackPolicy requires authentication on every endpoint — the SPA
+// shell must be publicly reachable so React Router can render the login page.
 app.MapFallbackToFile("dist/app.html").AllowAnonymous();
 
 // Stage 6a: removed startup EnsureExistsAsync hook. With HttpContextCurrentUserAccessor,

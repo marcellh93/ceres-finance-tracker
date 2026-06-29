@@ -266,8 +266,12 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task GetDashboardRoot_Returns302_RedirectingToAppShell()
+    public async Task GetDashboardRoot_ServesSpaShell()
     {
+        // Stage 11: the Razor /Dashboard → /app/ 302 redirect stub was deleted with all
+        // Razor controllers. The legacy path now falls through to the SPA fallback
+        // (MapFallbackToFile) and serves the app shell at 200; React Router renders the
+        // route client-side. No server redirect remains.
         using var noRedirectClient = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -275,8 +279,7 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
 
         var response = await noRedirectClient.GetAsync("/Dashboard");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.ToString().Should().Be("/app/");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
     }
 }
