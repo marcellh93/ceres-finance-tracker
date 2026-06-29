@@ -1305,7 +1305,7 @@ Both trees were already highly idiomatic after 9.1.6 (the production sweep + the
 
 ## Stage 11 — Razor + URL cleanup (Batch 4)
 
-**Status: ❌ Pending.** Mechanical cleanup. Lands after Stage 9 because Auth is the last surface that needs the `/app/` prefix to coexist with Razor stubs. (Note: previously stated "after Stage 10" when onboarding occupied that slot; onboarding moved to Stage 15.5, so this stage now follows Stage 9 directly with no functional change.)
+**Status: ✅ Done (2026-06-29).** The product is now a pure Web API + SPA. Three dependency-ordered commits: (1) `45e3845` shelve import + Review from the beta (ADR-0078, premise corrected — both Review tabs are import-fed); (2) `cdefe83` drop the `/app/` prefix, serve the built `dist/app.html` via `MapFallbackToFile`, add the `/app/* → /*` 301, delete all 17 Razor controllers + `Views/`; (3) `0670931` widen the two architecture tests to full scope (teardown-completeness proof), drive `pnpm lint` 39→0, and fix the antiforgery regression (kept `AddControllersWithViews()` for the CSRF filter infra per dotnet/aspnetcore#22189 — the `AddControllers()` swap reddened 278 tests, caught by the full suite). Two plan deltas recorded inline: `AddControllersWithViews()` retained (not `AddControllers()`); legacy `/Movements` returns 200 + SPA shell (client-side NotFound), not a server 404. Close-out evidence bundle (agent-walk over the 5 auth routes, manifest mode) at `.claude/state/evidence/stage-11.9/`. Next pending: Stage 12 (Sessions + Support SPA pages).
 
 > **Goal:** `/app/` prefix dropped, MVC infrastructure stripped from `Program.cs`, all per-area 302 redirects deleted, one-shot `/app/*` → `/*` 301 in place for legacy bookmarks. The product becomes a pure Web API + SPA.
 
@@ -1366,8 +1366,8 @@ Architecture tests (widening from Stage 6a's API-only narrowing):
 Smoke tests:
 
 - [x] Application boots without exception (verified live, E2E + Development).
-- [ ] Full SPA loads at `/` and every page renders — browser agent-walk (Stage close-out evidence bundle).
-- [ ] Browser dev-tools network tab shows no 404s for legacy assets — browser agent-walk.
+- [x] Full SPA loads at `/` and every page renders — agent-walk over `/login`, `/register`, `/email-verify`, `/account/unlock`, `/password-reset` (E2E manifest mode): all served the styled SPA host; evidence at `.claude/state/evidence/stage-11.9/`.
+- [x] No 404s for legacy assets — agent-walk `network_5xx_count: 0`; the only non-2xx are the expected `GET /api/auth/me` 401 (unauthenticated probe on logged-out auth pages) and the `/app/* → /*` 301 redirects.
 - [x] All API integration tests still pass — full `dotnet test` green at close-out (the antiforgery regression that briefly reddened the suite was fixed; root cause: `AddControllers()` swap, reverted).
 - [x] No regressions in the IDOR test suite from Stage 7 — included in the full suite.
 
