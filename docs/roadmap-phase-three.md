@@ -1393,59 +1393,9 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 ---
 
-## Stage 11.5 — Import sandbox + admin tooling (Batch 4)
+## Stage 11.5 — Import sandbox + admin tooling — SHELVED (relocated)
 
-**Status: ⏸️ On hold (shelved 2026-06-29, [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)).** This stage is tooling *for* the import module, which is shelved from the Phase 3 beta (Stage 11.9). It does not execute in Phase 3 and resumes only if/when import is un-shelved. The design below is preserved for that future. Developer-facing test environment for the CSV/XLSX import pipeline. Sits after Stage 11 (Razor cleanup) so the admin SPA route lands into a fully SPA-only world. See [ADR-0072](decisions/ADR-0072-import-sandbox-as-separate-environment.md) for the architecture pattern (multi-environment separation, NOT runtime switch) and the sequencing rationale (post-SPA-migration).
-
-> **Goal:** the developer can iterate on parser bugs against fake bank data with zero risk of contaminating real data, including per-import bulk wipe and row-level multi-select delete. Same code, separate database, separate launch profile, separate port. The boundary is physical — different process, different database, different URL.
-
-### Sub-stages
-
-| # | Sub-stage | Spec / Reference |
-|---|---|---|
-| 11.5.1 | New `ASPNETCORE_ENVIRONMENT=Sandbox` + `appsettings.Sandbox.json` + `Sandbox` launch profile in `Properties/launchSettings.json` | ADR-0072 § Decision 1 |
-| 11.5.2 | `project_ceres_sandbox` database created locally via `createdb`; `scripts/migrate-all.sh` applies migrations to both DBs | ADR-0072 § Decision 1 |
-| 11.5.3 | Fail-fast startup check: refuses to boot the `Sandbox` build if connection string `Database=` does not end with `_sandbox` | ADR-0072 § Decision 1 |
-| 11.5.4 | `ImportBatch` entity + nullable `ImportBatchId` FK on `Transaction`, `Transfer`, `LiabilityPayment`; `ImportService` mints a batch row per import and stamps every produced row | ADR-0072 § Decision 2 |
-| 11.5.5 | Admin SPA route `/admin/import-batches` (list view + detail view) in `ProjectCeres.Client/`; uses shadcn DataTable + TanStack row selection; bulk-wipe and multi-select-delete actions | ADR-0072 § Decision 2 |
-| 11.5.6 | Admin API endpoints register conditionally (`Sandbox` + `Development` only); architecture test asserts production 404 | ADR-0072 § Decision 1 |
-| 11.5.7 | `IHostedService` seed runner gated to `Sandbox` environment: creates one sandbox user + fixed test accounts (Test Checking EUR / Test Checking USD / Test Savings / Test Credit Card) + default category set on first boot; idempotent | ADR-0072 § Decision 1 |
-
-### Verification checklist
-
-Sandbox environment + database:
-
-- [ ] `dotnet run --launch-profile Sandbox` boots the app against `project_ceres_sandbox` on a port distinct from `Development`
-- [ ] `Development` and `Sandbox` builds can run simultaneously without port conflicts
-- [ ] `scripts/migrate-all.sh` applies pending migrations to both databases and exits non-zero on any per-database failure
-- [ ] Startup fail-fast: launching `Sandbox` with a connection string whose `Database=` value does not match `*_sandbox` throws before `app.Run()` (integration test against deliberate misconfiguration)
-- [ ] Seed runner creates the fixed sandbox user + accounts + categories on first sandbox boot; idempotent on subsequent boots
-- [ ] Seed runner is NOT registered when `EnvironmentName != "Sandbox"` (architecture test)
-
-`ImportBatch` primitive:
-
-- [ ] `ImportBatch` entity exists with `Id`, `UserId`, `StartedAt`, `SourceFileName`, `ParserVersion?`, `RowsTotal`, `RowsImported`, `Status` columns
-- [ ] `Transaction`, `Transfer`, `LiabilityPayment` each carry nullable `ImportBatchId Guid?` FK with index
-- [ ] EF query filter on `ImportBatch` registered alongside the other `IUserOwned` filters in `OnModelCreating`
-- [ ] `ImportService.ImportAsync` creates the `ImportBatch` row first, sets its `Status = InProgress`, then stamps every produced row with `ImportBatchId`; final status set to `Succeeded` / `Failed` / `Aborted` before commit
-- [ ] Existing rows from before Stage 11.5 have `ImportBatchId = null` and continue to read/write normally (back-compat test)
-- [ ] Architecture test: every entity created by an `IImporter<T>` implementation has an `ImportBatchId` column
-
-Admin SPA route:
-
-- [ ] `/admin/import-batches` lists every batch in reverse-chronological order for the current user
-- [ ] Per-batch "Delete batch" cascades to every produced row + the `ImportBatch` row itself, in a single transaction
-- [ ] Detail view `/admin/import-batches/:id` lists the rows the batch produced with a checkbox column
-- [ ] "Delete selected" deletes exactly the multi-selected rows in a single transaction; the `ImportBatch` row remains (only its `RowsImported` count is recalculated)
-- [ ] Empty-state copy when a batch has no surviving rows (all were deleted individually)
-- [ ] Admin route + API endpoints register only when `EnvironmentName` is `Sandbox` or `Development`
-- [ ] Integration test: in `Production` environment, `GET /api/admin/import-batches` returns 404 (route does not exist in the route table)
-
-Operational:
-
-- [ ] README's "Setup" section documents creating the sandbox database + running `migrate-all.sh`
-- [ ] `appsettings.Sandbox.json` is checked in; secrets (if any) live in User Secrets keyed to the Sandbox environment
-- [ ] CI smoke test: spin up a throwaway Postgres, run `migrate-all.sh`, run the seed runner, import a checked-in fake CSV, assert the rows landed, bulk-wipe, assert the rows are gone
+**Status: ⏸️ On hold (shelved 2026-06-29, [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)).** Tooling *for* the import module, which is shelved from the Phase 3 beta (Stage 11.9). It does not execute in Phase 3. The full design (sub-stages 11.5.1–11.5.7 + verification checklist) was relocated to [`planning-future.md` § Import sandbox + admin tooling](planning-future.md#import-sandbox--admin-tooling--shelved-was-roadmap-stage-115) on 2026-06-29 so the live Phase 3 roadmap carries no unchecked boxes under a shelved stage. It resumes only if/when import is un-shelved (reverses ADR-0078); architecture rationale in [ADR-0072](decisions/ADR-0072-import-sandbox-as-separate-environment.md).
 
 ---
 

@@ -344,6 +344,64 @@ Coach.0 ships as the first sub-stage of the Coach batch. Not pulled forward into
 
 ---
 
+### Import sandbox + admin tooling — SHELVED (was roadmap Stage 11.5)
+
+**Status:** On hold, shelved 2026-06-29 ([ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)). This is tooling *for* the import module, which is shelved from the Phase 3 beta (roadmap Stage 11.9). It does not execute in Phase 3 and resumes only if/when import is un-shelved. Relocated here from `roadmap-phase-three.md` on 2026-06-29 so the live Phase 3 roadmap carries no unchecked boxes under a shelved stage; the design is preserved verbatim below. Architecture pattern + sequencing rationale: [ADR-0072](decisions/ADR-0072-import-sandbox-as-separate-environment.md) (multi-environment separation, NOT runtime switch; lands post-SPA-migration).
+
+**Goal:** the developer can iterate on parser bugs against fake bank data with zero risk of contaminating real data, including per-import bulk wipe and row-level multi-select delete. Same code, separate database, separate launch profile, separate port. The boundary is physical — different process, different database, different URL.
+
+**Gate:** resumes only when import is un-shelved (reverses ADR-0078). At that point, restore a stage in the then-active roadmap from the sub-stages below.
+
+#### Sub-stages
+
+| # | Sub-stage | Spec / Reference |
+|---|---|---|
+| 11.5.1 | New `ASPNETCORE_ENVIRONMENT=Sandbox` + `appsettings.Sandbox.json` + `Sandbox` launch profile in `Properties/launchSettings.json` | ADR-0072 § Decision 1 |
+| 11.5.2 | `project_ceres_sandbox` database created locally via `createdb`; `scripts/migrate-all.sh` applies migrations to both DBs | ADR-0072 § Decision 1 |
+| 11.5.3 | Fail-fast startup check: refuses to boot the `Sandbox` build if connection string `Database=` does not end with `_sandbox` | ADR-0072 § Decision 1 |
+| 11.5.4 | `ImportBatch` entity + nullable `ImportBatchId` FK on `Transaction`, `Transfer`, `LiabilityPayment`; `ImportService` mints a batch row per import and stamps every produced row | ADR-0072 § Decision 2 |
+| 11.5.5 | Admin SPA route `/admin/import-batches` (list view + detail view) in `ProjectCeres.Client/`; uses shadcn DataTable + TanStack row selection; bulk-wipe and multi-select-delete actions | ADR-0072 § Decision 2 |
+| 11.5.6 | Admin API endpoints register conditionally (`Sandbox` + `Development` only); architecture test asserts production 404 | ADR-0072 § Decision 1 |
+| 11.5.7 | `IHostedService` seed runner gated to `Sandbox` environment: creates one sandbox user + fixed test accounts (Test Checking EUR / Test Checking USD / Test Savings / Test Credit Card) + default category set on first boot; idempotent | ADR-0072 § Decision 1 |
+
+#### Verification checklist
+
+Sandbox environment + database:
+
+- [ ] `dotnet run --launch-profile Sandbox` boots the app against `project_ceres_sandbox` on a port distinct from `Development`
+- [ ] `Development` and `Sandbox` builds can run simultaneously without port conflicts
+- [ ] `scripts/migrate-all.sh` applies pending migrations to both databases and exits non-zero on any per-database failure
+- [ ] Startup fail-fast: launching `Sandbox` with a connection string whose `Database=` value does not match `*_sandbox` throws before `app.Run()` (integration test against deliberate misconfiguration)
+- [ ] Seed runner creates the fixed sandbox user + accounts + categories on first sandbox boot; idempotent on subsequent boots
+- [ ] Seed runner is NOT registered when `EnvironmentName != "Sandbox"` (architecture test)
+
+`ImportBatch` primitive:
+
+- [ ] `ImportBatch` entity exists with `Id`, `UserId`, `StartedAt`, `SourceFileName`, `ParserVersion?`, `RowsTotal`, `RowsImported`, `Status` columns
+- [ ] `Transaction`, `Transfer`, `LiabilityPayment` each carry nullable `ImportBatchId Guid?` FK with index
+- [ ] EF query filter on `ImportBatch` registered alongside the other `IUserOwned` filters in `OnModelCreating`
+- [ ] `ImportService.ImportAsync` creates the `ImportBatch` row first, sets its `Status = InProgress`, then stamps every produced row with `ImportBatchId`; final status set to `Succeeded` / `Failed` / `Aborted` before commit
+- [ ] Existing rows from before Stage 11.5 have `ImportBatchId = null` and continue to read/write normally (back-compat test)
+- [ ] Architecture test: every entity created by an `IImporter<T>` implementation has an `ImportBatchId` column
+
+Admin SPA route:
+
+- [ ] `/admin/import-batches` lists every batch in reverse-chronological order for the current user
+- [ ] Per-batch "Delete batch" cascades to every produced row + the `ImportBatch` row itself, in a single transaction
+- [ ] Detail view `/admin/import-batches/:id` lists the rows the batch produced with a checkbox column
+- [ ] "Delete selected" deletes exactly the multi-selected rows in a single transaction; the `ImportBatch` row remains (only its `RowsImported` count is recalculated)
+- [ ] Empty-state copy when a batch has no surviving rows (all were deleted individually)
+- [ ] Admin route + API endpoints register only when `EnvironmentName` is `Sandbox` or `Development`
+- [ ] Integration test: in `Production` environment, `GET /api/admin/import-batches` returns 404 (route does not exist in the route table)
+
+Operational:
+
+- [ ] README's "Setup" section documents creating the sandbox database + running `migrate-all.sh`
+- [ ] `appsettings.Sandbox.json` is checked in; secrets (if any) live in User Secrets keyed to the Sandbox environment
+- [ ] CI smoke test: spin up a throwaway Postgres, run `migrate-all.sh`, run the seed runner, import a checked-in fake CSV, assert the rows landed, bulk-wipe, assert the rows are gone
+
+---
+
 ## Phase 5 — Business Model
 
 **Gate: Phase 4 must be stable. See [`business-model.md`](business-model.md) for full detail.**
