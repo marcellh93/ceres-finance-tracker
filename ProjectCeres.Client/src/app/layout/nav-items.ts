@@ -1,17 +1,14 @@
 import {
   BarChart3,
-  Inbox,
   Landmark,
   LayoutList,
   LifeBuoy,
   Repeat,
   Settings as SettingsIcon,
   Tags,
-  Upload,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
-import { useReviewCount } from '../features/review/ReviewCountProvider';
 
 /** Hook returning a numeric badge count to display next to a nav item. */
 export type NavBadgeHook = () => number;
@@ -33,14 +30,11 @@ export type NavGroup = {
   items: NavItem[];
 };
 
-const useReviewBadge: NavBadgeHook = () => useReviewCount().total;
-
 export const navGroups: NavGroup[] = [
   {
     label: 'Activity',
     items: [
       { to: '/movements', label: 'Movements', icon: LayoutList },
-      { to: '/review',    label: 'Review',    icon: Inbox, useBadge: useReviewBadge },
     ],
   },
   {
@@ -55,7 +49,6 @@ export const navGroups: NavGroup[] = [
     label: 'Tools',
     items: [
       { to: '/recurring', label: 'Recurring Transactions', icon: Repeat },
-      { to: '/import',    label: 'Import',                  icon: Upload },
       { to: '/reports',   label: 'Reports',                 icon: BarChart3 },
     ],
   },

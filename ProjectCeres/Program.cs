@@ -57,6 +57,14 @@ builder.Services.AddControllers()
         };
     });
 
+// ADR-0078 — shelve import + review endpoints from the beta (Production).
+// Enabled (endpoints live) in Development, E2E, and Testing; fenced (404) everywhere else.
+// A middleware fence (added to app below, before UseRouting) short-circuits before the
+// auth FallbackPolicy can issue a 401, ensuring a clean 404 for unauthenticated callers.
+var importAndReviewEnabled = builder.Environment.IsDevelopment()
+    || builder.Environment.IsEnvironment("E2E")
+    || builder.Environment.IsEnvironment("Testing");
+
 // Phase 3 Stage 7: background-job scope primitive. Singleton — the AsyncLocal inside
 // does the per-flow isolation; the holder is process-wide. IUserJobRunner is scoped
 // because it depends on the scoped AppDbContext.
@@ -649,6 +657,26 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ProjectCeres.Common.Localization.LanguagePreferenceMiddleware>();
+
+// ADR-0078 — shelve import + review endpoints in the beta (Production).
+// Placed BEFORE UseRouting so the 404 fires before the auth FallbackPolicy
+// can issue a 401. In Development / E2E / Testing importAndReviewEnabled is
+// true and this block is skipped, keeping endpoints live for tests and dev.
+if (!importAndReviewEnabled)
+{
+    app.Use(static async (context, next) =>
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/api/import", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/api/reconciliation-review", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/api/transfer-review", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        await next(context);
+    });
+}
 
 app.UseRouting();
 

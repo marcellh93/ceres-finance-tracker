@@ -287,6 +287,8 @@ Two enforcement mechanisms guarding auth / migration / `IUserOwned` diffs.
 
 ### Phase 2 Import Coverage
 
+> **Beta status (ADR-0078, 2026-06-29):** the import and review integration suites below run only in environments where the feature is enabled (Development/E2E/Testing). In beta/Production the API endpoints are fenced (404), so these suites are not exercised there. A dedicated `ShelvedEndpointFencingTests` asserts that the fenced endpoints (`/api/import*`, `/api/reconciliation-review*`, `/api/transfer-review*`) return 404 in the beta environment.
+
 | Service / Class                                | Test file                                                                              |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `CsvImportParser`                              | `Unit/CsvImportParserTests.cs`                                                         |
@@ -296,6 +298,7 @@ Two enforcement mechanisms guarding auth / migration / `IUserOwned` diffs.
 | `ImportProfileService`                         | `Integration/ImportProfileServiceTests.cs`                                             |
 | `HeaderDetectionService`                       | `Unit/HeaderDetectionServiceTests.cs`                                                  |
 | Import headers API (`ImportHeadersController`) | `Integration/ImportApiTests.cs` (via `WebApplicationFactory`)                          |
+| Endpoint fence (beta/Production) | `Integration/ShelvedEndpointFencingTests.cs` — asserts 404 for all fenced import + review routes |
 
 Razor controller actions remain untested — they are thin HTTP handlers with a defined end-of-life in Phase 3; testing them is not worth the investment. API controllers in `Controllers/Api/` are integration tested using `WebApplicationFactory<Program>` (see ADR-0037).
 

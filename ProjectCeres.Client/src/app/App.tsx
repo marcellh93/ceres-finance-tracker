@@ -8,7 +8,6 @@ import { Accounts } from './pages/Accounts';
 import { Budgets } from './pages/Budgets';
 import { Categories } from './pages/Categories';
 import { Dashboard } from './pages/Dashboard';
-import { Import } from './pages/Import';
 import { NotFound } from './pages/NotFound';
 import { Profile } from './pages/Profile';
 import { Recurring } from './pages/Recurring';
@@ -21,7 +20,6 @@ import { ExpenseBreakdown } from './features/reports/ExpenseBreakdown';
 import { BudgetVsActual } from './features/reports/BudgetVsActual';
 import { LargestExpenses } from './features/reports/LargestExpenses';
 import { TransactionHistory } from './features/reports/TransactionHistory';
-import { Review } from './pages/Review';
 // Security lazy-loaded: TOTP wizard pulls qrcode.react + the full security
 // feature folder, only needed when the user visits /app/security. Keeps the
 // main app chunk thin (Phase 2 budget breach 2026-05-18).
@@ -35,9 +33,6 @@ import { BudgetCreate } from './features/budgets/BudgetCreate';
 import { BudgetEdit } from './features/budgets/BudgetEdit';
 import { CategoryCreate } from './features/categories/CategoryCreate';
 import { CategoryEdit } from './features/categories/CategoryEdit';
-import { ProfilesLayout } from './features/import/ProfilesLayout';
-import { ProfileCreate } from './features/import/ProfileCreate';
-import { ProfileEdit } from './features/import/ProfileEdit';
 import { MovementCreate } from './features/movements/MovementCreate';
 import { MovementEdit } from './features/movements/MovementEdit';
 import { MovementsLayout } from './features/movements/MovementsLayout';
@@ -96,7 +91,6 @@ export function App() {
           <Route path="new" element={<MovementCreate />} />
           <Route path=":id/edit" element={<MovementEdit />} />
         </Route>
-        <Route path="review" element={<Review />} />
         <Route path="accounts" element={<Accounts />}>
           <Route path="new" element={<AccountCreate />} />
           <Route path=":id/edit" element={<AccountEdit />} />
@@ -113,11 +107,6 @@ export function App() {
         <Route path="recurring" element={<Recurring />}>
           <Route path="new" element={<RecurringCreateBridge />} />
           <Route path=":id/edit" element={<RecurringEditBridge />} />
-        </Route>
-        <Route path="import" element={<Import />} />
-        <Route path="import/profiles" element={<ProfilesLayout />}>
-          <Route path="new" element={<ProfileCreate />} />
-          <Route path=":id/edit" element={<ProfileEdit />} />
         </Route>
         <Route path="reports" element={<ReportsLayout />}>
           <Route index element={<Navigate to="net-worth" replace />} />

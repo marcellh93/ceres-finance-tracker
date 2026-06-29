@@ -922,6 +922,8 @@ Stores named column mapping profiles for CSV and Excel import. See ADR-0047, ADR
 
 ### ImportStagedTransfer (new entity — Phase 2, Stage 3.5)
 
+> **Beta status (ADR-0078, 2026-06-29):** `ImportStagedTransaction` and `ImportStagedTransfer` tables are retained in the schema but their write path (`ImportService`) is beta-disabled — no new rows are staged in beta/Production. Read endpoints for these tables are also fenced (see `api-contract.md`).
+
 Holds import rows that triggered transfer detection and are awaiting manual review before
 they can be imported as transactions or linked to existing transfers. One row per staged
 import row. Rows are never deleted — they transition through `Status` values instead.

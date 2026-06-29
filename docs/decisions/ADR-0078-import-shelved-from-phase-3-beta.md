@@ -23,15 +23,16 @@ The CSV/XLSX import module shipped as SPA surfaces in Batch 2 (Stage 4, 2026-05-
 - The `/app/import` wizard and `/app/import/profiles` column-mapping profiles (SPA routes + pages).
 - The **Import** item in the sidebar's TOOLS group.
 - The `ImportStagedTransactions` / `ImportStagedTransfers` staging tables and the import API endpoints.
-- The **coupled half of the Review page** — its **Reconciliations** tab exists to triage rows the importer staged. The **Transfers** tab is independent.
+- The **entire Review page** — both its **Reconciliations** tab and its **Transfers** tab read exclusively from the `ImportStagedTransactions` / `ImportStagedTransfers` staging tables, which are written only by `ImportService`. With import shelved, both tabs are permanently empty; the Review nav item, `/review` route, and `ReviewCountProvider` are shelved alongside import.
 
-## Open question (resolve at Stage 11.9 execution)
+## Open question — RESOLVED 2026-06-29
 
-The Review/Reconciliations coupling. **Unknown until investigated:** whether the Review page cleanly keeps its Transfers tab and drops Reconciliations, or whether Review is shelved alongside import. The tab separation in `Review.tsx` must be inspected before deciding. Recorded as a checklist item under Stage 11.9.
+The Review/Reconciliations coupling. **Resolved at Stage 11.9 execution:** inspection of `Review.tsx` confirmed that both the Reconciliations tab and the Transfers tab read exclusively from `ImportStaged*` staging tables written only by `ImportService`. With import shelved, neither tab can ever have content. The entire Review page (nav item, `/review` route, `ReviewCountProvider`) is shelved alongside import.
 
 ## Consequences
 
 - Import code remains in the tree but becomes unreachable once Stage 11.9 runs; nothing is deleted, so re-enabling is a matter of restoring the nav item + routes.
 - Stage 11.5 does not execute in Phase 3; ADR-0072's sandbox work is deferred until import is un-shelved.
-- `api-contract.md`, `models.md` (staging entities), and `testing.md` (import suites) are **not** edited now — the code they document still exists; they update when Stage 11.9 removes the surface.
+- `api-contract.md`, `models.md` (staging entities), and `testing.md` (import suites) are updated when Stage 11.9 executes to reflect the shelved-from-beta state.
 - Future "make import robust" work starts from the un-shelving of this ADR, not from scratch.
+- **Endpoint fence caution:** the fence in `Program.cs` uses prefix matching on `/api/import`, `/api/reconciliation-review`, and `/api/transfer-review`. A future controller whose route starts with one of those prefixes (e.g. a hypothetical `/api/important`) would be collaterally fenced. No such route exists today, but this is on record for future awareness.

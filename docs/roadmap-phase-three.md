@@ -1382,13 +1382,13 @@ Frontend lint cleanup (sub-stage 11.8):
 
 Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)):
 
-- [ ] **Import** sidebar nav item removed from `ProjectCeres.Client/src/app/layout/nav-items.ts` (and the Sidebar/MobileDrawer/TopBar tests updated to match)
-- [ ] `/app/import` and `/app/import/profiles` routes removed from `App.tsx` (the lazy page imports too); `/import*` resolves to NotFound
-- [ ] **Review/Reconciliations coupling resolved** — inspect `Review.tsx` tab separation and decide: keep the Transfers tab + drop Reconciliations, or shelve Review too. Record the call in ADR-0078 and update the Review checklist/nav accordingly
-- [ ] Import API endpoints (`/api/import*`, `/api/import-profiles*`) fenced off so no shelved UI path reaches them (return 404, or gate behind a non-beta environment) — architecture test pins it
-- [ ] Import code, services, and `ImportStagedTransactions` / `ImportStagedTransfers` tables left in the tree (NOT deleted — recoverable per ADR-0078)
-- [ ] `api-contract.md`, `models.md` (staging entities), `testing.md` (import suites) updated to reflect the shelved-from-beta state in the same commit
-- [ ] No dangling references to the removed routes/nav in code or docs (grep `app/import`)
+- [x] **Import** sidebar nav item removed from `ProjectCeres.Client/src/app/layout/nav-items.ts` (and the Sidebar/MobileDrawer/TopBar tests updated to match)
+- [x] `/app/import` and `/app/import/profiles` routes removed from `App.tsx` (the lazy page imports too); `/import*` resolves to NotFound
+- [x] **Review/Reconciliations coupling resolved** — both the Reconciliations and Transfers tabs read exclusively from `ImportStaged*` tables written only by `ImportService`; the entire Review page (nav item, `/review` route, `ReviewCountProvider`) is shelved alongside import. Recorded in ADR-0078 (2026-06-29).
+- [x] Import API endpoints (`/api/import*`, `/api/import-profiles*`) fenced off so no shelved UI path reaches them (return 404, or gate behind a non-beta environment) — architecture test pins it (`ShelvedEndpointFencingTests`)
+- [x] Import code, services, and `ImportStagedTransactions` / `ImportStagedTransfers` tables left in the tree (NOT deleted — recoverable per ADR-0078)
+- [x] `api-contract.md`, `models.md` (staging entities), `testing.md` (import suites) updated to reflect the shelved-from-beta state in the same commit
+- [x] No dangling references to the removed routes/nav in code or docs (grep `app/import`)
 
 ---
 

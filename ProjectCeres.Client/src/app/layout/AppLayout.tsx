@@ -4,7 +4,6 @@ import { MobileDrawer } from './MobileDrawer';
 import { ReminderCountProvider } from './ReminderCountProvider';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
-import { ReviewCountProvider } from '../features/review/ReviewCountProvider';
 import { useMediaQuery } from '../lib/use-media-query';
 import { useScrollRestoration } from '../lib/use-scroll-restoration';
 
@@ -16,8 +15,7 @@ export function AppLayout() {
 
   return (
     <ReminderCountProvider>
-      <ReviewCountProvider>
-        <div className="grid h-screen grid-rows-[3.5rem_1fr] bg-background text-foreground">
+      <div className="grid h-screen grid-rows-[3.5rem_1fr] bg-background text-foreground">
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-1.5 focus:text-primary-foreground"
@@ -41,7 +39,6 @@ export function AppLayout() {
           </div>
           {/* Toaster mounted at App root (App.tsx) so AuthLayout pages also get it. */}
         </div>
-      </ReviewCountProvider>
     </ReminderCountProvider>
   );
 }

@@ -49,11 +49,9 @@ const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/email-verify',   expectedHeading: 'This verification link is invalid' },
   { path: '/',             expectedHeading: 'Dashboard' },
   { path: '/movements',    expectedHeading: 'Movements' },
-  { path: '/review',       expectedHeading: 'Review' },
   { path: '/accounts',     expectedHeading: 'Accounts' },
   { path: '/categories',   expectedHeading: 'Categories' },
   { path: '/budgets',      expectedHeading: 'Budgets' },
-  { path: '/import',       expectedHeading: 'Import' },
   { path: '/reports/net-worth-over-time', expectedHeading: 'Net Worth Over Time' },
   { path: '/settings',     expectedHeading: 'Settings' },
   { path: '/support',      expectedHeading: 'Support' },
@@ -120,6 +118,22 @@ describe('App routes', () => {
       { timeout: 3000 }
     );
   });
+});
+
+describe('Shelved routes (ADR-0078)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(['/review', '/import', '/import/profiles'])(
+    'renders NotFound for shelved route %s',
+    async (path) => {
+      mockAuthedMe();
+      renderApp(path);
+      await waitFor(() =>
+        expect(screen.getByText(/not found/i)).toBeInTheDocument(),
+        { timeout: 3000 },
+      );
+    },
+  );
 });
 
 describe('App routing structure', () => {
