@@ -39,3 +39,8 @@ dotnet_diagnostic.CER006.severity = error
 # Tripwire is `dotnet format style --verify-no-changes --diagnostics IDE0001`
 # (IDE0001 is a format/IDE-only analyzer — it does NOT surface at dotnet build).
 dotnet_diagnostic.IDE0001.severity = warning
+
+# EF Core auto-generated migration files — never hand-edited.
+[ProjectCeres/Migrations/*.cs]
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1825.severity = none

@@ -51,30 +51,59 @@ public sealed class RowLevelSecurityInterceptor(
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
     {
-        SetUserGuc(connection, async: false).GetAwaiter().GetResult();
+        SetUserGucSync(connection);
         base.ConnectionOpened(connection, eventData);
     }
 
     public override async Task ConnectionOpenedAsync(
         DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
     {
-        await SetUserGuc(connection, async: true, cancellationToken).ConfigureAwait(false);
+        await SetUserGucAsync(connection, cancellationToken).ConfigureAwait(false);
         await base.ConnectionOpenedAsync(connection, eventData, cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask SetUserGuc(
-        DbConnection connection, bool async, CancellationToken cancellationToken = default)
+    private void SetUserGucSync(DbConnection connection)
     {
         switch (user.Context)
         {
             case UserContext.Resolved resolved:
-                await ExecuteAsync(connection, $"SELECT set_config('{GucName}', '{resolved.UserId:D}', false)", async, cancellationToken)
+                ExecuteSync(connection, $"SELECT set_config('{GucName}', '{resolved.UserId:D}', false)");
+                return;
+
+            case UserContext.PreAuth preAuth:
+                logger.LogDebug("RLS GUC RESET on pre-auth call site {CallSite}.", preAuth.CallSite);
+                ExecuteSync(connection, $"RESET \"{GucName}\"");
+                return;
+
+            case UserContext.Background background:
+                logger.LogError(
+                    "DB connection opened in Background context without a resolved user. " +
+                    "Reason: {Reason}. RLS policies will evaluate to zero rows.",
+                    background.Reason);
+                ExecuteSync(connection, $"RESET \"{GucName}\"");
+                return;
+
+            case UserContext.Uninitialized:
+                // Fires at EF model-creation time before any HTTP context exists. Logging here
+                // would be noise — the model creator is supposed to be empty. Connection still
+                // gets RESET so a leaked GUC from a prior pool user can't bleed through.
+                ExecuteSync(connection, $"RESET \"{GucName}\"");
+                return;
+        }
+    }
+
+    private async Task SetUserGucAsync(DbConnection connection, CancellationToken cancellationToken)
+    {
+        switch (user.Context)
+        {
+            case UserContext.Resolved resolved:
+                await ExecuteAsync(connection, $"SELECT set_config('{GucName}', '{resolved.UserId:D}', false)", cancellationToken)
                     .ConfigureAwait(false);
                 return;
 
             case UserContext.PreAuth preAuth:
                 logger.LogDebug("RLS GUC RESET on pre-auth call site {CallSite}.", preAuth.CallSite);
-                await ExecuteAsync(connection, $"RESET \"{GucName}\"", async, cancellationToken)
+                await ExecuteAsync(connection, $"RESET \"{GucName}\"", cancellationToken)
                     .ConfigureAwait(false);
                 return;
 
@@ -83,7 +112,7 @@ public sealed class RowLevelSecurityInterceptor(
                     "DB connection opened in Background context without a resolved user. " +
                     "Reason: {Reason}. RLS policies will evaluate to zero rows.",
                     background.Reason);
-                await ExecuteAsync(connection, $"RESET \"{GucName}\"", async, cancellationToken)
+                await ExecuteAsync(connection, $"RESET \"{GucName}\"", cancellationToken)
                     .ConfigureAwait(false);
                 return;
 
@@ -91,26 +120,23 @@ public sealed class RowLevelSecurityInterceptor(
                 // Fires at EF model-creation time before any HTTP context exists. Logging here
                 // would be noise — the model creator is supposed to be empty. Connection still
                 // gets RESET so a leaked GUC from a prior pool user can't bleed through.
-                await ExecuteAsync(connection, $"RESET \"{GucName}\"", async, cancellationToken)
+                await ExecuteAsync(connection, $"RESET \"{GucName}\"", cancellationToken)
                     .ConfigureAwait(false);
                 return;
         }
     }
 
-    private static async ValueTask ExecuteAsync(
-        DbConnection connection, string sql, bool async, CancellationToken cancellationToken)
+    private static void ExecuteSync(DbConnection connection, string sql)
     {
-        if (async)
-        {
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.ExecuteNonQuery();
-        }
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    private static async Task ExecuteAsync(DbConnection connection, string sql, CancellationToken cancellationToken)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = sql;
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 }

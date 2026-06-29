@@ -64,9 +64,9 @@ public class EmailConfirmationUnderRlsTests : AppRoleTestBase
         register.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Step 2: extract the raw token from the confirmation email. Register emits exactly one
-        // message and its URL is of the form {base}/app/email-verify#token={raw}; select by that
+        // message and its URL is of the form {base}/email-verify#token={raw}; select by that
         // URL and reuse the public ExtractResetTokenFromMessage helper (generic "token=" marker).
-        var confirmEmail = captured.Should().ContainSingle(m => m.BodyText.Contains("/app/email-verify#token="),
+        var confirmEmail = captured.Should().ContainSingle(m => m.BodyText.Contains("/email-verify#token="),
             "register issues exactly one confirmation email").Which;
         var rawToken = AuthTestFixture.ExtractResetTokenFromMessage(confirmEmail);
 

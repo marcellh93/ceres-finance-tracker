@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,6 +11,7 @@ public sealed class HaveIBeenPwnedPasswordChecker : IBreachedPasswordChecker
 
     public HaveIBeenPwnedPasswordChecker(HttpClient http) => _http = http;
 
+    [SuppressMessage("Security", "CA5350", Justification = "HIBP Pwned Passwords range API requires SHA-1 k-anonymity; the hash never protects data at rest.")]
     public async Task<bool> IsBreachedAsync(string password, CancellationToken ct = default)
     {
         var bytes = SHA1.HashData(Encoding.UTF8.GetBytes(password));

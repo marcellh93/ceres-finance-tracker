@@ -332,15 +332,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             nameof(RegisterUserOwnedFilter),
             BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-        // Query-filter set = model-derived RLS set MINUS the attachment tables. Attachments
-        // are RLS-protected at the DB layer (Stage 9.5b) but carry no EF query filter — they
-        // are scoped via their parent in service code. See UserOwnedModel + spec §4.1.
+        // Query-filter set = full model-derived RLS set. Attachments now carry a matching
+        // filter (Stage 11) — closes the EF 10622 required-principal advisory and the
+        // direct-query gap, defence-in-depth alongside the DB-layer RLS policy (Stage 9.5b).
         foreach (var table in UserOwnedModel.RlsTables(modelBuilder.Model))
         {
             if (typeof(Movement).IsAssignableFrom(table.EntityType))
                 continue; // TPC subtype — covered by Movement above.
-            if (table.PostgresTableName is "TransactionAttachments" or "TransferAttachments")
-                continue; // RLS-protected; scoped via parent at the EF layer (no query filter).
 
             registerMethod
                 .MakeGenericMethod(table.EntityType)

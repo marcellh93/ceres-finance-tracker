@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace ProjectCeres.Common;
 
 public readonly record struct ResultError(string Code, string Message);
@@ -17,6 +19,7 @@ public readonly struct Result
     public static Result Fail(string code, string message) => new(false, new ResultError(code, message));
 }
 
+[SuppressMessage("Design", "CA1000", Justification = "Static factory methods are the idiomatic construction API for a generic Result type.")]
 public readonly struct Result<T>
 {
     public bool IsSuccess { get; }

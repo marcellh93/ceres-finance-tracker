@@ -22,8 +22,8 @@ public class FileSinkEmailServiceTests
     private static EmailMessage SampleMessage() => new(
         To: BuildRecipient("user@example.test"),
         Subject: "Confirm your email",
-        BodyHtml: "<a href=\"https://localhost/app/email-verify#token=abc\">verify</a>",
-        BodyText: "Verify: https://localhost/app/email-verify#token=abc");
+        BodyHtml: "<a href=\"https://localhost/email-verify#token=abc\">verify</a>",
+        BodyText: "Verify: https://localhost/email-verify#token=abc");
 
     [Fact]
     public async Task SendAsync_writes_one_json_file_with_the_expected_shape()
@@ -43,8 +43,8 @@ public class FileSinkEmailServiceTests
             var root = doc.RootElement;
             root.GetProperty("to").GetString().Should().Be("user@example.test");
             root.GetProperty("subject").GetString().Should().Be("Confirm your email");
-            root.GetProperty("bodyText").GetString().Should().Contain("/app/email-verify#token=abc");
-            root.GetProperty("bodyHtml").GetString().Should().Contain("/app/email-verify#token=abc");
+            root.GetProperty("bodyText").GetString().Should().Contain("/email-verify#token=abc");
+            root.GetProperty("bodyHtml").GetString().Should().Contain("/email-verify#token=abc");
             root.TryGetProperty("sentAtUtc", out _).Should().BeTrue();
         }
         finally { Directory.Delete(dir, recursive: true); }

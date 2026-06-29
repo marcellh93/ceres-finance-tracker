@@ -89,8 +89,8 @@ public class EmailChangeUnderRlsTests : AppRoleTestBase
         requestResp.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
         // Capture the VerifyNew raw token. RequestAsync builds the verify URL as
-        // {base}/app/email-change/confirm#token={raw} and the revoke URL as
-        // {base}/app/email-change/revoke#token={raw}; select the verify email by its confirm URL.
+        // {base}/email-change/confirm#token={raw} and the revoke URL as
+        // {base}/email-change/revoke#token={raw}; select the verify email by its confirm URL.
         var verifyEmail = captured.Should().ContainSingle(m => m.BodyText.Contains("email-change/confirm#token="),
             "the request endpoint issues exactly one VerifyNew email (confirm URL)").Which;
         var rawVerifyToken = AuthTestFixture.ExtractResetTokenFromMessage(verifyEmail);
@@ -170,7 +170,7 @@ public class EmailChangeUnderRlsTests : AppRoleTestBase
             client, "/api/auth/email-change/request", sessionCookie, new { newEmail });
         requestResp.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        // Capture the RevokeOld raw token by its revoke URL: {base}/app/email-change/revoke#token={raw}.
+        // Capture the RevokeOld raw token by its revoke URL: {base}/email-change/revoke#token={raw}.
         var revokeEmail = captured.Should().ContainSingle(m => m.BodyText.Contains("email-change/revoke#token="),
             "the request endpoint issues exactly one RevokeOld email (revoke URL)").Which;
         var rawRevokeToken = AuthTestFixture.ExtractResetTokenFromMessage(revokeEmail);

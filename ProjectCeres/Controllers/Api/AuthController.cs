@@ -567,7 +567,10 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> Logout()
     {
-        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userIdForAudit);
+        if (!Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userIdForAudit))
+        {
+            _logger.LogWarning("Logout called with unparseable NameIdentifier claim; audit row skipped.");
+        }
 
         if (Guid.TryParse(User.FindFirstValue(SessionConstants.SessionIdClaim), out var sid))
         {
