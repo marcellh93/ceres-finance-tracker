@@ -185,7 +185,7 @@ public sealed class PasswordResetService
             sem.Release();
         }
 
-        var resetUrl = $"{resetUrlBase.TrimEnd('/')}/app/password-reset#token={rawToken}";
+        var resetUrl = $"{resetUrlBase.TrimEnd('/')}/password-reset#token={rawToken}";
 
         try
         {

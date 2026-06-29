@@ -10,6 +10,19 @@
     <script>
       (function () {
         try {
+          var stored = localStorage.getItem('ceres.theme:v1');
+          var theme = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system';
+          var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var resolved = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
+          var root = document.documentElement;
+          root.classList.add(resolved);
+          root.style.colorScheme = resolved;
+        } catch (e) { /* private mode, etc. — fall through to React's effect-driven application */ }
+      })();
+    </script>
+    <script>
+      (function () {
+        try {
           var c = localStorage.getItem('ceres.sidebar.collapsed');
           if (c === 'true') document.documentElement.classList.add('sidebar-collapsed');
         } catch (e) {}

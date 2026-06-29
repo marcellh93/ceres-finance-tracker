@@ -206,8 +206,8 @@ public sealed class EmailChangeService
         }
 
         // FIXME: re-surface in Stage 12 — no SPA route exists yet for either link target (roadmap Stage 12.8).
-        var verifyUrl = $"{verifyUrlBase.TrimEnd('/')}/app/email-change/confirm#token={verifyRaw}";
-        var revokeUrl = $"{revokeUrlBase.TrimEnd('/')}/app/email-change/revoke#token={revokeRaw}";
+        var verifyUrl = $"{verifyUrlBase.TrimEnd('/')}/email-change/confirm#token={verifyRaw}";
+        var revokeUrl = $"{revokeUrlBase.TrimEnd('/')}/email-change/revoke#token={revokeRaw}";
 
         try
         {

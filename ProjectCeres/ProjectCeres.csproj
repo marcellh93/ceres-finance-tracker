@@ -38,4 +38,18 @@
     <Exec Command="pnpm run build:css" WorkingDirectory="$(ProjectDir)" />
   </Target>
 
+  <!-- Stage 11 Task 5: build + stage the SPA for Release only.
+       Condition guards: Release (not Debug inner-loop/test), SkipSpaBuild opt-out.
+       Writes to wwwroot/dist/ — disjoint from BuildTailwind (wwwroot/css/). -->
+  <Target Name="BuildSpaClient" BeforeTargets="Build"
+          Condition="'$(SkipSpaBuild)' != 'true' AND '$(Configuration)' == 'Release'">
+    <Exec Command="pnpm install --frozen-lockfile" WorkingDirectory="$(ProjectDir)../ProjectCeres.Client" />
+    <Exec Command="pnpm build" WorkingDirectory="$(ProjectDir)../ProjectCeres.Client" />
+    <ItemGroup>
+      <SpaDist Include="$(ProjectDir)../ProjectCeres.Client/dist/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SpaDist)"
+          DestinationFiles="@(SpaDist->'$(ProjectDir)wwwroot/dist/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+
 </Project>

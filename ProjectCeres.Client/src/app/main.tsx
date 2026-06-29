@@ -13,7 +13,7 @@ if (!root) throw new Error('app root element missing');
 createRoot(root).render(
   <StrictMode>
     <ThemeProvider>
-      <BrowserRouter basename="/app">
+      <BrowserRouter>
         <AuthProvider>
           <App />
         </AuthProvider>

@@ -9,14 +9,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Rewrite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
-using ProjectCeres.Filters;
-using ProjectCeres.ModelBinders;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Services.Reports;
@@ -24,13 +23,6 @@ using Resend;
 using Vite.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddScoped<NumberFormatActionFilter>();
-builder.Services.AddControllersWithViews(options =>
-{
-    options.Filters.AddService<NumberFormatActionFilter>();
-    options.ModelBinderProviders.Insert(0, new DecimalModelBinderProvider());
-});
 
 builder.Services.AddControllers()
     .ConfigureApiBehaviorOptions(options =>
@@ -595,7 +587,19 @@ if (!app.Configuration.GetValue<bool>("Stage75:SkipPrivilegeLeakCheck"))
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler(exApp => exApp.Run(async ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            error = new
+            {
+                code = "INTERNAL_ERROR",
+                message = "An unexpected error occurred."
+            }
+        });
+    }));
     app.UseHsts();
 }
 
@@ -611,21 +615,21 @@ app.UseStaticFiles();
 if (app.Environment.IsDevelopment())
 {
     // Vite dev middleware must NOT see general page requests — it would serve
-    // its own root index.html for any unmatched path, hijacking /, /app/, and
-    // /app/login from AppController. Scope it to asset-shaped requests + the
-    // HMR WebSocket upgrade. Everything else falls through to UseRouting +
-    // MapControllers where AppController.Index serves the Razor SPA host view.
+    // its own root index.html for any unmatched path. Scope it to asset-shaped
+    // requests + the HMR WebSocket upgrade. Everything else falls through to
+    // UseRouting + MapFallbackToFile("dist/app.html"), which serves the SPA
+    // shell for all page-level paths (/, /movements, /login, etc.).
     //
     // Vite asset path prefixes (Vite-internal conventions):
-    //   /@vite/*       — Vite runtime + HMR client bundle
+    //   /@vite/*        — Vite runtime + HMR client bundle
     //   /@react-refresh — React refresh runtime
-    //   /@id/*         — virtual module IDs
-    //   /src/*         — application source (both /src/main.tsx + /src/app/main.tsx)
+    //   /@id/*          — virtual module IDs
+    //   /src/*          — application source modules
     //   /node_modules/* — third-party packages (fonts, etc.)
+    //   /dist/*         — asset URLs injected by Vite when base='/dist/' is set
     //
     // HMR WebSocket: Vite's HMR client connects to wss://host/?token=...
-    // (root path with a token query). Detect via the WebSocket upgrade header
-    // since the root path is otherwise owned by HomeController.
+    // (root path with a token query). Detect via the WebSocket upgrade header.
     //
     // UseWebSockets() MUST stay BEFORE MapWhen because the predicate reads
     // ctx.WebSockets.IsWebSocketRequest, which UseWebSockets() populates.
@@ -637,7 +641,8 @@ if (app.Environment.IsDevelopment())
             path.StartsWith("/@react-refresh", StringComparison.Ordinal) ||
             path.StartsWith("/@id/", StringComparison.Ordinal) ||
             path.StartsWith("/src/", StringComparison.Ordinal) ||
-            path.StartsWith("/node_modules/", StringComparison.Ordinal)))
+            path.StartsWith("/node_modules/", StringComparison.Ordinal) ||
+            path.StartsWith("/dist/", StringComparison.Ordinal)))
         {
             return true;
         }
@@ -694,13 +699,19 @@ app.UseAuthorization();
 app.UseMiddleware<UserBlockedIpMiddleware>();
 
 app.MapControllers();
-app.MapControllerRoute(
-    name: "app",
-    pattern: "app/{*path}",
-    defaults: new { controller = "App", action = "Index" });
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+
+// Stage 11 Task 7: one-shot 301 for legacy /app/* bookmarks → /*
+// Query string is preserved automatically by RewriteMiddleware.
+app.UseRewriter(new RewriteOptions()
+    .AddRedirect("^app/(.*)", "$1", statusCode: StatusCodes.Status301MovedPermanently));
+
+// Stage 11 Task 5: serve the built SPA for any unmatched path.
+// In manifest/E2E mode this resolves to wwwroot/dist/app.html (the
+// Vite-built host carrying hashed asset links). AllowAnonymous is required
+// because the global FallbackPolicy (line ~300) requires authentication on
+// every endpoint — the SPA shell must be publicly accessible so React Router
+// can render the login page and handle its own auth redirects.
+app.MapFallbackToFile("dist/app.html").AllowAnonymous();
 
 // Stage 6a: removed startup EnsureExistsAsync hook. With HttpContextCurrentUserAccessor,
 // no HttpContext exists at startup so the call would throw. Stage 7's data remap

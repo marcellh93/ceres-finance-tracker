@@ -6,6 +6,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: '/dist/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

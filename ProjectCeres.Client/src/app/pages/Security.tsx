@@ -32,7 +32,7 @@ export function Security() {
 
   const handleSignOut = async () => {
     await logout();
-    window.location.href = '/app/login';
+    window.location.href = '/login';
   };
 
   const startEnrollment = async () => {

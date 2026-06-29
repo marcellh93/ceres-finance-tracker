@@ -45,7 +45,7 @@ export function Navbar({ upcomingPaymentsCount = 0, pendingTransfers = 0, pendin
           <a href="/Categories"   className={navLink}>Categories</a>
           <a href="/Budgets"      className={navLink}>Budgets</a>
           <a href="/Import"       className={navLink}>Import</a>
-          <a href="/app/reports"   className={navLink}>Reports</a>
+          <a href="/reports"   className={navLink}>Reports</a>
         </div>
 
         {/* Spacer */}
