@@ -37,7 +37,7 @@ afterEach(() => {
 // uses internally). Exposing `vi` as `jest` lets RTL detect Vitest's fake timers
 // and advance them correctly inside waitFor, preventing hangs when
 // vi.useFakeTimers() is active.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Why: globalThis.jest must be typed as any to assign the vi object; RTL detects Vitest's fake timers via this global.
 ;(globalThis as any).jest = vi
 
 // matchMedia polyfill for useMediaQuery tests

@@ -68,6 +68,7 @@ export function GoalBudgetForm({ mode, goalType, initialValues, onSubmit, onCanc
     if (amountFocused) return;
     const wire = values.targetAmount;
     if (!wire) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: syncing locale-formatted display from wire-format form state; same pattern as MoneyInput — display is derived from wire+numberFormat, both of which arrive asynchronously.
       setDisplayAmount('');
       return;
     }

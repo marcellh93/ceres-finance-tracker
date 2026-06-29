@@ -14,6 +14,7 @@ export function useMediaQuery(query: string): boolean {
   useEffect(() => {
     const mql = window.matchMedia(query);
     const onChange = (e: MediaQueryListEvent) => setMatches(e.matches);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: syncing with matchMedia external system; initial setMatches(mql.matches) seeds state once on subscribe, then onChange fires on changes.
     setMatches(mql.matches);
     mql.addEventListener('change', onChange);
     return () => mql.removeEventListener('change', onChange);

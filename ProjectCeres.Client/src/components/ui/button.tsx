@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Why: shadcn-authored file exports buttonVariants (cva object) alongside Button component by shadcn convention; pnpm dlx shadcn add regenerates this shape and splitting would be clobbered on next shadcn update. */
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 

@@ -221,6 +221,8 @@ ASP.NET Core's `Redirect()` defaults to 302. **Do not use 301 (`RedirectPermanen
 
 ### Final cleanup plan (after every Razor view is gone)
 
+> **Executed 2026-06-29 (Stage 11, Batch 4) — DONE.** The cutover is complete. The SPA now serves at `/` via `app.MapFallbackToFile("dist/app.html")`; `/app/*` 301-redirects to the prefix-free path; all Razor controllers + `Views/` are deleted; the two Stage-6a architecture tests are widened back to full scope; `pnpm lint` is at 0. Two deltas from the plan below: (a) `Program.cs` keeps `AddControllersWithViews()` (not `AddControllers()`) because the global antiforgery filter needs its service registration (dotnet/aspnetcore#22189); (b) unmatched legacy paths like `/Movements` now return 200 + the SPA shell (client-side NotFound), not a server 404. Import + the Review page were also shelved here (ADR-0078).
+
 Once no Razor views remain (the last feature is ported), a single dedicated cleanup plan does the following in one sweep:
 
 1. **Drop the `/app/` prefix.** React Router `basename` changes from `/app` to `/`. The Razor host view's catch-all route changes from `app/{*path}` to `{*path}` (or equivalent fallback) so the SPA serves at `/` directly.

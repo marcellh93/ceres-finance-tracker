@@ -23,21 +23,19 @@ public class ArchitectureTests
     private static readonly Assembly App = typeof(Program).Assembly;
 
     [Fact]
-    public void No_api_controller_class_has_AllowAnonymous()
+    public void No_controller_class_has_AllowAnonymous()
     {
-        // Legacy Razor controllers under Controllers/* (not Controllers/Api/*) are
-        // permitted class-level AllowAnonymous because they are SPA-shell or 302-redirect
-        // holdovers slated for deletion in Batch 4. New API controllers must declare
-        // anonymity per-method to make the choice explicit and reviewable.
+        // All Razor controllers were deleted in Stage 11 Commit 2. Every remaining
+        // controller must declare anonymity per-method to make the choice explicit
+        // and reviewable.
         var violations = App.GetTypes()
             .Where(t => typeof(ControllerBase).IsAssignableFrom(t) && !t.IsAbstract)
-            .Where(t => t.Namespace?.Contains(".Api") == true)
             .Where(t => t.GetCustomAttribute<AllowAnonymousAttribute>() is not null)
             .Select(t => t.FullName!)
             .ToList();
 
         violations.Should().BeEmpty(
-            "API controllers must declare AllowAnonymous at the method level only — class-level lets new actions inherit anonymity by accident");
+            "controllers must declare AllowAnonymous at the method level only — class-level lets new actions inherit anonymity by accident");
     }
 
     [Fact]
@@ -58,13 +56,11 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void Api_HttpGet_actions_must_not_have_write_verb_names()
+    public void HttpGet_actions_must_not_have_write_verb_names()
     {
-        // Legacy Razor controllers under Controllers/* are 302-redirect holdovers
-        // whose action names mirror legacy URL paths (e.g. Edit, Create, Confirm,
-        // Dispute) but the action body is a Redirect — not a state change. They are
-        // slated for deletion in Batch 4. The API surface is where naming hygiene
-        // actually maps to behaviour.
+        // All Razor controllers were deleted in Stage 11 Commit 2. Every remaining
+        // [HttpGet] action is on the API surface where naming hygiene maps directly
+        // to behaviour.
         var forbiddenPrefixes = new[]
         {
             "Create", "Update", "Delete", "Remove",
@@ -76,14 +72,13 @@ public class ArchitectureTests
 
         var violations = App.GetTypes()
             .Where(t => typeof(ControllerBase).IsAssignableFrom(t))
-            .Where(t => t.Namespace?.Contains(".Api") == true)
             .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance))
             .Where(m => m.GetCustomAttribute<HttpGetAttribute>() is not null)
             .Where(m => forbiddenPrefixes.Any(p => m.Name.StartsWith(p, StringComparison.Ordinal)))
             .Select(m => $"{m.DeclaringType!.Name}.{m.Name}")
             .ToList();
 
-        violations.Should().BeEmpty("API GET endpoints must be side-effect-free per RFC 9110");
+        violations.Should().BeEmpty("GET endpoints must be side-effect-free per RFC 9110");
     }
 
     [Fact]

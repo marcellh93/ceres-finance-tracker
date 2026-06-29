@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Why: this file exports ThemeProvider (component), useTheme (hook), and shared types (Theme, ResolvedTheme); splitting would require updating 15+ consumer files including test fixtures. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';

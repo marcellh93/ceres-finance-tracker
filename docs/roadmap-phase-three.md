@@ -1329,56 +1329,57 @@ See [`planning-phase3-spa-migration.md` → Final cleanup plan](planning-phase3-
 
 URL surface:
 
-- [ ] `/` serves the SPA (no `/app/` prefix anywhere in user-facing URLs)
-- [ ] `/app/*` returns 301 to `/*` for every path that was previously a Batch 2 SPA route
-- [ ] Old SPA bookmarks tested: `https://.../app/movements?needsReview=true` redirects to `https://.../movements?needsReview=true` with query string preserved
-- [ ] Old Razor bookmarks tested: `https://.../Movements` (the per-area 302 from Batch 2) is now a 404 (redirect chain has been removed)
-- [ ] No `/app/` references remain in code or docs (grep returns nothing)
+- [x] `/` serves the SPA (no `/app/` prefix anywhere in user-facing URLs) — verified live (E2E manifest mode): `GET /` and `/login` serve `dist/app.html`.
+- [x] `/app/*` returns 301 to `/*` for every path that was previously a Batch 2 SPA route — `UseRewriter().AddRedirect("^app/(.*)", "$1", 301)`.
+- [x] Old SPA bookmarks tested: `https://.../app/movements?needsReview=true` redirects to `https://.../movements?needsReview=true` with query string preserved — verified live (301, query preserved).
+- [x] **Amended 2026-06-29:** `https://.../Movements` returns **200 serving the SPA shell** (React Router renders its client-side NotFound), NOT a server 404. With the per-area redirect stubs deleted, every unmatched path falls through to `MapFallbackToFile` — standard pure-SPA behavior (styled NotFound, better UX than a bare server 404). The original "now a 404" expectation predated the `MapFallbackToFile` host decision.
+- [x] No `/app/` route-prefix references remain in code (grep clean); doc references are historical/descriptive (guides + migration history) and left intentionally.
 
 `Program.cs`:
 
-- [ ] `AddControllersWithViews()` replaced with `AddControllers()`
-- [ ] `MapControllerRoute(...)` calls deleted
-- [ ] `MapRazorPages()` (if present) deleted
-- [ ] No remaining MVC-specific service registrations
-- [ ] `app.UseStaticFiles()` retained (still serves `wwwroot/` SPA assets)
-- [ ] Application boots cleanly with zero MVC infrastructure
+- [x] **Amended 2026-06-29:** `AddControllersWithViews()` is **retained** (NOT replaced with `AddControllers()`). The global `AutoValidateAntiforgeryTokenAttribute` CSRF filter requires the antiforgery filter infrastructure that only `AddControllersWithViews()` registers — `AddControllers()` alone throws `No service for type AutoValidateAntiforgeryTokenAuthorizationFilter` at runtime (dotnet/aspnetcore#22189). It is the service superset only; no `.cshtml`, no view routing. (Caught by the full integration suite — 278 failures — after an initial swap to `AddControllers()`.)
+- [x] `MapControllerRoute(...)` calls deleted (both the `app` and `default` routes).
+- [x] `MapRazorPages()` — not present; nothing to delete.
+- [x] No remaining MVC view-routing registrations; `NumberFormatActionFilter` + `DecimalModelBinderProvider` (+ binder) deleted.
+- [x] `app.UseStaticFiles()` retained (serves `wwwroot/dist/` SPA assets).
+- [x] Application boots cleanly (verified live, E2E + Development); SPA served via `MapFallbackToFile("dist/app.html")`.
 
 File deletions:
 
-- [ ] `ProjectCeres/Views/` directory deleted entirely
-- [ ] No `.cshtml` files anywhere in `ProjectCeres/`
-- [ ] No `.razor` files (Phase 3 never used Blazor; just confirm)
-- [ ] `obj/` and `bin/` rebuilt cleanly with no MVC remnants
+- [x] `ProjectCeres/Views/` directory deleted entirely (8 `.cshtml` removed).
+- [x] No `.cshtml` files anywhere in `ProjectCeres/` (grep: 0).
+- [x] No `.razor` files (confirmed; Phase 3 never used Blazor).
+- [x] `dotnet build` clean (0 errors) after teardown.
 
 Razor controller stubs:
 
-- [ ] Every Razor controller (`MovementsController`, `TransactionsController`, `TransfersController`, `CategoriesController`, `AccountsController`, `RecurringTransactionsController`, `ReportsController`, `ImportController`, `CsvImportProfilesController`, `BudgetsController`, `SettingsController`, `DashboardController`, `ReviewController`/`TransfersReviewController`) deleted
-- [ ] Verify by grep: no `: Controller` in `ProjectCeres/Controllers/` outside `ProjectCeres/Controllers/Api/`
-- [ ] All API controllers under `Controllers/Api/` retained and functional
+- [x] All 17 Razor controllers deleted (App, Home + the 15 redirect stubs: Movements, Transactions, Transfers, Categories, Accounts, RecurringTransactions, Reports, Import, CsvImportProfiles, Budgets, Settings, Dashboard, ReconciliationReview, TransferReview, Attachments).
+- [x] Verify by grep: no `: Controller` (Razor base) in `ProjectCeres/Controllers/` outside `Controllers/Api/`.
+- [x] All 29 API controllers under `Controllers/Api/` retained and functional (verified live: `/api/accounts` 401 auth-gated, not 404).
 
 Architecture tests (widening from Stage 6a's API-only narrowing):
 
-- [ ] `ArchitectureTests.No_api_controller_class_has_AllowAnonymous` renamed to `No_controller_class_has_AllowAnonymous`; the `.Namespace?.Contains(".Api") == true` filter is removed
-- [ ] `ArchitectureTests.Api_HttpGet_actions_must_not_have_write_verb_names` renamed to `HttpGet_actions_must_not_have_write_verb_names`; the `.Namespace?.Contains(".Api") == true` filter is removed
-- [ ] Both tests pass after the rename + filter removal — confirms no remaining controllers carry class-level `[AllowAnonymous]` or have `[HttpGet]` actions whose names start with write verbs
+- [x] `No_api_controller_class_has_AllowAnonymous` renamed to `No_controller_class_has_AllowAnonymous`; `.Namespace?.Contains(".Api")` filter removed.
+- [x] `Api_HttpGet_actions_must_not_have_write_verb_names` renamed to `HttpGet_actions_must_not_have_write_verb_names`; filter removed.
+- [x] Both pass at full scope — proves no remaining controller carries class-level `[AllowAnonymous]` or a write-verb `[HttpGet]` action (the teardown-completeness proof).
 
 Smoke tests:
 
-- [ ] Application boots without exception
-- [ ] Full SPA loads at `/` and every page renders
-- [ ] Browser dev-tools network tab shows no 404s for legacy assets
-- [ ] All API integration tests still pass (the API surface is unchanged by this batch)
-- [ ] No regressions in the IDOR test suite from Stage 7
+- [x] Application boots without exception (verified live, E2E + Development).
+- [ ] Full SPA loads at `/` and every page renders — browser agent-walk (Stage close-out evidence bundle).
+- [ ] Browser dev-tools network tab shows no 404s for legacy assets — browser agent-walk.
+- [x] All API integration tests still pass — full `dotnet test` green at close-out (the antiforgery regression that briefly reddened the suite was fixed; root cause: `AddControllers()` swap, reverted).
+- [x] No regressions in the IDOR test suite from Stage 7 — included in the full suite.
 
 Frontend lint cleanup (sub-stage 11.8):
 
-- [ ] `pnpm --dir ProjectCeres.Client lint` exits 0 with zero errors and zero warnings
-- [ ] All 18 `react-hooks/set-state-in-effect` violations either fixed (derive-during-render or refactored form-reset logic) or disabled per-line with a `Why:` comment justifying the external-system-sync exception (see `planning-phase3-spa-migration.md` § 6 for the false-positive list)
-- [ ] All 14 `react-refresh/only-export-components` violations resolved: shadcn-authored files (`badge.tsx`, `button.tsx`, `tabs.tsx`) carry a per-file disable comment with a `Why:` noting the shadcn convention; provider files are split into `provider.tsx` + `context.ts`; helpers/types are moved to sibling `*-types.ts` / `*-utils.ts`
-- [ ] Both `react-hooks/exhaustive-deps` warnings (`ReviewCountProvider.tsx`, `ReminderCountProvider.tsx`) resolved — each one verified as either a real stale-closure bug fixed by adding the dep, or a deliberate capture-at-mount with a per-line disable + `Why:` comment
-- [ ] Full Vitest suite still passes after the cleanup (no regressions in form-reset effects or matchMedia hooks)
-- [ ] `pnpm --dir ProjectCeres.Client build` still passes with all bundle-size budgets clean
+- [x] `pnpm --dir ProjectCeres.Client lint` exits 0 (0 errors, 0 warnings) — re-baselined from the May plan's 34 to the actual 39 (the auth pages added a new `react-hooks/incompatible-library` category + 2 context files).
+- [x] `react-hooks/set-state-in-effect` resolved: `usePagination.ts` refactored to derive-during-render (the one real anti-pattern); the external-system-sync false-positives (`use-media-query`, `use-delayed-loading`, `use-api`, etc.) per-line disabled with `Why:`.
+- [x] `react-refresh/only-export-components` resolved: shadcn files (`badge`/`button`/`tabs`) per-file disabled with `Why:` (shadcn cva convention); helpers extracted to sibling `*-utils.ts`; provider/context files per-file disabled with `Why:` (splitting would churn 4–18 consumers incl. test fixtures).
+- [x] `react-hooks/exhaustive-deps` resolved (`ReviewCountProvider`, `ReminderCountProvider`, `auth-context`) — per-line disable + `Why:` (deliberate capture-at-mount).
+- [x] **New category** `react-hooks/incompatible-library` (3 hits: `LoginTotp`, `PasswordReset`, `TotpEnrollStep1ScanVerify`) — all false-positives (`form.watch()` as a local derived value in an auto-submit effect, never passed to memoized children); per-line disable + `Why:`.
+- [x] Full Vitest suite passes after cleanup (1004/1004).
+- [x] `pnpm --dir ProjectCeres.Client build` passes, all bundle budgets clean.
 
 Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)):
 

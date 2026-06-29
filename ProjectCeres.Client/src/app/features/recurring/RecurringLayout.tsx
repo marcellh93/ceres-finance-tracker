@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Why: this file exports both the RecurringLayout component and the useRecurringLayoutCtx hook + RecurringLayoutCtx type; splitting would require updating App.tsx and the page re-export. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useMatch, useOutletContext, useSearchParams } from 'react-router-dom';
 import { useDocumentTitle } from '../../lib/use-document-title';
@@ -46,7 +47,7 @@ export function RecurringLayout() {
     if (debouncedSearch) next.set('q', debouncedSearch);
     else next.delete('q');
     setParams(next, { replace: true });
-  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps -- Why: only debouncedSearch drives the URL update; including params/setParams would cause stale-closure issues as setParams identity changes on each render.
 
   const list = useApi<RecurringTransactionListItemDto[]>(buildListUrl(includeInactive));
   const allList = useApi<RecurringTransactionListItemDto[]>('/api/recurring-transactions?includeInactive=true');

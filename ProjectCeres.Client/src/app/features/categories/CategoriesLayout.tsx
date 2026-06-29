@@ -54,7 +54,7 @@ export function CategoriesLayout() {
     if (debouncedSearch) next.set('q', debouncedSearch);
     else next.delete('q');
     setParams(next, { replace: true });
-  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps -- Why: only debouncedSearch drives the URL update; including params/setParams would cause stale-closure issues as setParams identity changes on each render.
 
   const list = useApi<CategoryListItemDto[]>(buildListUrl(includeInactive));
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Why: this file exports AuthProvider (component), useAuth (hook), and shared types; splitting into provider.tsx+context.ts would require updating 18+ consumer files including many test fixtures. */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { apiFetch, setOnUnauthenticated } from '../lib/api-client';
 import { setCachedXsrfRequestToken } from './csrf';
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: auth session probe on mount; refresh() calls the /api/auth/me endpoint and sets user+status from the server response — this is the canonical "sync with external auth system" pattern.
     void refresh();
   }, [refresh]);
 

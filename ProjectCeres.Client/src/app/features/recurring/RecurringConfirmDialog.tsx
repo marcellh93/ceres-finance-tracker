@@ -28,6 +28,7 @@ export function RecurringConfirmDialog({ open, reminder, onChanged, onOpenChange
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: dialog form reset on open; synchronizing controlled form state with the reminder prop when the dialog is opened, which is an external event, not a render.
       setDate(reminder.nextDueDate);
       setAmount(reminder.estimatedAmount?.toString() ?? '');
       setDescription('');

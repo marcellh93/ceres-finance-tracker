@@ -24,7 +24,10 @@ using Vite.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers()
+// AddControllersWithViews (not AddControllers) registers the antiforgery filter
+// infrastructure AutoValidateAntiforgeryTokenAttribute needs (dotnet/aspnetcore#22189).
+// No Razor views remain; this is the service superset only — no view routing.
+builder.Services.AddControllersWithViews()
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>

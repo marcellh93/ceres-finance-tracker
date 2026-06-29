@@ -25,6 +25,7 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
 
   useEffect(() => {
     if (detail.data) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: populating edit form when async server data arrives; the form cannot be pre-populated synchronously because the data comes from a network request.
       setValues({
         name: detail.data.name,
         accountId: detail.data.accountId,

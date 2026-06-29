@@ -61,6 +61,7 @@ export function MoneyInput({
     if (!numberFormat) return;
     if (focused) return;
     if (!value) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: syncing display representation from external wire-format prop; this effect is the canonical "derive display from props" pattern for locale-aware inputs.
       setDisplayAmount('');
       return;
     }

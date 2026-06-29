@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MovementsDateRangePicker, formatRangeLabel, readDraftFromParams, toIsoDate } from './MovementsDateRangePicker';
+import { MovementsDateRangePicker } from './MovementsDateRangePicker';
+import { formatRangeLabel, readDraftFromParams, toIsoDate } from './movements-date-range-utils';
 
 // Mock the Calendar primitive so we can drive it deterministically without
 // fighting react-day-picker's keyboard navigation in jsdom.

@@ -21,6 +21,7 @@ export function RecurringDismissDialog({ open, reminder, onChanged, onOpenChange
   const [submitting, setSubmitting] = useState(false);
   const isManual = reminder.reminderBehaviour === 'ManualDate';
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: dialog field reset on open event; clearing controlled input state when the dialog opens is an external-event-driven reset, not a cascading render.
   useEffect(() => { if (open) setNextDueDate(''); }, [open]);
 
   async function handleDismiss() {

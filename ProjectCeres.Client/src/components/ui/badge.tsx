@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Why: shadcn-authored file exports badgeVariants (cva object) alongside Badge component by shadcn convention; pnpm dlx shadcn add regenerates this shape and splitting would be clobbered on next shadcn update. */
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"

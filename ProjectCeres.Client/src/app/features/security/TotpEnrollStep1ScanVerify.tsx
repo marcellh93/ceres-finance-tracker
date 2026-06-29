@@ -67,6 +67,7 @@ export function TotpEnrollStep1ScanVerify({
     mode: 'onSubmit',
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- Why: React Hook Form's watch() is used here as a plain derived value for the auto-submit trigger effect, not passed to a memoized child; the concurrent-rendering risk the rule warns about does not apply in this linear control flow.
   const codeValue = form.watch('code');
 
   const onSubmit = async (values: TotpCodeFormValues) => {
@@ -103,7 +104,7 @@ export function TotpEnrollStep1ScanVerify({
     if (codeValue.length === 6 && /^\d{6}$/.test(codeValue) && !submitInFlightRef.current) {
       void form.handleSubmit(onSubmit)();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Why: onSubmit and form are intentionally excluded; they change on every render but are stable in practice, and including them would cause the auto-submit to re-trigger spuriously.
   }, [codeValue]);
 
   const copyManualKey = async () => {

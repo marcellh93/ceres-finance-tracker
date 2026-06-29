@@ -111,13 +111,14 @@ The app is hosted, behind authentication, with no SEO concern for authenticated 
 
 The delta from Phase 2: Razor Views are removed entirely. The backend becomes a pure JSON Web API. All routing moves to the client. Auth tokens replace session cookies.
 
-> **Current state (mid-migration).** Phase 3 is the active phase but the migration runs feature-area by feature-area, not as a single cutover. As of 2026-04-30:
-> - SPA hosted at `/app/*` via ASP.NET Core catch-all route; React Router uses `basename="/app"`.
-> - **Migrated to SPA:** Dashboard (with charts), Movements list, global quick-add modal.
-> - **Still served by Razor:** Accounts, Categories, Budgets, Recurring Transactions, Transactions (full CRUD), Transfers (full CRUD), Reports, Import, Settings — these continue to work as Phase 2-style hybrid pages.
-> - Auth has not yet shipped; session cookies are still in use.
+> **Current state (cutover complete, 2026-06-29 — Stage 11).** The SPA migration is finished; the app is now a pure Web API + SPA.
+> - SPA served at the site root `/` via `app.MapFallbackToFile("dist/app.html")` (the Vite-built host carries the hashed JS + stylesheet); React Router uses the default `/` basename.
+> - Legacy `/app/*` bookmarks return a one-shot 301 to the prefix-free path (`RewriteOptions().AddRedirect`).
+> - **All Razor controllers and `Views/` are deleted.** `Program.cs` retains `AddControllersWithViews()` for the antiforgery filter infrastructure only (dotnet/aspnetcore#22189) — no `.cshtml`, no `MapControllerRoute`. The API surface lives under `Controllers/Api/`.
+> - Import + the Review page are shelved from the beta (ADR-0078): nav items + routes removed, the five import/review API endpoints fenced to non-beta environments; code retained (recoverable).
+> - Auth ships via session cookies (Stage 6+); the "auth tokens" line above describes a possible future, not the current mechanism.
 >
-> The end-state diagram below describes the **target** architecture. See [`planning-phase3-spa-migration.md`](planning-phase3-spa-migration.md) for the per-controller migration status.
+> The diagram below now describes the **achieved** architecture. See [`planning-phase3-spa-migration.md`](planning-phase3-spa-migration.md) for the per-controller migration history.
 
 ```mermaid
 sequenceDiagram

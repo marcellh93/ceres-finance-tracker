@@ -62,6 +62,7 @@ export function StepMapping({
 
   // Re-seed the draft if the profile selection or initial mappings change.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: wizard form reset driven by parent profile-selection prop; the initialMappings object arrives from an external profile selection event, not a render.
     setDraft({
       dateColumn:        initialMappings.dateColumn,
       amountColumn:      initialMappings.amountColumn,

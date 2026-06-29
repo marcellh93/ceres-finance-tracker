@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MovementsFilterBar, buildTypeFilterParams } from './MovementsFilterBar';
+import { MovementsFilterBar } from './MovementsFilterBar';
+import { buildTypeFilterParams } from './movements-filter-utils';
 
 let mockFetch: ReturnType<typeof vi.fn>;
 

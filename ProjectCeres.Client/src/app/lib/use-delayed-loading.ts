@@ -16,6 +16,7 @@ export function useDelayedLoading(
 
   useEffect(() => {
     if (!loading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: immediately resetting skeleton state on loading=false is intentional; avoids an extra render frame where a stale skeleton flickers before the timeout clears it.
       setShowSkeleton(false);
       return;
     }

@@ -201,6 +201,7 @@ function ConfirmForm({ token }: { token: string }) {
     defaultValues: { newPassword: '', confirmPassword: '', totpCode: '' },
   });
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- Why: React Hook Form's watch() is used as a plain derived value to control the TOTP input field rendering, not passed to a memoized child; the concurrent-rendering hazard does not apply here.
   const totpValue = form.watch('totpCode') ?? '';
 
   const onSubmit = async (values: PasswordResetConfirmFormValues) => {

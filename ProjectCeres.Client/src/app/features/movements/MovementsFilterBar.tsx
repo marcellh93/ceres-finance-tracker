@@ -9,14 +9,7 @@ import { ACCOUNTS_ACTIVE_URL, type AccountOptionDto } from './movements-api';
 import { AccountCombobox } from '../../components/AccountCombobox';
 import { TypeFilterCombobox, type TypeFilterValue } from './TypeFilterCombobox';
 import { MovementsDateRangePicker } from './MovementsDateRangePicker';
-
-export function buildTypeFilterParams(prev: URLSearchParams, value: string | null): URLSearchParams {
-  const next = new URLSearchParams(prev);
-  if (value) next.set('type', value);
-  else next.delete('type');
-  next.delete('page');
-  return next;
-}
+import { buildTypeFilterParams } from './movements-filter-utils';
 
 export function MovementsFilterBar() {
   const [params, setParams] = useSearchParams();
@@ -42,7 +35,7 @@ export function MovementsFilterBar() {
     else next.delete('q');
     next.delete('page'); // reset to first page on filter change
     setParams(next, { replace: true });
-  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps -- Why: only debouncedSearch drives the URL update; including params/setParams would cause stale-closure issues as setParams identity changes on each render.
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params);

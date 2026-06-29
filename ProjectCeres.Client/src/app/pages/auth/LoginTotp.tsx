@@ -178,13 +178,14 @@ export function LoginTotp() {
     backupForm.reset({ code: '' });
   };
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- Why: React Hook Form's watch() is used as a plain derived value for the auto-submit effect, not passed to a memoized child; the concurrent-rendering risk does not apply in this linear auth flow.
   const codeValue = totpForm.watch('code');
   useEffect(() => {
     if (mode !== 'totp') return;
     if (codeValue.length === 6 && /^\d{6}$/.test(codeValue) && !submitInFlightRef.current) {
       void totpForm.handleSubmit(onTotpSubmit)();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Why: onTotpSubmit and totpForm are intentionally excluded; they change on every render but are stable in practice, and including them would cause the auto-submit to re-trigger spuriously.
   }, [codeValue, mode]);
 
   const isSubmitting = totpForm.formState.isSubmitting || backupForm.formState.isSubmitting;

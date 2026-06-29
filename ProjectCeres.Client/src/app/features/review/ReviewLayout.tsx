@@ -36,6 +36,7 @@ export function ReviewLayout() {
     if (loading) return;
     if (userTouchedTab.current) return;
     const target = pickDefaultTab(reconciliationCount, transferCount);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: post-load tab selection driven by server count data; this is a "sync with external server state" pattern — the active tab depends on which queue has items, and that data is only known after the API responds.
     if (target !== activeTab) setActiveTab(target);
   }, [loading, reconciliationCount, transferCount, initialFromUrl, activeTab]);
 

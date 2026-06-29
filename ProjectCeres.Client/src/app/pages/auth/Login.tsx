@@ -42,7 +42,7 @@ export function Login() {
     if (searchParams.get('unlocked') === '1') {
       toast(t('auth.accountUnlock.toastSucceeded'), { id: 'login-account-unlocked' });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Why: intentionally runs once on mount to show unlock toast from navigation state; including searchParams would re-fire on every URL change.
   }, []);
 
   const form = useForm<LoginFormValues>({

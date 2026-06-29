@@ -52,6 +52,7 @@ function CategoryEdit({ id }: { id: string }) {
 
   useEffect(() => {
     if (!dto || !currencies) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: deriving currency symbol from two async API responses (dto + currencies) that arrive independently; no synchronous derivation possible until both are loaded.
     setCurrencySymbol(currencies.find((c) => c.id === dto.currencyId)?.symbol ?? '');
   }, [dto, currencies]);
 

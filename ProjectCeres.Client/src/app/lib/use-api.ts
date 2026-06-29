@@ -37,6 +37,7 @@ export function useApi<T>(url: string): UseApiResult<T> {
 
   useEffect(() => {
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: fetch-on-URL-change pattern; synchronously setting loading=true before the async work is the canonical SWR pattern, not a cascading-render risk.
     setState((prev) => ({ data: prev.data, error: undefined, loading: true }));
 
     const sendOnce = () => fetch(url, { signal: controller.signal });

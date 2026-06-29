@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Why: shadcn-authored file exports tabsListVariants (cva object) alongside Tabs components by shadcn convention; pnpm dlx shadcn add regenerates this shape and splitting would be clobbered on next shadcn update. */
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
 import { cva, type VariantProps } from "class-variance-authority"
 

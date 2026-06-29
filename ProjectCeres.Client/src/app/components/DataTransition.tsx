@@ -42,6 +42,7 @@ export function DataTransition({
     if (prevRef.current === state) return;
     if (reducedMotion) {
       prevRef.current = state;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: syncing with prefers-reduced-motion external system; instantly collapsing the transition to no-op for accessibility is the intended behavior, not a cascading-render risk.
       setPreviousState(null);
       return;
     }

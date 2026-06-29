@@ -101,7 +101,7 @@ function MovementEditInner({
     if (stateFiles && stateFiles.length > 0) {
       navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Why: intentionally runs once on mount to clear navigation state from the Edit landing; including deps would re-run on every navigation state change, defeating the intent.
   }, []);
 
   const typedUrl =

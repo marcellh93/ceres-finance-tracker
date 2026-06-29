@@ -170,9 +170,10 @@ export function AttachmentDropzone({
     if (!pendingFiles || pendingFiles.length === 0) return;
     pendingFilesHandledRef.current = true;
     for (const file of pendingFiles) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: one-shot auto-upload on mount for Create→Edit hand-off; uploadOne is an async fire-and-forget that eventually calls setPending/setAttachments from within an async callback, not synchronously in the effect body.
       void uploadOne(file, { announceToast: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Why: intentionally runs once on mount to auto-upload pendingFiles from the Create→Edit hand-off; the ref guard prevents re-runs even if deps were included.
   }, []);
 
   function handleConfirmDelete() {

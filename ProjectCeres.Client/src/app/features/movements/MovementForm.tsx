@@ -115,6 +115,7 @@ export function MovementForm({
 
   // Sync when initialValues reference changes (e.g. data loaded by parent)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Why: form reset driven by parent prop change (Edit page loading server data into an already-mounted form); no synchronous alternative when the prop object arrives asynchronously.
     setValues(initialValues);
     setErrors({});
   }, [initialValues]);
