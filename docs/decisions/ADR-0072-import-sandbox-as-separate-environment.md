@@ -1,5 +1,7 @@
 # ADR-0072 — Import Sandbox as a Separate Environment (and Stage 11.5 Placement)
 
+> ⏸️ **On hold (2026-06-29):** import is shelved from the Phase 3 beta — see [ADR-0078](ADR-0078-import-shelved-from-phase-3-beta.md). The sandbox is tooling for a shelved feature; Stage 11.5 does not execute until import is un-shelved.
+
 **Status:** Accepted (Phase 3, Batch 4)
 
 **Date:** 2026-05-13

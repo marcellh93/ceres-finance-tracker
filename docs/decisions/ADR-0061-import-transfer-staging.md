@@ -1,5 +1,7 @@
 # ADR-0061 — Import Transfer Staging (Plan B)
 
+> ⏸️ **On hold (2026-06-29):** import is shelved from the Phase 3 beta — see [ADR-0078](ADR-0078-import-shelved-from-phase-3-beta.md). Paused, not superseded; resumes if import is un-shelved.
+
 **Status:** Accepted — implemented 2026-04-26
 
 ---

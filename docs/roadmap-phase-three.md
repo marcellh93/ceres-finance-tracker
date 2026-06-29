@@ -1323,6 +1323,7 @@ See [`planning-phase3-spa-migration.md` → Final cleanup plan](planning-phase3-
 | 11.6 | Razor host views deleted (`Views/App/`, `Views/Home/`, `Views/Shared/_Layout.cshtml`, `Error.cshtml`, `_ViewStart.cshtml`, `_ViewImports.cshtml`, `_ValidationScriptsPartial.cshtml`) |
 | 11.7 | Stage 6a architecture tests widened back to full scope (`No_api_controller_class_has_AllowAnonymous` → `No_controller_class_has_AllowAnonymous`; `Api_HttpGet_actions_must_not_have_write_verb_names` → `HttpGet_actions_must_not_have_write_verb_names`). Both rules are dropped to API-only in 6a because of legacy Razor controllers; Stage 11 deletes those, restoring the full-scope contract. |
 | 11.8 | Frontend lint cleanup sweep — drive `pnpm --dir ProjectCeres.Client lint` to zero. Logged 2026-05-13 after the ESLint 10 / `typescript-eslint` 8.59.3 upgrade surfaced 34 pre-existing violations. Detail: 18× `react-hooks/set-state-in-effect`, 14× `react-refresh/only-export-components`, 2× `react-hooks/exhaustive-deps`. Full file-by-file remediation plan in [`planning-phase3-spa-migration.md` → Final cleanup plan, item 6](planning-phase3-spa-migration.md#final-cleanup-plan-after-every-razor-view-is-gone). |
+| 11.9 | **Shelve the import module from the beta** (added 2026-06-29, [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)). Make import unreachable in the user-facing beta without deleting the code (recoverable — "maybe eventually, make it robust"). Remove the **Import** sidebar nav item (`layout/nav-items.ts`) and the `/app/import` + `/app/import/profiles` routes (`App.tsx`); fence off the import API endpoints + staging so nothing user-facing reaches them. **Resolve the Review/Reconciliations coupling here** (see checklist). Stage 11.5 (import sandbox) goes on hold. Keep the import code, services, and `ImportStaged*` tables in the tree. |
 
 ### Verification checklist
 
@@ -1379,11 +1380,21 @@ Frontend lint cleanup (sub-stage 11.8):
 - [ ] Full Vitest suite still passes after the cleanup (no regressions in form-reset effects or matchMedia hooks)
 - [ ] `pnpm --dir ProjectCeres.Client build` still passes with all bundle-size budgets clean
 
+Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)):
+
+- [ ] **Import** sidebar nav item removed from `ProjectCeres.Client/src/app/layout/nav-items.ts` (and the Sidebar/MobileDrawer/TopBar tests updated to match)
+- [ ] `/app/import` and `/app/import/profiles` routes removed from `App.tsx` (the lazy page imports too); `/import*` resolves to NotFound
+- [ ] **Review/Reconciliations coupling resolved** — inspect `Review.tsx` tab separation and decide: keep the Transfers tab + drop Reconciliations, or shelve Review too. Record the call in ADR-0078 and update the Review checklist/nav accordingly
+- [ ] Import API endpoints (`/api/import*`, `/api/import-profiles*`) fenced off so no shelved UI path reaches them (return 404, or gate behind a non-beta environment) — architecture test pins it
+- [ ] Import code, services, and `ImportStagedTransactions` / `ImportStagedTransfers` tables left in the tree (NOT deleted — recoverable per ADR-0078)
+- [ ] `api-contract.md`, `models.md` (staging entities), `testing.md` (import suites) updated to reflect the shelved-from-beta state in the same commit
+- [ ] No dangling references to the removed routes/nav in code or docs (grep `app/import`)
+
 ---
 
 ## Stage 11.5 — Import sandbox + admin tooling (Batch 4)
 
-**Status: ❌ Pending.** Developer-facing test environment for the CSV/XLSX import pipeline. Sits after Stage 11 (Razor cleanup) so the admin SPA route lands into a fully SPA-only world. See [ADR-0072](decisions/ADR-0072-import-sandbox-as-separate-environment.md) for the architecture pattern (multi-environment separation, NOT runtime switch) and the sequencing rationale (post-SPA-migration).
+**Status: ⏸️ On hold (shelved 2026-06-29, [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md)).** This stage is tooling *for* the import module, which is shelved from the Phase 3 beta (Stage 11.9). It does not execute in Phase 3 and resumes only if/when import is un-shelved. The design below is preserved for that future. Developer-facing test environment for the CSV/XLSX import pipeline. Sits after Stage 11 (Razor cleanup) so the admin SPA route lands into a fully SPA-only world. See [ADR-0072](decisions/ADR-0072-import-sandbox-as-separate-environment.md) for the architecture pattern (multi-environment separation, NOT runtime switch) and the sequencing rationale (post-SPA-migration).
 
 > **Goal:** the developer can iterate on parser bugs against fake bank data with zero risk of contaminating real data, including per-import bulk wipe and row-level multi-select delete. Same code, separate database, separate launch profile, separate port. The boundary is physical — different process, different database, different URL.
 

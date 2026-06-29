@@ -1,5 +1,7 @@
 # ADR 0060: Import UX Overhaul — Stepped Form, Reconciliation Pass, Sign-Based Category Fallback
 
+> ⏸️ **On hold (2026-06-29):** import is shelved from the Phase 3 beta — see [ADR-0078](ADR-0078-import-shelved-from-phase-3-beta.md). Paused, not superseded; resumes if import is un-shelved.
+
 ## Status: Accepted
 
 ## Context
