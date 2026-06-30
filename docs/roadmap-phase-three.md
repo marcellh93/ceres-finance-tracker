@@ -1444,7 +1444,7 @@ Server side:
 
 - [ ] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt`
 - [ ] Global query filter applies (only owner sees own tickets)
-- [ ] Admin can list all tickets via `Admin/` endpoints (per Stage 7 / ADR-0065)
+- [x] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). The admin ticket-LIST UI is deferred to § Stage 12.5 (needs a roles/admin-identity system that does not exist yet).
 - [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
 
 Tests:
@@ -1455,13 +1455,9 @@ Tests:
 - [ ] User A cannot view User B's ticket (IDOR)
 - [ ] Reauthentication required to access `/settings/sessions`
 
-Stage 6 deferred items (carry-forward from the Stage 6 verification checklist):
+Deferred out of Stage 12 core (2026-06-30, user-authorized — see § Stage 12.5 for the receiving checklist):
 
-- [ ] **Per-session IP enforcement UI** — per-row "anchor this session to its creation IP" toggle on `/settings/sessions`. Server-side enforcement is wired in 6a with `default-off` (each `UserSession` has the field; when enabled, requests from a different IP are rejected). This stage exposes the toggle so users can opt in per session. Confirm the entity field name (`IsIpAnchored` or similar) when wiring; pin with an integration test that flips the toggle on, simulates a request from a different IP, and asserts 401. *Anchor: Stage 6 § UserSession table + token rotation carry-forward.*
-
-Stage 8 deferred items (carry-forward from Stage 8 — security-event email call-sites):
-
-- [ ] **Wire new-session/new-device alert email** — when a new `UserSession` is created from an IP not previously seen for that user, send a notification with IP + UA summary + "this wasn't me" link revoking that session. The session-novelty-detection call site lands here (compare new session IP against the user's prior `UserSession.CreatedFromIp` history; first occurrence → fire email). Opt-out by default-enabled, disable from notification preferences in Settings per `planning-phase3.md`. Add `NewSessionAlert` to `EmailTemplateKey` + EN/ES resx keys (`NewSessionAlert.Subject/BodyText/BodyHtml`). *Anchor: Stage 8 § Transactional templates — New-session alert + Stage 8 § Security event notifications — New-device/session login.*
+- The **per-session IP-anchor toggle** (Stage 6 carry-forward) and the **new-session/new-device alert email** (Stage 8 carry-forward) were moved to § Stage 12.5 below. Both turned out to need design work the core stage doesn't carry — the `UserSession.IsIpAnchored` field does not actually exist (new column + enforcement + self-lockout design), and the new-session alert needs a comparison-granularity + suppression design. Full WHAT in [`planning-future.md` § Deferred from Stage 12](planning-future.md#deferred-from-stage-12-2026-06-30).
 
 Stage 9.11 deferred item (queued 2026-06-11 — deferral gate run, see Stage 9.11 spec § 9):
 
@@ -1480,6 +1476,43 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] `/support` mobile: ticket form full-page; ticket list as cards; status badges legible
 - [ ] `/support` desktop: form modal or full-page (decided per the form-presentation rule), ticket list as table
 - [ ] `/support` touch targets: every form input, submit button, and ticket-row tap target ≥ 44×44px on mobile
+
+---
+
+## Stage 12.5 — Deferred from Stage 12 (not scheduled)
+
+**Status: ❌ Deferred (2026-06-30, user-authorized).** Three items were scoped out of Stage 12 core during the 2026-06-30 brainstorm because each needs design work the core stage deliberately did not carry. This is the receiving checklist (the `[ ]` execution gate); the WHAT + open design questions live in [`planning-future.md` § Deferred from Stage 12](planning-future.md#deferred-from-stage-12-2026-06-30). Not on the active schedule — resumes only when the user schedules it. Listed here, separate from Stage 12, so Stage 12 closes with zero unchecked items under its own heading (Phase E).
+
+**Reason each qualifies as a deferral (no-unjustified-deferrals gate):** user-authorized AND a tooling/infra gap — the capability each needs does not exist in the codebase today (see per-item notes).
+
+### 12.5.1 — Per-session IP-anchor toggle
+
+*Deferral reason: tooling gap — `UserSession.IsIpAnchored` column + enforcement does not exist (the roadmap's Stage 6 carry-forward wrongly assumed it did). Needs a column migration + self-lockout design first.*
+
+- [ ] Add `IsIpAnchored` (or chosen-granularity) column to `UserSession` + RLS-table migration
+- [ ] Server-side enforcement: reject a request whose session is anchored and whose IP differs from the anchor (resolve granularity: exact-IP vs subnet vs ASN — exact-IP self-locks-out roaming mobile users)
+- [ ] Per-row toggle on `/settings/sessions` + a self-lockout UX warning + recovery path
+- [ ] Integration test: toggle on → request from a different IP → 401
+- *Tripwire: this checklist + the `planning-future.md` entry; no code stub exists to FIXME (the feature is greenfield).*
+
+### 12.5.2 — Admin ticket-list UI
+
+*Deferral reason: tooling/infra gap — no roles/admin-identity system exists (no `api/admin`, no role claims). Stage 12 core ships admin-NOTIFY email only.*
+
+- [ ] Decide + build the admin-identity mechanism (role claim / configured admin allow-list / single-operator)
+- [ ] `Admin/` endpoints to list all tickets, access-controlled, using the `ceres_admin` BYPASSRLS context deliberately (mirror `IUserJobRunner` discipline) per ADR-0065
+- [ ] Admin list/triage SPA surface
+- *Tripwire: this checklist + the `planning-future.md` entry.*
+
+### 12.5.3 — New-session-from-new-IP alert email
+
+*Deferral reason: needs a comparison-granularity + first-login-suppression design; naive exact-IP shipping now causes alert fatigue.*
+
+- [ ] Resolve novelty granularity (exact IP / /24 / geo-ASN) + first-ever-login suppression
+- [ ] Session-novelty detection at the `UserSession` creation path (login)
+- [ ] `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx (`NewSessionAlert.Subject/BodyText/BodyHtml`)
+- [ ] Opt-out toggle in Settings notification preferences (the preferences surface itself may not exist yet — confirm)
+- *Tripwire: this checklist + the `planning-future.md` entry; `EmailTemplateKey` has no `NewSessionAlert` member until built.*
 
 ---
 

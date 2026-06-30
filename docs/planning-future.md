@@ -402,6 +402,49 @@ Operational:
 
 ---
 
+### Deferred from Stage 12 (2026-06-30)
+
+Three items were scoped out of Stage 12 core during the 2026-06-30 brainstorm (user-authorized). Each needs design work the core stage deliberately did not carry. The `[ ]` execution checklist lives in `roadmap-phase-three.md` § Stage 12.5 (the trackable receiving stage); the WHAT + open design questions are preserved here. Source spec: `docs/superpowers/specs/2026-06-30-stage-12-sessions-support-spa-design.md` § Deferrals.
+
+#### Per-session IP-anchor toggle (was roadmap Stage 12 / Stage 6 carry-forward)
+
+**What:** a per-row "anchor this session to its creation IP" toggle on `/settings/sessions`; when enabled, requests carrying that session's cookie from a different IP are rejected.
+
+**Why deferred:** the roadmap's Stage 6 carry-forward assumed `UserSession` already has the field and that this stage merely "exposes the toggle." It does **not** — `UserSession` fields are `Id, UserId, PersistentTokenHash, IpCreatedAt, UserAgent, CreatedAt, LastUsedAt, RevokedAt, IsPersistent, UsedBackupCodeAtLogin` (no `IsIpAnchored`). This is a new column + new server enforcement, not a UI exposure — bigger and riskier than written.
+
+**Open design questions to resolve before building:**
+- Anchoring granularity: exact-IP (self-locks-out roaming mobile/CGNAT/VPN users) vs subnet vs ASN. Exact-IP is the naive choice and the dangerous one.
+- Where enforcement hooks: alongside `UserBlockedIpMiddleware`, or in `SessionRevocationValidator`?
+- Self-lockout guard: a user on mobile data who anchors will lose the session on the next tower hop. Need a UX warning + a recovery path (it shouldn't require account recovery to undo).
+- Migration: adds a column to an auth-internal RLS table — confirm the RLS migration + parity implications.
+
+#### Admin ticket-list UI (was part of roadmap Stage 12.6)
+
+**What:** an admin surface to list/triage all users' support tickets (Stage 12 core ships admin-NOTIFY email only — `EmailTemplateKey.SupportTicketReceived` to the configured admin address).
+
+**Why deferred:** there is no roles / admin-identity system in the codebase today — no `api/admin`, no role claims, no admin-user concept. ADR-0065 names an `Admin/` endpoint scope but nothing implements it. Building the list UI first requires deciding and building the admin-identity mechanism.
+
+**Open design questions:**
+- How is "admin" identified: a role claim on the auth cookie? A configured admin email allow-list? A single-operator assumption for the beta?
+- Endpoint scope + isolation: admin endpoints read across users (bypass the per-user query filter / RLS) — they must use the `ceres_admin` BYPASSRLS context deliberately and be access-controlled, mirroring the `IUserJobRunner` admin-context discipline.
+- Whether the beta needs this at all, or admin triage via the notification email + direct DB access suffices until there's a second operator.
+
+#### New-session-from-new-IP alert email (Stage 8 carry-forward)
+
+**What:** when a `UserSession` is created from an IP not previously seen for that user, email a "new sign-in — wasn't you? revoke it" notification with IP + UA summary + a revoke link. Opt-out, default-enabled, toggle in Settings notification preferences.
+
+**Why deferred:** novelty = "IP not previously seen" naively compared against `UserSession.IpCreatedAt` history fires on nearly every login for mobile/CGNAT/VPN users → alert fatigue that trains users to ignore security mail. Doing it well needs a comparison-granularity + suppression design.
+
+**Open design questions:**
+- Comparison granularity: exact IP vs /24 subnet vs geo/ASN.
+- First-ever-login suppression (don't alert on the account's very first session).
+- Opt-out wiring: the Settings notification-preferences surface this toggles from doesn't exist yet either.
+- Template: add `NewSessionAlert` to `EmailTemplateKey` + EN/ES resx (`NewSessionAlert.Subject/BodyText/BodyHtml`) when built.
+
+**Gate (all three):** resume when scheduled by the user; restore an executing stage in the then-active roadmap from § Stage 12.5's checklist.
+
+---
+
 ## Phase 5 — Business Model
 
 **Gate: Phase 4 must be stable. See [`business-model.md`](business-model.md) for full detail.**
