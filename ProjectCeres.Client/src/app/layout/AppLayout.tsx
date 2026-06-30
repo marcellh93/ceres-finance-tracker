@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { StepUpProvider } from '../auth/StepUpProvider';
 import { MobileDrawer } from './MobileDrawer';
 import { ReminderCountProvider } from './ReminderCountProvider';
 import { Sidebar } from './Sidebar';
@@ -14,6 +15,7 @@ export function AppLayout() {
   useScrollRestoration(mainRef);
 
   return (
+    <StepUpProvider>
     <ReminderCountProvider>
       <div className="grid h-screen grid-rows-[3.5rem_1fr] bg-background text-foreground">
           <a
@@ -40,5 +42,6 @@ export function AppLayout() {
           {/* Toaster mounted at App root (App.tsx) so AuthLayout pages also get it. */}
         </div>
     </ReminderCountProvider>
+    </StepUpProvider>
   );
 }
