@@ -26,32 +26,44 @@ function ensureDir(p) {
   try { fs.mkdirSync(p, { recursive: true }); } catch {}
 }
 
+// Returns the project-relative path to record, or null to ignore this call.
+// Pure — the whole gate decision, so __tests__/track-session-writes.test.js can
+// pin it. run-tests.sh AND evidence-bundle-check.js both key off the result.
+function classifyWrite(input, projectDir) {
+  if (!input || typeof input !== "object") return null;
+
+  const toolInput = input.tool_input || {};
+  if (!input.session_id) return null;
+  if (!["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(input.tool_name)) return null;
+
+  const filePath = toolInput.file_path || toolInput.notebook_path;
+  if (!filePath) return null;
+
+  if (!TRACKED_EXT.has(path.extname(filePath).toLowerCase())) return null;
+
+  // Only count writes inside the project tree — out-of-tree edits (e.g. to
+  // ~/.claude/...) don't affect the build.
+  const abs = path.resolve(filePath);
+  const projAbs = path.resolve(projectDir);
+  if (!abs.startsWith(projAbs + path.sep)) return null;
+
+  return path.relative(projAbs, abs);
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { classifyWrite };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
   try { input = JSON.parse(raw || "{}"); } catch { process.exit(0); }
 
   const sessionId = input.session_id;
-  const toolName = input.tool_name;
-  const toolInput = input.tool_input || {};
-
-  if (!sessionId) process.exit(0);
-  if (!["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(toolName)) process.exit(0);
-
-  const filePath = toolInput.file_path || toolInput.notebook_path;
-  if (!filePath) process.exit(0);
-
-  const ext = path.extname(filePath).toLowerCase();
-  if (!TRACKED_EXT.has(ext)) process.exit(0);
-
-  // Only count writes inside the project tree — out-of-tree edits (e.g. to
-  // ~/.claude/...) don't affect the build.
-  const abs = path.resolve(filePath);
-  const projAbs = path.resolve(PROJECT_DIR);
-  if (!abs.startsWith(projAbs + path.sep)) process.exit(0);
-
-  const rel = path.relative(projAbs, abs);
+  const rel = classifyWrite(input, PROJECT_DIR);
+  if (rel === null) process.exit(0);
 
   ensureDir(STATE_DIR);
   const stateFile = path.join(STATE_DIR, `${sessionId}.json`);
@@ -68,3 +80,4 @@ process.stdin.on("end", () => {
 
   process.exit(0);
 });
+}

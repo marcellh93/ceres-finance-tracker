@@ -46,7 +46,21 @@ const STAGE_REF = /Stage \d+(\.\d+)?\b/;
 const CHECKBOX = /^\s*-\s+\[ \]\s+/m;
 const REASON_MARKER = /\b(tooling|already scheduled|scheduled in)\b/i;
 
+// A deferral is well-formed when it names a receiving stage, opens a real
+// checkbox, AND cites one of the two valid reasons. Those three together are
+// the escape hatch — the gate stays quiet so correct behaviour isn't punished.
+function isWellFormedDeferral(text) {
+  if (!text) return false;
+  return STAGE_REF.test(text) && CHECKBOX.test(text) && REASON_MARKER.test(text);
+}
+
+// Exported for __tests__/pre-write-deferral.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { PHRASES, STAGE_REF, CHECKBOX, REASON_MARKER, isWellFormedDeferral };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -94,7 +108,7 @@ process.stdin.on("end", () => {
   const hasStage = STAGE_REF.test(text);
   const hasCheckbox = CHECKBOX.test(text);
   const hasReason = REASON_MARKER.test(text);
-  if (hasStage && hasCheckbox && hasReason) process.exit(0);
+  if (isWellFormedDeferral(text)) process.exit(0);
 
   const missingFields = [];
   if (!hasStage) missingFields.push("no Stage X reference");
@@ -157,3 +171,4 @@ process.stdin.on("end", () => {
   );
   process.exit(0);
 });
+}
