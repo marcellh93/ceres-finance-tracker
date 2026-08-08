@@ -168,45 +168,19 @@ function auditEntities() {
         // U2 — there must exist a migration with CREATE POLICY user_isolation
         // referencing the table name. Pluralize crudely: typeName + "s".
         // (If the entity carries [Table("Custom")] override, accept either.)
-        const tableAttrMatch = content
-          .slice(idx, idx + 1000)
-          .match(/\[Table\("([^"]+)"\)\]/);
-        const tableName = tableAttrMatch ? tableAttrMatch[1] : `${typeName}s`;
+        const tableName = tableNameFor(typeName, content.slice(idx, idx + 1000));
 
         const migrationsDir = path.join(PROJECT_DIR, "ProjectCeres", "Migrations");
-        let policyFound = false;
+        const migrationSources = [];
         try {
           for (const f of fs.readdirSync(migrationsDir)) {
             if (!f.endsWith(".cs") || f.endsWith(".Designer.cs")) continue;
-            const mig = fs.readFileSync(path.join(migrationsDir, f), "utf8");
-            if (!mig.includes("CREATE POLICY user_isolation")) continue;
-            // Two acceptable shapes:
-            //  (a) Explicit: `ON "TableName"` literal in the SQL (or the frozen
-            //      table-name list the Stage 7.5 migration now carries — Stage 9.5b
-            //      Task 4 inlined a `FrozenUserOwnedTables` copy so the historical
-            //      migration stays byte-reproducible after the hand-list deletion).
-            //  (b) Loop shape: a migration that iterates a table-name list and emits
-            //      CREATE POLICY user_isolation per entry. The runtime SQL truth
-            //      (whether the policy is actually installed for this table) is
-            //      verified by ParityTests + RlsParityStartupCheck, not this static
-            //      check — here we only confirm a migration plausibly covers it.
-            if (mig.includes(`"${tableName}"`)) {
-              policyFound = true;
-              break;
-            }
-            if (
-              /foreach\s*\(var\s+table\s+in\s+(FrozenUserOwnedTables|UserOwnedTables\.All)\)/.test(mig)
-            ) {
-              // Tentative — loop-based. Mark as "loop-covered" and continue
-              // searching for an explicit one (explicit wins).
-              policyFound = true;
-              // Don't break — we want to confirm there's no follow-up migration
-              // that does something different (e.g. DROP POLICY).
-            }
+            migrationSources.push(fs.readFileSync(path.join(migrationsDir, f), "utf8"));
           }
         } catch {
           // ignore directory read errors
         }
+        const policyFound = policyCoversTable(migrationSources, tableName);
         checks.push({
           id: "U2",
           label: `CREATE POLICY user_isolation migration covers "${tableName}"`,
@@ -400,7 +374,78 @@ function auditFailedLoginReasons() {
 // Main
 // ─────────────────────────────────────────────────────────────────────────
 
+// The table an entity maps to: an explicit [Table("...")] wins, else EF's
+// default pluralization. Naive typeName + "s" yielded "Categorys" / "Settingss"
+// / "TotpReplayEntrys" — none real, so U2 denied three healthy entities once the
+// loop-shape blanket-pass stopped masking it.
+function tableNameFor(typeName, declarationWindow) {
+  const attr = (declarationWindow || "").match(/\[Table\("([^"]+)"\)\]/);
+  if (attr) return attr[1];
+  if (/s$/i.test(typeName)) return typeName;
+  if (/[^aeiou]y$/i.test(typeName)) return typeName.slice(0, -1) + "ies";
+  return typeName + "s";
+}
+
+// Does any migration install a user_isolation policy covering `tableName`?
+// Two shapes count:
+//   (a) explicit — the SQL names the table literally.
+//   (b) loop — the migration iterates a table-name list; it covers the table
+//       only if the table appears in THAT list. The list is frozen, so a blanket
+//       pass here would mean U2 could never fail for an entity added later —
+//       exactly the rowsecurity=false bug the hook exists to catch (found
+//       2026-08-08 by planting a probe entity and watching the gate allow).
+function policyCoversTable(migrationSources, tableName) {
+  for (const mig of migrationSources || []) {
+    if (!mig || !mig.includes("CREATE POLICY user_isolation")) continue;
+    if (mig.includes(`"${tableName}"`)) return true;
+  }
+  return false;
+}
+
+// Every tool shape the gate must read text from. A shape that returns ""
+// silently skips the audit, so this is pinned by tests.
+function extractProposedText(ti) {
+  if (!ti || typeof ti !== "object") return "";
+  const chunks = [];
+  if (typeof ti.content === "string") chunks.push(ti.content);
+  if (typeof ti.new_string === "string") chunks.push(ti.new_string);
+  if (Array.isArray(ti.edits)) {
+    for (const e of ti.edits) {
+      if (e && typeof e.new_string === "string") chunks.push(e.new_string);
+    }
+  }
+  return chunks.join("\n");
+}
+
+// A check is a gap only when it failed AND is not advisory. D2 is deliberately
+// advisory — entities configured by an iteration loop have no explicit
+// modelBuilder.Entity<T> block, and denying on that would train a bypass habit.
+function collectGaps(auditResults) {
+  const gaps = [];
+  for (const item of auditResults || []) {
+    for (const c of item.checks || []) {
+      if (!c.pass && !c.na) {
+        gaps.push({ kind: item.kind, name: item.name, id: c.id, label: c.label });
+      }
+    }
+  }
+  return gaps;
+}
+
+// Exported for __tests__/stage-completeness-check.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    isStageClose,
+    collectGaps,
+    ROADMAP_PATH_PATTERN,
+    extractProposedText,
+    policyCoversTable,
+    tableNameFor,
+  };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   if (process.env.CERES_SKIP_STAGE_COMPLETENESS_HOOK === "1") allow();
@@ -419,15 +464,7 @@ process.stdin.on("end", () => {
   const filePath = ti.file_path || "";
   if (!ROADMAP_PATH_PATTERN.test(filePath)) allow();
 
-  const chunks = [];
-  if (typeof ti.content === "string") chunks.push(ti.content);
-  if (typeof ti.new_string === "string") chunks.push(ti.new_string);
-  if (Array.isArray(ti.edits)) {
-    for (const e of ti.edits) {
-      if (e && typeof e.new_string === "string") chunks.push(e.new_string);
-    }
-  }
-  const text = chunks.join("\n");
+  const text = extractProposedText(ti);
   if (!text) allow();
   if (!isStageClose(text)) allow();
 
@@ -441,14 +478,7 @@ process.stdin.on("end", () => {
   ];
 
   // Collect gaps only.
-  const gaps = [];
-  for (const item of all) {
-    for (const c of item.checks) {
-      if (!c.pass && !c.na) {
-        gaps.push({ kind: item.kind, name: item.name, id: c.id, label: c.label });
-      }
-    }
-  }
+  const gaps = collectGaps(all);
 
   // Build a grouped report — only items with at least one gap appear in the
   // denial message (keeps the output focused on what to fix).
@@ -512,3 +542,4 @@ process.stdin.on("end", () => {
 
   deny(reason);
 });
+}
