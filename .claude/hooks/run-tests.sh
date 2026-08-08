@@ -74,9 +74,14 @@ if [[ -n "$SESSION_ID" ]]; then
 
   SESSION_FILES_JSON=$(cat "$STATE_FILE")
 
-  # Session HAS writes. Clear the list now so the next turn only fires if
-  # NEW writes come in. Done BEFORE running tests so a long dotnet test
-  # doesn't leave stale state.
+  # Session HAS writes. Record a turn-scoped breadcrumb BEFORE clearing, so
+  # later Stop hooks (evidence-bundle-check.js) can still tell this turn wrote
+  # code. Without it they read the truncated file and skip themselves.
+  mkdir -p ".claude/state/run-tests"
+  printf '%s' "$SESSION_FILES_JSON" > ".claude/state/run-tests/${SESSION_ID}.lastturn.json"
+
+  # Clear the list now so the next turn only fires if NEW writes come in.
+  # Done BEFORE running tests so a long dotnet test doesn't leave stale state.
   : > "$STATE_FILE"
 else
   # No session_id — fall back to git working tree. Always TIER 2 in this
