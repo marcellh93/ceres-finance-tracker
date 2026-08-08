@@ -119,7 +119,13 @@ function countUncheckedInOtherStages(newString, closingHeaderLine) {
   return total;
 }
 
+// Exported for __tests__/pre-gates.test.js. Only read stdin when run as a hook.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { isStageClose, countUncheckedInClosingStage };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let payload;
@@ -194,3 +200,4 @@ process.stdin.on("end", () => {
 
   deny(reason);
 });
+}

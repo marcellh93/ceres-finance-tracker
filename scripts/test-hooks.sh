@@ -11,9 +11,13 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-shopt -s nullglob
-SUITES=(.claude/hooks/lib/__tests__/*.test.js .claude/skills/*/hooks/__tests__/*.test.js)
-shopt -u nullglob
+# Discover with `find`, not fixed globs: the first version of this script listed
+# two glob patterns and silently missed .claude/hooks/__tests__/, reporting green
+# while 46 tests never ran. Any __tests__ dir under .claude/ is picked up now.
+SUITES=()
+while IFS= read -r f; do SUITES+=("$f"); done < <(
+  find .claude -type d -name node_modules -prune -o -type f -name '*.test.js' -print | sort
+)
 
 if [[ ${#SUITES[@]} -eq 0 ]]; then
   echo "[test-hooks] no hook test suites found" >&2

@@ -79,7 +79,13 @@ function getStagedFiles() {
   }
 }
 
+// Exported for __tests__/pre-gates.test.js. Only read stdin when run as a hook.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { isGitCommit };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let payload;
@@ -138,6 +144,7 @@ process.stdin.on("end", () => {
 
   allow();
 });
+}
 
 function buildReason(stagedCode, requireBackend, requireFrontend, detail) {
   const names = stagedCode.join(", ");

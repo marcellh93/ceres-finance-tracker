@@ -193,6 +193,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/surface-build-warnings.js\""
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-tests-on-write.js\""
+          }
+        ]
       }
     ],
     "PreCompact": [

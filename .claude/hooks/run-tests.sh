@@ -110,48 +110,8 @@ fi
 # Empty file list (legacy fallback path) defaults to TIER 2.
 TIER=2
 if [[ -n "$SESSION_FILES_JSON" ]]; then
-  TIER=$(printf '%s' "$SESSION_FILES_JSON" | python3 -c '
-import json, sys
-try:
-  d = json.load(sys.stdin)
-  files = d.get("files", []) if isinstance(d, dict) else []
-except Exception:
-  print(2); sys.exit(0)
-
-if not files:
-  print(2); sys.exit(0)
-
-has_dotnet = False
-has_test = False
-has_sln = False
-has_csproj_app = False
-
-for f in files:
-  ext = f.rsplit(".", 1)[-1].lower() if "." in f else ""
-  if ext == "sln":
-    has_sln = True
-  if ext == "cs":
-    has_dotnet = True
-    if f.startswith("ProjectCeres.Tests/"):
-      has_test = True
-  if ext == "csproj":
-    has_dotnet = True
-    if f.startswith("ProjectCeres.Tests/"):
-      has_test = True
-    else:
-      has_csproj_app = True
-
-# TIER 0 — purely frontend (.tsx / .ts), no dotnet impact at all.
-if not has_dotnet and not has_sln:
-  print(0); sys.exit(0)
-
-# TIER 2 — anything touching test code, the solution file, or both.
-if has_test or has_sln:
-  print(2); sys.exit(0)
-
-# TIER 1 — only production .cs / .csproj under ProjectCeres/.
-print(1)
-' 2>/dev/null || echo 2)
+  TIER=$(printf '%s' "$SESSION_FILES_JSON" \
+    | python3 "$(dirname "${BASH_SOURCE[0]}")/tier-classify.py" 2>/dev/null || echo 2)
 fi
 
 case "$TIER" in

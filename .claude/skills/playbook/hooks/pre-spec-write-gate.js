@@ -62,7 +62,13 @@ function readState(sessionId) {
   }
 }
 
+// Exported for __tests__/pre-gates.test.js. Only read stdin when run as a hook.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { extractProposedContent };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let payload;
@@ -160,6 +166,7 @@ process.stdin.on("end", () => {
 
   deny(reason);
 });
+}
 
 function extractProposedContent(payload) {
   const t = payload?.tool_name || "";
