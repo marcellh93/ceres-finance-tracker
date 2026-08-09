@@ -87,7 +87,9 @@ export function Login() {
         // open-redirect attacks via crafted /login?redirect=<external> URLs.
         // RequireAuth always writes encoded relative paths so this only changes
         // behaviour for hand-crafted links.
-        const redirectTo = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
+        // Backslashes count: browsers treat "/\" like "//", so a bare
+        // startsWith('//') check lets /\evil.example through as protocol-relative.
+        const redirectTo = /^\/(?![/\\])/.test(raw) ? raw : '/';
         navigate(redirectTo);
         return;
       }

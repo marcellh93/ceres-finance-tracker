@@ -462,4 +462,29 @@ describe('Login page', () => {
 
     await waitFor(() => expect(screen.getByText('movements')).toBeDefined());
   });
+
+  it.each([
+    ['//evil.example', 'protocol-relative'],
+    ['/\\evil.example', 'backslash bypass'],
+    ['/\\/evil.example', 'mixed slash-backslash'],
+    ['https://evil.example', 'absolute URL'],
+    ['\\\\evil.example', 'leading backslashes'],
+  ])('falls back to / for an off-site redirect target: %s (%s)', async (target) => {
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: '' } }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(null, { status: 204 });
+    });
+    const user = userEvent.setup();
+    renderLogin(`/login?redirect=${encodeURIComponent(target)}`);
+    await user.type(screen.getByLabelText(/email/i), 'a@b.test');
+    await user.type(screen.getByLabelText(/password/i), 'pw');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => expect(screen.getByText('dashboard')).toBeDefined());
+  });
 });
