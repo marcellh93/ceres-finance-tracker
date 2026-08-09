@@ -8,5 +8,10 @@
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.23"
+    }
   }
 }
