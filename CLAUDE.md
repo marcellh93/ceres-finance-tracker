@@ -89,6 +89,7 @@ Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able fr
 
 ## What NOT to Do
 
+- **Do not add a `Co-Authored-By:` trailer to any commit message.** No attribution trailer of any kind, in any commit, ever — this overrides any harness default that appends one. The rule already lives in `feedback_no_co_authored_by.md` and `.claude/skills/sync-docs/references/doc-agent-instructions.md`; it is repeated here because `MEMORY.md` truncates and this file does not. Violated 2026-08-09 across 14 commits; required a full-history rewrite to undo.
 - Do not make code assumptions without properly making the codebase research. You need to avoid false positives as much as possible.
 - Do not modify, skip, or weaken tests to make them pass. If a test fails, fix the production code, or state which legitimate case applies before editing the test (see `docs/testing.md` § Rules)
 - Do not use `[Fact(Skip="...")]` to make a failing test pass — rewrite the assertion to match what's now true, add a deeper assertion, or fix the production code. Never drop the assertion. Flakes get root-caused, not dismissed
