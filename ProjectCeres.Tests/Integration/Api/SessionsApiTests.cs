@@ -1,0 +1,284 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Common.Authentication;
+using ProjectCeres.Data;
+using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration.Authentication;
+
+namespace ProjectCeres.Tests.Integration.Api;
+
+[Collection("IntegrationTests")]
+public class SessionsApiTests : IAsyncLifetime
+{
+    private readonly AuthTestWebApplicationFactory _factory;
+
+    public SessionsApiTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.UserSessions
+            .IgnoreQueryFilters()
+            .Where(s => s.IpCreatedAt.EndsWith(".sessions-api-test"))
+            .ExecuteDeleteAsync();
+        await db.UserBlockedIps
+            .IgnoreQueryFilters()
+            .Where(b => b.IpAddress.EndsWith(".sessions-api-test"))
+            .ExecuteDeleteAsync();
+        await db.UserSessions
+            .IgnoreQueryFilters()
+            .Where(s => s.UserAgent == "sessions-api-test")
+            .ExecuteDeleteAsync();
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Logs in via HTTP, which stamps LastReauthAt (production login flow).
+    /// Returns the session cookie value and the user.
+    /// </summary>
+    private async Task<(string SessionCookie, Microsoft.AspNetCore.Identity.IdentityUser<Guid> User)>
+        LoginWithFreshReauthAsync(string emailSuffix)
+    {
+        var email = $"sessions-api-{emailSuffix}-{Guid.NewGuid():N}@example.com";
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, email);
+        var client = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = false });
+        var cookie = await AuthTestFixture.LoginViaHttpAsync(_factory, client, email);
+        return (cookie, user);
+    }
+
+    /// <summary>
+    /// Mints a cookie without LastReauthAt (stale/no reauth claim) for the given user.
+    /// Also inserts a session row so the validator doesn't reject the ticket.
+    /// </summary>
+    private async Task<(string SessionCookie, Guid SessionId)>
+        MintStaleAuthCookieAsync(ApplicationUser user)
+    {
+        var cookie = await AuthTestFixture.MintAuthCookieWithLastReauthAt(_factory, user, null);
+
+        // Retrieve the session id that was inserted inside MintAuthCookieWithLastReauthAt.
+        // We can't call it without the factory scope, but MintAuthCookieWithLastReauthAt
+        // already inserted the row — we just need the sid from the cookie.
+        // Instead: read the most recently inserted session for this user.
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sid = await db.UserSessions
+            .IgnoreQueryFilters()
+            .Where(s => s.UserId == user.Id)
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => s.Id)
+            .FirstAsync();
+        return (cookie, sid);
+    }
+
+    /// <summary>
+    /// Builds an HttpClient with the given session cookie pre-set and a fresh CSRF pair.
+    /// Returns the client and the CSRF cookie+header values.
+    /// </summary>
+    private (HttpClient Client, string CsrfCookie, string CsrfHeader) BuildClient(
+        string sessionCookie, Guid userId)
+    {
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, userId);
+        var client = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = false });
+        client.DefaultRequestHeaders.Add(
+            "Cookie",
+            $"{SessionConstants.SessionCookieName}={sessionCookie}; " +
+            $"{SessionConstants.CsrfCookieName}={csrfCookie}");
+        client.DefaultRequestHeaders.Add(SessionConstants.CsrfHeaderName, csrfHeader);
+        return (client, csrfCookie, csrfHeader);
+    }
+
+    // ── Test 1 ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Get_lists_own_active_sessions_and_marks_current_session()
+    {
+        var (sessionCookie, user) = await LoginWithFreshReauthAsync("list");
+        var (client, _, _) = BuildClient(sessionCookie, user.Id);
+
+        var resp = await client.GetAsync("/api/sessions");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var sessions = body.EnumerateArray().ToList();
+        sessions.Should().NotBeEmpty("at least the login session should be returned");
+
+        var current = sessions.Where(s => s.GetProperty("isCurrent").GetBoolean()).ToList();
+        current.Should().HaveCount(1, "exactly one session should be flagged as isCurrent");
+
+        // All returned sessions must belong to the caller (no cross-user leak).
+        // We verify this indirectly: the GET scopes to UserId per the controller code.
+        // Every session must have required fields.
+        foreach (var s in sessions)
+        {
+            s.GetProperty("id").GetGuid().Should().NotBe(Guid.Empty);
+            // ipCreatedAt is "" in the test host (RemoteIpAddress is null on TestServer).
+            s.GetProperty("ipCreatedAt").GetString().Should().NotBeNull();
+            s.GetProperty("userAgent").GetString().Should().NotBeNull();
+        }
+    }
+
+    // ── Test 2 ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Delete_revokes_session_and_that_cookie_no_longer_authenticates()
+    {
+        // Login to get Session A.
+        var (sessionCookieA, userA) = await LoginWithFreshReauthAsync("revoke");
+        var (clientA, _, _) = BuildClient(sessionCookieA, userA.Id);
+
+        // List to get the session id.
+        var listResp = await clientA.GetAsync("/api/sessions");
+        listResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var sessions = (await listResp.Content.ReadFromJsonAsync<JsonElement>())
+            .EnumerateArray().ToList();
+        var sessionId = sessions.First(s => s.GetProperty("isCurrent").GetBoolean())
+            .GetProperty("id").GetGuid();
+
+        // Now login AGAIN as the same user to get Session B, which we will use to
+        // perform the revoke (Session A might also be the current one in Session B's
+        // perspective, but the important thing is: Session A's cookie stops working).
+        var emailB = $"sessions-api-revoke-b-{Guid.NewGuid():N}@example.com";
+        // Re-use user — log in again via a second client to get a fresh session with reauth.
+        var clientB = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = false });
+        var sessionCookieB = await AuthTestFixture.LoginViaHttpAsync(
+            _factory, clientB, userA.UserName!);
+        var (clientBAuth, _, _) = BuildClient(sessionCookieB, userA.Id);
+
+        // Use Session B to revoke Session A.
+        var deleteResp = await clientBAuth.DeleteAsync($"/api/sessions/{sessionId}");
+        deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Session A's cookie should now fail authentication.
+        var probeClient = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = false });
+        var probe = new HttpRequestMessage(HttpMethod.Get, "/api/transactions");
+        probe.Headers.Add("Cookie", $"{SessionConstants.SessionCookieName}={sessionCookieA}");
+        var probeResp = await probeClient.SendAsync(probe);
+        probeResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "a revoked session cookie must be rejected");
+    }
+
+    // ── Test 3 ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Delete_another_users_session_returns_404_idor_guard()
+    {
+        // User A logs in, creates a session.
+        var (sessionCookieA, userA) = await LoginWithFreshReauthAsync("idor-a");
+        var (clientA, _, _) = BuildClient(sessionCookieA, userA.Id);
+
+        // User B logs in separately.
+        var (sessionCookieB, userB) = await LoginWithFreshReauthAsync("idor-b");
+
+        // Find User B's session id.
+        var (clientBForList, _, _) = BuildClient(sessionCookieB, userB.Id);
+        var listResp = await clientBForList.GetAsync("/api/sessions");
+        listResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var bSessions = (await listResp.Content.ReadFromJsonAsync<JsonElement>())
+            .EnumerateArray().ToList();
+        var bSessionId = bSessions.First().GetProperty("id").GetGuid();
+
+        // User A tries to delete User B's session — must get 404 (IDOR guard).
+        var deleteResp = await clientA.DeleteAsync($"/api/sessions/{bSessionId}");
+        deleteResp.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "cross-user session revoke must return 404 (IDOR guard)");
+
+        // User B's session must still be active.
+        var (clientBVerify, _, _) = BuildClient(sessionCookieB, userB.Id);
+        var verifyResp = await clientBVerify.GetAsync("/api/sessions");
+        verifyResp.StatusCode.Should().Be(HttpStatusCode.OK,
+            "User B's session should still be valid after the failed cross-user revoke");
+    }
+
+    // ── Test 4 ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Post_block_ip_inserts_UserBlockedIp_and_revokes_matching_ip_sessions()
+    {
+        var testIp = $"10.0.{DateTime.UtcNow.Millisecond}.1.sessions-api-test";
+
+        var (sessionCookie, user) = await LoginWithFreshReauthAsync("blockip");
+
+        // Directly insert a second session with the target IP so we can verify bulk-revoke.
+        Guid targetSessionId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            targetSessionId = Guid.NewGuid();
+            db.UserSessions.Add(new UserSession
+            {
+                Id = targetSessionId,
+                UserId = user.Id,
+                IpCreatedAt = testIp,
+                UserAgent = "sessions-api-test",
+                CreatedAt = DateTime.UtcNow,
+                LastUsedAt = DateTime.UtcNow,
+                IsPersistent = false,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var (client, _, _) = BuildClient(sessionCookie, user.Id);
+        var resp = await client.PostAsJsonAsync("/api/sessions/block-ip", new { ipAddress = testIp });
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // UserBlockedIp row must exist.
+        var blocked = await verifyDb.UserBlockedIps
+            .IgnoreQueryFilters()
+            .Where(b => b.UserId == user.Id && b.IpAddress == testIp)
+            .SingleOrDefaultAsync();
+        blocked.Should().NotBeNull("UserBlockedIp row must be inserted");
+
+        // The session with that IP must be revoked.
+        var revokedSession = await verifyDb.UserSessions
+            .IgnoreQueryFilters()
+            .Where(s => s.Id == targetSessionId)
+            .SingleAsync();
+        revokedSession.RevokedAt.Should().NotBeNull(
+            "sessions with the blocked IP must be bulk-revoked");
+    }
+
+    // ── Test 5 ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Get_without_recent_auth_returns_401_REAUTH_REQUIRED()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(
+            _factory, $"sessions-api-noreauth-{Guid.NewGuid():N}@example.com");
+
+        // Mint a cookie without LastReauthAt.
+        var (staleCookie, _) = await MintStaleAuthCookieAsync(user);
+
+        var client = _factory.CreateClient(
+            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { HandleCookies = false });
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, user.Id);
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/sessions");
+        req.Headers.Add("Cookie",
+            $"{SessionConstants.SessionCookieName}={staleCookie}; " +
+            $"{SessionConstants.CsrfCookieName}={csrfCookie}");
+        req.Headers.Add(SessionConstants.CsrfHeaderName, csrfHeader);
+
+        var resp = await client.SendAsync(req);
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await resp.Content.ReadAsStringAsync()).Should().Contain("REAUTH_REQUIRED");
+    }
+}
