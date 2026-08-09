@@ -43,7 +43,7 @@ if [[ -f "$PID_FILE" ]]; then
 fi
 
 # 2. Drop the schema. IF EXISTS keeps this idempotent.
-#    We connect as the OS superuser (youruser) via the default
+#    We connect as the OS superuser (your OS user) via the default
 #    Postgres.app socket — no password needed locally, and we sidestep the
 #    role-vs-owner question entirely.
 if command -v psql >/dev/null 2>&1; then
