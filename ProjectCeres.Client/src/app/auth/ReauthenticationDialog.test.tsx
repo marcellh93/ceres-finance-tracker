@@ -1,7 +1,7 @@
 // ReauthenticationDialog.test.tsx — render with a mocked auth context + mocked fetch.
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { it, expect, vi, beforeEach } from 'vitest';
 import { ReauthenticationDialog } from './ReauthenticationDialog';
 
 // Mock the auth context hook the dialog reads.
