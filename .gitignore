@@ -138,3 +138,11 @@ impeccable-sandbox/
 
 # Generated presentation decks — large binaries, regenerated on demand
 docs/presentations/
+
+# Personal learning notes — kept local, not part of the published project
+docs/guide/
+
+# Internal audit / self-review docs — kept local
+docs/gaps-review.md
+docs/code-quality-audit-*.md
+docs/hook-architecture-audit-*.md
