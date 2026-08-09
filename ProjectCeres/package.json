@@ -1,6 +1,7 @@
 {
   "name": "project-ceres",
   "private": true,
+  "packageManager": "pnpm@10.33.2+sha512.qQ+vb+6rca1sblf5Tg/hoS9dzCLNdU20CulZPraj4LaxLjVAIYuzeuCDQEsfLObbKkEh6XmCm0r/lLmfSdoc+A==",
   "scripts": {
     "build:css": "tailwindcss -i ./Styles/app.css -o ./wwwroot/css/site.css --minify",
     "watch:css": "tailwindcss -i ./Styles/app.css -o ./wwwroot/css/site.css --watch"
