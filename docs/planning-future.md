@@ -155,7 +155,7 @@ The system must communicate improvement explicitly — users do not perceive val
 - Goal progress: "You are on track for your Japan trip — 67% funded"
 - Savings rate tracking: displayed on dashboard as a trailing 3-month metric; improving trend surfaced as a `Progress` insight
 
-**Guiding product principle (from `docs/gaps-review.md`):**
+**Guiding product principle:**
 > At every step, ask: "Does this help the user decide something?" If not, it is likely not part of the core product differentiation.
 
 Value is not in features. Value is in making improvement visible and measurable.
@@ -163,8 +163,6 @@ Value is not in features. Value is in making improvement visible and measurable.
 ---
 
 ### Strategic Positioning Note
-
-> See `docs/gaps-review.md` for the full product gap analysis that informs Phase 4+ direction.
 
 The competitive angle for Project Ceres is **low-friction financial visibility** — not bank sync speed, not feature count. The target evolution is from a financial tracking system to a **financial decision-making and life-planning platform**.
 
