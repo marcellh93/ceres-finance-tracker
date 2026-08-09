@@ -73,5 +73,10 @@
     "vite": "^8.2.1",
     "vitest": "^4.1.6",
     "vitest-axe": "^0.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "nanoid": "^3.3.18"
+    }
   }
 }
