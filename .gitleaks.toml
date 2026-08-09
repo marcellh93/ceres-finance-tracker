@@ -1,0 +1,15 @@
+# Gitleaks configuration for Project Ceres.
+# Extends the default rule set; adds allowlists for verified non-secrets.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deterministic Svix test webhook secret — decodes to the literal placeholder 0123456789abcdef0123456789abcdef. Used by ResendWebhookTests and documented in the Stage 8 plan."
+regexes = [
+  '''whsec_(MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=|test_0123456789abcdef0123456789abcdef)''',
+]
+paths = [
+  '''ProjectCeres\.Tests/Integration/Email/ResendWebhookTests\.cs''',
+  '''docs/superpowers/plans/2026-05-14-stage-8-email-service-plan\.md''',
+]
