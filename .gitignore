@@ -135,3 +135,6 @@ impeccable-sandbox/
 
 # Stage 9.11 E2E artifacts
 .e2e/
+
+# Generated presentation decks — large binaries, regenerated on demand
+docs/presentations/
