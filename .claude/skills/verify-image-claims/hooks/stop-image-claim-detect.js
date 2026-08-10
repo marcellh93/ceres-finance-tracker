@@ -36,7 +36,44 @@ const path = require("path");
 const MARKER_RE = /<image-finding\s+image="([^"]+)"\s*>([\s\S]*?)<\/image-finding>/gi;
 const SESSION_BYPASS = process.env.CERES_SKIP_IMAGE_CLAIMS_HOOK === "1";
 
+
+// Pure helpers — exported for __tests__/image-claim-detect.test.js.
+// The matcher must neither miss a real claim (ungrounded findings ship) nor
+// invent one (the turn blocks with nothing to fix).
+
+function extractClaims(text) {
+  if (!text) return [];
+  const out = [];
+  // Fresh regex per call: a module-level /g regex carries lastIndex between
+  // calls and would skip matches on the second invocation.
+  const re = new RegExp(MARKER_RE.source, "gi");
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ imagePath: m[1].trim(), findingSnippet: m[2].trim().slice(0, 200) });
+  }
+  return out;
+}
+
+function extractReadPaths(lines) {
+  const readPaths = new Set();
+  for (const blob of lines || []) {
+    if (typeof blob !== "string" || !/"name"\s*:\s*"Read"/.test(blob)) continue;
+    const pathMatch = blob.match(/"file_path"\s*:\s*"([^"]+)"/);
+    if (pathMatch) readPaths.add(pathMatch[1]);
+  }
+  return readPaths;
+}
+
+function findMissing(claims, readPaths) {
+  return (claims || []).filter((c) => !readPaths.has(c.imagePath));
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { extractClaims, extractReadPaths, findMissing, MARKER_RE };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -92,12 +129,7 @@ process.stdin.on("end", () => {
   if (!lastAssistantText) process.exit(0);
 
   // Extract all <image-finding> marker blocks from the assistant text.
-  const claimed = [];
-  let m;
-  MARKER_RE.lastIndex = 0;
-  while ((m = MARKER_RE.exec(lastAssistantText)) !== null) {
-    claimed.push({ imagePath: m[1].trim(), findingSnippet: m[2].trim().slice(0, 200) });
-  }
+  const claimed = extractClaims(lastAssistantText);
   if (claimed.length === 0) process.exit(0);
 
   // For each claimed image, scan the WHOLE transcript for any Read on the
@@ -111,15 +143,9 @@ process.stdin.on("end", () => {
   // "assistant Read this image yesterday and is now making fresh claims
   // without re-reading it" case, but that's the rarer failure mode; the
   // common case (Read in same conversation, claims later) is what we want.
-  const readPaths = new Set();
-  for (let i = 0; i < lines.length; i++) {
-    const blob = lines[i] || "";
-    if (!/"name"\s*:\s*"Read"/.test(blob)) continue;
-    const pathMatch = blob.match(/"file_path"\s*:\s*"([^"]+)"/);
-    if (pathMatch) readPaths.add(pathMatch[1]);
-  }
+  const readPaths = extractReadPaths(lines);
 
-  const missing = claimed.filter((c) => !readPaths.has(c.imagePath));
+  const missing = findMissing(claimed, readPaths);
   const outcome = missing.length === 0 ? "passed" : "blocked";
 
   try {
@@ -169,3 +195,4 @@ process.stdin.on("end", () => {
   process.stderr.write(reason);
   process.exit(2);
 });
+}

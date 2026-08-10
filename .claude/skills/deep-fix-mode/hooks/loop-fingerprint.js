@@ -68,7 +68,13 @@ function fingerprint(toolName, toolInput, toolResponse) {
   return crypto.createHash("sha256").update(payload).digest("hex").slice(0, 24);
 }
 
+// Exported for __tests__/deep-fix-detectors.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { normalizeInput, resultPreview, fingerprint, WARN_AT, BLOCK_AT };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -164,3 +170,4 @@ process.stdin.on("end", () => {
   }
   process.exit(0);
 });
+}
