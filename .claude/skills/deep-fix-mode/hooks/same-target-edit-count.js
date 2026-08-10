@@ -46,7 +46,27 @@ function hashContent(s) {
   return crypto.createHash("sha256").update(s || "").digest("hex").slice(0, 16);
 }
 
+
+// Verdict for an edit run against one file. Pure — pinned by
+// __tests__/same-target-edit-count.test.js.
+//
+// The RATIO is the signal, not the raw count: N edits across N distinct
+// fingerprints is a convergent sweep; N edits across 2 is circling on the same
+// block. Firing on count alone would nag through every planned refactor.
+function classifyEditRun(total, distinct, ext) {
+  const advisoryAt = DOC_EXTENSIONS.has(ext) ? ADVISORY_AT_DOC : ADVISORY_AT_CODE;
+  const repetitionRatio = distinct === 0 ? 0 : total / distinct;
+  if (total < advisoryAt) return "silent";
+  if (repetitionRatio <= 1.5) return "silent";
+  return total >= advisoryAt + 3 ? "hard" : "advisory";
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { classifyEditRun, DOC_EXTENSIONS, ADVISORY_AT_DOC, ADVISORY_AT_CODE };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -110,10 +130,10 @@ process.stdin.on("end", () => {
   // Suppress entirely when edits are diverging (each edit lands different content).
   // The hook only fires when BOTH total crosses the threshold AND repetition is
   // present (ratio > 1.5, i.e. on average the same content is edited 1.5×).
-  if (total < advisoryAt) process.exit(0);
-  if (repetitionRatio <= 1.5) process.exit(0);
+  const verdict = classifyEditRun(total, distinct, ext);
+  if (verdict === "silent") process.exit(0);
 
-  const hard = total >= hardNudgeAt;
+  const hard = verdict === "hard";
   const fileKind = DOC_EXTENSIONS.has(ext) ? "doc" : "source";
   const msg = hard
     ? [
@@ -138,3 +158,4 @@ process.stdin.on("end", () => {
   );
   process.exit(0);
 });
+}
