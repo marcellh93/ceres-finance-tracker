@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-08-10. Eight overrides live in `ProjectCeres.Client/package.json`, one in `ProjectCeres/package.json`.
+**Status:** Accepted — 2026-08-10. Twelve overrides live in `ProjectCeres.Client/package.json`, one in `ProjectCeres/package.json`. One advisory is deliberately left unfixed — see *Deliberately left open* below.
 
 **Phase:** Phase 3 (Hosted Beta) — post-publication hardening, after the repository went public 2026-08-09.
 
@@ -14,7 +14,7 @@
 
 Publishing the repository turned on GitHub Dependabot, which reported **60 advisories (21 high)** against `ProjectCeres.Client/pnpm-lock.yaml` and one against `ProjectCeres/pnpm-lock.yaml`.
 
-Nine of those clusters shared a shape that blocked the ordinary fix:
+Thirteen of those clusters shared a shape that blocked the ordinary fix:
 
 - The vulnerable package was **transitive** — nothing in either `package.json` named it, so there was no version to bump.
 - The **parent could not be upgraded**. Six clusters reached the tree through `shadcn@4.7.0`, which is the latest published release; upgrading it was not an option because there was nothing newer. Two more arrived through `jsdom@29.1.1`, likewise current.
@@ -32,7 +32,7 @@ Use `pnpm.overrides` to pin transitive packages to their patched floor when, and
 2. Its parent is already at the latest published version, so a normal upgrade cannot reach the fix.
 3. The pinned version stays **inside the range the parent declares**, so the override corrects a resolution rather than forcing an incompatibility.
 
-Condition 3 was satisfied for every entry below and is not optional. Two examples: `jsdom@29.1.1` declares `undici: ^7.25.0`, so pinning `^7.29.0` stays within its own range — this is why `7.29.0` was chosen over the available `8.x`. `@modelcontextprotocol/sdk` declares `hono: ^4.11.4` and `@hono/node-server` peers `^4`, so `^4.12.34` is inside both.
+Condition 3 was satisfied for every entry below and is not optional. It is also the condition that stopped one alert from being fixed at all (see *Deliberately left open*). Two examples: `jsdom@29.1.1` declares `undici: ^7.25.0`, so pinning `^7.29.0` stays within its own range — this is why `7.29.0` was chosen over the available `8.x`. `@modelcontextprotocol/sdk` declares `hono: ^4.11.4` and `@hono/node-server` peers `^4`, so `^4.12.34` is inside both.
 
 If an override would violate condition 3, it is not an override — it is an unverified upgrade of someone else's dependency, and the correct action is to wait for the parent or replace it.
 
@@ -50,6 +50,10 @@ If an override would violate condition 3, it is not an override — it is an unv
 | `js-yaml` | `^4.3.1` | 4.3.1 | 3 | shadcn → cosmiconfig |
 | `fast-uri` | `^3.1.5` | 3.1.5 | 3 | shadcn → @modelcontextprotocol/sdk → ajv |
 | `nanoid` | `^3.3.18` | 3.3.18 | 2 | postcss (under both shadcn and vite) |
+| `qs` | `^6.15.2` | 6.15.3 | 1 | shadcn → @modelcontextprotocol/sdk → express → body-parser |
+| `body-parser` | `^2.3.0` | 2.3.0 | 1 | shadcn → @modelcontextprotocol/sdk → express |
+| `@babel/core` | `^7.29.6` | 7.29.7 | 1 | shadcn → @babel/preset-typescript; eslint-plugin-react-hooks |
+| `esbuild` | `^0.28.1` | 0.28.2 | 1 | vite; tsx |
 
 ### `ProjectCeres/package.json`
 
@@ -59,11 +63,11 @@ If an override would violate condition 3, it is not an override — it is an unv
 
 The Razor-layer entry exists because the same postcss advisory affected both lockfiles. Fixing only the manifest Dependabot named would have left the client on a vulnerable copy.
 
-**None of the nine were reachable from application code.** Each was verified individually — no path in `ProjectCeres.Client/src` parses YAML, IP addresses, or URIs; there is no hono server (CORS is ASP.NET Core's); `undici` serves only jsdom inside the test environment. They were fixed because unreachable-today is not unreachable-forever, and because open high-severity alerts on a public portfolio repository carry their own cost.
+**None of the thirteen were reachable from application code.** Each was verified individually — no path in `ProjectCeres.Client/src` parses YAML, IP addresses, or URIs; there is no hono server (CORS is ASP.NET Core's); `undici` serves only jsdom inside the test environment. They were fixed because unreachable-today is not unreachable-forever, and because open high-severity alerts on a public portfolio repository carry their own cost.
 
-Result: **60 advisories → 5** (0 high, 0 critical; 2 moderate, 3 low).
+Result: **60 advisories → 1** (0 high, 0 critical, 0 low; 1 moderate, deliberately left open).
 
-## Consequences — read this before bumping any of the nine
+## Consequences — read this before bumping any of the thirteen
 
 **An override is global. It is not scoped to the dependency that motivated it.**
 
@@ -81,6 +85,10 @@ Direct consumers at the time of writing:
 | `ip-address` | `express-rate-limit`, `@modelcontextprotocol/sdk` |
 | `js-yaml` | `cosmiconfig`, `shadcn` |
 | `hono` | `@hono/node-server` |
+| `qs` | `body-parser` |
+| `body-parser` | `express`, `express-rate-limit`, `@modelcontextprotocol/sdk` |
+| `@babel/core` | `eslint-plugin-react-hooks`, and the `@babel/helper-*` / `@babel/plugin-syntax-*` graph |
+| `esbuild` | `vite` (peer), `tsx` |
 
 Concretely: raising the `postcss` pin does not just affect shadcn. It changes the CSS processor used by the Vite build, the React plugin, the Vitest mocker, and the Razor layer's Tailwind v3 pipeline — five consumers, two projects, one line. Raising the `undici` pin changes the HTTP layer under every one of the 1014 client tests.
 
@@ -112,7 +120,23 @@ Overrides are debt. The test for whether one can be retired:
 3. If the advisory does **not** return, the upstream shipped a patched version — delete the override.
 4. If it does return, restore the entry.
 
-Six of the eight client overrides exist solely because of `shadcn`'s `@modelcontextprotocol/sdk` dependency. If a future shadcn release drops the MCP SDK, or moves `shadcn/tailwind.css` into a standalone package so `shadcn` can leave `dependencies` entirely, those six retire together. That is the single highest-value upstream change available to this project's dependency tree.
+Eight of the twelve client overrides exist solely because of `shadcn`'s `@modelcontextprotocol/sdk` dependency (`hono`, `ip-address`, `fast-uri`, `js-yaml`, `qs`, `body-parser`, plus `postcss` and `@babel/core` in part). If a future shadcn release drops the MCP SDK, or moves `shadcn/tailwind.css` into a standalone package so `shadcn` can leave `dependencies` entirely, those six retire together. That is the single highest-value upstream change available to this project's dependency tree.
+
+## Deliberately left open
+
+One Dependabot alert is **not** dismissed and **not** fixed: `@hono/node-server` (#27, moderate 5.9) — path traversal in `serve-static` on Windows via an encoded backslash (`%5C`).
+
+It fails condition 3 and cannot be overridden:
+
+- `@modelcontextprotocol/sdk@1.29.0` pins `@hono/node-server: ^1.19.9`.
+- The fix ships only in **2.0.5+** — a major version outside that range.
+- The fix was **not backported**. `1.19.17` (the newest 1.x) was installed and audited during triage: the advisory persists.
+
+Overriding to `^2.0.5` would hand the MCP SDK a major version it was never written against, and no check available in this repository would detect a break — nothing under `src/` imports the MCP server, so `build`, `lint`, and all 1014 tests pass identically whether the pairing works or is completely broken. A green run would prove only that the already-unaffected parts are still unaffected.
+
+It is also not applicable: the traversal relies on Windows treating `\` as a path separator (development is macOS), and this project runs no hono server and serves no static files through one.
+
+**Left open rather than dismissed, deliberately.** An open alert is a live tripwire — when shadcn or the MCP SDK moves to `@hono/node-server` 2.x, Dependabot re-scans and closes it automatically. A dismissal would hide it from the default view and signal nothing when the constraint lifts. The cost is one visible moderate alert on the Security tab; the benefit is that the constraint cannot be silently forgotten.
 
 ## Alternatives considered
 
