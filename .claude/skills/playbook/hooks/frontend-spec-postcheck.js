@@ -25,7 +25,10 @@ const SPEC_DIR_REL = "docs/superpowers/specs";
 const FRONTEND_SIGNALS = [
   /\bProjectCeres\.Client\b/i,
   /\b\w+\.tsx?\b/,
-  /\b(shadcn|tailwind|vite|vitest|@\/(components|lib|hooks))\b/i,
+  // `@/...` aliases need their own alternative: a leading \b before `@`
+  // requires a word char immediately before it, so it never matched in real
+  // usage ("import from @/lib/utils"). Split out 2026-08-11.
+  /\b(shadcn|tailwind|vite|vitest)\b|@\/(components|lib|hooks|ui)\b/i,
   /\b(component|drawer|dialog|modal|sheet|design system|design tokens|empty state|error state|loading state)\b/i,
   /\b(React|JSX|TSX|useState|useEffect|useMemo|useCallback)\b/,
   /\bdocs\/design-system\.md\b/i,
@@ -74,7 +77,13 @@ function readNewContent(toolName, toolInput, filePath) {
   }
 }
 
+// Exported for __tests__/playbook-postchecks.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { FRONTEND_SIGNALS, isSpecPath, readNewContent, hasFiredFrontendOrchestrator };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -125,3 +134,4 @@ process.stdin.on("end", () => {
   );
   process.exit(0);
 });
+}

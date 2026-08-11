@@ -56,7 +56,60 @@ function writeState(file, state) {
   try { fs.writeFileSync(file, JSON.stringify(state, null, 2)); } catch {}
 }
 
+
+function freshState() {
+  return { fired: [], fired_with_timestamps: [], writes_since_last_skill: [], open_deferrals: [] };
+}
+
+// One state transition. Pure — returns a NEW state, never mutates the input.
+// Pinned by __tests__/state-record-skill-fire.test.js because all four HARD
+// playbook gates read what this writes: a missed write lets an unverified
+// commit through, a missed reset blocks every commit forever.
+function applyEvent(prevState, input, projectDir, now) {
+  const out = {
+    fired: [...(prevState.fired || [])],
+    fired_with_timestamps: [...(prevState.fired_with_timestamps || [])],
+    writes_since_last_skill: [...(prevState.writes_since_last_skill || [])],
+    open_deferrals: [...(prevState.open_deferrals || [])],
+  };
+  const tName = (input && input.tool_name) || "";
+  const tInput = (input && input.tool_input) || {};
+
+  if (tName === "Skill") {
+    const skillName = tInput.skill || tInput.name || (tInput.args && tInput.args.skill) || "";
+    if (!skillName) return out;
+    if (!out.fired.includes(skillName)) out.fired.push(skillName);
+    out.fired_with_timestamps.push({
+      skill: skillName,
+      at: now,
+      tool_use_index: out.fired_with_timestamps.length + out.writes_since_last_skill.length,
+    });
+    // Phase F asks "did the verify skill fire AFTER the most recent code Write?"
+    // — so every skill fire resets the counter.
+    out.writes_since_last_skill = [];
+    return out;
+  }
+
+  if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(tName)) {
+    const fp = tInput.file_path || tInput.notebook_path;
+    if (!fp) return out;
+    if (!TRACKED_EXT.has(path.extname(fp).toLowerCase())) return out;
+    const abs = path.resolve(fp);
+    const projAbs = path.resolve(projectDir);
+    if (!abs.startsWith(projAbs + path.sep)) return out;
+    out.writes_since_last_skill.push({ file: path.relative(projAbs, abs), at: now });
+    return out;
+  }
+
+  return out;
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { applyEvent, freshState, TRACKED_EXT };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -73,46 +126,9 @@ process.stdin.on("end", () => {
   const stateFile = path.join(STATE_DIR, `${sessionId}.json`);
   const state = readState(stateFile);
 
-  if (toolName === "Skill") {
-    // Record the skill fire.
-    const skillName =
-      toolInput.skill ||
-      toolInput.name ||
-      toolInput.args?.skill ||
-      "";
-    if (!skillName) process.exit(0);
-
-    if (!state.fired.includes(skillName)) state.fired.push(skillName);
-    state.fired_with_timestamps.push({
-      skill: skillName,
-      at: now,
-      tool_use_index: state.fired_with_timestamps.length + state.writes_since_last_skill.length,
-    });
-    // A skill fired — clear the write list. Phase F asks "did verify-against-codebase
-    // fire AFTER the most recent code Write?" so we reset the counter at every fire.
-    state.writes_since_last_skill = [];
-
-    writeState(stateFile, state);
-    process.exit(0);
-  }
-
-  if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(toolName)) {
-    const filePath = toolInput.file_path || toolInput.notebook_path;
-    if (!filePath) process.exit(0);
-
-    const ext = path.extname(filePath).toLowerCase();
-    if (!TRACKED_EXT.has(ext)) process.exit(0);
-
-    // Only count writes inside the project tree.
-    const abs = path.resolve(filePath);
-    const projAbs = path.resolve(PROJECT_DIR);
-    if (!abs.startsWith(projAbs + path.sep)) process.exit(0);
-
-    const rel = path.relative(projAbs, abs);
-    state.writes_since_last_skill.push({ file: rel, at: now });
-    writeState(stateFile, state);
-    process.exit(0);
-  }
+  const nextState = applyEvent(state, { tool_name: toolName, tool_input: toolInput }, PROJECT_DIR, now);
+  if (JSON.stringify(nextState) !== JSON.stringify(state)) writeState(stateFile, nextState);
 
   process.exit(0);
 });
+}

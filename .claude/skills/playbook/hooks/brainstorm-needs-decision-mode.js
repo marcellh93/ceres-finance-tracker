@@ -40,7 +40,24 @@ function hasFiredDecisionMode(sessionId) {
   }
 }
 
+
+const BRAINSTORM_SKILL = "superpowers:brainstorming";
+
+// Is this tool_input a fire of the brainstorming skill? Matches the prefixed
+// name only — an unprefixed match would fire on a same-named skill from
+// another plugin. Pinned by __tests__/playbook-postchecks.test.js.
+function isBrainstormSkill(toolInput) {
+  const ti = toolInput || {};
+  const name = ti.skill || ti.name || (ti.args && ti.args.skill) || "";
+  return name === BRAINSTORM_SKILL;
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { isBrainstormSkill, BRAINSTORM_SKILL };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -53,11 +70,7 @@ process.stdin.on("end", () => {
   const toolName = input.tool_name || "";
   if (toolName !== "Skill") process.exit(0);
 
-  const toolInput = input.tool_input || {};
-  const skillName =
-    toolInput.skill || toolInput.name || toolInput.args?.skill || "";
-
-  if (skillName !== "superpowers:brainstorming") process.exit(0);
+  if (!isBrainstormSkill(input.tool_input)) process.exit(0);
 
   const sessionId = String(input.session_id || "");
   if (hasFiredDecisionMode(sessionId)) process.exit(0);
@@ -86,3 +99,4 @@ process.stdin.on("end", () => {
   );
   process.exit(0);
 });
+}
