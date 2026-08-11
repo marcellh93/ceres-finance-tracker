@@ -30,7 +30,7 @@ const FRONTEND_PHRASES = [
   // Visual / tone adjustments
   /\bmake (this |it |the \w+ )?(bolder|quieter|tighter|looser|cleaner|more delightful|more compact|more spacious)\b/i,
   // Design-system maintenance
-  /\b(design system|design tokens|tokens|primitives|recipes)\b/i,
+  /\b(design systems?|design tokens?|tokens?|primitives?|recipes?)\b/i,
   // Direct invocation phrasing
   /\b(frontend|front-end|client(-side)?|ui|ux) (work|change|task|review|polish|refactor|spec|plan|design)\b/i,
   // Explicit slash-style invocation in chat (the orchestrator's own triggers)
@@ -56,7 +56,13 @@ function hasFiredFrontendOrchestrator(sessionId) {
   }
 }
 
+// Exported for __tests__/prompt-detectors.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { FRONTEND_PHRASES };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -99,3 +105,4 @@ process.stdin.on("end", () => {
   );
   process.exit(0);
 });
+}

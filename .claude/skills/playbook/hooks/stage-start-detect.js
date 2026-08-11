@@ -24,7 +24,13 @@ const STAGE_START_PHRASES = [
   /\bnext step[s]? for\b/i,
 ];
 
+// Exported for __tests__/prompt-detectors.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { STAGE_START_PHRASES };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -56,3 +62,4 @@ process.stdin.on("end", () => {
   }));
   process.exit(0);
 });
+}
