@@ -10,8 +10,10 @@
 //   - blockquoted lines (^>) removed
 //   - markdown stage headings (^## Stage \d+...) removed
 //   - JSON-shaped tool-use / task-notification payloads removed
-//   - lines within ±2 of an "audit trail" / "log.jsonl" / "the hook fired"
-//     reference removed (meta-context)
+//
+// It does NOT strip lines near an "audit trail" / "log.jsonl" reference — an
+// earlier version of this header claimed it did. That case is handled by
+// isMetaContext() below, which the caller short-circuits on instead.
 //
 // isMetaContext(text) — true if the message is discussing a hook itself
 // (recovery instructions, audit-trail explanation, "false positive" framing).
