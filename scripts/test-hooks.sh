@@ -6,6 +6,9 @@
 # The 2026-08-07 evidence-bundle loop shipped through that gap: tests existed
 # under __tests__/ and nothing ran them.
 #
+# Two runners: node:test for the .js suites, plus any *.test.sh harnesses for
+# the bash hooks (node:test cannot drive those). Both must be green.
+#
 # Usage: scripts/test-hooks.sh
 
 set -uo pipefail
@@ -24,9 +27,19 @@ if [[ ${#SUITES[@]} -eq 0 ]]; then
   exit 0
 fi
 
-echo "[test-hooks] running ${#SUITES[@]} suite(s)"
+# Shell-hook harnesses run under bash, not node:test.
+SH_SUITES=()
+while IFS= read -r f; do SH_SUITES+=("$f"); done < <(
+  find .claude -type d -name node_modules -prune -o -type f -name '*.test.sh' -print | sort
+)
+
+echo "[test-hooks] running ${#SUITES[@]} node suite(s) + ${#SH_SUITES[@]} shell suite(s)"
 node --test "${SUITES[@]}"
 STATUS=$?
+
+for sh in ${SH_SUITES[@]+"${SH_SUITES[@]}"}; do
+  bash "$sh" || STATUS=1
+done
 
 if [[ $STATUS -ne 0 ]]; then
   echo "[test-hooks] FAILED — a hook is broken; fix before relying on the gates." >&2
