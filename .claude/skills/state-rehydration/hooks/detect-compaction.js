@@ -27,10 +27,14 @@ function summarize(snapshot) {
   lines.push(`  • skills_fired: ${sf.length} entries${sf.length ? " — " + sf.join(", ") : ""}`);
 
   const lw = Array.isArray(snapshot.last_code_writes) ? snapshot.last_code_writes : [];
-  lines.push(`  • last_code_writes: ${lw.length} entries${lw.length ? " — most recent: " + (lw[lw.length - 1].file || "(unknown)") : ""}`);
+  // Every field here comes from a JSON file written by another process — a null
+  // or shapeless entry must not throw. This runs at SessionStart right after a
+  // compaction, when the snapshot is the only surviving state.
+  const mostRecent = lw.length ? ((lw[lw.length - 1] || {}).file || "(unknown)") : "";
+  lines.push(`  • last_code_writes: ${lw.length} entries${lw.length ? " — most recent: " + mostRecent : ""}`);
 
   const od = Array.isArray(snapshot.open_deferrals) ? snapshot.open_deferrals : [];
-  lines.push(`  • open_deferrals: ${od.length} entries${od.length ? " — " + od.map((d) => d.stage || d.file).join(", ") : ""}`);
+  lines.push(`  • open_deferrals: ${od.length} entries${od.length ? " — " + od.map((d) => (d || {}).stage || (d || {}).file || "(unknown)").join(", ") : ""}`);
 
   const ca = snapshot.current_artifacts || {};
   if (ca.open_spec) lines.push(`  • open_spec: ${ca.open_spec.path}`);
@@ -45,7 +49,13 @@ function summarize(snapshot) {
   return lines.join("\n");
 }
 
+// Exported for __tests__/state-rehydration.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { summarize };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -94,3 +104,4 @@ process.stdin.on("end", () => {
   }));
   process.exit(0);
 });
+}

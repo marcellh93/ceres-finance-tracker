@@ -78,6 +78,7 @@ function writeSnapshot(sessionId, snapshot) {
 }
 
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -88,5 +89,6 @@ process.stdin.on("end", () => {
   writeSnapshot(sessionId, snapshot);
   process.exit(0);
 });
+}
 
 module.exports = { buildSnapshot, writeSnapshot };

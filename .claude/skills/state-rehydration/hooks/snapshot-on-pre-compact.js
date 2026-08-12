@@ -93,7 +93,13 @@ function tailLastAssistantThought(transcriptPath) {
   return "";
 }
 
+// Exported for __tests__/state-rehydration.test.js.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { tailLastAssistantThought, inlineBuildSnapshot, inlineWriteSnapshot };
+}
+
 let raw = "";
+if (require.main === module) {
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
   let input;
@@ -116,3 +122,4 @@ process.stdin.on("end", () => {
   // Allow compaction to proceed. (We intentionally do NOT emit decision: "block".)
   process.exit(0);
 });
+}
