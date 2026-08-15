@@ -256,6 +256,54 @@ public class SessionsApiTests : IAsyncLifetime
             "sessions with the blocked IP must be bulk-revoked");
     }
 
+    // ── Test 4b ──────────────────────────────────────────────────────────────────
+
+    // Blocking an already-blocked IP hits the unique index on
+    // (UserId, IpAddress). Before ISessionService this reached the generic
+    // handler as a 500; blocking is idempotent by nature, so the service now
+    // no-ops the duplicate insert and still revokes matching sessions.
+    [Fact]
+    public async Task Post_block_ip_twice_is_idempotent_and_still_revokes()
+    {
+        var testIp = $"10.0.{DateTime.UtcNow.Millisecond}.2.sessions-api-dup-test";
+
+        var (sessionCookie, user) = await LoginWithFreshReauthAsync("blockipdup");
+        var (client, _, _) = BuildClient(sessionCookie, user.Id);
+
+        var first = await client.PostAsJsonAsync("/api/sessions/block-ip", new { ipAddress = testIp });
+        first.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var second = await client.PostAsJsonAsync("/api/sessions/block-ip", new { ipAddress = testIp });
+        second.StatusCode.Should().Be(
+            HttpStatusCode.NoContent,
+            "blocking an already-blocked IP is idempotent, not an error");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var rows = await db.UserBlockedIps
+            .IgnoreQueryFilters()
+            .CountAsync(b => b.UserId == user.Id && b.IpAddress == testIp);
+        rows.Should().Be(1, "the duplicate block must not insert a second row");
+    }
+
+    // A blank IP is rejected by the service before any write.
+    [Fact]
+    public async Task Post_block_ip_with_blank_ip_returns_422_and_writes_nothing()
+    {
+        var (sessionCookie, user) = await LoginWithFreshReauthAsync("blockipblank");
+        var (client, _, _) = BuildClient(sessionCookie, user.Id);
+
+        var resp = await client.PostAsJsonAsync("/api/sessions/block-ip", new { ipAddress = "   " });
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var any = await db.UserBlockedIps.IgnoreQueryFilters()
+            .AnyAsync(b => b.UserId == user.Id && b.IpAddress == "   ");
+        any.Should().BeFalse();
+    }
+
     // ── Test 5 ───────────────────────────────────────────────────────────────────
 
     [Fact]

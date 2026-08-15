@@ -531,6 +531,7 @@ builder.Services.Configure<FileAttachmentOptions>(
     builder.Configuration.GetSection("FileAttachments"));
 builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
+builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();
 builder.Services.AddScoped<IMovementService, MovementService>();
 builder.Services.AddScoped<IMovementExportService, MovementExportService>();
