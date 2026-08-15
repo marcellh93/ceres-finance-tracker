@@ -11,6 +11,34 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user, TimeProv
     // Opening Balance category is seeded with this known Guid (see AppDbContext seed data).
     private static readonly Guid OpeningBalanceCategoryId = new("20000000-0000-0000-0000-000000000001");
 
+    // One query per movement table instead of three per account: the caller
+    // (accounts list) previously ran 3 EXISTS checks inside a per-account loop.
+    public async Task<IReadOnlySet<Guid>> GetAccountIdsWithMovementsAsync()
+    {
+        var ids = new HashSet<Guid>();
+
+        ids.UnionWith(await db.Transactions.Owned(user)
+            .Select(t => t.AccountId).Distinct().ToListAsync());
+
+        var transferIds = await db.Transfers.Owned(user)
+            .Select(t => new { t.SourceAccountId, t.DestAccountId }).Distinct().ToListAsync();
+        foreach (var t in transferIds)
+        {
+            ids.Add(t.SourceAccountId);
+            ids.Add(t.DestAccountId);
+        }
+
+        var paymentIds = await db.LiabilityPayments.Owned(user)
+            .Select(p => new { p.AssetAccountId, p.LiabilityAccountId }).Distinct().ToListAsync();
+        foreach (var p in paymentIds)
+        {
+            ids.Add(p.AssetAccountId);
+            ids.Add(p.LiabilityAccountId);
+        }
+
+        return ids;
+    }
+
     public async Task<IEnumerable<Account>> GetAllAsync(bool includeInactive = false)
     {
         var query = db.Accounts

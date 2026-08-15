@@ -44,14 +44,13 @@ public class AccountsApiController(
 
         var accounts = await query.OrderBy(a => a.Name).ToListAsync();
 
+        var withMovements = await accountService.GetAccountIdsWithMovementsAsync();
+
         var dtos = new List<AccountListItemDto>(accounts.Count);
         foreach (var a in accounts)
         {
             var balance = await accountService.GetBalanceAsync(a.Id);
-            var hasTransactions =
-                await db.Transactions.Owned(user).AnyAsync(t => t.AccountId == a.Id) ||
-                await db.Transfers.Owned(user).AnyAsync(t => t.SourceAccountId == a.Id || t.DestAccountId == a.Id) ||
-                await db.LiabilityPayments.Owned(user).AnyAsync(p => p.AssetAccountId == a.Id || p.LiabilityAccountId == a.Id);
+            var hasTransactions = withMovements.Contains(a.Id);
             dtos.Add(new AccountListItemDto(
                 a.Id, a.Name, a.AccountTypeId, a.AccountType.Name,
                 a.CurrencyId, a.Currency.Code, a.Currency.Symbol,

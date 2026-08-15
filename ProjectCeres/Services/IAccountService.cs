@@ -10,6 +10,11 @@ public interface IAccountService
     Task<Account?> GetByIdAsync(Guid id);
     /// <summary>Derived balance: SUM of income transactions − SUM of expense transactions.</summary>
     Task<decimal> GetBalanceAsync(Guid id);
+
+    /// <summary>Account ids that have at least one Transaction, Transfer, or
+    /// LiabilityPayment. Drives the "cannot hard delete" rule (ADR-0023).</summary>
+    Task<IReadOnlySet<Guid>> GetAccountIdsWithMovementsAsync();
+
     /// <summary>Returns the current opening balance amount, or 0 if none has been set.</summary>
     Task<decimal> GetOpeningBalanceAsync(Guid id);
     /// <summary>Returns the opening balance transaction date, or null if no opening balance exists.</summary>
