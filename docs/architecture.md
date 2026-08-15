@@ -179,6 +179,10 @@ Introducing a Web API in Phase 1 or 2 adds auth complexity, CORS configuration, 
 
 The service layer is where business rules live — validation, cross-entity consistency, deletion rules, derived value computation. If controllers bypass services and call DbContext directly, business rules get duplicated or missed. Tests that mock services cannot catch this. The rule is: if it changes the database or computes a business result, it belongs in a service.
 
+**Enforced by `CER007` (2026-08-15).** The rule was convention-only until an audit found 11 API controllers injecting `AppDbContext`. One of them, `SessionsApiController`, wrote two tables with no transaction and returned 500 when a user blocked the same IP twice — the unique index fired and no layer caught `UniqueConstraintViolationException`, exactly the failure this rule exists to prevent. `ISessionService` now owns those writes, and the account-deletability check moved into `IAccountService`.
+
+`CER007` ships at **suggestion**, not error: 14 controllers still inject `AppDbContext`. Ten are read-path (GET actions projecting straight into DTOs, a shortcut from the Razor→SPA migration); the rest are the auth controllers (`AuthController`, `MfaController`, `ReauthController`, `PasswordResetController`, `EmailChangeController`, `EmailVerificationController`, `ResendWebhookController`), which pre-date the audit and were not part of the 2026-08-15 fix. None compute business rules the way `SessionsApiController` did, so they are lower risk than the write-path violation — but they are not sanctioned. Raise the severity to error once they are migrated. `dotnet build` does not print suggestions; to count the remaining sites, flip `dotnet_diagnostic.CER007.severity` to `warning` in `.editorconfig` and rebuild.
+
 ---
 
 ## What Lives Where

@@ -58,6 +58,15 @@ internal static class Diagnostics
         isEnabledByDefault: true,
         description: "A class named *Token under ProjectCeres.Models implementing IUserOwned represents a stored single-use token row. It must carry a byte[] TokenLookup column (HMAC-SHA256 of the raw token, uniquely indexed) so /confirm locates its row in O(1). Stage 9.1.5.a shipped LockoutUnlockToken without it and regressed the integration suite ~15min. See docs/superpowers/specs/2026-06-09-stage-9-5f-cer005-tokenlookup-analyzer-design.md.");
 
+    public static readonly DiagnosticDescriptor CER007_DbContextInController = new(
+        id: "CER007",
+        title: "Controller uses AppDbContext directly instead of a service",
+        messageFormat: "'{0}' accesses AppDbContext directly — move the query or write into a service",
+        category: "Design",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "ADR-0017 puts all business logic in interface-backed services; architecture.md lists 'call DbContext directly' under what controllers may NOT do. Bypassing the service layer duplicates or loses business rules, and tests that mock services cannot catch it — the 2026-08-15 audit found SessionsApiController writing two tables with no transaction and returning 500 on a duplicate IP block. Info-level while the read-path migration is in progress (30 known GET-action sites); raise to Warning once they are gone.");
+
     public static readonly DiagnosticDescriptor CER006_PreAuthScopeMarkerMissing = new(
         id: "CER006",
         title: "Class calling BeginPreAuthUserScopeAsync must be marked [PreAuthScope]",

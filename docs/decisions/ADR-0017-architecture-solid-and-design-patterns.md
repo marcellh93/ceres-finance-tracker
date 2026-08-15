@@ -94,3 +94,16 @@ DbContext           ← EF Core, talks to PostgreSQL directly
   report type
 - Factory omission means the report selection logic lives in the service for now — if it
   grows complex, refactoring to a factory is straightforward but is a future task
+
+## Enforcement (added 2026-08-15)
+
+This ADR was convention-only for its whole life. A 2026-08-15 audit found 11 API
+controllers calling `AppDbContext` directly, which produced the exact consequence
+the ADR predicted: `SessionsApiController.BlockIp` inserted a `UserBlockedIp` and
+bulk-revoked sessions in two separate statements with no transaction, and returned
+500 on a duplicate block because nothing caught `UniqueConstraintViolationException`
+(`SettingsService` shows the intended service-layer catch).
+
+`CER007` now flags `AppDbContext` in `Controllers/`, at Info while the 30 remaining
+read-path sites are migrated. The decision itself is unchanged — services own
+business logic, controllers handle HTTP.
