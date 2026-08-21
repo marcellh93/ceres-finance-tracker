@@ -2,6 +2,7 @@ import { CheckCircle, Clock } from 'lucide-react';
 import { useOptimistic, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { apiFetch } from '../../lib/api-client';
 import type { MovementType } from './movements-api';
 import { MOVEMENTS_CLEARED_URL } from './movements-api';
 
@@ -34,10 +35,9 @@ export function MovementClearedToggle({ id, type, isCleared: initial }: Props) {
     startTransition(async () => {
       applyOptimistic(next);
       try {
-        const response = await fetch(MOVEMENTS_CLEARED_URL(id), {
+        const response = await apiFetch(MOVEMENTS_CLEARED_URL(id), {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: typeForApi(type), cleared: next }),
+          body: { type: typeForApi(type), cleared: next },
         });
         if (response.ok) {
           setServerCleared(next);

@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Toaster } from 'sonner';
 import { TransferCard } from './TransferCard';
 import type { StagedTransferDto } from './review-api';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
+import { stubResponse } from '../../../test/csrf-fetch-mock';
 
 function dto(overrides: Partial<StagedTransferDto> = {}): StagedTransferDto {
   return {
@@ -25,7 +27,8 @@ function dto(overrides: Partial<StagedTransferDto> = {}): StagedTransferDto {
 }
 
 describe('TransferCard', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+  await primeCsrfToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -56,7 +59,7 @@ describe('TransferCard', () => {
   });
 
   it('Dismiss POSTs to /dismiss-as-transaction; 204 fires success toast and onChanged', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    const fetchMock = vi.fn().mockResolvedValue(stubResponse({ ok: true, status: 204 }));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const onChanged = vi.fn();
 
@@ -103,7 +106,7 @@ describe('TransferCard', () => {
     expect(button).toBeDisabled();
     expect(screen.getByText(/Dismissing…/)).toBeInTheDocument();
 
-    resolve({ ok: true, status: 204 } as Response);
+    resolve(stubResponse({ ok: true, status: 204 }) as Response);
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 
@@ -123,13 +126,13 @@ describe('TransferCard', () => {
     await userEvent.click(button); // disabled now, should not fire
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    resolve({ ok: true, status: 204 } as Response);
+    resolve(stubResponse({ ok: true, status: 204 }) as Response);
   });
 
   it('Dismiss 404 fires "no longer exists" toast and calls onChanged', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 404 }) as typeof fetch,
+      vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 404 })) as typeof fetch,
     );
     const onChanged = vi.fn();
     render(
@@ -148,7 +151,7 @@ describe('TransferCard', () => {
   it('Dismiss other error fires generic toast, does not call onChanged', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 500 }) as typeof fetch,
+      vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 500 })) as typeof fetch,
     );
     const onChanged = vi.fn();
     render(

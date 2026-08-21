@@ -3,9 +3,12 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Toaster } from 'sonner';
 import { ReconciliationConfirmAllDialog } from './ReconciliationConfirmAllDialog';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
+import { stubResponse } from '../../../test/csrf-fetch-mock';
 
 describe('ReconciliationConfirmAllDialog', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+  await primeCsrfToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -21,7 +24,7 @@ describe('ReconciliationConfirmAllDialog', () => {
   });
 
   it('submit posts to /confirm-all and on 204 toasts with the count, calls onConfirmed, closes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    const fetchMock = vi.fn().mockResolvedValue(stubResponse({ ok: true, status: 204 }));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const onConfirmed = vi.fn();
     const onOpenChange = vi.fn();
@@ -47,7 +50,7 @@ describe('ReconciliationConfirmAllDialog', () => {
   });
 
   it('on error keeps the dialog open and shows generic toast', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }) as typeof fetch);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 500 })) as typeof fetch);
     const onOpenChange = vi.fn();
     render(
       <>

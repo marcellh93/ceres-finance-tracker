@@ -16,6 +16,7 @@ import {
   type SettingsFormValues,
   type UpdateSettingsRequest,
 } from './settings-api';
+import { apiFetch } from '../../lib/api-client';
 
 export function SettingsPage() {
   useDocumentTitle('Settings');
@@ -46,10 +47,9 @@ export function SettingsPage() {
     };
 
     try {
-      const response = await fetch(SETTINGS_URL, {
+      const response = await apiFetch(SETTINGS_URL, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
       });
 
       if (!response.ok) {

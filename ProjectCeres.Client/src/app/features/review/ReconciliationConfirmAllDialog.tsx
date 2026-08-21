@@ -5,6 +5,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { RECONCILIATION_REVIEW_CONFIRM_ALL_URL } from './review-api';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   open: boolean;
@@ -20,7 +21,7 @@ export function ReconciliationConfirmAllDialog({ open, count, onOpenChange, onCo
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch(RECONCILIATION_REVIEW_CONFIRM_ALL_URL, { method: 'POST' });
+      const res = await apiFetch(RECONCILIATION_REVIEW_CONFIRM_ALL_URL, { method: 'POST' });
       if (res.ok) {
         toast.success(`Confirmed ${count} matches.`);
         onConfirmed();

@@ -90,6 +90,12 @@ export type ApiGenericFailure = {
   status: number;
   code: string;
   message: string;
+  /**
+   * The parsed response body, verbatim. Endpoints whose error envelope carries
+   * fields beyond code/message (e.g. the 409 DUPLICATE_BUDGET envelope's
+   * existingBudgetId / existingIsActive) read them from here.
+   */
+  body?: unknown;
 };
 export type ApiFailure = ApiFieldErrorsFailure | ApiFormErrorFailure | ApiGenericFailure;
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
@@ -224,5 +230,5 @@ export async function apiFetch<T = unknown>(
     return { ok: false, status: 422, code, message, formError: message };
   }
 
-  return { ok: false, status: response.status, code, message };
+  return { ok: false, status: response.status, code, message, body: payload };
 }

@@ -14,6 +14,7 @@ import {
   type CategoryTypeDto,
   type UpdateCategoryRequest,
 } from './categories-api';
+import { apiFetch } from '../../lib/api-client';
 
 type LayoutContext = { refetch: () => void };
 
@@ -83,10 +84,9 @@ export function CategoryEdit() {
       lifestyleTag: values.lifestyleTag,
     };
     try {
-      const response = await fetch(CATEGORY_BY_ID_URL(id!), {
+      const response = await apiFetch(CATEGORY_BY_ID_URL(id!), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
       });
       if (!response.ok) {
         toast.error("Couldn't save. Try again.");

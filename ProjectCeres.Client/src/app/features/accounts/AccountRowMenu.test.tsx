@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AccountRowMenu } from './AccountRowMenu';
 import type { AccountListItemDto } from './accounts-api';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -28,9 +29,9 @@ const archived: AccountListItemDto = {
   ...activeWithTransactions, id: 'a-3', name: 'Old Savings', isActive: false,
 };
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 function renderMenu(account: AccountListItemDto, onChanged = vi.fn()) {
@@ -113,7 +114,8 @@ describe('AccountRowMenu', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Archived.'));
     expect(onChanged).toHaveBeenCalledTimes(1);
-    const [, init] = mockFetch.mock.calls[0];
+    // appCalls() skips the CSRF handshake apiFetch performs first.
+    const [, init] = mockFetch.appCalls()[0] as [string, RequestInit];
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body as string)).toEqual({ excludeFromReports: false });
   });
@@ -127,7 +129,8 @@ describe('AccountRowMenu', () => {
     fireEvent.click(sw);
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Archived.'));
-    const [, init] = mockFetch.mock.calls[0];
+    // appCalls() skips the CSRF handshake apiFetch performs first.
+    const [, init] = mockFetch.appCalls()[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({ excludeFromReports: true });
   });
 

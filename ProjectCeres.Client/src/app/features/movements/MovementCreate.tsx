@@ -14,7 +14,8 @@ import {
   type CategoryOptionDto,
   type MovementType,
 } from './movements-api';
-import { parseValidationErrors } from './movement-validation';
+import { apiFetch } from '../../lib/api-client';
+import { toFormErrors } from './movement-validation';
 import { useApi } from '../../lib/use-api';
 
 function urlToMovementType(t: string | null): MovementType | null {
@@ -114,18 +115,16 @@ export function MovementCreate() {
               isCleared: values.isCleared,
             };
 
-    const response = await fetch(url, {
+    const response = await apiFetch<{ id: string }>(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body,
     });
 
-    if (response.status === 201) {
+    if (response.ok && response.status === 201) {
       toast.success('Created.');
       refetch();
-      if (pendingAttachments.length > 0) {
-        const created = (await response.json()) as { id: string };
-        navigate(`/movements/${created.id}/edit?created=1`, {
+      if (pendingAttachments.length > 0 && response.data) {
+        navigate(`/movements/${response.data.id}/edit?created=1`, {
           replace: true,
           state: { pendingAttachments },
         });
@@ -135,9 +134,8 @@ export function MovementCreate() {
       return { ok: true };
     }
 
-    if (response.status === 422) {
-      const envelope = await response.json();
-      return { ok: false, errors: parseValidationErrors(envelope) };
+    if (!response.ok && response.status === 422) {
+      return { ok: false, errors: toFormErrors(response) };
     }
 
     toast.error("Couldn't save. Try again.");

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { SaveProfilePrompt } from './SaveProfilePrompt';
 import type { ImportColumnMappings } from './import-api';
+import { installCsrfFetchMock, resetCsrfCache, TEST_CSRF_TOKEN } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -19,9 +20,11 @@ const mappings: ImportColumnMappings = {
   sheetName:         null,
 };
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 describe('SaveProfilePrompt', () => {
@@ -49,10 +52,15 @@ describe('SaveProfilePrompt', () => {
       '/api/import-profiles',
       expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // apiFetch adds the antiforgery header alongside the JSON content type.
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'X-XSRF-TOKEN': TEST_CSRF_TOKEN,
+        }),
       }),
     );
-    const body = JSON.parse((mockFetch.mock.calls[0][1] as { body: string }).body);
+    // appCalls() skips the CSRF handshake apiFetch performs first.
+    const body = JSON.parse((mockFetch.appCalls()[0][1] as { body: string }).body);
     expect(body).toEqual({
       name:   'BBVA',
       format: 'Excel',

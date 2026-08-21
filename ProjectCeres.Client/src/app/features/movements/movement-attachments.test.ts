@@ -1,10 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { uploadAttachment, deleteAttachment } from './movement-attachments';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 let mockFetch: ReturnType<typeof vi.fn>;
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 describe('uploadAttachment', () => {

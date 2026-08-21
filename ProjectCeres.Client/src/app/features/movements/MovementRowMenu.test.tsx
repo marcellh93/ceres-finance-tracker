@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementRowMenu } from './MovementRowMenu';
+import { installCsrfFetchMock, resetCsrfCache, TEST_CSRF_TOKEN } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -9,9 +10,11 @@ vi.mock('sonner', () => ({
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so the queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 afterEach(() => {
@@ -100,7 +103,14 @@ describe('MovementRowMenu', () => {
     fireEvent.click(confirmButtons[confirmButtons.length - 1]);
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/transactions/tx1', { method: 'DELETE' });
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/transactions/tx1',
+        expect.objectContaining({
+          method: 'DELETE',
+          // apiFetch attaches the antiforgery header the raw fetch() omitted.
+          headers: expect.objectContaining({ 'X-XSRF-TOKEN': TEST_CSRF_TOKEN }),
+        }),
+      );
       expect(onDeleted).toHaveBeenCalledTimes(1);
     });
   });
@@ -119,7 +129,14 @@ describe('MovementRowMenu', () => {
     fireEvent.click(confirmButtons[confirmButtons.length - 1]);
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/transfers/tr1', { method: 'DELETE' });
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/transfers/tr1',
+        expect.objectContaining({
+          method: 'DELETE',
+          // apiFetch attaches the antiforgery header the raw fetch() omitted.
+          headers: expect.objectContaining({ 'X-XSRF-TOKEN': TEST_CSRF_TOKEN }),
+        }),
+      );
       expect(onDeleted).toHaveBeenCalledTimes(1);
     });
   });
@@ -138,7 +155,14 @@ describe('MovementRowMenu', () => {
     fireEvent.click(confirmButtons[confirmButtons.length - 1]);
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/liability-payments/lp1', { method: 'DELETE' });
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/liability-payments/lp1',
+        expect.objectContaining({
+          method: 'DELETE',
+          // apiFetch attaches the antiforgery header the raw fetch() omitted.
+          headers: expect.objectContaining({ 'X-XSRF-TOKEN': TEST_CSRF_TOKEN }),
+        }),
+      );
       expect(onDeleted).toHaveBeenCalledTimes(1);
     });
   });

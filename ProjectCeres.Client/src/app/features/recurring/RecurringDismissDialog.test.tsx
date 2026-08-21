@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RecurringDismissDialog } from './RecurringDismissDialog';
 import type { RecurringTransactionListItemDto } from './reminder-status';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
 
 const TODAY = '2026-05-03';
 
@@ -15,7 +16,8 @@ function makeReminder(overrides: Partial<RecurringTransactionListItemDto> = {}):
 }
 
 describe('RecurringDismissDialog', () => {
-  beforeEach(() => { global.fetch = vi.fn(); });
+  beforeEach(async () => {
+    await primeCsrfToken(); global.fetch = vi.fn(); });
 
   it('shows simple confirm for Snap reminders (no next due date input)', () => {
     render(<RecurringDismissDialog open reminder={makeReminder()} onChanged={vi.fn()} onOpenChange={vi.fn()} />);
@@ -29,7 +31,7 @@ describe('RecurringDismissDialog', () => {
 
   it('calls POST on dismiss and fires onChanged on 204', async () => {
     const onChanged = vi.fn();
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ status: 204, ok: true });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  status: 204, ok: true });
     render(<RecurringDismissDialog open reminder={makeReminder()} onChanged={onChanged} onOpenChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /^dismiss$/i }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());

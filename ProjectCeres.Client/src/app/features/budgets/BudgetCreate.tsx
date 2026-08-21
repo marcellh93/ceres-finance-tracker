@@ -11,7 +11,8 @@ import {
   type DuplicateBudgetEnvelope,
   type GoalType,
 } from './budgets-api';
-import { parseValidationErrors } from '../movements/movement-validation';
+import { toFormErrors } from '../movements/movement-validation';
+import { apiFetch } from '../../lib/api-client';
 import { useApi } from '../../lib/use-api';
 
 type CreateType = 'category' | 'spending' | 'savings';
@@ -57,14 +58,13 @@ export function BudgetCreate() {
 
     async function onSubmit(values: CategoryBudgetFormValues) {
       setConflict(null);
-      const response = await fetch(CATEGORY_BUDGETS_URL, {
+      const response = await apiFetch(CATEGORY_BUDGETS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           categoryId: values.categoryId,
           currencyId: values.currencyId,
           limitAmount: Number(values.limitAmount),
-        }),
+        },
       });
 
       if (response.status === 201) {
@@ -74,11 +74,13 @@ export function BudgetCreate() {
         return { ok: true } as const;
       }
 
-      if (response.status === 409) {
-        const env = (await response.json()) as DuplicateBudgetEnvelope;
+      if (!response.ok && response.status === 409) {
+        // The DUPLICATE_BUDGET envelope carries fields beyond code/message;
+        // apiFetch exposes the raw parsed body for exactly this case.
+        const env = ('body' in response ? response.body : null) as DuplicateBudgetEnvelope | null;
         setConflict({
-          existingBudgetId: env.error.existingBudgetId,
-          existingIsActive: env.error.existingIsActive,
+          existingBudgetId: env?.error.existingBudgetId ?? '',
+          existingIsActive: env?.error.existingIsActive ?? false,
         });
         // Return an empty errors map. The conflict prompt rendered above the
         // form is the actionable surface — also surfacing the same message in
@@ -88,9 +90,8 @@ export function BudgetCreate() {
         return { ok: false, errors: {} } as const;
       }
 
-      if (response.status === 422) {
-        const envelope = await response.json();
-        return { ok: false, errors: parseValidationErrors(envelope) } as const;
+      if (!response.ok && response.status === 422) {
+        return { ok: false, errors: toFormErrors(response) } as const;
       }
 
       toast.error("Couldn't save. Try again.");
@@ -102,7 +103,7 @@ export function BudgetCreate() {
     }
 
     async function reactivateAndRedirect(id: string) {
-      const response = await fetch(CATEGORY_BUDGET_REACTIVATE_URL(id), { method: 'PATCH' });
+      const response = await apiFetch(CATEGORY_BUDGET_REACTIVATE_URL(id), { method: 'PATCH' });
       if (response.status === 204) {
         toast.success('Reactivated.');
         navigate(`/budgets/${id}/edit`);
@@ -166,10 +167,9 @@ export function BudgetCreate() {
   };
 
   async function onGoalSubmit(values: GoalBudgetFormValues) {
-    const response = await fetch(GOAL_BUDGETS_URL, {
+    const response = await apiFetch(GOAL_BUDGETS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         name: values.name,
         goalType: values.goalType,
         currencyId: values.currencyId,
@@ -178,19 +178,18 @@ export function BudgetCreate() {
         endDate: values.endDate,
         description: values.description,
         linkedAccountId: values.linkedAccountId,
-      }),
+      },
     });
 
-    if (response.status === 201) {
+    if (response.ok && response.status === 201) {
       toast.success('Created.');
       ctx?.refetch();
       navigate('/budgets?type=goal');
       return { ok: true } as const;
     }
 
-    if (response.status === 422) {
-      const envelope = await response.json();
-      return { ok: false, errors: parseValidationErrors(envelope) } as const;
+    if (!response.ok && response.status === 422) {
+      return { ok: false, errors: toFormErrors(response) } as const;
     }
 
     toast.error("Couldn't save. Try again.");

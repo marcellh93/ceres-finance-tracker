@@ -22,6 +22,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ACCOUNT_ARCHIVE_URL, ACCOUNT_REACTIVATE_URL, type AccountListItemDto } from './accounts-api';
+import { apiFetch } from '../../lib/api-client';
 
 const ARCHIVE_COPY_EMPTY =
   "This account has no transactions. It will be hidden from the active list and pickers; you can find it again with the Include archived toggle.";
@@ -49,10 +50,9 @@ export function AccountRowMenu({ account, onChanged }: Props) {
     const exclude = excludeFromReports;
     setConfirmOpen(false);
     try {
-      const response = await fetch(ACCOUNT_ARCHIVE_URL(account.id), {
+      const response = await apiFetch(ACCOUNT_ARCHIVE_URL(account.id), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ excludeFromReports: exclude }),
+        body: { excludeFromReports: exclude },
       });
       if (response.ok) {
         toast.success('Archived.');
@@ -67,7 +67,7 @@ export function AccountRowMenu({ account, onChanged }: Props) {
 
   async function handleReactivate() {
     try {
-      const response = await fetch(ACCOUNT_REACTIVATE_URL(account.id), { method: 'PATCH' });
+      const response = await apiFetch(ACCOUNT_REACTIVATE_URL(account.id), { method: 'PATCH' });
       if (response.ok) {
         toast.success('Reactivated.');
         onChanged();

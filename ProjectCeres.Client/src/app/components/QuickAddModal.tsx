@@ -10,6 +10,7 @@ import { Field } from './Field';
 import { MoneyInput } from './MoneyInput';
 import { SubmitButton } from './SubmitButton';
 import { DatePickerField } from '../../components/DatePickerField';
+import { apiFetch } from '../lib/api-client';
 import {
   ACCOUNTS_ACTIVE_URL,
   CATEGORIES_ACTIVE_URL,
@@ -125,10 +126,9 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
             ? { date, amount: Number(amount), sourceAccountId, destAccountId, description: description || null }
             : { date, amount: Number(amount), assetAccountId, liabilityAccountId, description: description || null };
 
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
       });
 
       if (response.ok) {
@@ -138,15 +138,18 @@ export function QuickAddModal({ open, onOpenChange, onSaved }: Props) {
         return true;
       }
 
-      if (response.status === 422) {
-        const problem = await response.json();
+      if (!response.ok && response.status === 422) {
+        // apiFetch parses the project envelope. Field keys arrive PascalCase
+        // from the server, so lowercase the first letter to match form fields.
+        // A business-rule 422 has no details[] — surface its message as a toast
+        // so the failure is never silent.
         const flat: FieldErrors = {};
-        if (problem?.errors && typeof problem.errors === 'object') {
-          for (const [key, messages] of Object.entries(problem.errors as Record<string, string[]>)) {
-            // ASP.NET sends PascalCase keys; lowercase the first letter for matching
-            const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
-            flat[camelKey] = messages.join(' ');
+        if ('fieldErrors' in response) {
+          for (const [key, message] of Object.entries(response.fieldErrors)) {
+            flat[key.charAt(0).toLowerCase() + key.slice(1)] = message;
           }
+        } else {
+          toast.error('formError' in response ? response.formError : response.message);
         }
         setErrors(flat);
         throw new Error('validation');

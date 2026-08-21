@@ -8,8 +8,44 @@ vi.mock('sonner', () => ({
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
+// apiFetch bootstraps CSRF via GET /api/auth/csrf before its first
+// state-changing call and caches the token module-side. Serve that handshake
+// here so the PATCH under test carries a real X-XSRF-TOKEN header — the header
+// whose absence caused the 400 this component used to hit.
+const CSRF_TOKEN = 'test-xsrf-token';
+
+function csrfHandshakeResponse() {
+  return {
+    ok: true,
+    status: 204,
+    headers: { get: (name: string) => (name === 'X-XSRF-TOKEN' ? CSRF_TOKEN : null) },
+  };
+}
+
+/** The PATCH call recorded by the fetch stub, skipping the CSRF handshake. */
+function patchCall() {
+  return mockFetch.mock.calls.find(
+    (c) => (c[1] as RequestInit | undefined)?.method === 'PATCH',
+  );
+}
+
+/** Builds a stubbed apiFetch-shaped response for the PATCH under test. */
+function patchResponse(ok: boolean) {
+  return {
+    ok,
+    status: ok ? 204 : 400,
+    headers: { get: () => null },
+    json: async () => null,
+  };
+}
+
 beforeEach(() => {
-  mockFetch = vi.fn();
+  mockFetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (typeof url === 'string' && url.startsWith('/api/auth/csrf')) {
+      return csrfHandshakeResponse();
+    }
+    return patchResponse(init?.method !== undefined);
+  });
   global.fetch = mockFetch as unknown as typeof fetch;
 });
 
@@ -29,20 +65,36 @@ describe('MovementClearedToggle', () => {
   });
 
   it('PATCHes the API on click and updates the label', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
     render(<MovementClearedToggle id="m1" type="Transaction" isCleared={false} />);
 
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/movements/m1/cleared', expect.objectContaining({ method: 'PATCH' }));
+      expect(patchCall()?.[0]).toBe('/api/movements/m1/cleared');
       expect(screen.getByText('Cleared')).toBeInTheDocument();
+    });
+  });
+
+  // Regression: the component used raw fetch() and sent no X-XSRF-TOKEN, so the
+  // global AutoValidateAntiforgeryTokenAttribute rejected every PATCH with 400
+  // and the pill silently failed with "Couldn't update status."
+  it('sends the X-XSRF-TOKEN header on the PATCH', async () => {
+    render(<MovementClearedToggle id="m1" type="Transaction" isCleared={false} />);
+
+    fireEvent.click(screen.getByRole('button'));
+
+    await waitFor(() => {
+      const headers = (patchCall()?.[1] as RequestInit).headers as Record<string, string>;
+      expect(headers['X-XSRF-TOKEN']).toBe(CSRF_TOKEN);
     });
   });
 
   it('reverts the label and fires error toast on failed PATCH', async () => {
     const { toast } = await import('sonner');
-    mockFetch.mockResolvedValue({ ok: false });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (typeof url === 'string' && url.startsWith('/api/auth/csrf')) return csrfHandshakeResponse();
+      return patchResponse(false);
+    });
     render(<MovementClearedToggle id="m1" type="Transaction" isCleared={false} />);
 
     fireEvent.click(screen.getByRole('button'));
@@ -54,14 +106,12 @@ describe('MovementClearedToggle', () => {
   });
 
   it('sends type=liabilitypayment for LiabilityPayment movements', async () => {
-    mockFetch.mockResolvedValue({ ok: true });
     render(<MovementClearedToggle id="lp1" type="LiabilityPayment" isCleared={false} />);
 
     fireEvent.click(screen.getByRole('button'));
 
     await waitFor(() => {
-      const call = mockFetch.mock.calls[0];
-      const body = JSON.parse(call[1].body);
+      const body = JSON.parse((patchCall()?.[1] as RequestInit).body as string);
       expect(body.type).toBe('liabilitypayment');
     });
   });
@@ -74,7 +124,12 @@ describe('MovementClearedToggle', () => {
       new Promise<{ ok: boolean }>((r) => { resolveSecond = r; }),
     ];
     let call = 0;
-    global.fetch = vi.fn(() => responses[call++]) as unknown as typeof fetch;
+    // The CSRF handshake must not consume a slot in the ordered PATCH queue.
+    global.fetch = vi.fn((url: string) =>
+      typeof url === 'string' && url.startsWith('/api/auth/csrf')
+        ? Promise.resolve(csrfHandshakeResponse())
+        : responses[call++],
+    ) as unknown as typeof fetch;
 
     render(<MovementClearedToggle id="m1" type="Transaction" isCleared={false} />);
     const btn = screen.getByRole('button');

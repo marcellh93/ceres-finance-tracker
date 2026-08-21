@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { BudgetCreate } from './BudgetCreate';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -12,9 +13,9 @@ vi.mock('../../lib/use-settings', () => ({
 }));
 
 let mockFetch: ReturnType<typeof vi.fn>;
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/categories/active') {
       return Promise.resolve({ ok: true, status: 200, json: async () => [{ id: 'c1', name: 'Groceries', categoryTypeName: 'Expense' }] });

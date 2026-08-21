@@ -5,6 +5,7 @@ import {
   TRANSFER_ATTACHMENTS_URL,
   TRANSFER_ATTACHMENT_BY_ID_URL,
 } from './movements-api';
+import { apiFetch } from '../../lib/api-client';
 
 export type AttachmentParentType = 'Transaction' | 'Transfer';
 
@@ -20,15 +21,18 @@ export async function uploadAttachment(
   const form = new FormData();
   form.append('file', file);
 
-  const response = await fetch(url, { method: 'POST', body: form });
+  // FormData is passed through unserialised by apiFetch, which also omits the
+  // JSON Content-Type so the browser sets its own multipart boundary.
+  const response = await apiFetch<AttachmentDto>(url, { method: 'POST', body: form });
 
-  if (response.status === 201) {
-    return (await response.json()) as AttachmentDto;
+  if (response.ok && response.status === 201 && response.data) {
+    return response.data;
   }
 
-  if (response.status === 422) {
-    const body = await response.json().catch(() => null);
-    const message = body?.error?.message ?? 'Could not upload the file.';
+  if (!response.ok && response.status === 422) {
+    const message =
+      ('formError' in response ? response.formError : response.message) ??
+      'Could not upload the file.';
     throw new Error(message);
   }
 
@@ -43,8 +47,8 @@ export async function deleteAttachment(
     ? TRANSACTION_ATTACHMENT_BY_ID_URL(attachmentId)
     : TRANSFER_ATTACHMENT_BY_ID_URL(attachmentId);
 
-  const response = await fetch(url, { method: 'DELETE' });
+  const response = await apiFetch(url, { method: 'DELETE' });
 
-  if (response.status === 204) return;
+  if (response.ok && response.status === 204) return;
   throw new Error("Couldn't delete the attachment. Try again.");
 }

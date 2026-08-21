@@ -26,6 +26,7 @@ import {
   GOAL_BUDGET_REACTIVATE_URL,
   type BudgetKind,
 } from './budgets-api';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   budgetId: string;
@@ -51,7 +52,7 @@ export function BudgetRowMenu({ budgetId, kind, isActive, noun, onChanged }: Pro
       : GOAL_BUDGET_REACTIVATE_URL(budgetId);
 
   async function handleArchive() {
-    const response = await fetch(archiveUrl, { method: 'PATCH' });
+    const response = await apiFetch(archiveUrl, { method: 'PATCH' });
     if (response.status === 204) {
       toast.success(`${capitalize(noun)} archived.`);
       onChanged();
@@ -61,16 +62,14 @@ export function BudgetRowMenu({ budgetId, kind, isActive, noun, onChanged }: Pro
   }
 
   async function handleReactivate() {
-    const response = await fetch(reactivateUrl, { method: 'PATCH' });
+    const response = await apiFetch(reactivateUrl, { method: 'PATCH' });
     if (response.status === 204) {
       toast.success(`${capitalize(noun)} reactivated.`);
       onChanged();
       return;
     }
-    if (response.status === 409) {
-      const body = await response.json().catch(() => null);
-      const message = body?.error?.message ?? `Couldn't reactivate the ${noun}.`;
-      toast.error(message);
+    if (!response.ok && response.status === 409) {
+      toast.error(response.message || `Couldn't reactivate the ${noun}.`);
       return;
     }
     toast.error(`Couldn't reactivate the ${noun}.`);

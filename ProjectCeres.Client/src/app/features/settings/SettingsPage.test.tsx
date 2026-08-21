@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { SettingsPage } from './SettingsPage';
 import { refetchSettings } from '../../lib/use-settings';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -27,7 +28,8 @@ const currenciesResponse = [
   { id: 2, code: 'USD', symbol: '$' },
 ];
 
-beforeEach(() => {
+beforeEach(async () => {
+  await primeCsrfToken();
   // Clear call history on module-level mocks (per-file scope, no cross-file race).
   vi.mocked(toast.success).mockClear();
   vi.mocked(toast.error).mockClear();

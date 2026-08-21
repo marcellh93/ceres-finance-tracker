@@ -1,13 +1,17 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ClearedBadge } from './ClearedBadge'
+import { installCsrfFetchMock, resetCsrfCache, TEST_CSRF_TOKEN } from '../test/csrf-fetch-mock'
 
 describe('ClearedBadge', () => {
   const id = '11111111-1111-1111-1111-111111111111'
   const type = 'transaction'
 
-  beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn())
+  beforeEach(async () => {
+    // apiFetch runs a one-time CSRF handshake before the first state-changing
+    // request; this mock serves it so queued responses still line up.
+    await resetCsrfCache()
+    installCsrfFetchMock()
   })
 
   afterEach(() => {
@@ -43,8 +47,8 @@ describe('ClearedBadge', () => {
   // -------------------------------------------------------------------------
 
   it('calls PATCH /api/movements/{id}/cleared with correct body on click', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true })
-    vi.stubGlobal('fetch', mockFetch)
+    const mockFetch = installCsrfFetchMock()
+    mockFetch.mockResolvedValue({ ok: true, status: 204, headers: { get: () => null } })
 
     render(<ClearedBadge id={id} type={type} isCleared={false} />)
     fireEvent.click(screen.getByRole('button'))
@@ -54,7 +58,11 @@ describe('ClearedBadge', () => {
         `/api/movements/${id}/cleared`,
         expect.objectContaining({
           method: 'PATCH',
-          headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+          // The CSRF header is the fix: without it antiforgery rejects with 400.
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'X-XSRF-TOKEN': TEST_CSRF_TOKEN,
+          }),
           body: JSON.stringify({ type, cleared: true }),
         })
       )
@@ -70,7 +78,7 @@ describe('ClearedBadge', () => {
     const pendingFetch = new Promise<{ ok: true }>((res) => {
       resolvePromise = () => res({ ok: true })
     })
-    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pendingFetch))
+    installCsrfFetchMock().mockImplementation(() => pendingFetch)
 
     render(<ClearedBadge id={id} type={type} isCleared={false} />)
     expect(screen.getByText('Pending')).toBeTruthy()
@@ -89,7 +97,7 @@ describe('ClearedBadge', () => {
   // -------------------------------------------------------------------------
 
   it('reverts badge to original state when API call fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    installCsrfFetchMock().mockResolvedValue({ ok: false, status: 400, headers: { get: () => null }, json: async () => null })
 
     render(<ClearedBadge id={id} type={type} isCleared={false} />)
     fireEvent.click(screen.getByRole('button'))
@@ -106,7 +114,7 @@ describe('ClearedBadge', () => {
   // -------------------------------------------------------------------------
 
   it('reverts badge when fetch throws', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')))
+    installCsrfFetchMock().mockImplementation(() => Promise.reject(new Error('network error')))
 
     render(<ClearedBadge id={id} type={type} isCleared={false} />)
     fireEvent.click(screen.getByRole('button'))

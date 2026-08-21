@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Toaster } from 'sonner';
 import { ReconciliationCard } from './ReconciliationCard';
 import type { StagedTransactionDto } from './review-api';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
+import { stubResponse } from '../../../test/csrf-fetch-mock';
 
 function dto(overrides: Partial<StagedTransactionDto> = {}): StagedTransactionDto {
   return {
@@ -25,7 +27,8 @@ function dto(overrides: Partial<StagedTransactionDto> = {}): StagedTransactionDt
 }
 
 describe('ReconciliationCard', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+  await primeCsrfToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -38,7 +41,7 @@ describe('ReconciliationCard', () => {
   });
 
   it('Confirm match POSTs to the confirm endpoint and fires success toast on 204', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    const fetchMock = vi.fn().mockResolvedValue(stubResponse({ ok: true, status: 204 }));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const onChanged = vi.fn();
 
@@ -59,7 +62,7 @@ describe('ReconciliationCard', () => {
   });
 
   it('404 fires "no longer exists" toast and still calls onChanged so list refetches', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }) as typeof fetch);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 404 })) as typeof fetch);
     const onChanged = vi.fn();
     render(
       <>
@@ -73,7 +76,7 @@ describe('ReconciliationCard', () => {
   });
 
   it('other errors fire generic toast and do NOT call onChanged', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }) as typeof fetch);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 500 })) as typeof fetch);
     const onChanged = vi.fn();
     render(
       <>

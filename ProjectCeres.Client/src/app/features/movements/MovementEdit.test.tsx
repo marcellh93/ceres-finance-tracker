@@ -8,6 +8,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 import { toast } from 'sonner';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 // ── Mock AttachmentDropzone — assert props rather than render full DOM ──
 vi.mock('./AttachmentDropzone', () => ({
@@ -132,9 +133,11 @@ function defaultFetchImpl(url: string, init?: RequestInit) {
   return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
 }
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
   mockFetch.mockImplementation(defaultFetchImpl);
   discriminatorType = 'Transaction';
 });

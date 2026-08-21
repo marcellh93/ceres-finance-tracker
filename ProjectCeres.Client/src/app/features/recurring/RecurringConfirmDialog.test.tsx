@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RecurringConfirmDialog } from './RecurringConfirmDialog';
 import type { RecurringTransactionListItemDto } from './reminder-status';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
 
 const TODAY = '2026-05-03';
 
@@ -15,7 +16,10 @@ function makeReminder(overrides: Partial<RecurringTransactionListItemDto> = {}):
 }
 
 describe('RecurringConfirmDialog', () => {
-  beforeEach(() => { global.fetch = vi.fn(); });
+  beforeEach(async () => {
+    await primeCsrfToken();
+    global.fetch = vi.fn();
+  });
 
   it('renders Date label and date picker on open', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
@@ -41,7 +45,9 @@ describe('RecurringConfirmDialog', () => {
   it('calls POST on confirm and fires onChanged on 201', async () => {
     const onChanged = vi.fn();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      status: 201, ok: true, json: async () => ({ transactionId: 'tx-1' }),
+      status: 201, ok: true,
+      headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },
+      json: async () => ({ transactionId: 'tx-1' }),
     });
     render(<RecurringConfirmDialog open reminder={makeReminder()} onChanged={onChanged} onOpenChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
@@ -57,6 +63,7 @@ describe('RecurringConfirmDialog', () => {
   it('shows inline error on DATE_BEFORE_OPENING_BALANCE', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       status: 422, ok: false,
+      headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },
       json: async () => ({ error: { code: 'DATE_BEFORE_OPENING_BALANCE', message: 'Before opening balance.' } }),
     });
     render(<RecurringConfirmDialog open reminder={makeReminder()} onChanged={vi.fn()} onOpenChange={vi.fn()} />);

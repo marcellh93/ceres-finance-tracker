@@ -5,6 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Toaster } from 'sonner';
 import { TransferActionDialog } from './TransferActionDialog';
 import type { AccountOption } from './TransferCard';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
+import { stubResponse } from '../../../test/csrf-fetch-mock';
 
 const STAGED_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -16,7 +18,8 @@ const accounts: AccountOption[] = [
 ];
 
 describe('TransferActionDialog', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+  await primeCsrfToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -95,7 +98,7 @@ describe('TransferActionDialog', () => {
   });
 
   it('mode="link" 204 success: posts to /link-to-existing, toast "Linked.", closes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    const fetchMock = vi.fn().mockResolvedValue(stubResponse({ ok: true, status: 204 }));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const onActioned = vi.fn();
     const onOpenChange = vi.fn();
@@ -129,7 +132,7 @@ describe('TransferActionDialog', () => {
   });
 
   it('mode="create" 204 success: posts to /create-as-transfer, toast "Transfer created.", closes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    const fetchMock = vi.fn().mockResolvedValue(stubResponse({ ok: true, status: 204 }));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
 
     render(
@@ -158,7 +161,7 @@ describe('TransferActionDialog', () => {
   });
 
   it('404 closes dialog and calls onActioned (so list refetches)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }) as typeof fetch);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 404 })) as typeof fetch);
     const onActioned = vi.fn();
     const onOpenChange = vi.fn();
     render(

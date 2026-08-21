@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { apiFetch } from '@/app/lib/api-client'
 
 interface ClearedBadgeProps {
   id: string
@@ -17,10 +18,9 @@ export function ClearedBadge({ id, type, isCleared: initialCleared, needsReview 
     setCleared(next)
 
     try {
-      const response = await fetch(`/api/movements/${id}/cleared`, {
+      const response = await apiFetch(`/api/movements/${id}/cleared`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, cleared: next }),
+        body: { type, cleared: next },
       })
 
       if (!response.ok) {

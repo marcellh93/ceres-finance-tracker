@@ -19,7 +19,8 @@ import {
   type AccountOptionDto,
   type CategoryOptionDto,
 } from './movements-api';
-import { parseValidationErrors } from './movement-validation';
+import { apiFetch } from '../../lib/api-client';
+import { toFormErrors } from './movement-validation';
 import { useApi } from '../../lib/use-api';
 
 // ── DTO → form values mappers ──
@@ -189,22 +190,20 @@ function MovementEditInner({
               isCleared: values.isCleared,
             };
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body,
     });
 
-    if (response.status === 204) {
+    if (response.ok && response.status === 204) {
       toast.success('Saved.');
       refetch();
       navigate(buildMovementsListPath(values, accounts ?? []));
       return { ok: true };
     }
 
-    if (response.status === 422) {
-      const envelope = await response.json();
-      return { ok: false, errors: parseValidationErrors(envelope) };
+    if (!response.ok && response.status === 422) {
+      return { ok: false, errors: toFormErrors(response) };
     }
 
     toast.error("Couldn't save. Try again.");
@@ -219,9 +218,9 @@ function MovementEditInner({
           ? TRANSFER_BY_ID_URL(id)
           : LIABILITY_PAYMENT_BY_ID_URL(id);
 
-    const response = await fetch(url, { method: 'DELETE' });
+    const response = await apiFetch(url, { method: 'DELETE' });
 
-    if (response.status === 204) {
+    if (response.ok && response.status === 204) {
       toast.success('Deleted.');
       refetch();
       navigate(buildMovementsListPath(initialValues, accounts ?? []));

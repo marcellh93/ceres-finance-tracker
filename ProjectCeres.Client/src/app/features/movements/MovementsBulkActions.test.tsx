@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementsBulkActions } from './MovementsBulkActions';
 import { toast } from 'sonner';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -18,9 +19,11 @@ function renderAt(search: string, totalCount = 5, onAfterBulk = vi.fn()) {
   );
 }
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 afterEach(() => {
@@ -73,7 +76,8 @@ describe('MovementsBulkActions', () => {
         expect.objectContaining({ method: 'POST' }),
       );
     });
-    const init = mockFetch.mock.calls[0][1];
+    // appCalls() filters out the CSRF handshake apiFetch performs first.
+    const init = mockFetch.appCalls()[0][1] as RequestInit;
     const body = JSON.parse((init?.body as string) ?? '{}');
     expect(body).toEqual({
       from: '2026-01-01',
@@ -98,7 +102,8 @@ describe('MovementsBulkActions', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();
     });
-    const init = mockFetch.mock.calls[0][1];
+    // appCalls() filters out the CSRF handshake apiFetch performs first.
+    const init = mockFetch.appCalls()[0][1] as RequestInit;
     const body = JSON.parse((init?.body as string) ?? '{}');
     expect(body.currency).toBe('EUR');
   });

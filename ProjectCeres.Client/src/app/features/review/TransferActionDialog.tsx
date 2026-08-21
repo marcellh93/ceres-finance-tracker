@@ -15,6 +15,7 @@ import {
   TRANSFER_REVIEW_LINK_URL, TRANSFER_REVIEW_CREATE_URL,
 } from './review-api';
 import type { AccountOption } from './TransferCard';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   open: boolean;
@@ -62,10 +63,9 @@ export function TransferActionDialog({
     if (!otherAccountId || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otherAccountId }),
+        body: { otherAccountId },
       });
       if (res.ok) {
         toast.success(successToast);

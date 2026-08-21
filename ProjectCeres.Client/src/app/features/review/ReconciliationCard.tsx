@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { RECONCILIATION_REVIEW_CONFIRM_URL, type StagedTransactionDto } from './review-api';
 import { ReconciliationDisputeDialog } from './ReconciliationDisputeDialog';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   staged: StagedTransactionDto;
@@ -24,7 +25,7 @@ export function ReconciliationCard({ staged, onChanged }: Props) {
     if (confirming) return;
     setConfirming(true);
     try {
-      const res = await fetch(RECONCILIATION_REVIEW_CONFIRM_URL(staged.id), { method: 'POST' });
+      const res = await apiFetch(RECONCILIATION_REVIEW_CONFIRM_URL(staged.id), { method: 'POST' });
       if (res.ok) {
         toast.success('Confirmed.');
         onChanged();

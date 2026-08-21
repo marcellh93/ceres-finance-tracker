@@ -10,6 +10,7 @@ import {
   type ImportColumnMappings,
   type ImportFormat,
 } from './import-api';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   fileFormat: ImportFormat;
@@ -50,10 +51,9 @@ export function SaveProfilePrompt({ fileFormat, mappings }: Props) {
     };
 
     try {
-      const response = await fetch(IMPORT_PROFILES_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
+      const response = await apiFetch(IMPORT_PROFILES_URL, {
+        method: 'POST',
+        body,
       });
       if (response.ok) {
         toast.success('Profile saved.');

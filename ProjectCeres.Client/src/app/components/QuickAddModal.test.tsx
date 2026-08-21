@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuickAddModal } from './QuickAddModal';
+import { installCsrfFetchMock, resetCsrfCache } from '../../test/csrf-fetch-mock';
 
 // Mock Sonner so we can assert toast calls
 vi.mock('sonner', () => ({
@@ -38,9 +39,9 @@ const categoriesResponse = {
   ],
 };
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
   mockFetch.mockImplementation((url: string) => {
     if (url.includes('/api/accounts/active')) return Promise.resolve(accountsResponse);
     if (url.includes('/api/categories/active')) return Promise.resolve(categoriesResponse);
@@ -109,14 +110,23 @@ describe('QuickAddModal', () => {
     expect(screen.queryByText('Checking')).not.toBeInTheDocument();
   });
 
-  it('renders inline errors on 422 ValidationProblem', async () => {
+  // The server never emits ASP.NET's raw ModelState shape: Program.cs installs
+  // an InvalidModelStateResponseFactory that rewrites every 422 — ModelState and
+  // business-rule alike — into the project envelope with error.details[].
+  it('renders inline errors on a 422 validation envelope', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/api/accounts/active')) return Promise.resolve(accountsResponse);
       if (url.includes('/api/categories/active')) return Promise.resolve(categoriesResponse);
       return Promise.resolve({
         ok: false,
         status: 422,
-        json: async () => ({ errors: { Amount: ['Amount must be greater than zero.'] } }),
+        json: async () => ({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'One or more fields are invalid.',
+            details: [{ field: 'Amount', message: 'Amount must be greater than zero.' }],
+          },
+        }),
       });
     });
 

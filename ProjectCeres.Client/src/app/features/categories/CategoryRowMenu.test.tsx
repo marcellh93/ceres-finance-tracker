@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CategoryRowMenu } from './CategoryRowMenu';
 import type { CategoryListItemDto } from './categories-api';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -23,9 +24,11 @@ const activeRow: CategoryListItemDto = {
 
 const archivedRow: CategoryListItemDto = { ...activeRow, id: 'a-2', name: 'Old', isActive: false };
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 function renderMenu(category: CategoryListItemDto, onChanged = vi.fn()) {

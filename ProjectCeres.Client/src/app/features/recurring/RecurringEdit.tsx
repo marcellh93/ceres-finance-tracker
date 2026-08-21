@@ -9,6 +9,7 @@ import { ACCOUNTS_ACTIVE_URL, CATEGORIES_ACTIVE_URL, type AccountOptionDto, type
 import { RecurringForm, type RecurringFormValues } from './RecurringForm';
 import { RECURRING_BY_ID_URL, type RecurringTransactionDetailDto } from './recurring-api';
 import type { RecurringPageCtx } from './RecurringCreate';
+import { apiFetch } from '../../lib/api-client';
 
 export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
   useDocumentTitle('Edit Recurring');
@@ -59,10 +60,9 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
     if (!values) return;
     setSubmitting(true);
     try {
-      const res = await fetch(RECURRING_BY_ID_URL(id!), {
+      const res = await apiFetch(RECURRING_BY_ID_URL(id!), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           name: values.name.trim(),
           estimatedAmount: values.estimatedAmount === '' ? null : Number(values.estimatedAmount),
           accountId: values.accountId,
@@ -71,7 +71,7 @@ export function RecurringEdit({ ctx }: { ctx: RecurringPageCtx }) {
           dayOfPeriod: values.dayOfPeriod,
           nextDueDate: values.nextDueDate,
           reminderBehaviour: values.reminderBehaviour,
-        }),
+        },
       });
       if (res.ok) {
         toast.success('Saved.');

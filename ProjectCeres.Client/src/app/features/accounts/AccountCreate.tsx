@@ -4,6 +4,7 @@ import { useDocumentTitle } from '../../lib/use-document-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '../../lib/use-api';
+import { apiFetch } from '../../lib/api-client';
 import { AccountForm } from './AccountForm';
 import {
   ACCOUNTS_URL,
@@ -66,10 +67,9 @@ export function AccountCreate() {
 
   async function handleSubmit(body: CreateAccountRequest | UpdateAccountRequest) {
     try {
-      const response = await fetch(ACCOUNTS_URL, {
+      const response = await apiFetch(ACCOUNTS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
       });
       if (!response.ok) {
         toast.error("Couldn't save. Try again.");

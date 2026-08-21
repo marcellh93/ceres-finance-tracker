@@ -2,13 +2,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementForm, type MovementFormValues } from './MovementForm';
 import type { GoalBudgetListItemDto } from '../budgets/budgets-api';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
 
 // Per-test goal-budget fixture; tests can override before rendering.
 let SPENDING_GOALS: GoalBudgetListItemDto[] = [];
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
-beforeEach(() => {
+beforeEach(async () => {
+  await primeCsrfToken();
   SPENDING_GOALS = [];
   mockFetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();

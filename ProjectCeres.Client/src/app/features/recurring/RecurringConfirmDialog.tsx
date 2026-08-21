@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { DatePickerField } from '../../../components/DatePickerField';
 import { RECURRING_CONFIRM_URL } from './recurring-api';
 import type { RecurringTransactionListItemDto } from './reminder-status';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   open: boolean;
@@ -41,15 +42,14 @@ export function RecurringConfirmDialog({ open, reminder, onChanged, onOpenChange
     setSubmitting(true);
     setInlineError('');
     try {
-      const res = await fetch(RECURRING_CONFIRM_URL(reminder.id), {
+      const res = await apiFetch(RECURRING_CONFIRM_URL(reminder.id), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           date,
           amount: Number(amount),
           description: description.trim() || null,
           nextDueDate: isManual ? nextDueDate : null,
-        }),
+        },
       });
       if (res.status === 201) {
         toast.success(`Recorded ${reminder.currencySymbol}${amount} on ${date}.`);
@@ -57,8 +57,8 @@ export function RecurringConfirmDialog({ open, reminder, onChanged, onOpenChange
         onChanged();
         return;
       }
-      const body = await res.json().catch(() => ({})) as { error?: { code?: string } };
-      if (body.error?.code === 'DATE_BEFORE_OPENING_BALANCE') {
+      // apiFetch surfaces the envelope's error.code directly.
+      if (!res.ok && res.code === 'DATE_BEFORE_OPENING_BALANCE') {
         setInlineError("That date is before this account's opening balance.");
         return;
       }

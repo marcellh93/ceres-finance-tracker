@@ -25,7 +25,7 @@ import {
   LIABILITY_PAYMENT_BY_ID_URL,
   type MovementType,
 } from './movements-api';
-import { parseValidationErrors } from './movement-validation';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   movementId: string;
@@ -46,16 +46,16 @@ export function MovementRowMenu({ movementId, movementType, isOpeningBalance, on
         : LIABILITY_PAYMENT_BY_ID_URL(movementId);
 
   async function handleDelete() {
-    const response = await fetch(url, { method: 'DELETE' });
-    if (response.status === 204) {
+    const response = await apiFetch(url, { method: 'DELETE' });
+    if (response.ok && response.status === 204) {
       toast.success('Deleted.');
       onDeleted();
       return;
     }
-    if (response.status === 422) {
-      const envelope = await response.json();
-      const errs = parseValidationErrors(envelope);
-      toast.error(errs._form ?? "Couldn't delete.");
+    // apiFetch already parses the 422 envelope; formError carries error.message.
+    if (!response.ok && response.status === 422) {
+      const formError = 'formError' in response ? response.formError : undefined;
+      toast.error(formError ?? "Couldn't delete.");
       return;
     }
     toast.error("Couldn't delete.");

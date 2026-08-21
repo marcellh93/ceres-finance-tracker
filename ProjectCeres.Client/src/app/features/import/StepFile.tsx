@@ -16,6 +16,7 @@ import {
   IMPORT_HEADERS_URL,
   type HeaderDetectionResult,
 } from './import-api';
+import { apiFetch } from '../../lib/api-client';
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 const ACCEPT_EXTS = '.csv,.xlsx';
@@ -42,10 +43,9 @@ export function StepFile({ file, accountId, onFileChange, onAccountChange, onCon
     fd.append('file', file);
 
     try {
-      const response = await fetch(IMPORT_HEADERS_URL, { method: 'POST', body: fd });
-      if (response.ok) {
-        const headers = (await response.json()) as HeaderDetectionResult;
-        onContinue(headers);
+      const response = await apiFetch<HeaderDetectionResult>(IMPORT_HEADERS_URL, { method: 'POST', body: fd });
+      if (response.ok && response.data) {
+        onContinue(response.data);
       } else {
         toast.warning("We couldn't read the file's headers. You can map columns manually.");
         onContinue({

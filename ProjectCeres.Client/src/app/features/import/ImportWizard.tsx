@@ -14,6 +14,7 @@ import {
   type ImportColumnMappings,
   type ImportResult,
 } from './import-api';
+import { apiFetch } from '../../lib/api-client';
 
 const EMPTY_MAPPINGS: ImportColumnMappings = {
   dateColumn:        '',
@@ -106,14 +107,16 @@ export function ImportWizard() {
     setSubmitting(true);
     try {
       const fd = buildImportFormData({ file, accountId, mappings });
-      const response = await fetch(IMPORT_URL, { method: 'POST', body: fd });
+      const response = await apiFetch<ImportResult>(IMPORT_URL, { method: 'POST', body: fd });
       if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string } | null;
-        toast.error(body?.message ?? "Couldn't import. Try again.");
+        toast.error(response.message || "Couldn't import. Try again.");
         return;
       }
-      const importResult = (await response.json()) as ImportResult;
-      setResult(importResult);
+      if (!response.data) {
+        toast.error("Couldn't import. Try again.");
+        return;
+      }
+      setResult(response.data);
       setStep(4);
     } catch {
       toast.error("Couldn't import. Try again.");

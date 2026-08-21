@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Outlet, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MovementCreate } from './MovementCreate';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 // ── Mock sonner so toast calls don't explode in tests ──
 vi.mock('sonner', () => ({
@@ -42,9 +43,11 @@ vi.mock('./AttachmentDropzone', () => ({
 // ── Mock fetch ──
 let mockFetch: ReturnType<typeof vi.fn>;
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 
   // Default: accounts + categories resolve with test data
   mockFetch.mockImplementation((url: string) => {

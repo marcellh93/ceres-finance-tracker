@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { apiFetch } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { CheckCheck, Download } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -62,14 +63,12 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
       type: type ?? null,
       currency: currency ?? null,
     };
-    const response = await fetch(MOVEMENTS_BULK_CLEARED_URL, {
+    const response = await apiFetch<BulkClearedResponse>(MOVEMENTS_BULK_CLEARED_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body,
     });
-    if (response.status === 200) {
-      const data = (await response.json()) as BulkClearedResponse;
-      const count = data?.cleared ?? 0;
+    if (response.ok && response.status === 200) {
+      const count = response.data?.cleared ?? 0;
       toast.success(`${count} marked cleared.`);
       setOpen(false);
       onAfterBulk();

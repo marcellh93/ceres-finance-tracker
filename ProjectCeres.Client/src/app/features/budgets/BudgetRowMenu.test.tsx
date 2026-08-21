@@ -7,12 +7,13 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 import { toast } from 'sonner';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 let mockFetch: ReturnType<typeof vi.fn>;
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
 });
 
 function renderMenu({

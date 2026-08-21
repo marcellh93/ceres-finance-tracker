@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { TRANSFER_REVIEW_DISMISS_URL, type StagedTransferDto } from './review-api';
 import { TransferActionDialog } from './TransferActionDialog';
+import { apiFetch } from '../../lib/api-client';
 
 // Minimal account shape needed by the dialog.
 export type AccountOption = {
@@ -28,7 +29,7 @@ export function TransferCard({ staged, accounts, onChanged }: Props) {
     if (dismissing) return;
     setDismissing(true);
     try {
-      const res = await fetch(TRANSFER_REVIEW_DISMISS_URL(staged.id), { method: 'POST' });
+      const res = await apiFetch(TRANSFER_REVIEW_DISMISS_URL(staged.id), { method: 'POST' });
       if (res.ok) {
         toast.success('Imported as a plain transaction.');
         onChanged();

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AccountCreate } from './AccountCreate';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -20,9 +21,9 @@ const currenciesResponse = [
   { id: 2, code: 'USD', name: 'US Dollar', symbol: '$' },
 ];
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/account-types') {
       return Promise.resolve({ ok: true, status: 200, json: async () => accountTypesResponse });

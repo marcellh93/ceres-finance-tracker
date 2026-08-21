@@ -5,6 +5,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { RECONCILIATION_REVIEW_DISPUTE_URL } from './review-api';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   open: boolean;
@@ -20,7 +21,7 @@ export function ReconciliationDisputeDialog({ open, stagedId, onOpenChange, onDi
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch(RECONCILIATION_REVIEW_DISPUTE_URL(stagedId), { method: 'POST' });
+      const res = await apiFetch(RECONCILIATION_REVIEW_DISPUTE_URL(stagedId), { method: 'POST' });
       if (res.ok) {
         toast.success('Disputed. Original un-cleared and a new transaction added.');
         onDisputed();

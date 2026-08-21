@@ -22,9 +22,9 @@ import {
 import {
   CATEGORY_ARCHIVE_URL,
   CATEGORY_REACTIVATE_URL,
-  type ApiErrorEnvelope,
   type CategoryListItemDto,
 } from './categories-api';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   category: CategoryListItemDto;
@@ -39,7 +39,7 @@ export function CategoryRowMenu({ category, onChanged }: Props) {
   async function handleArchive() {
     setConfirmOpen(false);
     try {
-      const response = await fetch(CATEGORY_ARCHIVE_URL(category.id), {
+      const response = await apiFetch(CATEGORY_ARCHIVE_URL(category.id), {
         method: 'PATCH',
       });
       if (response.ok) {
@@ -47,9 +47,8 @@ export function CategoryRowMenu({ category, onChanged }: Props) {
         onChanged();
         return;
       }
-      if (response.status === 409) {
-        const body = (await response.json().catch(() => null)) as ApiErrorEnvelope | null;
-        toast.error(body?.error.message ?? "Couldn't archive. Try again.");
+      if (!response.ok && response.status === 409) {
+        toast.error(response.message || "Couldn't archive. Try again.");
         return;
       }
       toast.error("Couldn't archive. Try again.");
@@ -60,7 +59,7 @@ export function CategoryRowMenu({ category, onChanged }: Props) {
 
   async function handleReactivate() {
     try {
-      const response = await fetch(CATEGORY_REACTIVATE_URL(category.id), {
+      const response = await apiFetch(CATEGORY_REACTIVATE_URL(category.id), {
         method: 'PATCH',
       });
       if (response.ok) {

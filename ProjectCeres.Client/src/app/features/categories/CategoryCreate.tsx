@@ -12,6 +12,7 @@ import {
   type CategoryTypeDto,
   type CreateCategoryRequest,
 } from './categories-api';
+import { apiFetch } from '../../lib/api-client';
 
 type LayoutContext = { refetch: () => void };
 
@@ -60,10 +61,9 @@ export function CategoryCreate() {
       lifestyleTag: values.lifestyleTag,
     };
     try {
-      const response = await fetch(CATEGORIES_URL, {
+      const response = await apiFetch(CATEGORIES_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body,
       });
       if (!response.ok) {
         toast.error("Couldn't save. Try again.");

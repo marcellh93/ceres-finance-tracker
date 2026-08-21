@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StepFile } from './StepFile';
 import type { AccountOptionDto } from '../movements/movements-api';
 import type { HeaderDetectionResult } from './import-api';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -22,9 +23,11 @@ const headers: HeaderDetectionResult = {
   categoryColumn: null,
 };
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
   mockFetch.mockImplementation((url: string) => {
     if (url === '/api/accounts/active') {
       return Promise.resolve({ ok: true, status: 200, json: async () => accounts });

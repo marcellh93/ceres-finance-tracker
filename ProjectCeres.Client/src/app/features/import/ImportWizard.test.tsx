@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ImportWizard } from './ImportWizard';
 import type { AccountOptionDto } from '../movements/movements-api';
+import { installCsrfFetchMock, resetCsrfCache } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -14,9 +15,11 @@ const accounts: AccountOptionDto[] = [
   { id: 'a-1', name: 'Sabadell Checking', currencyCode: 'EUR', currencySymbol: '€', accountTypeName: 'Checking' },
 ];
 
-beforeEach(() => {
-  mockFetch = vi.fn();
-  global.fetch = mockFetch as unknown as typeof fetch;
+beforeEach(async () => {
+  // apiFetch runs a one-time CSRF handshake before the first state-changing
+  // request; this mock serves it so queued responses still line up.
+  await resetCsrfCache();
+  mockFetch = installCsrfFetchMock();
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/accounts/active') {
       return Promise.resolve({ ok: true, status: 200, json: async () => accounts });

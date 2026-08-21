@@ -17,6 +17,7 @@ import { RECURRING_ARCHIVE_URL, RECURRING_REACTIVATE_URL } from './recurring-api
 import { RecurringConfirmDialog } from './RecurringConfirmDialog';
 import { RecurringDismissDialog } from './RecurringDismissDialog';
 import type { RecurringTransactionListItemDto } from './reminder-status';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   reminder: RecurringTransactionListItemDto;
@@ -31,7 +32,7 @@ export function RecurringRowMenu({ reminder, onChanged }: Props) {
 
   async function handleReactivate() {
     try {
-      const res = await fetch(RECURRING_REACTIVATE_URL(reminder.id), { method: 'PATCH' });
+      const res = await apiFetch(RECURRING_REACTIVATE_URL(reminder.id), { method: 'PATCH' });
       if (res.ok) { toast.success('Reactivated.'); onChanged(); return; }
       toast.error("Couldn't reactivate. Try again.");
     } catch {
@@ -42,7 +43,7 @@ export function RecurringRowMenu({ reminder, onChanged }: Props) {
   async function handleArchive() {
     setArchiveOpen(false);
     try {
-      const res = await fetch(RECURRING_ARCHIVE_URL(reminder.id), { method: 'PATCH' });
+      const res = await apiFetch(RECURRING_ARCHIVE_URL(reminder.id), { method: 'PATCH' });
       if (res.ok) { toast.success('Archived.'); onChanged(); return; }
       toast.error("Couldn't archive. Try again.");
     } catch {

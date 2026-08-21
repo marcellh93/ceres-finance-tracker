@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { RecurringLayout } from './RecurringLayout';
 import { ReminderCountProvider } from '../../layout/ReminderCountProvider';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
 
 function renderLayout(path = '/recurring') {
   return render(
@@ -33,7 +34,8 @@ function renderLayoutWithBell(path = '/recurring') {
 }
 
 describe('RecurringLayout', () => {
-  beforeEach(() => { global.fetch = vi.fn(); });
+  beforeEach(async () => {
+    await primeCsrfToken(); global.fetch = vi.fn(); });
 
   it('shows skeleton after the delay window when loading is slow', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
@@ -46,7 +48,7 @@ describe('RecurringLayout', () => {
   });
 
   it('renders h1 "Recurring transactions"', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => [] });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => [] });
     renderLayout();
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Recurring transactions' })).toBeInTheDocument()
@@ -54,13 +56,13 @@ describe('RecurringLayout', () => {
   });
 
   it('renders first-run empty state when no reminders exist', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => [] });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => [] });
     renderLayout();
     await waitFor(() => expect(screen.getByText(/No recurring reminders yet/i)).toBeInTheDocument());
   });
 
   it('renders child route when on /recurring/new (hides list chrome)', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => [] });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => [] });
     renderLayout('/recurring/new');
     await waitFor(() => expect(screen.getByText('Create form')).toBeInTheDocument());
     expect(screen.queryByRole('heading', { name: 'Recurring transactions' })).not.toBeInTheDocument();
@@ -78,7 +80,7 @@ describe('RecurringLayout', () => {
         frequency: 'Monthly', dayOfPeriod: null, nextDueDate: '2026-05-01',
         isActive: true, reminderBehaviour: 'SnapToCalendarDay' },
     ];
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => items });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => items });
     renderLayout('/recurring?q=rent');
     await waitFor(() => expect(screen.getByText('Rent')).toBeInTheDocument());
     expect(screen.queryByText('Salary')).not.toBeInTheDocument();
@@ -91,7 +93,7 @@ describe('RecurringLayout', () => {
         frequency: 'Monthly', dayOfPeriod: null, nextDueDate: '2026-05-15',
         isActive: true, reminderBehaviour: 'SnapToCalendarDay' },
     ];
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => items });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => items });
     renderLayout('/recurring?q=xyz');
     await waitFor(() => expect(screen.getByText(/No reminders match/i)).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /clear search/i })).toBeInTheDocument();
@@ -110,14 +112,14 @@ describe('RecurringLayout', () => {
       callCount++;
       // First call = active-only list (empty), second call = all list (has archived item)
       const data = callCount === 1 ? [] : archived;
-      return Promise.resolve({ ok: true, json: async () => data });
+      return Promise.resolve({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => data });
     });
     renderLayout();
     await waitFor(() => expect(screen.getByText('No active reminders.')).toBeInTheDocument());
   });
 
   it('shows error state when fetch fails', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: false, status: 500, json: async () => ({}) });
     renderLayout();
     await waitFor(() => expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument());
   });
@@ -131,9 +133,9 @@ describe('RecurringLayout', () => {
     };
     const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (typeof url === 'string' && url.includes('/confirm') && init?.method === 'POST') {
-        return Promise.resolve({ status: 201, ok: true, json: async () => ({ transactionId: 'tx-1' }) });
+        return Promise.resolve({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  status: 201, ok: true, json: async () => ({ transactionId: 'tx-1' }) });
       }
-      return Promise.resolve({ ok: true, json: async () => [item] });
+      return Promise.resolve({ headers: { get: (n: string) => (n === 'Content-Type' ? 'application/json' : null) },  ok: true, json: async () => [item] });
     });
     global.fetch = fetchMock;
 

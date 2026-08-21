@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { RecurringRowMenu } from './RecurringRowMenu';
 import type { RecurringTransactionListItemDto } from './reminder-status';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
 
 function makeReminder(overrides: Partial<RecurringTransactionListItemDto> = {}): RecurringTransactionListItemDto {
   return {
@@ -20,7 +21,8 @@ function renderMenu(reminder: RecurringTransactionListItemDto, onChanged = vi.fn
 }
 
 describe('RecurringRowMenu', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+  await primeCsrfToken();
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
   });
 

@@ -12,7 +12,8 @@ import {
   type CategoryBudgetEditDto,
   type GoalBudgetEditDto,
 } from './budgets-api';
-import { parseValidationErrors } from '../movements/movement-validation';
+import { toFormErrors } from '../movements/movement-validation';
+import { apiFetch } from '../../lib/api-client';
 import { useApi } from '../../lib/use-api';
 
 export function BudgetEdit() {
@@ -65,26 +66,24 @@ function CategoryEdit({ id }: { id: string }) {
   };
 
   async function onSubmit(values: CategoryBudgetFormValues) {
-    const response = await fetch(CATEGORY_BUDGET_BY_ID_URL(id), {
+    const response = await apiFetch(CATEGORY_BUDGET_BY_ID_URL(id), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         categoryId: values.categoryId,
         currencyId: values.currencyId,
         limitAmount: Number(values.limitAmount),
         isActive: dto?.isActive ?? true,
-      }),
+      },
     });
 
-    if (response.status === 204) {
+    if (response.ok && response.status === 204) {
       toast.success('Saved.');
       ctx?.refetch();
       navigate('/budgets?type=category');
       return { ok: true } as const;
     }
-    if (response.status === 422) {
-      const envelope = await response.json();
-      return { ok: false, errors: parseValidationErrors(envelope) } as const;
+    if (!response.ok && response.status === 422) {
+      return { ok: false, errors: toFormErrors(response) } as const;
     }
     toast.error("Couldn't save.");
     return { ok: false, errors: { _form: 'Network or server error.' } } as const;
@@ -128,10 +127,9 @@ function GoalEdit({ id }: { id: string }) {
   };
 
   async function onSubmit(values: GoalBudgetFormValues) {
-    const response = await fetch(GOAL_BUDGET_BY_ID_URL(id), {
+    const response = await apiFetch(GOAL_BUDGET_BY_ID_URL(id), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         name: values.name,
         goalType: values.goalType,
         currencyId: values.currencyId,
@@ -141,18 +139,17 @@ function GoalEdit({ id }: { id: string }) {
         description: values.description,
         linkedAccountId: values.linkedAccountId,
         isActive: dto?.isActive ?? true,
-      }),
+      },
     });
 
-    if (response.status === 204) {
+    if (response.ok && response.status === 204) {
       toast.success('Saved.');
       ctx?.refetch();
       navigate('/budgets?type=goal');
       return { ok: true } as const;
     }
-    if (response.status === 422) {
-      const envelope = await response.json();
-      return { ok: false, errors: parseValidationErrors(envelope) } as const;
+    if (!response.ok && response.status === 422) {
+      return { ok: false, errors: toFormErrors(response) } as const;
     }
     toast.error("Couldn't save.");
     return { ok: false, errors: { _form: 'Network or server error.' } } as const;

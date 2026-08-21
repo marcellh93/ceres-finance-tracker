@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RECURRING_DISMISS_URL } from './recurring-api';
 import type { RecurringTransactionListItemDto } from './reminder-status';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   open: boolean;
@@ -27,10 +28,9 @@ export function RecurringDismissDialog({ open, reminder, onChanged, onOpenChange
   async function handleDismiss() {
     setSubmitting(true);
     try {
-      const res = await fetch(RECURRING_DISMISS_URL(reminder.id), {
+      const res = await apiFetch(RECURRING_DISMISS_URL(reminder.id), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nextDueDate: isManual ? nextDueDate : null }),
+        body: { nextDueDate: isManual ? nextDueDate : null },
       });
       if (res.ok) {
         toast.success('Dismissed. Next due date advanced.');

@@ -3,11 +3,14 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Toaster } from 'sonner';
 import { ReconciliationDisputeDialog } from './ReconciliationDisputeDialog';
+import { primeCsrfToken } from '../../../test/csrf-fetch-mock';
+import { stubResponse } from '../../../test/csrf-fetch-mock';
 
 const STAGED_ID = '11111111-1111-1111-1111-111111111111';
 
 describe('ReconciliationDisputeDialog', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+  await primeCsrfToken();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -30,7 +33,7 @@ describe('ReconciliationDisputeDialog', () => {
   });
 
   it('Submit posts to /dispute and 204 fires success toast + onDisputed + close', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    const fetchMock = vi.fn().mockResolvedValue(stubResponse({ ok: true, status: 204 }));
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
     const onDisputed = vi.fn();
     const onOpenChange = vi.fn();
@@ -56,7 +59,7 @@ describe('ReconciliationDisputeDialog', () => {
   });
 
   it('404 closes the dialog and still calls onDisputed (so the list refetches)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }) as typeof fetch);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 404 })) as typeof fetch);
     const onDisputed = vi.fn();
     const onOpenChange = vi.fn();
     render(
@@ -75,7 +78,7 @@ describe('ReconciliationDisputeDialog', () => {
   });
 
   it('422 keeps dialog open with generic error toast', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422 }) as typeof fetch);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 422 })) as typeof fetch);
     const onOpenChange = vi.fn();
     render(
       <>

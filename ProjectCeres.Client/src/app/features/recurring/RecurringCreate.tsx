@@ -8,6 +8,7 @@ import { useApi } from '../../lib/use-api';
 import { ACCOUNTS_ACTIVE_URL, CATEGORIES_ACTIVE_URL, type AccountOptionDto, type CategoryOptionDto } from '../movements/movements-api';
 import { RecurringForm, type RecurringFormValues } from './RecurringForm';
 import { RECURRING_URL } from './recurring-api';
+import { apiFetch } from '../../lib/api-client';
 
 export type RecurringPageCtx = { refetch: () => void; refreshBell: () => void };
 
@@ -41,10 +42,9 @@ export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch(RECURRING_URL, {
+      const res = await apiFetch(RECURRING_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           name: values.name.trim(),
           estimatedAmount: values.estimatedAmount === '' ? null : Number(values.estimatedAmount),
           accountId: values.accountId,
@@ -53,7 +53,7 @@ export function RecurringCreate({ ctx }: { ctx: RecurringPageCtx }) {
           dayOfPeriod: values.dayOfPeriod,
           nextDueDate: values.nextDueDate,
           reminderBehaviour: values.reminderBehaviour,
-        }),
+        },
       });
       if (res.ok) {
         toast.success('Created.');

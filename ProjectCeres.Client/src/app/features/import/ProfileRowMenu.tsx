@@ -22,9 +22,9 @@ import {
 import {
   IMPORT_PROFILE_BY_ID_URL,
   IMPORT_PROFILE_RECOVER_URL,
-  type ApiErrorEnvelope,
   type ImportProfileListItemDto,
 } from './import-api';
+import { apiFetch } from '../../lib/api-client';
 
 type Props = {
   profile: ImportProfileListItemDto;
@@ -39,7 +39,7 @@ export function ProfileRowMenu({ profile, onChanged }: Props) {
   async function handleArchive() {
     setConfirmOpen(false);
     try {
-      const response = await fetch(IMPORT_PROFILE_BY_ID_URL(profile.id), {
+      const response = await apiFetch(IMPORT_PROFILE_BY_ID_URL(profile.id), {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -47,8 +47,7 @@ export function ProfileRowMenu({ profile, onChanged }: Props) {
         onChanged();
         return;
       }
-      const body = (await response.json().catch(() => null)) as ApiErrorEnvelope | null;
-      toast.error(body?.error.message ?? "Couldn't archive. Try again.");
+      toast.error(response.message || "Couldn't archive. Try again.");
     } catch {
       toast.error("Couldn't archive. Try again.");
     }
@@ -56,7 +55,7 @@ export function ProfileRowMenu({ profile, onChanged }: Props) {
 
   async function handleReactivate() {
     try {
-      const response = await fetch(IMPORT_PROFILE_RECOVER_URL(profile.id), {
+      const response = await apiFetch(IMPORT_PROFILE_RECOVER_URL(profile.id), {
         method: 'POST',
       });
       if (response.ok) {
