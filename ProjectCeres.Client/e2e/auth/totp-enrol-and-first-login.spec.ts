@@ -9,14 +9,14 @@ test('enrol TOTP from Security → sign out → login with TOTP → dashboard', 
   })
 
   // Log in (no MFA yet).
-  await page.goto('/app/login')
+  await page.goto('/login')
   await page.locator('#email').fill(user.email)
   await page.locator('#password').fill(user.password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/app\/?$/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/^https?:\/\/[^/]+\/?$/, { timeout: 10_000 })
 
   // Start enrolment; capture the otpauth URI from the enroll API response.
-  await page.goto('/app/security')
+  await page.goto('/security')
   const enrollResp = page.waitForResponse((r) => r.url().includes('/api/auth/mfa/enroll') && r.request().method() === 'POST')
   await page.getByRole('button', { name: 'Set up two-factor sign-in' }).click()
   const enroll = await enrollResp
@@ -37,16 +37,16 @@ test('enrol TOTP from Security → sign out → login with TOTP → dashboard', 
   await page.context().clearCookies()
 
   // Re-login → requiresTotp.
-  await page.goto('/app/login')
+  await page.goto('/login')
   await page.locator('#email').fill(user.email)
   await page.locator('#password').fill(user.password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/app\/login\/totp/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/\/login\/totp/, { timeout: 10_000 })
   await expect(page.getByRole('heading', { name: 'Verify your identity' })).toBeVisible()
 
   // Use a code distinct from the enrolment code (replay guard rejects reuse within a window).
   const loginCode = await nextDistinctCode(totp, enrollCode)
   await page.getByRole('textbox', { name: 'Verification code' }).fill(loginCode)
 
-  await expect(page).toHaveURL(/\/app\/?$/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/^https?:\/\/[^/]+\/?$/, { timeout: 10_000 })
 })

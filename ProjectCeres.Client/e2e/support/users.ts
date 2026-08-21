@@ -30,7 +30,7 @@ export async function createVerifiedUser(
     throw new Error(`register failed: ${reg.status()} ${await reg.text()}`)
 
   const email = await waitForEmail(user.email, (e) =>
-    e.bodyText.includes('/app/email-verify#token='),
+    e.bodyText.includes('/email-verify#token='),
   )
   const token = extractToken(email)
 

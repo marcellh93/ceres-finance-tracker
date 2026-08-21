@@ -28,7 +28,7 @@ export function register(page: Page, creds: Creds) {
       // Project Ceres requires email verification before login, so the post-submit
       // surface is /email-verify in the common case. If the project ever changes
       // to auto-login on register, the dashboard path is the alternate landing.
-      await page.waitForURL((url) => /\/(email-verify|app\/?$)/.test(url.pathname), {
+      await page.waitForURL((url) => /\/(email-verify|$)/.test(url.pathname), {
         timeout: 10_000,
       });
     },
@@ -52,7 +52,7 @@ export function login(page: Page, creds: Creds) {
       await loginPage.email().fill(creds.email);
       await loginPage.password().fill(creds.password);
       await loginPage.submit().click();
-      await page.waitForURL((url) => /\/app\/?$/.test(url.pathname), { timeout: 10_000 });
+      await page.waitForURL((url) => /^\/$/.test(url.pathname), { timeout: 10_000 });
     },
   };
 }

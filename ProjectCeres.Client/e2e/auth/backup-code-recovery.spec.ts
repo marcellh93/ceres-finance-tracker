@@ -30,28 +30,28 @@ test('lost device → backup code login → dashboard; reuse rejected', async ({
 
   // Fresh browser session: log in via UI → TOTP challenge → switch to backup code.
   await page.context().clearCookies()
-  await page.goto('/app/login')
+  await page.goto('/login')
   await page.locator('#email').fill(user.email)
   await page.locator('#password').fill(user.password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/app\/login\/totp/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/\/login\/totp/, { timeout: 10_000 })
 
   await page.getByRole('button', { name: 'Lost your device? Use a backup code' }).click()
   await page.locator('#backup-code').fill(backupCode)
   await page.getByRole('button', { name: 'Verify' }).click()
-  await expect(page).toHaveURL(/\/app\/?$/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/^https?:\/\/[^/]+\/?$/, { timeout: 10_000 })
 
   // Edge: the same backup code is single-use — a second login with it is rejected.
   await page.context().clearCookies()
-  await page.goto('/app/login')
+  await page.goto('/login')
   await page.locator('#email').fill(user.email)
   await page.locator('#password').fill(user.password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/app\/login\/totp/, { timeout: 10_000 })
+  await expect(page).toHaveURL(/\/login\/totp/, { timeout: 10_000 })
   await page.getByRole('button', { name: 'Lost your device? Use a backup code' }).click()
   await page.locator('#backup-code').fill(backupCode)
   await page.getByRole('button', { name: 'Verify' }).click()
   // Stays on the TOTP page with an error; does NOT reach the dashboard.
-  await expect(page).toHaveURL(/\/app\/login\/totp/)
+  await expect(page).toHaveURL(/\/login\/totp/)
   await expect(page.getByText('Invalid code')).toBeVisible()
 })

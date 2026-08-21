@@ -2,14 +2,14 @@ import type { Page } from '@playwright/test';
 
 /**
  * Dashboard lives under the authenticated AppLayout (src/app/layout/AppLayout.tsx)
- * at the index route — i.e. `/app`. Locators stay skeletal for 9.5a; expand as
+ * at the index route — i.e. `/`. Locators stay skeletal for 9.5a; expand as
  * dashboard tests are written.
  */
 export class DashboardPage {
   private readonly page: Page;
   constructor(page: Page) { this.page = page; }
 
-  private readonly basePath = '/app';
+  private readonly basePath = '/';
 
   async goto(): Promise<void> {
     await this.page.goto(this.basePath, { waitUntil: 'networkidle' });

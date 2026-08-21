@@ -11,11 +11,12 @@ export class AuthLayoutPage {
   protected readonly page: Page;
   constructor(page: Page) { this.page = page; }
 
-  // React Router basename is "/app" (see ProjectCeres.Client/src/app/main.tsx).
-  protected readonly basePath = '/app';
+  // Stage 11 Task 7 moved the SPA from /app/* to the site root; /app/* now 301s
+  // to /* (see Program.cs UseRewriter). Routes are therefore root-relative.
+  protected readonly basePath = '';
 
   async gotoRoute(route: string): Promise<void> {
-    const path = route.startsWith(this.basePath) ? route : `${this.basePath}${route}`;
+    const path = `${this.basePath}${route}`;
     await this.page.goto(path, { waitUntil: 'networkidle' });
   }
 }
