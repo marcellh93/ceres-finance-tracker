@@ -8,6 +8,7 @@ const {
   strikeCount,
   recordStrike,
   gapsFingerprint,
+  normalizeGap,
   MAX_STRIKES,
 } = require("../evidence-bundle-check.js");
 
@@ -144,4 +145,68 @@ test("strikes are scoped per session — a fresh session blocks independently", 
   const fp = gapsFingerprint(["Missing: trace.zip"]);
   for (let i = 0; i < MAX_STRIKES; i++) recordStrike(dir, "sess-a", "12.9", fp);
   assert.strictEqual(strikeCount(dir, "sess-b", "12.9", fp), 0);
+});
+
+// ---------------------------------------------------------------------------
+// Guard 3 — volatile gap text must not defeat Guard 2.
+//
+// The 2026-08-21 recurrence: the guards above only ever fed gapsFingerprint
+// bare strings ("Missing: trace.zip"), but the hook emits stale gaps carrying
+// the turn-start timestamp, which changes every turn. Every turn therefore
+// minted a new fingerprint, strikes stayed at 1, MAX_STRIKES was unreachable,
+// and the Stop blocked unboundedly. Fingerprint gap IDENTITY, not rendered text.
+// ---------------------------------------------------------------------------
+
+const staleGaps = (turnStart) => [
+  `Stale: build-matrix.json (mtime 2026-08-09T22:11:34.433Z, turn-start ${turnStart})`,
+  `Stale: turn-shape.json (mtime 2026-08-09T22:20:01.475Z, turn-start ${turnStart})`,
+];
+
+test("gapsFingerprint: identical for the same stale slots across different turn-start values", () => {
+  assert.strictEqual(
+    gapsFingerprint(staleGaps("2026-08-21T00:16:06.336Z")),
+    gapsFingerprint(staleGaps("2026-09-14T18:42:11.001Z")),
+    "a timestamp embedded in the gap text must not change the fingerprint"
+  );
+});
+
+test("gapsFingerprint: mtime differences on the same slots do not change the fingerprint", () => {
+  const a = ["Stale: build-matrix.json (mtime 2026-01-01T00:00:00.000Z, turn-start T)"];
+  const b = ["Stale: build-matrix.json (mtime 2026-07-07T07:07:07.007Z, turn-start T)"];
+  assert.strictEqual(gapsFingerprint(a), gapsFingerprint(b));
+});
+
+test("gapsFingerprint: still distinguishes different slots and kinds", () => {
+  const stale = gapsFingerprint(["Stale: build-matrix.json (mtime X, turn-start T)"]);
+  const other = gapsFingerprint(["Stale: turn-shape.json (mtime X, turn-start T)"]);
+  const missing = gapsFingerprint(["Missing: build-matrix.json (required because always)"]);
+  assert.notStrictEqual(stale, other, "different slots must not collide");
+  assert.notStrictEqual(stale, missing, "Stale and Missing on one slot are different problems");
+});
+
+test("gapsFingerprint: insensitive to gap ordering", () => {
+  const gaps = staleGaps("2026-08-21T00:16:06.336Z");
+  assert.strictEqual(gapsFingerprint(gaps), gapsFingerprint([...gaps].reverse()));
+});
+
+test("normalizeGap: leaves a non-slot gap (turn-shape validation message) untouched", () => {
+  const gap = "turn-shape.json: missing/invalid 'fix_mentions' array";
+  assert.strictEqual(normalizeGap(gap), gap);
+});
+
+test("stale blocks terminate at MAX_STRIKES even when turn-start changes every turn", () => {
+  const dir = tmpDir();
+  let blocked = 0;
+  for (let turn = 0; turn < 12; turn++) {
+    // A new turn-start on every iteration — exactly what the live hook produces.
+    const fp = gapsFingerprint(staleGaps(`2026-08-21T00:${String(turn).padStart(2, "0")}:00.000Z`));
+    if (strikeCount(dir, "sess", "12.1", fp) >= MAX_STRIKES) break;
+    recordStrike(dir, "sess", "12.1", fp);
+    blocked++;
+  }
+  assert.strictEqual(
+    blocked,
+    MAX_STRIKES,
+    `stale gaps must escalate after ${MAX_STRIKES} blocks, got ${blocked} (unbounded loop)`
+  );
 });
