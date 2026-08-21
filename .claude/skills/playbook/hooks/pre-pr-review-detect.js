@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // PRE-PR-REVIEW DETECTOR — DISABLED IN CERES.
 //
-// Ceres is local-only (feedback_no_remote_no_push_suggestions). This hook is
-// NOT wired in .claude/settings.json. It lives on disk as a placeholder so
+// Ceres has an origin remote and pushes main to it, but never opens PRs —
+// main is the only branch, local and remote (verified 2026-08-21). Phase G
+// covers the PR-review workflow, not remote existence, so it stays off. This
+// hook is NOT wired in .claude/settings.json. It lives on disk as a placeholder so
 // Phase G in playbook/references/constitution.md is documented end-to-end
 // and re-enabling it later is one settings.json edit, not a re-build.
 //

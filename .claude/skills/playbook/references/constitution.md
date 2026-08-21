@@ -228,7 +228,7 @@ Both hooks no-op when `frontend-orchestrator` has already fired this session (st
 
 1. `superpowers:requesting-code-review`
 
-**Enforcement.** Advisory via `playbook/hooks/pre-pr-review-detect.js` (UserPromptSubmit). **Per `feedback_no_remote_no_push_suggestions`, Project Ceres has no remote and never opens PRs.** The hook is shipped disabled by default — its detection logic flags the phrasing in case the user starts an external PR-driven workflow later, but the hook is NOT wired in `settings.json`. Re-enable by adding the hook entry to `UserPromptSubmit` if a remote is ever added.
+**Enforcement.** Advisory via `playbook/hooks/pre-pr-review-detect.js` (UserPromptSubmit). **Project Ceres has an `origin` remote and pushes `main` to it, but never opens PRs** — `main` is the only branch, local and remote (verified 2026-08-21). Phase G is about the PR-review workflow, not about whether a remote exists, so it stays disabled. The hook is shipped disabled by default — its detection logic flags the phrasing in case the user starts a PR-driven workflow later, but the hook is NOT wired in `settings.json`. Re-enable by adding the hook entry to `UserPromptSubmit` if that changes.
 
 **Consumes / produces.**
 - Consumes: user prompt mentioning PR/review.
@@ -312,12 +312,12 @@ Default rule: a `Skill` tool call with the exact `skill` argument value, recorde
 
 Two superpowers skills are project-disabled per memory:
 
-- `superpowers:finishing-a-development-branch` — local-only, no branches per `feedback_stay_on_main`.
+- `superpowers:finishing-a-development-branch` — no branches per `feedback_stay_on_main`; work lands directly on `main`.
 - `superpowers:using-git-worktrees` — same memory.
 
-Three more are situationally inappropriate for Ceres' single-machine local-only workflow:
+Three more are situationally inappropriate for Ceres' single-developer, single-branch workflow:
 
-- `superpowers:requesting-code-review` — no remote, no PRs (Phase G is disabled).
+- `superpowers:requesting-code-review` — no PRs (Phase G is disabled); a remote exists but is push-only.
 - `superpowers:receiving-code-review` — same reason.
 - `superpowers:dispatching-parallel-agents` — used selectively when the user explicitly invokes it; not part of the default chain.
 
