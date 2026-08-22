@@ -122,4 +122,42 @@ public class AdminRoleServiceTests : IAsyncLifetime
 
         (await svc.AnyAdminExistsAsync()).Should().BeTrue();
     }
+
+    [Fact]
+    public async Task AnyAdminExistsAsync_is_false_after_the_only_admin_is_revoked()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, $"existsfalse{EmailSuffix}");
+
+        using var scope = _factory.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+
+        await svc.GrantAsync(user.Id);
+        (await svc.AnyAdminExistsAsync()).Should().BeTrue();
+
+        await svc.RevokeAsync(user.Id);
+
+        (await svc.AnyAdminExistsAsync()).Should().BeFalse(
+            "the role row still exists but has no members, so this must read membership, not role existence");
+    }
+
+    [Fact]
+    public async Task RevokeAsync_returns_false_for_an_unknown_user()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+
+        (await svc.RevokeAsync(Guid.NewGuid())).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RevokeAsync_returns_false_for_a_user_who_was_never_granted_admin()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, $"neveradmin{EmailSuffix}");
+
+        using var scope = _factory.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+
+        (await svc.RevokeAsync(user.Id)).Should().BeFalse();
+    }
 }
+
