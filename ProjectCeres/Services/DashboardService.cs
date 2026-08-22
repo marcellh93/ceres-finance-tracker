@@ -154,10 +154,16 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
     /// </summary>
     private async Task<(decimal? availableToday, decimal? safeToSpend, decimal? imminentBills, decimal? laterBills, decimal? budgetReserve)> GetSpendableBalanceAsync(int currencyId)
     {
-        var today    = DateOnly.FromDateTime(DateTime.Today);
-        var firstDay = new DateOnly(today.Year, today.Month, 1);
-        var lastDay  = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        var today = DateOnly.FromDateTime(DateTime.Today);
         const int imminentWindowDays = 7;
+
+        // Bills follow the user's configured cycle, not the calendar month. The budget
+        // reserve below already did; bills did not, so a bill due early next month but
+        // inside the current cycle (rent on the 1st, cycle starting on the 17th) was
+        // dropped from the forecast entirely.
+        var spendSettings = await settingsService.GetAsync();
+        var (periodYear, periodMonth) = BudgetPeriod.GetCurrentPeriodMonth(today, spendSettings.PeriodStartDay);
+        var (firstDay, lastDay) = BudgetPeriod.GetBoundsForMonth(periodYear, periodMonth, spendSettings.PeriodStartDay);
 
         // Load active, non-excluded asset accounts with their transactions and category types.
         var accounts = await db.Accounts
@@ -213,13 +219,22 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         // Later: due after today+7 through end of this calendar month only.
         var imminentCutoff = today.AddDays(imminentWindowDays);
 
+        // A subscription charged to a credit card is committed spending even though no
+        // cash leaves the bank today, so bills are matched against every account in this
+        // currency, not just the spendable asset ones.
+        var billAccountIds = await db.Accounts
+            .Owned(user)
+            .Where(a => a.IsActive && a.CurrencyId == currencyId)
+            .Select(a => a.Id)
+            .ToListAsync();
+
         var imminentRecurring = await db.RecurringTransactions
             .Owned(user)
             .Where(r => r.IsActive
                      && r.EstimatedAmount != null
                      && r.NextDueDate >= firstDay
                      && r.NextDueDate <= imminentCutoff
-                     && accountIds.Contains(r.AccountId))
+                     && billAccountIds.Contains(r.AccountId))
             .ToListAsync();
         decimal imminentBills = imminentRecurring.Sum(r => r.EstimatedAmount ?? 0m);
 
@@ -229,7 +244,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
                      && r.EstimatedAmount != null
                      && r.NextDueDate > imminentCutoff
                      && r.NextDueDate <= lastDay
-                     && accountIds.Contains(r.AccountId))
+                     && billAccountIds.Contains(r.AccountId))
             .ToListAsync();
         decimal laterBills = laterRecurring.Sum(r => r.EstimatedAmount ?? 0m);
 
@@ -244,9 +259,8 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         decimal budgetReserve = 0m;
         if (activeBudgets.Count > 0)
         {
-            var settings = await settingsService.GetAsync();
-            var (year, month) = BudgetPeriod.GetCurrentPeriodMonth(today, settings.PeriodStartDay);
-            var (periodStart, periodEnd) = BudgetPeriod.GetBoundsForMonth(year, month, settings.PeriodStartDay);
+            // Same cycle the bills above use — resolved once at the top of the method.
+            var (periodStart, periodEnd) = (firstDay, lastDay);
 
             var budgetCategoryIds = activeBudgets.Select(cb => cb.CategoryId).ToList();
             var actualSpendByCategory = await db.Transactions
@@ -269,8 +283,15 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
             }
         }
 
+        // A FullMonthly liability (a card cleared in full each cycle) has its whole
+        // outstanding balance due, so it is not money available to spend. Amortising
+        // liabilities are excluded: only their instalment is owed this cycle, and that
+        // arrives through their recurring reminder — subtracting a mortgage principal
+        // would drive the figure permanently negative.
+        var fullMonthlyDebt = await GetFullMonthlyLiabilityBalanceAsync(currencyId);
+
         var availableToday = liquid - imminentBills;
-        var safeToSpend    = availableToday - laterBills - budgetReserve;
+        var safeToSpend    = availableToday - laterBills - budgetReserve - fullMonthlyDebt;
 
         return (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve);
     }
@@ -279,6 +300,53 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
     /// Runway = (total assets − total liabilities) ÷ avg monthly expenses over last 6 full months.
     /// Returns null if avg monthly expenses = 0 or no expense transactions exist in that window.
     /// </summary>
+    /// <summary>
+    /// Outstanding balance across active FullMonthly liability accounts in this currency.
+    /// Mirrors <c>AccountService</c>'s sign rules: on a liability an expense increases
+    /// what is owed, and a liability payment reduces it.
+    /// </summary>
+    private async Task<decimal> GetFullMonthlyLiabilityBalanceAsync(int currencyId)
+    {
+        var cards = await db.Accounts
+            .Owned(user)
+            .Where(a => a.IsActive
+                     && a.CurrencyId == currencyId
+                     && a.AccountType.Name == "Liability"
+                     && a.LiabilityRepaymentType == "FullMonthly")
+            .Include(a => a.Transactions)
+                .ThenInclude(t => t.Category)
+                    .ThenInclude(c => c.CategoryType)
+            .ToListAsync();
+
+        if (cards.Count == 0) return 0m;
+
+        var cardIds = cards.Select(a => a.Id).ToHashSet();
+        var repayments = await db.LiabilityPayments
+            .Owned(user)
+            .AsNoTracking()
+            .Where(p => cardIds.Contains(p.LiabilityAccountId))
+            .ToListAsync();
+
+        var repaidByCard = repayments
+            .GroupBy(p => p.LiabilityAccountId)
+            .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+        decimal owed = 0m;
+        foreach (var card in cards)
+        {
+            var balance = card.Transactions.Sum(t =>
+            {
+                if (t.Category.IsSystem) return t.Amount;
+                bool isIncome = t.Category.CategoryType.Name == "Income";
+                return isIncome ? -t.Amount : t.Amount;
+            });
+            balance -= repaidByCard.GetValueOrDefault(card.Id);
+            if (balance > 0m) owed += balance;
+        }
+
+        return owed;
+    }
+
     private async Task<(decimal? months, decimal? avgMonthlyExpense)> GetRunwayAsync(int currencyId)
     {
         var today    = DateOnly.FromDateTime(DateTime.Today);

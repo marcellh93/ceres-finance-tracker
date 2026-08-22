@@ -620,4 +620,188 @@ public class DashboardServiceTests : IAsyncLifetime
 
         snapshot.BudgetBurnRate.Should().BeNull();
     }
+
+    // -------------------------------------------------------------------------
+    // Spendable balance corrections (2026-08-22)
+    //
+    // Three faults made "safe to spend" report money that was already committed:
+    //   1. Bills used a hard-coded calendar month, ignoring Settings.PeriodStartDay,
+    //      while the budget reserve in the same panel respected it.
+    //   2. Bills on liability accounts were skipped entirely, so subscriptions
+    //      charged to a credit card never counted as commitments.
+    //   3. An outstanding FullMonthly liability balance (a card cleared in full each
+    //      cycle) did not reduce the figure at all.
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// A bill falling inside the configured cycle but outside the calendar month must
+    /// still count. With PeriodStartDay = 17 and today on/after the 17th, the cycle runs
+    /// into next month, so a bill due early next month is a commitment for THIS cycle.
+    /// </summary>
+    [Fact]
+    public async Task GetHealthSnapshotAsync_LaterBills_RespectsPeriodStartDay_NotCalendarMonth()
+    {
+        var settings = await _fixture.Db.Settings.FirstAsync();
+        settings.PeriodStartDay = 17;
+        await _fixture.Db.SaveChangesAsync();
+
+        var baseline = await _service.GetHealthSnapshotAsync();
+        var baselineLater = baseline.LaterBills ?? 0m;
+
+        // A date inside the cycle but in NEXT calendar month, and beyond the 7-day
+        // imminent window so it lands in LaterBills.
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var nextMonth = today.AddMonths(1);
+        var dueNextMonth = new DateOnly(nextMonth.Year, nextMonth.Month, 2);
+
+        // Only meaningful when the cycle actually reaches into next month.
+        if (today.Day < 17) return;
+
+        _fixture.Db.RecurringTransactions.Add(new RecurringTransaction
+        {
+            Id                = Guid.NewGuid(),
+            Name              = $"Rent {Guid.NewGuid():N}",
+            EstimatedAmount   = 770m,
+            AccountId         = _accountId,
+            CategoryId        = HousingCategoryId,
+            Frequency         = Frequency.Monthly,
+            NextDueDate       = dueNextMonth,
+            IsActive          = true,
+            ReminderBehaviour = ReminderBehaviour.SnapToCalendarDay
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        (snapshot.LaterBills ?? 0m).Should().Be(baselineLater + 770m,
+            "a bill inside the configured cycle counts even when it falls in the next calendar month");
+    }
+
+    /// <summary>
+    /// A subscription charged to a credit card is a commitment. It was skipped because
+    /// the bill queries required the reminder's account to be an asset account.
+    /// </summary>
+    [Fact]
+    public async Task GetHealthSnapshotAsync_Bills_IncludeRemindersOnLiabilityAccounts()
+    {
+        var card = new Account
+        {
+            Id                     = Guid.NewGuid(),
+            Name                   = $"Card {Guid.NewGuid():N}",
+            AccountTypeId          = 2,
+            CurrencyId             = 1,
+            IsActive               = true,
+            LiabilityRepaymentType = "FullMonthly"
+        };
+        _fixture.Db.Accounts.Add(card);
+        await _fixture.Db.SaveChangesAsync();
+
+        var baseline = await _service.GetHealthSnapshotAsync();
+        var baselineBills = (baseline.ImminentBills ?? 0m) + (baseline.LaterBills ?? 0m);
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        _fixture.Db.RecurringTransactions.Add(new RecurringTransaction
+        {
+            Id                = Guid.NewGuid(),
+            Name              = $"Spotify {Guid.NewGuid():N}",
+            EstimatedAmount   = 11.99m,
+            AccountId         = card.Id,
+            CategoryId        = HousingCategoryId,
+            Frequency         = Frequency.Monthly,
+            NextDueDate       = today.AddDays(2),
+            IsActive          = true,
+            ReminderBehaviour = ReminderBehaviour.SnapToCalendarDay
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+        var bills = (snapshot.ImminentBills ?? 0m) + (snapshot.LaterBills ?? 0m);
+
+        bills.Should().Be(baselineBills + 11.99m,
+            "a card subscription is committed spending even though no cash leaves the bank today");
+    }
+
+    /// <summary>
+    /// A FullMonthly liability is cleared in full each cycle, so its whole outstanding
+    /// balance is owed and must reduce safe-to-spend.
+    /// </summary>
+    [Fact]
+    public async Task GetHealthSnapshotAsync_SafeToSpend_SubtractsFullMonthlyLiabilityBalance()
+    {
+        var baseline = await _service.GetHealthSnapshotAsync();
+        var baselineSafe = baseline.SafeToSpend ?? 0m;
+
+        var card = new Account
+        {
+            Id                     = Guid.NewGuid(),
+            Name                   = $"Card {Guid.NewGuid():N}",
+            AccountTypeId          = 2,
+            CurrencyId             = 1,
+            IsActive               = true,
+            LiabilityRepaymentType = "FullMonthly"
+        };
+        _fixture.Db.Accounts.Add(card);
+        await _fixture.Db.SaveChangesAsync();
+
+        // An expense on a liability account increases what is owed.
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = Guid.NewGuid(),
+            Date       = new DateOnly(today.Year, today.Month, 1),
+            Amount     = 324.80m,
+            AccountId  = card.Id,
+            CategoryId = HousingCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        (snapshot.SafeToSpend ?? 0m).Should().Be(baselineSafe - 324.80m,
+            "an outstanding balance on a card cleared in full each cycle is money already owed");
+    }
+
+    /// <summary>
+    /// An amortising loan is repaid by instalments, so subtracting its whole balance
+    /// would make the figure permanently negative. Its instalment counts via its
+    /// recurring reminder instead.
+    /// </summary>
+    [Fact]
+    public async Task GetHealthSnapshotAsync_SafeToSpend_IgnoresAmortisingLiabilityBalance()
+    {
+        var baseline = await _service.GetHealthSnapshotAsync();
+        var baselineSafe = baseline.SafeToSpend ?? 0m;
+
+        var loan = new Account
+        {
+            Id                     = Guid.NewGuid(),
+            Name                   = $"Loan {Guid.NewGuid():N}",
+            AccountTypeId          = 2,
+            CurrencyId             = 1,
+            IsActive               = true,
+            LiabilityRepaymentType = "Amortising",
+            InterestRate           = 0.03m
+        };
+        _fixture.Db.Accounts.Add(loan);
+        await _fixture.Db.SaveChangesAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _fixture.Db.Transactions.Add(new Transaction
+        {
+            Id         = Guid.NewGuid(),
+            Date       = new DateOnly(today.Year, today.Month, 1),
+            Amount     = 180000m,
+            AccountId  = loan.Id,
+            CategoryId = HousingCategoryId,
+            CreatedAt  = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        (snapshot.SafeToSpend ?? 0m).Should().Be(baselineSafe,
+            "an amortising loan's principal is not due this cycle; only its instalment is");
+    }
 }
