@@ -43,15 +43,9 @@ dotnet test                                  # run all server tests
 pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on view changes
 ```
 
-**Stale-binary trip-up (2026-05-19).** When `dotnet watch` is running and a separate session does a manual `dotnet build`, watch does NOT auto-restart the running app — it only restarts on `.cs` file changes since _its_ last scan. The DLL on disk gets ahead of the process in memory, exception stack traces report line numbers from the OLD source, and "I restarted the server" produces no observable change. Detect by comparing `ls -la ProjectCeres/bin/Debug/net10.0/ProjectCeres.dll` against `ps aux | grep "bin/Debug/net10.0/ProjectCeres"` start time; if the DLL is newer, `kill -9 <pid>` and `touch ProjectCeres/<any-source>.cs` to force watch to rebuild + relaunch.
+**Stale-artifact trip-ups.** Both halves of the stack can silently serve old code: `dotnet watch` keeps running a process whose DLL has moved on, and the SPA falls back to the last-built bundle in `wwwroot/dist/` whenever no Vite process is running (`dotnet watch` never rebuilds the SPA — only `pnpm build` does). Neither raises an error, and the source file on disk looks correct. Symptoms, detection commands, and fixes: `docs/runbooks/local-dev-troubleshooting.md`.
 
-**Stale-SPA-bundle trip-up (2026-08-22).** The frontend twin of the above, and it looks identical to "my change didn't work". In Development, `/dist/*` requests are routed to the Vite dev server (`Program.cs` ~L662, `MapWhen(IsViteRequest)`). **If no Vite process is running, those requests fall through to the static files in `ProjectCeres/wwwroot/dist/` instead** — whatever was last built there, possibly days old. `dotnet watch` does not rebuild the SPA; only `pnpm build` does. The page renders stale React with no error, no warning, and a correct-looking source file on disk.
-
-Detect: `curl -sk https://localhost:7081/ | grep -oE 'razorAppEntry-[A-Za-z0-9_-]+\.js'` and compare against `ls -la ProjectCeres/wwwroot/dist/assets/`; then `pgrep -fl "node.*vite"` — no match means the bundle is being served from disk. (Use `pgrep`, not `ps aux | grep vite`: the latter matches its own shell invocation and reports a false positive.) Confirm by grepping the served asset for the string you changed.
-
-Two fixes: run `pnpm --dir ProjectCeres.Client dev` alongside `dotnet watch` so Vite serves live modules with hot reload (preferred — this is what the `MapWhen` branch exists for), or after frontend edits re-run `pnpm --dir ProjectCeres.Client build` and copy `ProjectCeres.Client/dist/.` into `ProjectCeres/wwwroot/dist/`. The output filename is content-hashed, so once rebuilt a plain reload picks it up — no cache-buster needed.
-
-**Before reporting any frontend change as done, confirm the running app is serving it** — not just that the source file contains it.
+**Before reporting any change as done, confirm the running app is serving it** — not just that the source file contains it.
 
 ## When the Stop hook actually fires
 
@@ -123,6 +117,7 @@ Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able fr
 - `docs/design-system.md` — React client design system: tokens, primitives, recipes. Source of truth for UI look-and-feel.
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
+- `docs/runbooks/` — operational procedures and troubleshooting. `local-dev-troubleshooting.md` (stale binary / stale SPA bundle), `email-dns-setup.md` (Stage 16 SPF/DKIM/DMARC).
 - `.claude/skills/playbook/references/constitution.md` — the eight-phase routing matrix the session is gated by. Source of truth for HARD/advisory phases and their required chains.
 - `~/.claude/projects/<project-slug>/memory/MEMORY.md` — index of pinned `feedback_*` / `project_*` / `reference_*` memory entries. Auto-loaded on session start, but truncated past ~200 lines; the topic files it points to are not.
 - When an open question in any planning doc (`docs/planning.md`, `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md`) is resolved, remove it from Open Questions, mark it `[x]`, and append it to `docs/planning-resolved.md`. If the decision is architectural, execute the sync-docs skill.
