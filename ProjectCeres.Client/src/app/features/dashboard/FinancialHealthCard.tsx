@@ -143,7 +143,7 @@ function SpendableEquation({ data }: { data: HealthDto }) {
       </div>
       {hasLater && (
         <EquationRow
-          label="Bills later this month"
+          label="Bills later this cycle"
           value={<Numeric>−{sym} {(data.laterBills ?? 0).toFixed(2)}</Numeric>}
         />
       )}
