@@ -544,6 +544,7 @@ builder.Services.AddScoped<ITransferDetectionService, TransferDetectionService>(
 builder.Services.AddScoped<ITransferReviewService, TransferReviewService>();
 builder.Services.AddScoped<IImportStagedTransactionService, ImportStagedTransactionService>();
 builder.Services.AddScoped<IHeaderDetectionService, HeaderDetectionService>();
+builder.Services.AddScoped<ProjectCeres.Admin.AdminRoleService>();
 builder.Services.AddViteServices();
 
 // Development-only bootstrap tool: creates the first user + remaps sentinel-tagged data.
