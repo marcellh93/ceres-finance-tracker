@@ -12,6 +12,7 @@ using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -40,6 +41,8 @@ public class AuditLogIntegrationTests : IAsyncLifetime
             await db.EmailChangeTokens.IgnoreQueryFilters().Where(t => t.UserId == u.Id).ExecuteDeleteAsync();
             await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
             await db.TotpReplayEntries.IgnoreQueryFilters().Where(r => r.UserId == u.Id).ExecuteDeleteAsync();
+            // Purge owned rows first: deleting the user cascades nothing.
+            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
             await um.DeleteAsync(u);
         }
         await db.FailedLoginAttempts

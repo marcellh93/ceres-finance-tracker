@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -34,7 +35,10 @@ public class SpaCsrfContractTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith(EmailSuffix)).ToList())
         {
-            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            // Deleting the user cascades nothing — Categories/Accounts carry a bare
+            // UserId with no FK to AspNetUsers — so purge the owned rows first or
+            // registration's seeded categories are stranded permanently.
+            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
             await um.DeleteAsync(u);
         }
     }

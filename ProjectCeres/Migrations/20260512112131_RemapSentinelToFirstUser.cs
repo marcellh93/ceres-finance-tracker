@@ -21,6 +21,24 @@ namespace ProjectCeres.Migrations
     /// LockoutUnlockToken, UserBlockedIp, UserMfaBackupCode, TotpReplayEntry,
     /// FailedLoginAttempt) are intentionally NOT touched — they were created after
     /// Stage 6 with real user ids and never held sentinel data.
+    ///
+    /// KNOWN SIDE EFFECT — duplicate categories (observed 2026-08-22).
+    /// The pre-check only asserts that exactly one user exists; it does not check
+    /// whether that user ALREADY has categories. If the user registered before this
+    /// migration ran, CategorySeedService has already copied the 26 defaults to them
+    /// with fresh GUIDs, and this remap then hands them the 26 sentinel-owned
+    /// originals (fixed ids 20000000-…) as well — every default category appears
+    /// twice. It happened on the dev database: the user registered 2026-05-16, the
+    /// migration applied afterwards, and 26 duplicates showed up in the Categories UI.
+    ///
+    /// The transaction-carrying copy is always the sentinel one, because pre-existing
+    /// Phase 1/2 transactions were already attached to those ids — so the runtime-seeded
+    /// twins are unreferenced and safe to delete. Cleanup on dev was exactly that.
+    ///
+    /// This migration is one-shot and already applied everywhere it matters, so it will
+    /// not recur on existing databases. It CAN recur on a database rebuilt from scratch
+    /// if a user registers before `dotnet ef database update` runs. Migrate first, then
+    /// register.
     /// </summary>
     public partial class RemapSentinelToFirstUser : Migration
     {

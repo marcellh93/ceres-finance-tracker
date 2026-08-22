@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
@@ -22,6 +23,8 @@ public class MfaBackupCodeRaceTests : IAsyncLifetime
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@bc-race-test.local")).ToList())
         {
             await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+            // Purge owned rows first: deleting the user cascades nothing.
+            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
             await um.DeleteAsync(u);
         }
     }

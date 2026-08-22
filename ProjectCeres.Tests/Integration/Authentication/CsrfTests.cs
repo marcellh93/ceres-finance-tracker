@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -28,6 +29,8 @@ public class CsrfTests : IAsyncLifetime
         foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@csrf-test.local")).ToList())
         {
             await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+            // Purge owned rows first: deleting the user cascades nothing.
+            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
             await um.DeleteAsync(u);
         }
     }

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -24,6 +25,8 @@ public class TotpReplayDuringLockoutTests : IAsyncLifetime
             await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
             await db.TotpReplayEntries.IgnoreQueryFilters().Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
+            // Purge owned rows first: deleting the user cascades nothing.
+            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
             await um.DeleteAsync(u);
         }
     }

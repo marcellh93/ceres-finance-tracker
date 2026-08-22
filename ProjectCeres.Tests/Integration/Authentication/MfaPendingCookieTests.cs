@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
@@ -25,6 +26,8 @@ public class MfaPendingCookieTests : IAsyncLifetime
         {
             await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
             await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
+            // Purge owned rows first: deleting the user cascades nothing.
+            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
             await um.DeleteAsync(u);
         }
         await db.FailedLoginAttempts.Where(e => e.EmailAttempted!.EndsWith("@mfa-cookie-test.local"))
