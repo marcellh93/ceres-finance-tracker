@@ -919,4 +919,21 @@ public class ArchitectureTests
             "HttpContextCurrentUserAccessor resolve the request as UserContext.PreAuth instead of " +
             "Background, which keeps the RowLevelSecurityInterceptor's diagnostic clean.");
     }
+
+    [Fact]
+    public void Admin_namespace_is_allow_listed_for_IgnoreQueryFilters()
+    {
+        // ADR-0065 reserves Admin/ as the only namespace permitted to bypass the
+        // per-user query filter. Stage 15.6 is the first code to live there, so this
+        // pins that a file under Admin/ is accepted while the boundary still holds
+        // for every other namespace.
+        var repoRoot = FindRepoRoot();
+        var adminDir = Path.Combine(repoRoot, "ProjectCeres", "Admin");
+
+        Directory.Exists(adminDir).Should().BeTrue(
+            "ProjectCeres/Admin/ is the namespace ADR-0065 reserves for cross-user queries");
+
+        File.Exists(Path.Combine(adminDir, "README.md")).Should().BeTrue(
+            "the boundary needs a stated contract, not just a directory");
+    }
 }
