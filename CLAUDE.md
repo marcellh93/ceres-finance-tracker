@@ -45,6 +45,14 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 
 **Stale-binary trip-up (2026-05-19).** When `dotnet watch` is running and a separate session does a manual `dotnet build`, watch does NOT auto-restart the running app — it only restarts on `.cs` file changes since _its_ last scan. The DLL on disk gets ahead of the process in memory, exception stack traces report line numbers from the OLD source, and "I restarted the server" produces no observable change. Detect by comparing `ls -la ProjectCeres/bin/Debug/net10.0/ProjectCeres.dll` against `ps aux | grep "bin/Debug/net10.0/ProjectCeres"` start time; if the DLL is newer, `kill -9 <pid>` and `touch ProjectCeres/<any-source>.cs` to force watch to rebuild + relaunch.
 
+**Stale-SPA-bundle trip-up (2026-08-22).** The frontend twin of the above, and it looks identical to "my change didn't work". In Development, `/dist/*` requests are routed to the Vite dev server (`Program.cs` ~L662, `MapWhen(IsViteRequest)`). **If no Vite process is running, those requests fall through to the static files in `ProjectCeres/wwwroot/dist/` instead** — whatever was last built there, possibly days old. `dotnet watch` does not rebuild the SPA; only `pnpm build` does. The page renders stale React with no error, no warning, and a correct-looking source file on disk.
+
+Detect: `curl -sk https://localhost:7081/ | grep -oE 'razorAppEntry-[A-Za-z0-9_-]+\.js'` and compare against `ls -la ProjectCeres/wwwroot/dist/assets/`; then `pgrep -fl "node.*vite"` — no match means the bundle is being served from disk. (Use `pgrep`, not `ps aux | grep vite`: the latter matches its own shell invocation and reports a false positive.) Confirm by grepping the served asset for the string you changed.
+
+Two fixes: run `pnpm --dir ProjectCeres.Client dev` alongside `dotnet watch` so Vite serves live modules with hot reload (preferred — this is what the `MapWhen` branch exists for), or after frontend edits re-run `pnpm --dir ProjectCeres.Client build` and copy `ProjectCeres.Client/dist/.` into `ProjectCeres/wwwroot/dist/`. The output filename is content-hashed, so once rebuilt a plain reload picks it up — no cache-buster needed.
+
+**Before reporting any frontend change as done, confirm the running app is serving it** — not just that the source file contains it.
+
 ## When the Stop hook actually fires
 
 The Stop hook (`.claude/hooks/run-tests.sh`) is the project's `dotnet test` gate. Three facts to keep straight, because earlier drafts of Phase 3 specs got them wrong:
