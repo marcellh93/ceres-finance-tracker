@@ -38,10 +38,14 @@ public class UserOwnedModelTests
         names.Should().NotContain("EmailDeliveryEvents");
     }
 
+    // A deliberate count pin: adding a user-owned entity must fail this test so the
+    // author consciously confirms the new table reached every registry (RLS policy
+    // migration, query filter, cleanup) rather than only the DbSet.
+    // 25 -> 26: SupportTickets (Stage 12.5).
     [Fact]
-    public void RlsTables_has_exactly_25_entries()
+    public void RlsTables_has_exactly_26_entries()
     {
-        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(25);
+        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(26);
     }
 
     [Fact]

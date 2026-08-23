@@ -24,6 +24,9 @@ public static class UserOwnedModel
         "UserSessions", "UserBlockedIps", "UserMfaBackupCodes", "TotpReplayEntries",
         "PasswordResetTokens", "EmailChangeTokens", "LockoutUnlockTokens",
         "AuditLogs", "EmailConfirmationTokens",
+        // SupportTickets: created in Stage 12.5, long after the Phase 1/2 sentinel
+        // era, so it can never hold sentinel rows for the dev-seed remap to move.
+        "SupportTickets",
     };
 
     /// <summary>Every user-owned table that must carry an RLS policy.</summary>
