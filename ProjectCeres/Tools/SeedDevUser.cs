@@ -36,7 +36,8 @@ namespace ProjectCeres.Tools;
 /// </para>
 ///
 /// <para>
-/// Exit codes: 0 ok | 1 user-create fail | 2 env gate | 3 remap pre-check | 4 remap post-check | 5 CLI validation.
+/// Exit codes: 0 ok | 1 user-create fail | 2 env gate | 3 remap pre-check | 4 remap post-check
+/// | 5 CLI validation | 6 admin-grant fail (the account exists and is usable; only the role is missing).
 /// </para>
 /// </summary>
 public static class SeedDevUser
@@ -191,8 +192,11 @@ public static class SeedDevUser
             var granted = await adminRoles.GrantAsync(userId);
             if (!granted)
             {
-                Console.Error.WriteLine("[SeedDevUser] ERROR: could not grant the Admin role.");
-                return 1;
+                // Exit 6, not 1: the account exists and is usable, only the role is missing.
+                // A retry needs to grant the role, not re-create the account.
+                Console.Error.WriteLine(
+                    $"[SeedDevUser] ERROR: account {parsed.Email} exists but the Admin role could not be granted.");
+                return 6;
             }
             Console.WriteLine($"[SeedDevUser] Granted Admin to {parsed.Email}.");
         }
