@@ -157,9 +157,13 @@ export function SessionsPage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {sessions?.length === 1
-                ? '1 active session'
-                : `${sessions?.length ?? 0} active sessions`}
+              {/* `?? 0` here would announce "0 active sessions" while the list
+                  is still loading, contradicting the body directly below it. */}
+              {sessions === undefined
+                ? 'Active sessions'
+                : sessions.length === 1
+                  ? '1 active session'
+                  : `${sessions.length} active sessions`}
             </CardTitle>
           </CardHeader>
           <CardContent>

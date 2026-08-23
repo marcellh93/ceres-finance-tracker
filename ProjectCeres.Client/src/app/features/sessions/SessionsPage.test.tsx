@@ -82,6 +82,20 @@ describe('SessionsPage', () => {
     expect(screen.getByRole('button', { name: 'Revoke' })).toBeInTheDocument();
   });
 
+  // Found by the 375px evidence screenshot: the card title used `?? 0`, so it
+  // announced "0 active sessions" while the list was still loading — directly
+  // contradicting the body beside it, which correctly waited for data.
+  it('does not claim zero sessions while still loading', async () => {
+    let resolve!: (v: unknown) => void;
+    apiFetch.mockReturnValue(new Promise((r) => { resolve = r; }));
+    renderPage();
+
+    expect(screen.queryByText('0 active sessions')).not.toBeInTheDocument();
+
+    resolve({ ok: true, status: 200, data: [session()] });
+    expect(await screen.findByText('1 active session')).toBeInTheDocument();
+  });
+
   it('shows an empty state when no sessions come back', async () => {
     apiFetch.mockResolvedValue({ ok: true, status: 200, data: [] });
     renderPage();
