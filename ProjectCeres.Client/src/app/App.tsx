@@ -25,6 +25,7 @@ import { TransactionHistory } from './features/reports/TransactionHistory';
 // main app chunk thin (Phase 2 budget breach 2026-05-18).
 const Security = lazy(() => import('./pages/Security').then((m) => ({ default: m.Security })));
 import { Settings } from './pages/Settings';
+import { Sessions } from './pages/Sessions';
 import { Support } from './pages/Support';
 import { AccountCreate } from './features/accounts/AccountCreate';
 import { AccountEdit } from './features/accounts/AccountEdit';
@@ -120,6 +121,7 @@ export function App() {
           <Route path="transaction-history" element={<TransactionHistory />} />
         </Route>
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/sessions" element={<Sessions />} />
         <Route path="support" element={<Support />} />
         <Route path="profile" element={<Profile />} />
         <Route

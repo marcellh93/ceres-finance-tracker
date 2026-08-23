@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -113,6 +115,23 @@ export function SettingsPage() {
           </Card>
         )}
       </DataTransition>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Security</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-muted-foreground text-sm">
+            Review the devices signed in to your account and revoke any you don&apos;t recognise.
+          </p>
+          <Link
+            to="/settings/sessions"
+            className={cn(buttonVariants({ variant: 'outline' }), 'shrink-0')}
+          >
+            Active sessions
+          </Link>
+        </CardContent>
+      </Card>
     </PageShell>
   );
 }

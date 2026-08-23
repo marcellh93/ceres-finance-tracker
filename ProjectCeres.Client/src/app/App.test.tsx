@@ -54,6 +54,7 @@ const routes: Array<{ path: string; expectedHeading: string }> = [
   { path: '/budgets',      expectedHeading: 'Budgets' },
   { path: '/reports/net-worth-over-time', expectedHeading: 'Net Worth Over Time' },
   { path: '/settings',     expectedHeading: 'Settings' },
+  { path: '/settings/sessions', expectedHeading: 'Active sessions' },
   { path: '/support',      expectedHeading: 'Support' },
   { path: '/profile',      expectedHeading: 'Profile' },
   { path: '/security',     expectedHeading: 'Security' },
