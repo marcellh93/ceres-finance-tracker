@@ -23,7 +23,8 @@ namespace ProjectCeres.Migrations
     /// nowhere to put it in the model. Postgres has no such restriction, so the
     /// constraint is declared directly — the same approach this project already uses for
     /// RLS policies. The EF model therefore still describes single-column FKs; the
-    /// DATABASE is the authority here, and DatabaseConstraintTests asserts against
+    /// DATABASE is the authority here, and ParityTests'
+    /// Attachment_fks_are_scoped_to_the_parent_owner_in_the_database asserts against
     /// pg_constraint rather than the model for exactly that reason.
     ///
     /// Pre-flight: aborts if any attachment already points at a movement owned by
