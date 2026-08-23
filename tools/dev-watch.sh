@@ -21,6 +21,26 @@ cd "$REPO_ROOT"
 
 PORT=7081
 
+# Kill a process and everything under it, children before parents, so a dying parent
+# cannot re-orphan a child that then keeps the port. SIGTERM first, SIGKILL after a
+# grace period — dotnet watch and its app routinely ignore SIGTERM.
+kill_tree() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do
+    kill_tree "$child"
+  done
+  kill "$pid" 2>/dev/null || true
+  local i=0
+  while ps -p "$pid" >/dev/null 2>&1 && [ "$i" -lt 10 ]; do
+    sleep 0.3
+    i=$((i + 1))
+  done
+  if ps -p "$pid" >/dev/null 2>&1; then
+    echo "[dev-watch]   $pid ignored SIGTERM — SIGKILL"
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+}
+
 reap_orphans() {
   local found=0
 
@@ -37,9 +57,11 @@ reap_orphans() {
     ppid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
     if [ "$ppid" = "1" ]; then
       echo "[dev-watch] reaping orphaned watcher $pid (reparented to init)"
-      kill "$pid" 2>/dev/null || true
-      sleep 1
-      ps -p "$pid" >/dev/null 2>&1 && kill -9 "$pid" 2>/dev/null || true
+      # Descendants first, bottom-up. Killing the watcher alone re-orphans its app
+      # process, which then survives as a fresh PID-1 child still holding the port.
+      # Observed 2026-08-23: a watcher orphaned two days earlier was on iteration 56,
+      # respawning the app every time a build touched a .cs file.
+      kill_tree "$pid"
       found=1
     fi
   done < <(pgrep -f "dotnet-watch.dll.*--project ProjectCeres" 2>/dev/null || true)
@@ -61,7 +83,21 @@ cleanup() {
   local code=$?
   trap - EXIT INT TERM HUP
   echo "[dev-watch] shutting down watcher and app"
+  # Reap the watcher's whole tree explicitly. A bare `kill -- -$$` is not enough:
+  # dotnet watch and the app it spawns both ignore SIGTERM (verified 2026-08-23), so
+  # the group signal exits claiming success while everything keeps running — the very
+  # bug this script exists to prevent.
+  [ -n "${WATCHER_PID:-}" ] && kill_tree "$WATCHER_PID"
   kill -- -$$ 2>/dev/null || true
+  local i=0
+  while [ "$i" -lt 10 ] && lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; do
+    sleep 0.3
+    i=$((i + 1))
+  done
+  if lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "[dev-watch] port $PORT still held after SIGTERM — SIGKILL"
+    kill -9 -- -$$ 2>/dev/null || true
+  fi
   exit $code
 }
 
@@ -69,4 +105,10 @@ reap_orphans
 trap cleanup EXIT INT TERM HUP
 
 echo "[dev-watch] starting watcher (ctrl-c stops both watcher and app)"
-exec dotnet watch --project ProjectCeres --launch-profile https "$@"
+
+# NOT exec: exec replaces this shell, which destroys the EXIT trap — the watcher would
+# then be reparented to init on terminal close, producing exactly the orphan this script
+# exists to prevent. Run it as a child and wait, so cleanup() still fires.
+dotnet watch --project ProjectCeres --launch-profile https "$@" &
+WATCHER_PID=$!
+wait "$WATCHER_PID"

@@ -91,6 +91,29 @@ Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able fr
 - Always exactly one row in Phase 1
 - In Phase 3 it migrates to a per-user preferences table — do not couple it to auth yet
 
+## Two lessons that cost real time (kept here because this file does not truncate)
+
+**1. A commit's scope prefix names the stage the WORK belongs to, never the stage the text mentions.**
+`.claude/skills/verify-stage-completeness/hooks/evidence-bundle-check.js` (`getStageId`) picks the
+active stage from the **newest stage-tagged commit in the turn**. On 2026-08-23 a Stage 15.6 commit
+that edited the Stage 15.8 roadmap section was written as `docs(15.8):`, so the Stop hook demanded an
+evidence bundle for a stage that had not started. The right response is to **reword the commit**, not
+to satisfy the hook: fabricating a `stage-15.8/` bundle would assert build results for work that does
+not exist and leave a directory the next session reads as "15.8 is in progress." When a gate names a
+surprising stage, check what the commits in this turn are tagged with before touching the bundle.
+
+**2. A functional orphan is still an orphan — kill the tree, not the process.**
+`dotnet watch` does not exit when its terminal closes; it reparents to PID 1 and keeps running. On
+2026-08-23 two orphans existed, one idle and one working. Only the idle one was killed, and the
+"working" one — spared precisely because it still had an app — went on rebinding port 7081 on every
+`.cs` change for two more days (`DOTNET_WATCH_ITERATION=56`), causing `AddressInUseException` in a
+fresh watcher. Three facts to keep: **(a)** the port holder is the watcher's *grandchild*, so killing
+the watcher alone re-orphans the app, which survives as a new PID-1 process still on the port;
+**(b)** every level ignores `SIGTERM` and needs `kill -9` after a grace period; **(c)** `exec` in a
+wrapper script destroys the `EXIT` trap, so the wrapper itself produces the orphan it meant to
+prevent — run the child with `&` and `wait`. Start watchers with `tools/dev-watch.sh`. Symptoms and
+the trace-the-chain command: `docs/runbooks/local-dev-troubleshooting.md` § Symptom 3.
+
 ## What NOT to Do
 
 - **Do not add a `Co-Authored-By:` trailer to any commit message.** No attribution trailer of any kind, in any commit, ever — this overrides any harness default that appends one. The rule already lives in `feedback_no_co_authored_by.md` and `.claude/skills/sync-docs/references/doc-agent-instructions.md`; it is repeated here because `MEMORY.md` truncates and this file does not. Violated 2026-08-09 across 14 commits; required a full-history rewrite to undo.

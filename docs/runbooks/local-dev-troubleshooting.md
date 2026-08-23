@@ -123,15 +123,39 @@ pgrep -f "dotnet-watch.dll.*--project ProjectCeres" | while read -r p; do
 done
 ```
 
+**An orphaned watcher that still has an app is worse, not better.** It keeps
+rebuilding and rebinding port 7081 every time any `.cs` file changes — including
+from a `dotnet build` or `dotnet test` run in another terminal. Observed
+2026-08-23: a watcher orphaned two days earlier was on `DOTNET_WATCH_ITERATION=56`
+and had re-taken the port seconds before a fresh `dotnet watch` tried to start,
+producing `AddressInUseException` from a process the user could not see. **A
+functional orphan is still an orphan — do not spare it.**
+
+Trace the whole chain before killing anything, because the port holder is a
+grandchild, not the watcher:
+
+```bash
+# Walk up from whatever holds the port.
+p=$(lsof -nP -tiTCP:7081 -sTCP:LISTEN | head -1)
+while [ -n "$p" ] && [ "$p" != "1" ]; do
+  ps -o pid=,ppid=,command= -p "$p" | cut -c1-110
+  p=$(ps -o ppid= -p "$p" | tr -d ' ')
+done
+```
+
+Kill children before parents. Killing the watcher alone **re-orphans its app**,
+which survives as a new PID-1 process still holding the port. All three levels
+routinely ignore `SIGTERM` and need `kill -9`.
+
 **Fix — and prevent it recurring:** start the watcher through
 
 ```bash
 tools/dev-watch.sh
 ```
 
-It reaps orphaned watchers and port squatters before starting, and kills its own
-process group on exit so neither the watcher nor the app can outlive the terminal.
-Note it reaps *every* orphaned watcher for this project, including one that is
+It reaps orphaned watcher *trees* before starting, and tears its own tree down on
+exit — children first, escalating to `SIGKILL`, then verifying the port is actually
+free. Note it reaps *every* orphaned watcher for this project, including one that is
 still working — if you have a watcher you want to keep, stop it yourself first.
 
 ## Related
