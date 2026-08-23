@@ -1,6 +1,8 @@
 # ADR-0028 — Admin Dashboard: ASP.NET Core Area with Immutable Audit Log (Phase 3)
 
-**Status:** Accepted
+**Status:** Accepted — **gating mechanism superseded by [ADR-0080](ADR-0080-admin-gating-via-live-role-policy.md)**
+
+> **Superseded in part (2026-08-23).** The Area-plus-`[Authorize(Roles = "Admin")]` gating described below is obsolete: no Razor views remain, so there is no area to group, and role claims baked into the auth cookie are never re-issued mid-session — a revoked admin would keep access until the cookie expired. Admin surfaces are now `api/admin/*` controllers gated by a class-level `[RequireAdmin]` policy that checks the role live. See ADR-0080. **The audit-log requirement, the list of admin actions, and the isolation principle below all stand unchanged.**
 
 **Context:**
 

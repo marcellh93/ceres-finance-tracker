@@ -195,9 +195,10 @@ A `pg_dump` precedes the migration. The migration asserts afterwards that every
 | 2 — Category model | `OwnerUserId`, `UserCategories`, in-place conversion, RLS rewrite, read-path changes across 17 call sites in 5 files, archive-rule relaxation | **Highest** |
 | 3 — Catalogue management | Admin screen for global categories, collision detection, merge prompt and merge execution | Medium |
 
-Landing before Stage 15.5 so the onboarding wizard is built against the final
-shape. Onboarding does not list categories, but its opening-balance step uses the
-global "Opening Balance" row.
+Landing as Stages 15.6–15.8, after the onboarding wizard. Onboarding does not list
+categories — its steps are preferences, accounts and opening balance — so it is
+unaffected by the catalogue change beyond using the global "Opening Balance" row,
+which survives the conversion unchanged.
 
 ## Testing
 

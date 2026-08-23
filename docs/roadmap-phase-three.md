@@ -37,8 +37,11 @@
 19. [Stage 14 — HTTP security headers + CORS (Batch 5)](#stage-14--http-security-headers--cors-batch-5)
 20. [Stage 15 — Identity masking, HMAC `UserRef` (Batch 5)](#stage-15--identity-masking-hmac-userref-batch-5)
 21. [Stage 15.5 — Onboarding wizard (Batch 5)](#stage-155--onboarding-wizard-batch-5)
-22. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
-23. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
+22. [Stage 15.6 — Admin capability (Batch 5)](#stage-156--admin-capability-batch-5)
+23. [Stage 15.7 — Global category catalogue + per-user overlay (Batch 5)](#stage-157--global-category-catalogue--per-user-overlay-batch-5)
+24. [Stage 15.8 — Admin screen + collision merge (Batch 5)](#stage-158--admin-screen--collision-merge-batch-5)
+25. [Stage 16 — Hosting + ops (Batch 5)](#stage-16--hosting--ops-batch-5)
+26. [Master pre-launch verification checklist](#master-pre-launch-verification-checklist)
 
 ---
 
@@ -1802,6 +1805,100 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] All form inputs meet 44×44px touch-target minimum on mobile
 - [ ] Per-account opening-balance step on mobile lists each account vertically (no horizontal table on small screens)
 - [ ] Step 5 net-worth display per-currency breakdown wraps cleanly on mobile when 2+ currencies present
+
+---
+
+## Stage 15.6 — Admin capability (Batch 5)
+
+**Status: 🟡 Code complete 2026-08-23, one manual verification outstanding.** All six sub-stages are implemented, reviewed and green; the single open checklist item is the `--admin` bootstrap run, which needs a human because the seed tool builds a full application host and cannot be exercised by an integration test. Flip to ✅ once that run is confirmed. First of three stages delivering the shared category catalogue — Stages 15.7 and 15.8 both depend on the role and the namespace boundary established here.
+
+> **Goal:** an account can hold an `Admin` role; admin-only surfaces are enforced; the `Admin/` namespace that `ADR-0065` reserves for cross-user queries exists and is guarded by an architecture test.
+
+### Sub-stages
+
+| # | Sub-stage | Reference |
+|---|---|---|
+| 15.6.1 | `AppRoles.Admin` — one declaration of the role name | `docs/superpowers/specs/2026-08-22-shared-category-catalogue-design.md` § Access control |
+| 15.6.2 | `ProjectCeres/Admin/` namespace + README contract; allow-listed in the `IgnoreQueryFilters` architecture test | [ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md) |
+| 15.6.3 | `AdminRoleService` — grant, revoke, is-admin, any-admin-exists, admin-count | (spec, above) |
+| 15.6.4 | `--admin` flag on the seed tool; gate relaxed to "Development, or first admin" | (spec, above) |
+| 15.6.5 | `POST /api/admin/users/{id}/promote` and `/demote`, admin-only | (spec, above) |
+| 15.6.6 | `[RequireAdmin]` + the `AdminLive` policy — live role check, replacing `[Authorize(Roles = ...)]` | [ADR-0080](decisions/ADR-0080-admin-gating-via-live-role-policy.md) |
+
+### Two things that changed during implementation
+
+**`[Authorize(Roles = "Admin")]` does not work in this codebase, and the plan was wrong to specify it.** Role claims are written into the auth cookie at sign-in, and `SessionRevocationValidator` only rejects principals — it never re-issues them. A role granted after login stays invisible until the next sign-in, so every admin created by the promote endpoint would have been refused by the very gate meant to admit them; and a role revoked after login is still honoured until the cookie expires (30 min sliding, 30 days persistent). Admin surfaces are gated by a class-level `[RequireAdmin]` policy that reads the role from the database per request. Class-level rather than per-action because a per-action check is satisfiable by omission — nothing catches a new action that simply forgets it. See [ADR-0080](decisions/ADR-0080-admin-gating-via-live-role-policy.md), which supersedes ADR-0028 on this point only.
+
+**The seed tool's grant had to move.** Three early returns sit between category seeding and the end of `SeedDevUser`, and the zero-sentinel-rows return is the ordinary path on any fresh database — that is, on every real production server. Granting at the end of the method would have created the account, printed success, exited 0, and never granted the role. The grant runs immediately after category seeding, before the sentinel remap. Grant failures exit 6, distinct from exit 1 (user-create failure), because the two need opposite operator recovery: at 1 no account exists, at 6 the account exists and only the role is missing.
+
+### Verification checklist
+
+- [x] `AppRoles.Admin` is the only declaration of the role name — `AppRolesTests`
+- [x] `ProjectCeres/Admin/README.md` states what may live in the namespace
+- [x] The `IgnoreQueryFilters` architecture test allow-lists `Admin/` and still fails for any other namespace — `Admin_namespace_is_allow_listed_for_IgnoreQueryFilters`
+- [x] `AdminRoleService.GrantAsync` is idempotent and returns false for an unknown user — `AdminRoleServiceTests` (9 tests, including the `AnyAdminExistsAsync` and `RevokeAsync` false paths)
+- [x] Promote/demote return 401 anonymous, 403 for a signed-in non-admin, 204 for an admin — `AdminAuthorizationTests`
+- [x] Promoting an unknown account returns 404 — `Promoting_an_unknown_account_is_a_404`
+- [x] Demoting an account that exists but holds no role returns 204, not 404 — `Demoting_a_non_admin_that_exists_is_a_204`
+- [x] The last remaining admin cannot be demoted (409, state unchanged) — `The_last_admin_cannot_be_demoted`
+- [x] An admin can step down once a successor exists — `An_admin_can_step_down_once_another_admin_exists`
+- [x] A role granted after sign-in is honoured on the next request without re-login — `A_role_granted_after_sign_in_takes_effect_without_re_login`
+- [x] The admin gate is declared once at class level; no action opts out — `Every_action_on_the_admin_controller_is_gated_by_the_class_level_policy`
+- [x] Full `dotnet test` green — 1218 server + 50 analyzer tests, 0 failures at `230b1d3`
+- [ ] `--admin` creates the first admin outside Development, and refuses once one exists — **manual verification, owed.** The seed tool builds a full application host and cannot be exercised by an integration test. Run `dotnet run --project ProjectCeres -- --seed-dev-user --email <addr> --generate-password --admin`, then confirm the role landed with a join across `AspNetUsers`/`AspNetUserRoles`/`AspNetRoles`.
+
+### Known gaps carried into Stage 15.8
+
+These were found by the Stage 15.6 security review and deliberately deferred; each has a checkbox in Stage 15.8.
+
+- **Promote and demote write no audit record.** `security-model.md` § Access Control and ADR-0028 both require every admin mutation to write an append-only `AdminAuditLog` row. That entity is documented in `models.md` but does not exist in code, and building it (table, migration, FK, append-only grant, enum) is stage-sized work that 15.6's scope excludes. Exposure: a compromised admin session can promote an account, use it, and demote it, leaving no record. Near-zero risk while there is one admin; it stops being near-zero the moment there is a second.
+- **The last-admin guard is check-then-act.** Two concurrent demotes of two different admins, when exactly two exist, can both pass the guard. Recovery needs shell access to the server. Unreachable without already holding admin.
+- **Neither endpoint requires step-up auth.** Role promotion is not on `security-model.md`'s documented `[RequireRecentAuth]` list, so this is a policy extension rather than a violation — but a stolen admin session currently mints permanent admins with no re-proof of identity.
+
+### Out of scope
+
+Email invitations for accounts that do not exist yet; admin dashboards; user management beyond promotion and demotion; usage statistics. See the spec's Out of scope section.
+
+---
+
+## Stage 15.7 — Global category catalogue + per-user overlay (Batch 5)
+
+**Status: ❌ Pending.** Second of three stages delivering the shared category catalogue. Depends on the `Admin` role and the `Admin/` namespace from Stage 15.6.
+
+> **Goal:** replace today's per-user category row copies with a global catalogue plus a per-user junction table carrying `IsActive` and `NameOverride`. Includes the in-place conversion of existing data and the RLS policy rewrite on a forced-RLS table.
+
+Scope, decisions, and the in-place conversion plan live in `docs/superpowers/specs/2026-08-22-shared-category-catalogue-design.md`. This is the highest-risk stage of the three — it rewrites RLS policies and the per-user query filter, both of which Stage 15.6 deliberately left untouched.
+
+### Verification checklist
+
+- [ ] Plan written and reviewed before any migration is authored
+- [ ] Existing per-user categories convert in place with no reference loss
+- [ ] RLS policy rewrite verified against `ceres_app` with a forced-RLS audit
+- [ ] Full `dotnet test` green
+
+---
+
+## Stage 15.8 — Admin screen + collision merge (Batch 5)
+
+**Status: ❌ Pending.** Third of three stages delivering the shared category catalogue. Depends on Stages 15.6 and 15.7.
+
+> **Goal:** the admin screen where a catalogue is actually managed, plus the merge flow for a global category that collides by name with a user's private one.
+
+### Carried over from Stage 15.6
+
+Each item below was found by the Stage 15.6 security review and deferred with a recorded reason. They land here because this is the stage where role changes gain a UI and become user-visible.
+
+- [ ] **`AdminAuditLog` for privilege changes.** `security-model.md` § Access Control and [ADR-0028](decisions/ADR-0028-admin-dashboard-architecture.md) both require every admin mutation to write an append-only audit row. The entity is specced in `models.md` § AdminAuditLog but does not exist in code. Promote and demote currently write nothing, so a compromised admin session can grant itself help, use it, and revoke it without leaving a trace. Needs the table, migration, FK, append-only INSERT-only grant, and the enum values for `Promote`/`Demote`.
+- [ ] **Close the last-admin check-then-act race.** `AdminUsersApiController.Demote` reads `AdminCountAsync` and then revokes in separate round-trips. Two concurrent demotes of two different admins, when exactly two exist, can both pass the guard and leave zero admins; recovery then requires shell access to the server. Cheapest fix is a serializable transaction spanning the count and the revoke.
+- [ ] **Decide whether promote/demote require step-up auth.** Role promotion is not on `security-model.md`'s documented `[RequireRecentAuth]` list, so adding it is a policy extension, not a bug fix. A stolen admin session currently mints permanent admins with no re-proof of identity.
+- [ ] **Refresh role claims mid-session, or confirm the live check stays.** `SessionRevocationValidator` never re-issues the principal, which is why [ADR-0080](decisions/ADR-0080-admin-gating-via-live-role-policy.md) gates on a per-request database read instead of `[Authorize(Roles = ...)]`. The reauth flow's `RefreshSignInAsync` already rebuilds the principal and could do the same here. If claims refresh lands, revisit ADR-0080 — but note the live check remains stronger for revocation.
+
+### Verification checklist
+
+- [ ] Admin screen lists the catalogue and supports promote/demote
+- [ ] Collision merge prompt is dismissible and non-blocking, per the spec
+- [ ] Every carried-over item above is either shipped or explicitly re-deferred with a reason
+- [ ] Full `dotnet test` green
 
 ---
 
