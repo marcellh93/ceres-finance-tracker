@@ -1309,20 +1309,31 @@ Stores a named set of filter parameters for a specific table, so users can re-ap
 
 Stores user-submitted support requests. Admin management is handled via a separate admin surface.
 
-| Column    | Type     | Constraints  | Notes                                                               |
-|-----------|----------|--------------|---------------------------------------------------------------------|
-| Id        | uuid     | PK           |                                                                     |
-| UserId    | uuid     | FK, NOT NULL | → User (the submitting user)                                        |
-| Subject   | varchar  | NOT NULL     |                                                                     |
-| Message   | text     | NOT NULL     |                                                                     |
-| Status    | varchar  | NOT NULL     | `Open`, `InProgress`, `Resolved`, `Closed`                         |
-| Priority  | varchar  | NOT NULL     | `Low`, `Normal`, `High`, `Urgent`                                   |
-| CreatedAt | datetime | NOT NULL     |                                                                     |
-| UpdatedAt | datetime | NOT NULL     | Stamped on every status or priority change                          |
+*Shipped 2026-08-23 — this table reflects the actual schema, verified against the migration.*
 
-**Email notification:** on creation, an email is sent to the configurable admin address.
+| Column            | Type          | Constraints   | Notes                                                          |
+|-------------------|---------------|---------------|----------------------------------------------------------------|
+| Id                | uuid          | PK            |                                                                |
+| UserId            | uuid          | NOT NULL      | → User (the submitting user). No FK — same as every `IUserOwned` table |
+| Subject           | varchar(200)  | NOT NULL      |                                                                |
+| Message           | varchar(5000) | NOT NULL      | Bounded, not `text` — the column width is the only limit on user-submitted text until the service ships |
+| Status            | integer       | NOT NULL      | `HasConversion<int>()`: `Open`=0, `InProgress`=1, `Resolved`=2, `Closed`=3. **The ordinal is the stored contract** — reordering the enum silently changes the meaning of every existing row |
+| Priority          | integer       | NOT NULL      | `HasConversion<int>()`: `Low`=0, `Normal`=1, `High`=2, `Urgent`=3. Advisory only — nothing routes on it |
+| PrecedingTicketId | uuid          | FK, NULL      | → SupportTicket. The closed ticket this one continues; null for a standalone ticket. `OnDelete: Restrict` |
+| CreatedAt         | datetime      | NOT NULL      |                                                                |
+| UpdatedAt         | datetime      | NOT NULL      | Stamped on every status or priority change                     |
 
-**Deletion rule:** no deletion — tickets are the audit trail of user contact. Status transitions to `Closed` when resolved.
+**Indexes:** `(UserId, CreatedAt)` — serves the "my tickets, newest first" query; `(PrecedingTicketId)` — the FK index.
+
+**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the same migration that creates the table (`20260823084630_AddSupportTickets`). The two are inseparable: `ParityTests` fails and `RlsParityStartupCheck` refuses to boot the moment the entity exists without a matching policy.
+
+**Email notification:** on creation, an email is sent to the configurable admin address (`Email:SupportAddress`). Not yet built — see the Stage 12 roadmap.
+
+**Deletion rule:** no deletion — tickets are the audit trail of user contact.
+
+**Close is final; there is no reopen.** A user may move their own ticket `Open → Closed`, and that is the only transition available to them. Continuing a conversation means filing a **follow-up ticket** — a new ticket with its own Subject and Message, linked to the closed one via `PrecedingTicketId`. Every ticket therefore keeps a single immutable lifecycle and a thread is a chain rather than a reopened record. Decided 2026-08-23; the `Restrict` delete behaviour exists so a follow-up survives the deletion of the ticket it continues.
+
+**Cross-user reference caveat:** PostgreSQL's referential-integrity trigger is not subject to RLS, so the database will accept a `PrecedingTicketId` pointing at another user's ticket. The exposure is bounded to an existence oracle over an unguessable GUID — no ticket content crosses the boundary, because every read passes through both the EF query filter and the policy's `USING` clause. The service enforces same-owner-and-closed; a composite `(Id, UserId)` FK to make it structurally impossible is queued with the service half.
 
 ---
 

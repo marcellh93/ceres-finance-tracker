@@ -49,7 +49,7 @@ Every entity that represents a user's own data must have a direct `UserId` FK. R
 > UserId". That is no longer true: Stage 7.5's RLS migration (Phase A) added a denormalized
 > `UserId` column to the attachment tables, and the auth-internal tables implement `IUserOwned`
 > with their own `UserId` + a `user_isolation` RLS policy. The authoritative user-owned set is
-> now **derived from the EF model** by `UserOwnedModel.RlsTables(model)` (25 tables) — not a
+> now **derived from the EF model** by `UserOwnedModel.RlsTables(model)` (26 tables) — not a
 > hand-list — and is boot-verified by `RlsParityStartupCheck` (Stage 9.5b). See § *Row-Level
 > Security* in `security-model.md`.
 

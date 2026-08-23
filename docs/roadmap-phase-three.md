@@ -1416,7 +1416,7 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 | 12.2 | Per-session revoke action | (above) |
 | 12.3 | IP block toggle from session row | (above) |
 | 12.4 | `/support` SPA page (ticket form + list) | `planning-phase3.md` § Support ticket system |
-| 12.5 | `SupportTicket` entity + service + API endpoints (if not already present) | (above) |
+| 12.5 | `SupportTicket` entity + service + API endpoints. **Entity + RLS migration shipped 2026-08-23** (`cb4a51b`); service and endpoints pending. Scope question open: `SupportTicketAttachment` is specified in the 2026-06-30 design doc but was not built — see that spec's 2026-08-23 amendment | (above) |
 | 12.6 | Admin email notification on new ticket | (above) |
 | 12.7 | **Stage 7.5 follow-up.** When the `SupportTicket` entity ships, mark it `: IUserOwned` (the user-owned set is derived from the EF model by `UserOwnedModel.RlsTables` since Stage 9.5b — `UserOwnedTables.cs` was deleted) AND add an `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + `user_isolation` policy in the same migration. The Stage 7.5 parity test (`ParityTests.UserOwnedModel_RlsTables_match_pg_policies_user_isolation_set`) + the Stage 9.5b `RlsParityStartupCheck` will fail the build / refuse to boot until both halves land. | Stage 7.5 / ADR-0068 / 9.5b |
 | 12.8 | Email-change SPA pages: settings entry point (request form, reauth-gated) + `/app/email-change/confirm` + `/app/email-change/revoke` token pages. The Stage 6.12 API has emailed links to these routes since 2026-05-10 with no React page behind them — confirm dead-ends a legitimate email change; revoke dead-ends a security affordance. Queued 2026-06-11 by the Stage 9.11 audit (deferral gate run; tripwire FIXME at `EmailChangeService.cs:208`). | Stage 9.11 spec § 9 / Stage 6.12 |
@@ -1445,8 +1445,8 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 Server side:
 
-- [ ] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt`
-- [ ] Global query filter applies (only owner sees own tickets)
+- [x] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt` — **plus `PrecedingTicketId`** (nullable self-reference for the follow-up chain; close is final, there is no reopen — see `models.md` § SupportTicket). Shipped 2026-08-23 with its RLS policy in the same migration
+- [x] Global query filter applies (only owner sees own tickets) — derived from `UserOwnedModel.RlsTables`, pinned by `ArchitectureTests.UserOwnedModel_RlsTables_match_HasQueryFilter_registrations`
 - [ ] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). **Corrected 2026-08-23: this was marked `[x]` but nothing shipped** — `EmailTemplateKey` has no `SupportTicketReceived` member and there are no matching resx keys. Lands with the service half of 12.5, using a new `Email:SupportAddress` config key validated at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
 - [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
 

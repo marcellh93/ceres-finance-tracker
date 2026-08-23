@@ -97,6 +97,40 @@ Pure frontend wiring of the shipped Stage 6.12 API. Reuse `PasswordReset.tsx` (S
 
 ## Commit 4 — Support page + SupportTicket + attachments + admin-notify email (12.4–12.7)
 
+> ### ⚠️ Amendment 2026-08-23 — read this before implementing Commit 4
+>
+> The entity + RLS migration half of 12.5 shipped on 2026-08-23 (`cb4a51b`, `f6ec402`,
+> `5304ed5`) **without** reading this spec first. Two divergences exist between what is
+> written below and what is now in the codebase. Both are recorded here so the next
+> session does not "fix" the code back toward a stale document.
+>
+> **1. `SupportTicket.PrecedingTicketId` exists in code and is absent from this spec.**
+> The user decided (2026-08-23, in conversation) that a closed ticket is **never
+> reopened** — closing is final. Continuing a conversation means filing a *follow-up*
+> ticket: a new ticket with its own editable Subject and Message, linked to the closed
+> one by a nullable self-reference. This is a permanent product decision that post-dates
+> this spec, not drift. The FK is `Restrict`, not `Cascade`, so a follow-up survives the
+> deletion of the ticket it continues. The service must enforce that the referenced
+> ticket belongs to the same user and is `Closed`; PostgreSQL's referential-integrity
+> trigger is not subject to RLS, so the database alone will accept a cross-user
+> reference (bounded to an existence oracle — no content leaks).
+>
+> **2. `SupportTicketAttachment` is specified below but NOT built, and its status is
+> UNDECIDED.** The shipped migration creates one table, not two. This is an open scope
+> question for the user, not a settled descope:
+>
+> - **If attachments are in scope**, they need their own entity, their own `user_isolation`
+>   policy, and the `FileAttachmentService` reuse described below. Note they can no longer
+>   share a migration with `SupportTicket` — that one has already run.
+> - **If attachments are descoped**, delete the attachment material from this section and
+>   from the `/support` page description, and drop `GET /api/attachments/support/{id}`.
+>
+> Until the user rules, treat the attachment material below as **proposed, not agreed**.
+>
+> Everything else in this section — the status/priority enums, `201 Created` + `Location`,
+> `AuditLogAction.SupportTicketCreated`, the `SupportTicketReceived` admin-notify template,
+> the four status colours, IDOR-as-404 — stands unchanged and is still to be built.
+
 The only greenfield-backend feature. Two new `IUserOwned` entities → full registry discipline (`feedback_iuserowned_requires_five_registries`).
 
 **Entities:**
