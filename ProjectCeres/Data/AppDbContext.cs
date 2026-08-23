@@ -182,6 +182,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany()
                 .HasForeignKey(t => t.PrecedingTicketId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Alternate key so a child can reference (Id, UserId) rather than Id alone.
+            // See the SupportTicketAttachment config below for why that matters.
+            b.HasAlternateKey(t => new { t.Id, t.UserId });
         });
 
         modelBuilder.Entity<SupportTicketAttachment>(b =>
@@ -192,12 +196,27 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.Property(a => a.StoredPath).HasMaxLength(500).IsRequired();
             b.Property(a => a.ContentType).HasMaxLength(100).IsRequired();
 
-            // Cascade, unlike the ticket self-FK: an attachment has no meaning without
-            // its ticket, and orphaned rows would point at files nothing can reach.
-            // Tickets are not user-deletable, so this only fires on an admin path.
+            // COMPOSITE foreign key on (SupportTicketId, UserId), not SupportTicketId
+            // alone. Postgres runs foreign-key checks and ON DELETE CASCADE through an
+            // internal referential-integrity trigger that RLS does not apply to — FORCE
+            // does not change this. With a single-column FK, user B could attach a row
+            // to user A's ticket (the RLS WITH CHECK pins UserId to the WRITER, and says
+            // nothing about the parent's owner), and A deleting their own ticket would
+            // then silently destroy B's row via the cascade. Both were reproduced against
+            // the real database on 2026-08-23 before this key was added.
+            //
+            // Referencing (Id, UserId) makes the divergence unrepresentable: an
+            // attachment can only ever hang off a ticket with the same owner, so the
+            // RLS-bypassing cascade has nothing to reach that the deleter does not
+            // already own.
+            //
+            // Cascade itself is right, unlike the ticket self-FK's Restrict: an
+            // attachment has no meaning without its ticket, and Restrict would make a
+            // ticket with attachments undeletable.
             b.HasOne(a => a.SupportTicket)
                 .WithMany()
-                .HasForeignKey(a => a.SupportTicketId)
+                .HasForeignKey(a => new { a.SupportTicketId, a.UserId })
+                .HasPrincipalKey(t => new { t.Id, t.UserId })
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

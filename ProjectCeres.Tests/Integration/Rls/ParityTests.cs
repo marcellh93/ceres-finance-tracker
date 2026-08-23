@@ -100,6 +100,49 @@ public class ParityTests
             + "and no extra policies should exist." + hint);
     }
 
+    /// <summary>
+    /// Every user_isolation policy must actually compare UserId against the GUC, with the
+    /// fail-closed NULLIF guard, on BOTH the read and write clause.
+    ///
+    /// The other parity tests match on policy NAME only. A policy called user_isolation
+    /// with a typo'd GUC name, a missing NULLIF, or no WITH CHECK sits on the table, keeps
+    /// relforcerowsecurity true, and passes both of them while isolating nothing. Each new
+    /// table's policy is hand-copied into a fresh migration, so that is a live risk rather
+    /// than a theoretical one.
+    /// </summary>
+    [Fact]
+    public async Task Every_user_isolation_policy_compares_UserId_to_the_guc_fail_closed()
+    {
+        await using var admin = _fixture.CreateAdminContext();
+        var conn = admin.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+
+        var broken = new List<string>();
+        await using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"SELECT tablename, COALESCE(qual,''), COALESCE(with_check,'')
+                                FROM pg_policies WHERE policyname = 'user_isolation' ORDER BY tablename";
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var (table, using_, withCheck) = (reader.GetString(0), reader.GetString(1), reader.GetString(2));
+                foreach (var (clause, text) in new[] { ("USING", using_), ("WITH CHECK", withCheck) })
+                {
+                    if (!text.Contains("\"UserId\"", StringComparison.Ordinal))
+                        broken.Add($"{table}: {clause} does not reference UserId");
+                    else if (!text.Contains("app.current_user_ref", StringComparison.Ordinal))
+                        broken.Add($"{table}: {clause} does not read app.current_user_ref");
+                    else if (!text.Contains("NULLIF", StringComparison.OrdinalIgnoreCase))
+                        broken.Add($"{table}: {clause} lacks the NULLIF fail-closed guard — an empty GUC would raise 22P02 instead of denying");
+                }
+            }
+        }
+
+        broken.Should().BeEmpty(
+            "a user_isolation policy that does not compare UserId to the GUC isolates nothing, "
+            + "yet passes every name-based parity check");
+    }
+
     [Fact]
     public async Task Every_user_owned_table_has_FORCE_RLS_enabled()
     {

@@ -805,13 +805,13 @@ public class ArchitectureTests
         // ConfigureGlobalQueryFilters loops it via a generic helper. This test fails the
         // build if any future user-owned entity slips through without an EF-side filter.
         //
-        // Stage 9.5b / §4.1: the two attachment tables (TransactionAttachment,
-        // TransferAttachment) are in the RLS set but deliberately have NO EF query filter —
-        // they carry no UserId at the EF layer and are scoped via their parent in service
-        // code, then RLS-protected at the DB layer. So they are excluded here. The
-        // FailedLoginAttempt_has_no_global_query_filter test and the UserOwnedModelTests
-        // unit suite pin the surrounding invariants.
-        var attachmentsWithoutEfFilter = new[] { "TransactionAttachments", "TransferAttachments" };
+        // The exclusion list that used to live here was removed on 2026-08-23. It skipped
+        // TransactionAttachments and TransferAttachments on the grounds that they "carry no
+        // UserId at the EF layer and are scoped via their parent in service code". That was
+        // true when written, and Stage 7.5 Phase A superseded it by adding a denormalized
+        // UserId to both — so for roughly fifteen months this test was silently skipping two
+        // tables that do carry filters. Every user-owned table is now checked, which is what
+        // the test claims to do.
         var factory = new AuthTestWebApplicationFactory();
         try
         {
@@ -819,7 +819,6 @@ public class ArchitectureTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             var missing = ProjectCeres.Common.UserOwnedModel.RlsTables(db.Model)
-                .Where(t => !attachmentsWithoutEfFilter.Contains(t.PostgresTableName))
                 .Where(t => !HasFilterOnSelfOrBase(db.Model.FindEntityType(t.EntityType)))
                 .Select(t => t.EntityType.Name)
                 .ToList();

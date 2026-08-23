@@ -61,13 +61,21 @@ public class UserOwnedModelTests
     public void FinanceTables_matches_the_dev_seed_remap_set_exactly()
     {
         // Pins behaviour-preservation for SeedDevUser (Stage 9.5b Task 3): the model-derived
-        // finance subset must equal the 16-table hand-list it replaced, or the dev sentinel
-        // remap would silently start/stop touching a table.
+        // finance subset must equal the hand-list it replaced, or the dev sentinel remap
+        // would silently start/stop touching a table.
+        //
+        // 16 -> 17: SupportTicketAttachments (Stage 12.5). It briefly sat in
+        // AuthInternalTables, which kept this test green — and that was the bug. The set
+        // is not "tables the remap skips"; it is auth machinery. An attachment holding a
+        // user's financial screenshots belongs with its two sibling attachment tables in
+        // the finance set that GDPR erasure, export and quota sweeps iterate. Excluding
+        // it would have hidden those files from every one of them.
         var expected = new[]
         {
             "Accounts", "Budgets", "Categories", "CategoryBudgets", "ImportProfiles",
             "ImportStagedTransactions", "ImportStagedTransfers", "ImportTransferExclusions",
             "LiabilityPayments", "RecurringTransactions", "SavedReports", "Settings",
+            "SupportTicketAttachments",
             "TransactionAttachments", "Transactions", "TransferAttachments", "Transfers",
         };
         var names = UserOwnedModel.FinanceTables(Ctx().Model).Select(t => t.PostgresTableName);
@@ -143,6 +151,44 @@ public class UserOwnedModelTests
 
         parentFk.DeleteBehavior.Should().Be(DeleteBehavior.Cascade,
             "an attachment cannot outlive the ticket it belongs to — the stored file would be unreachable");
+    }
+
+    // The security review's Critical finding, pinned. With a single-column FK, user B
+    // could attach to user A's ticket (the RLS WITH CHECK pins UserId to the WRITER and
+    // says nothing about the parent's owner, and Postgres runs FK checks through an RI
+    // trigger that RLS does not apply to). A deleting their own ticket then destroyed
+    // B's row via the cascade. Both were reproduced against the real database before the
+    // composite key was added, and the same insert now fails with an FK violation.
+    //
+    // Referencing (Id, UserId) is what makes the divergence unrepresentable. A future
+    // change back to a single-column FK reopens a cross-tenant destructive write.
+    [Fact]
+    public void SupportTicketAttachment_fk_is_scoped_to_the_ticket_owner()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportTicketAttachment))!;
+
+        var parentFk = entity.GetForeignKeys()
+            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportTicket));
+
+        parentFk.Properties.Select(p => p.Name).Should().BeEquivalentTo(
+            new[] { nameof(SupportTicketAttachment.SupportTicketId), nameof(SupportTicketAttachment.UserId) },
+            "a single-column FK lets an attachment hang off another user's ticket, which the " +
+            "RLS-bypassing cascade then destroys");
+
+        parentFk.PrincipalKey.Properties.Select(p => p.Name).Should().BeEquivalentTo(
+            new[] { nameof(SupportTicket.Id), nameof(SupportTicket.UserId) });
+    }
+
+    [Fact]
+    public void SupportTicket_exposes_the_alternate_key_the_attachment_fk_needs()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportTicket))!;
+
+        entity.GetKeys().Should().Contain(
+            k => k.Properties.Count == 2
+                 && k.Properties.Any(p => p.Name == nameof(SupportTicket.Id))
+                 && k.Properties.Any(p => p.Name == nameof(SupportTicket.UserId)),
+            "dropping this alternate key would force the attachment FK back to a single column");
     }
 
     [Fact]
