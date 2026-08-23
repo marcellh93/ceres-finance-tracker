@@ -59,4 +59,11 @@ public class AdminRoleService(
         var admins = await userManager.GetUsersInRoleAsync(AppRoles.Admin);
         return admins.Count > 0;
     }
+
+    /// <summary>Number of accounts currently holding Admin.</summary>
+    public async Task<int> AdminCountAsync(CancellationToken ct = default)
+    {
+        if (!await roleManager.RoleExistsAsync(AppRoles.Admin)) return 0;
+        return (await userManager.GetUsersInRoleAsync(AppRoles.Admin)).Count;
+    }
 }
