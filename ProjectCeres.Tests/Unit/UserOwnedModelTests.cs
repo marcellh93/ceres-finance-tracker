@@ -42,11 +42,11 @@ public class UserOwnedModelTests
     // A deliberate count pin: adding a user-owned entity must fail this test so the
     // author consciously confirms the new table reached every registry (RLS policy
     // migration, query filter, cleanup) rather than only the DbSet.
-    // 25 -> 26: SupportTickets (Stage 12.5).
+    // 25 -> 26: SupportTickets (Stage 12.5). 26 -> 27: SupportTicketAttachments (Stage 12.5).
     [Fact]
-    public void RlsTables_has_exactly_26_entries()
+    public void RlsTables_has_exactly_27_entries()
     {
-        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(26);
+        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(27);
     }
 
     [Fact]
@@ -127,6 +127,32 @@ public class UserOwnedModelTests
         ((int)SupportTicketPriority.Normal).Should().Be(1);
         ((int)SupportTicketPriority.High).Should().Be(2);
         ((int)SupportTicketPriority.Urgent).Should().Be(3);
+    }
+
+    // Cascade here, unlike the ticket self-FK: an attachment has no meaning without its
+    // ticket, and an orphaned row would point at a file nothing can reach. The two
+    // behaviours are deliberately opposite, so both are pinned — a future reader
+    // "harmonising" them would silently break one or the other.
+    [Fact]
+    public void SupportTicketAttachment_cascades_from_its_ticket()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportTicketAttachment))!;
+
+        var parentFk = entity.GetForeignKeys()
+            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportTicket));
+
+        parentFk.DeleteBehavior.Should().Be(DeleteBehavior.Cascade,
+            "an attachment cannot outlive the ticket it belongs to — the stored file would be unreachable");
+    }
+
+    [Fact]
+    public void SupportTicketAttachment_path_columns_stay_bounded()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportTicketAttachment))!;
+
+        entity.FindProperty(nameof(SupportTicketAttachment.FileName))!.GetMaxLength().Should().Be(255);
+        entity.FindProperty(nameof(SupportTicketAttachment.StoredPath))!.GetMaxLength().Should().Be(500);
+        entity.FindProperty(nameof(SupportTicketAttachment.ContentType))!.GetMaxLength().Should().Be(100);
     }
 
     [Fact]

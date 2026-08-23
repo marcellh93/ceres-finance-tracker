@@ -26,7 +26,7 @@ public static class UserOwnedModel
         "AuditLogs", "EmailConfirmationTokens",
         // SupportTickets: created in Stage 12.5, long after the Phase 1/2 sentinel
         // era, so it can never hold sentinel rows for the dev-seed remap to move.
-        "SupportTickets",
+        "SupportTickets", "SupportTicketAttachments",
     };
 
     /// <summary>Every user-owned table that must carry an RLS policy.</summary>

@@ -93,6 +93,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<UserBlockedIp> UserBlockedIps => Set<UserBlockedIp>();
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+    public DbSet<SupportTicketAttachment> SupportTicketAttachments => Set<SupportTicketAttachment>();
     public DbSet<UserMfaBackupCode> UserMfaBackupCodes => Set<UserMfaBackupCode>();
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
@@ -181,6 +182,23 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany()
                 .HasForeignKey(t => t.PrecedingTicketId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SupportTicketAttachment>(b =>
+        {
+            b.HasKey(a => a.Id);
+            b.HasIndex(a => a.SupportTicketId);
+            b.Property(a => a.FileName).HasMaxLength(255).IsRequired();
+            b.Property(a => a.StoredPath).HasMaxLength(500).IsRequired();
+            b.Property(a => a.ContentType).HasMaxLength(100).IsRequired();
+
+            // Cascade, unlike the ticket self-FK: an attachment has no meaning without
+            // its ticket, and orphaned rows would point at files nothing can reach.
+            // Tickets are not user-deletable, so this only fires on an admin path.
+            b.HasOne(a => a.SupportTicket)
+                .WithMany()
+                .HasForeignKey(a => a.SupportTicketId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<FailedLoginAttempt>(b =>
@@ -327,7 +345,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     /// concrete subtype, not the abstract root.
     ///
     /// NOT filtered (and why):
-    /// - TransactionAttachment, TransferAttachment: no UserId column; scoped via parent in service code.
+    /// (TransactionAttachment / TransferAttachment / SupportTicketAttachment were once listed
+    ///  here as unfiltered. They are NOT: all three carry a UserId, implement IUserOwned, and are
+    ///  both query-filtered and RLS-protected. Corrected 2026-08-23.)
     /// - FailedLoginAttempt: cross-tenant by design (ADR-0067); retention sweep iterates all rows.
     /// - AccountType, CategoryType, Currency, ReportType: system reference tables.
     /// - AspNet* Identity tables: cross-tenant by definition.
