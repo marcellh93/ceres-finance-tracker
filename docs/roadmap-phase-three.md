@@ -344,12 +344,12 @@ Tier 5 — discretionary: ✅ T5.20/T5.21 shipped 2026-05-09; T5.19 deferred
 
 ### "Feels well done" gut-check — verification checklist
 
-From the same audit doc (§ 15). With all five tiers shipped (T1–T5 done as of 2026-05-09), most boxes are now ticked. Remaining `[ ]` and `[~]` items are deliberately deferred — they tie to features that have no consumer today (Button primitive scale-on-press, opt-in `<Link viewTransition>` for cross-fade page transitions). Reopen if a consumer emerges.
+From the same audit doc (§ 15). With all five tiers shipped (T1–T5 done as of 2026-05-09), most boxes are now ticked. Remaining `[~]` items are deliberately deferred — they tie to features that have no consumer today (opt-in `<Link viewTransition>` for cross-fade page transitions). Reopen if a consumer emerges. The Button press-state item was reopened and ticked 2026-08-23: the primitive does carry an `active:` press nudge, so the note calling it unshipped was out of date.
 
 - [x] No element appears or disappears instantly except in response to typing — skeleton/data cross-fade ships across the SPA via DataTransition
 - [x] No content jumps when data loads — skeleton heights match reality
 - [~] Hovering any button gives visible feedback within 150 ms (uses `duration-200`, fine; partial)
-- [ ] Pressing any button gives a subtle scale/color change (verify Button primitive — Tier 3)
+- [x] Pressing any button gives visible feedback — the Button primitive carries `active:not-aria-[haspopup]:translate-y-px` (a 1px press nudge rather than a scale), compiled into the shipped bundle and used by 76 consumer files. Excludes popup triggers by design.
 - [x] Tab key reveals a clear focus ring on every interactive element
 - [~] Switching themes is smooth, not flashy (T1.1 shipped; T1.5 deliberately not shipped — flip is a clean snap, not flashy)
 - [~] Navigating between pages cross-fades, doesn't snap (T1.3 root rule shipped, dormant until navigation opts in via `<Link viewTransition>` — Tier 3 follow-up)
@@ -898,14 +898,14 @@ Application controls (per `security-model.md` § Layer 2 — Application control
 
 Transactional templates (EN + ES, per `planning-phase3.md` § Localization):
 
-- [ ] Registration confirmation (verify-email link) — Deferred to Stage 9 — Auth SPA pages (no registration call site exists yet).
+- [x] Registration confirmation (verify-email link) — shipped with Stage 9. `AuthController.Register` calls `EmailConfirmationService.IssueAsync` (`AuthController.cs:157`), which composes and sends `EmailTemplateKey.RegistrationConfirmation`. Pinned by `EmailConfirmationUnderRlsTests` ("register issues exactly one confirmation email").
 - [x] Password reset request — template present in `Emails.en.resx` + `Emails.es.resx`; rendered by `EmailComposer` and pinned by `EmailComposerTests.Renders_all_nine_templates_en_and_es` (Theory: 9 templates × 2 cultures = 18 cases).
 - [x] Password changed notification — fires from `PasswordResetService.ConfirmAsync`; template covered by the all-nine-templates Theory above.
 - [x] Email-change verify-new-address link — fires from `EmailChangeService.RequestAsync`; template covered by the all-nine-templates Theory above.
 - [x] Email-change revoke-old-address link — fires from `EmailChangeService.RequestAsync`; template covered by the all-nine-templates Theory above.
-- [ ] TOTP enrolled (security event) — Deferred to Stage 9 — Auth SPA pages (enrolment SPA flow wires the call site).
-- [ ] TOTP disabled (security event) — Deferred to Stage 9 — Auth SPA pages (no disable call site exists yet).
-- [ ] Backup codes regenerated (security event) — Deferred to Stage 9 — Auth SPA pages (the `/api/auth/mfa/backup-codes` regeneration endpoint exists from Stage 6 but currently does not send a notification; wire here).
+- [x] TOTP enrolled (security event) — shipped with Stage 9. `MfaController.EnrollVerify` sends it (`MfaController.cs:103`); pinned by `MfaSecurityEmailTests.EnrollVerify_sends_TotpEnrolled`.
+- [x] TOTP disabled (security event) — shipped with Stage 9. `MfaController.Disable` sends it (`MfaController.cs:153`); pinned by `MfaSecurityEmailTests.Disable_sends_TotpDisabled`.
+- [x] Backup codes regenerated (security event) — shipped with Stage 9. `MfaController.RegenerateBackupCodes` sends it (`MfaController.cs:124`); pinned by `MfaSecurityEmailTests.RegenerateBackupCodes_sends_BackupCodesRegenerated`.
 - [x] Account lockout notification with self-service unlock link — fires from `LockoutUnlockService.IssueAsync`; template covered by the all-nine-templates Theory above. Arg-mapping pinned by `EmailComposerTests.LockoutUnlock_args_map_to_correct_slots`.
 - [ ] New-session alert (when login from previously-unseen IP for that user) — Deferred to Stage 12 — Sessions + Support SPA pages (the session-novelty-detection call site lands there).
 - [ ] GDPR data export ready (with 24-hour authenticated download link) — Deferred to Stage 13 — GDPR baseline (the export job lands there).
@@ -920,9 +920,9 @@ Security event notifications (mandatory regardless of user preferences, per `sec
 - [x] Password-changed email — fires from `PasswordResetService.ConfirmAsync` on success; template + send pinned end-to-end by the Stage 6c.1 password-reset integration tests using `CapturingEmailService`.
 - [x] Email-change-initiated email — fires from `EmailChangeService.RequestAsync` to both the new and old addresses; pinned by the Stage 6.12 `EmailChangeRequestTests`.
 - [x] Email-change-confirmed email — fires from `EmailChangeService.ConfirmAsync` to the old address (notification of the change taking effect); pinned by `EmailChangeConfirmTests`.
-- [ ] TOTP-re-enrolled email — Deferred to Stage 9 — Auth SPA pages.
-- [ ] TOTP-disabled email — Deferred to Stage 9 — Auth SPA pages.
-- [ ] Backup-codes-regenerated email — Deferred to Stage 9 — Auth SPA pages (regeneration endpoint exists; notification wiring lands with the SPA flow).
+- [x] TOTP-re-enrolled email — closed in Stage 9 close-out: resolved by **reusing the `TotpEnrolled` key** (first-enrol and re-enrol share `enroll/verify`), so no separate template was needed. See Stage 9's "Wire TOTP-re-enrolled email" entry.
+- [x] TOTP-disabled email — closed in Stage 9 close-out: `TotpDisabled` wired into `MfaController.Disable`. Pinned by `MfaSecurityEmailTests.Disable_sends_TotpDisabled`.
+- [x] Backup-codes-regenerated email — closed in Stage 9 close-out: `BackupCodesRegenerated` wired into `MfaController.RegenerateBackupCodes`. Pinned by `MfaSecurityEmailTests.RegenerateBackupCodes_sends_BackupCodesRegenerated`.
 - [x] Account-locked-out email — fires from `LockoutUnlockService.IssueAsync` only on the lockout transition (gated by the existing `_loginLocks` semaphore — Stage 6.10's email-DoS defence); pinned by the Stage 6.10 issuance tests.
 - [ ] GDPR-erasure-initiated email — Deferred to Stage 13 — GDPR baseline.
 - [~] All eight emails verified to actually fire in integration tests with test fixtures — four (password-changed, email-change-initiated, email-change-confirmed, account-locked-out) are pinned today via `CapturingEmailService`; the remaining five (new-device/session login, TOTP-re-enrolled, TOTP-disabled, backup-codes-regenerated, GDPR-erasure-initiated) land with the deferred stages above.
