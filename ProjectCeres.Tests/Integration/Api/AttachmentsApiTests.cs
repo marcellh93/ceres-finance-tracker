@@ -139,6 +139,11 @@ public class AttachmentsApiTests : IAsyncLifetime
             {
                 Id = intruderAttId,
                 TransactionId = intruderTxId,
+                // Must match the parent transaction's owner: the FK is composite on
+                // (TransactionId, UserId) since 2026-08-24, so a row whose UserId differs
+                // from its parent's is no longer representable. Without this the
+                // interceptor would stamp the CURRENT user and the insert would fail.
+                UserId = _intruderUserId,
                 FileName = "secret.png",
                 StoredPath = "uploads/intruder/never-served.png",
                 ContentType = "image/png",
@@ -195,6 +200,8 @@ public class AttachmentsApiTests : IAsyncLifetime
             db.TransferAttachments.Add(new TransferAttachment
             {
                 Id = attId, TransferId = trfId,
+                // Must match the parent transfer's owner — see the transaction case above.
+                UserId = _intruderUserId,
                 FileName = "secret.png", StoredPath = "uploads/transfers/intruder/never-served.png",
                 ContentType = "image/png", FileSizeBytes = 100, UploadedAt = DateTime.UtcNow,
             });
@@ -261,6 +268,8 @@ public class AttachmentsApiTests : IAsyncLifetime
             db.TransactionAttachments.Add(new TransactionAttachment
             {
                 Id = intruderAttId, TransactionId = intruderTxId,
+                // Must match the parent transaction's owner — see the download case above.
+                UserId = _intruderUserId,
                 FileName = "do-not-delete.png", StoredPath = "uploads/intruder/keep.png",
                 ContentType = "image/png", FileSizeBytes = 100, UploadedAt = DateTime.UtcNow,
             });
@@ -272,10 +281,15 @@ public class AttachmentsApiTests : IAsyncLifetime
             var res = await _client.DeleteAsync($"/api/transactions/attachments/{intruderAttId}");
             res.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-            // Confirm the intruder row is still in the database.
+            // Confirm the intruder row is still in the database. IgnoreQueryFilters is
+            // required: the row carries the INTRUDER's UserId (the composite FK has
+            // required that since 2026-08-24), so the per-user filter correctly hides it
+            // from this scope. Without the bypass this asserts the filter works, not that
+            // the delete was refused.
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            (await db.TransactionAttachments.AnyAsync(a => a.Id == intruderAttId)).Should().BeTrue();
+            (await db.TransactionAttachments.IgnoreQueryFilters()
+                .AnyAsync(a => a.Id == intruderAttId)).Should().BeTrue();
         }
         finally
         {

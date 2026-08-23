@@ -158,14 +158,22 @@ public class ParityTests
     /// not HasAlternateKey is declared, so a model assertion passes on configurations
     /// that would not produce the constraint. This reads pg_constraint.
     /// </summary>
-    [Fact]
-    public async Task Attachment_fk_is_scoped_to_the_ticket_owner_in_the_database()
+    [Theory]
+    [InlineData("SupportTicketAttachments", "SupportTicketId")]
+    [InlineData("TransactionAttachments", "TransactionId")]
+    [InlineData("TransferAttachments", "TransferId")]
+    public async Task Attachment_fks_are_scoped_to_the_parent_owner_in_the_database(
+        string table, string parentColumn)
     {
         await using var admin = _fixture.CreateAdminContext();
         var conn = admin.Database.GetDbConnection();
         if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
 
         await using var cmd = conn.CreateCommand();
+        var p = cmd.CreateParameter();
+        p.ParameterName = "table";
+        p.Value = table;
+        cmd.Parameters.Add(p);
         // conkey lists the referencing columns; confkey the referenced ones. Resolve both
         // to names so the assertion reads as the invariant rather than as column numbers.
         cmd.CommandText = @"
@@ -178,7 +186,7 @@ public class ParityTests
                       JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = x.attnum),
                    c.confdeltype
               FROM pg_constraint c
-             WHERE c.conrelid = '""SupportTicketAttachments""'::regclass
+             WHERE c.conrelid = quote_ident(@table)::regclass
                AND c.contype = 'f'";
 
         var found = new List<(string Name, string Cols, string RefCols, char OnDelete)>();
@@ -188,10 +196,10 @@ public class ParityTests
                 found.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetChar(3)));
         }
 
-        found.Should().ContainSingle("the attachment has exactly one foreign key, to its ticket");
+        found.Should().ContainSingle($"{table} has exactly one foreign key, to its parent");
         var fk = found[0];
 
-        fk.Cols.Should().Be("SupportTicketId,UserId",
+        fk.Cols.Should().Be($"{parentColumn},UserId",
             "a single-column FK lets an attachment hang off another user's ticket, which the "
             + "RLS-bypassing cascade then destroys");
         fk.RefCols.Should().Be("Id,UserId");
