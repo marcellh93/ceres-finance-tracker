@@ -143,6 +143,61 @@ public class ParityTests
             + "yet passes every name-based parity check");
     }
 
+    /// <summary>
+    /// The attachment FK must be scoped to the ticket's owner IN THE DATABASE, not merely
+    /// in the EF model.
+    ///
+    /// Postgres runs FK checks and ON DELETE CASCADE through a referential-integrity
+    /// trigger that RLS does not apply to. A single-column FK therefore let user B attach
+    /// to user A's ticket, and A deleting their own ticket destroyed B's row — both
+    /// reproduced against this database on 2026-08-23. The composite key is what makes
+    /// that unrepresentable.
+    ///
+    /// The model-level test in UserOwnedModelTests cannot stand in for this one: the
+    /// child's HasPrincipalKey induces the principal key in the runtime model whether or
+    /// not HasAlternateKey is declared, so a model assertion passes on configurations
+    /// that would not produce the constraint. This reads pg_constraint.
+    /// </summary>
+    [Fact]
+    public async Task Attachment_fk_is_scoped_to_the_ticket_owner_in_the_database()
+    {
+        await using var admin = _fixture.CreateAdminContext();
+        var conn = admin.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+
+        await using var cmd = conn.CreateCommand();
+        // conkey lists the referencing columns; confkey the referenced ones. Resolve both
+        // to names so the assertion reads as the invariant rather than as column numbers.
+        cmd.CommandText = @"
+            SELECT c.conname,
+                   (SELECT string_agg(a.attname, ',' ORDER BY x.ord)
+                      FROM unnest(c.conkey) WITH ORDINALITY AS x(attnum, ord)
+                      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = x.attnum),
+                   (SELECT string_agg(a.attname, ',' ORDER BY x.ord)
+                      FROM unnest(c.confkey) WITH ORDINALITY AS x(attnum, ord)
+                      JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = x.attnum),
+                   c.confdeltype
+              FROM pg_constraint c
+             WHERE c.conrelid = '""SupportTicketAttachments""'::regclass
+               AND c.contype = 'f'";
+
+        var found = new List<(string Name, string Cols, string RefCols, char OnDelete)>();
+        await using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+                found.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetChar(3)));
+        }
+
+        found.Should().ContainSingle("the attachment has exactly one foreign key, to its ticket");
+        var fk = found[0];
+
+        fk.Cols.Should().Be("SupportTicketId,UserId",
+            "a single-column FK lets an attachment hang off another user's ticket, which the "
+            + "RLS-bypassing cascade then destroys");
+        fk.RefCols.Should().Be("Id,UserId");
+        fk.OnDelete.Should().Be('c', "cascade — an attachment cannot outlive its ticket");
+    }
+
     [Fact]
     public async Task Every_user_owned_table_has_FORCE_RLS_enabled()
     {

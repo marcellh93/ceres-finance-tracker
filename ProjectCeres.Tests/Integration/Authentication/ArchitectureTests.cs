@@ -824,7 +824,7 @@ public class ArchitectureTests
                 .ToList();
 
             missing.Should().BeEmpty(
-                "Every user-owned RLS table except the attachment tables must have a " +
+                "Every user-owned RLS table must have a " +
                 "HasQueryFilter registration on the EF model (directly or via TPC " +
                 "inheritance). Stage 7.5's RLS parity test catches the migration-side " +
                 "drift; this test catches the EF-side drift. Add the missing entity to " +

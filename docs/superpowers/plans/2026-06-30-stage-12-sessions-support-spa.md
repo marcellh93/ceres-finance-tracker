@@ -336,7 +336,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - Produces: `SupportTicket : IUserOwned { Id, UserId, Subject, Message, Status (enum), Priority (enum), CreatedAt, UpdatedAt }`; `SupportTicketAttachment : IUserOwned { Id, SupportTicketId, UserId, FileName, StoredPath, ContentType, FileSizeBytes, UploadedAt }` + `SupportTicket.Attachments` nav.
 
 - [ ] **Step 1: Write the entities + enums** (no test-first here — schema; the parity test IS the gate). `SupportTicketStatus { Open, InProgress, Resolved, Closed }`, `SupportTicketPriority { Low, Normal, High, Urgent }`.
-- [ ] **Step 2: Add DbSets + OnModelCreating.** `DbSet<SupportTicket> SupportTickets`, `DbSet<SupportTicketAttachment> SupportTicketAttachments`. Configure the attachment FK → ticket (`HasOne(a => a.SupportTicket).WithMany(t => t.Attachments).HasForeignKey(a => a.SupportTicketId).OnDelete(DeleteBehavior.Cascade)`) + index on `SupportTicketId`. Both are `IUserOwned` → the model-derived query filter auto-applies (no manual `HasQueryFilter` needed; `RegisterUserOwnedFilter` loop picks them up). **Update the now-stale comment at `AppDbContext.cs:309`** that says attachments have no UserId/filter (no longer true after the Stage-11 attachment-filter change + this entity).
+- [ ] **Step 2: Add DbSets + OnModelCreating.** `DbSet<SupportTicket> SupportTickets`, `DbSet<SupportTicketAttachment> SupportTicketAttachments`. Configure the attachment FK → ticket (`HasOne(a => a.SupportTicket).WithMany(t => t.Attachments).HasForeignKey(a => new { a.SupportTicketId, a.UserId })
+                .HasPrincipalKey(t => new { t.Id, t.UserId }).OnDelete(DeleteBehavior.Cascade)`) + index on `SupportTicketId`. Both are `IUserOwned` → the model-derived query filter auto-applies (no manual `HasQueryFilter` needed; `RegisterUserOwnedFilter` loop picks them up). **Update the now-stale comment at `AppDbContext.cs:309`** that says attachments have no UserId/filter (no longer true after the Stage-11 attachment-filter change + this entity).
 - [ ] **Step 3: Generate migrations** — `dotnet ef migrations add AddSupportTickets`. Then add a second migration `EnableRlsOnSupportTickets` (or append `migrationBuilder.Sql` to the same) mirroring `20260526054514_EnableRlsOnEmailConfirmationTokens.cs` for BOTH tables:
 
 ```csharp
@@ -376,6 +377,12 @@ migrationBuilder.Sql(@"
 - [ ] **Step 3: Implement.** `SupportTicketService.CreateAsync` inserts with `Status=Open, CreatedAt=UpdatedAt=now`. Attachment methods mirror `UploadForTransferAsync`/`GetTransferAttachmentAsync` — same `ValidateAsync`, same magic-byte path, path `uploads/support/{ticketId}/{guid}{ext}`, `MaxFilesPerTransaction`-equivalent cap. Register DI in `Program.cs`.
 - [ ] **Step 4: Run, verify pass** — ALONE.
 - [ ] **Step 5: Commit** (defer to Task 13).
+
+> **Corrected 2026-08-23.** The attachment FK below was originally specified as a
+> single column. That shape allows a cross-tenant destructive write — Postgres runs FK
+> checks and `ON DELETE CASCADE` through a referential-integrity trigger that RLS does
+> not apply to, so user B can attach to user A's ticket and A deleting it destroys B's
+> row. Reproduced against the real database. It is composite now; do not revert it.
 
 ### Task 12: Support API controller + admin-notify email + EmailTemplateKey/AuditLogAction/resx
 

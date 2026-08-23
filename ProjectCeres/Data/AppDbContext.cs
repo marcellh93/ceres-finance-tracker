@@ -191,7 +191,11 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         modelBuilder.Entity<SupportTicketAttachment>(b =>
         {
             b.HasKey(a => a.Id);
-            b.HasIndex(a => a.SupportTicketId);
+            // The composite FK below creates (SupportTicketId, UserId), whose leading
+            // column already serves "attachments for this ticket" — so no separate
+            // SupportTicketId index is declared. UserId gets its own because the RLS
+            // policy injects "UserId" = $1 into every query on this table.
+            b.HasIndex(a => a.UserId);
             b.Property(a => a.FileName).HasMaxLength(255).IsRequired();
             b.Property(a => a.StoredPath).HasMaxLength(500).IsRequired();
             b.Property(a => a.ContentType).HasMaxLength(100).IsRequired();

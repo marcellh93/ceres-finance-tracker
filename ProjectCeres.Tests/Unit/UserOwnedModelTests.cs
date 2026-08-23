@@ -25,7 +25,7 @@ public class UserOwnedModelTests
     }
 
     [Fact]
-    public void RlsTables_includes_both_attachment_tables()
+    public void RlsTables_includes_every_attachment_table()
     {
         var names = UserOwnedModel.RlsTables(Ctx().Model).Select(t => t.PostgresTableName).ToList();
         names.Should().Contain(new[] { "TransactionAttachments", "TransferAttachments" });

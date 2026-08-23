@@ -1416,7 +1416,7 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 | 12.2 | Per-session revoke action | (above) |
 | 12.3 | IP block toggle from session row | (above) |
 | 12.4 | `/support` SPA page (ticket form + list) | `planning-phase3.md` § Support ticket system |
-| 12.5 | `SupportTicket` entity + service + API endpoints. **Entity + RLS migration shipped 2026-08-23** (`cb4a51b`); service and endpoints pending. Scope question open: `SupportTicketAttachment` is specified in the 2026-06-30 design doc but was not built — see that spec's 2026-08-23 amendment | (above) |
+| 12.5 | `SupportTicket` entity + service + API endpoints. **Entity + RLS migration shipped 2026-08-23** (`cb4a51b`); service and endpoints pending. `SupportTicketAttachment` shipped 2026-08-23 (`26d2f7f`) after the user ruled attachments in scope, with its FK scoped to the ticket owner (`4795b07`) | (above) |
 | 12.6 | Admin email notification on new ticket | (above) |
 | 12.7 | **Stage 7.5 follow-up.** When the `SupportTicket` entity ships, mark it `: IUserOwned` (the user-owned set is derived from the EF model by `UserOwnedModel.RlsTables` since Stage 9.5b — `UserOwnedTables.cs` was deleted) AND add an `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + `user_isolation` policy in the same migration. The Stage 7.5 parity test (`ParityTests.UserOwnedModel_RlsTables_match_pg_policies_user_isolation_set`) + the Stage 9.5b `RlsParityStartupCheck` will fail the build / refuse to boot until both halves land. | Stage 7.5 / ADR-0068 / 9.5b |
 | 12.8 | Email-change SPA pages: settings entry point (request form, reauth-gated) + `/app/email-change/confirm` + `/app/email-change/revoke` token pages. The Stage 6.12 API has emailed links to these routes since 2026-05-10 with no React page behind them — confirm dead-ends a legitimate email change; revoke dead-ends a security affordance. Queued 2026-06-11 by the Stage 9.11 audit (deferral gate run; tripwire FIXME at `EmailChangeService.cs:208`). | Stage 9.11 spec § 9 / Stage 6.12 |
@@ -1449,6 +1449,14 @@ Server side:
 - [x] Global query filter applies (only owner sees own tickets) — derived from `UserOwnedModel.RlsTables`, pinned by `ArchitectureTests.UserOwnedModel_RlsTables_match_HasQueryFilter_registrations`
 - [ ] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). **Corrected 2026-08-23: this was marked `[x]` but nothing shipped** — `EmailTemplateKey` has no `SupportTicketReceived` member and there are no matching resx keys. Lands with the service half of 12.5, using a new `Email:SupportAddress` config key validated at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
 - [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
+- [ ] **Scope the two older attachment FKs to their owner, as `SupportTicketAttachment` now is.** `TransactionAttachments → Transactions` and `TransferAttachments → Transfers` are single-column FKs with `ON DELETE CASCADE`, and both parents are `IUserOwned`. That is the identical shape that produced a Critical cross-tenant destructive write on `SupportTicketAttachments`: Postgres runs FK checks and cascades through a referential-integrity trigger that RLS is not applied to, so a row can be attached to another user's parent and destroyed when that user deletes it. Verified against the live schema 2026-08-23 — see the table below. Unlike the support case these tables hold real data, so the fix needs a pre-flight query for existing divergent rows before the composite FK can be added. Found by the Stage 12.5 spec review; **the fix there closed the instance, not the class.**
+
+  | Table | FK columns | On delete | Scoped to owner? |
+  |---|---|---|---|
+  | `TransactionAttachments` | `TransactionId` | cascade | ❌ |
+  | `TransferAttachments` | `TransferId` | cascade | ❌ |
+  | `SupportTicketAttachments` | `SupportTicketId, UserId` | cascade | ✅ (Stage 12.5) |
+
 - [ ] **Attachment files must be deleted explicitly, never via the FK cascade.** `SupportTicketAttachment` cascades from its ticket at the database level, and a DB cascade never runs application code — so deleting a ticket removes the rows and strands their files on disk permanently. `FileAttachmentService.DeleteAsync` already deletes the file before the row, which is the pattern any ticket-delete path must follow. Applies to the admin delete path (§ 12.5.2) and to GDPR erasure (Stage 13), where a row-level purge alone leaves user-uploaded screenshots behind. Found 2026-08-23 while documenting the entity.
 
 Tests:
