@@ -173,7 +173,7 @@ The global filter expression resolves `_currentUser.UserId` via `ICurrentUserAcc
 
 **Intentionally NOT filtered:**
 
-- `TransactionAttachment`, `TransferAttachment` — no `UserId` column; service code scopes them via parent (`a.Transaction.UserId == ...`). EF emits two `PendingModelChangesWarning`s about the parent-attachment FK pair being a "required end with a filtered parent"; the warnings are documented inline in `AppDbContext.ConfigureGlobalQueryFilters` and accepted as the cost of the no-UserId-column design.
+- ~~`TransactionAttachment`, `TransferAttachment` — no `UserId` column; service code scopes them via parent.~~ **Superseded.** Stage 7.5 Phase A added a denormalized `UserId` to both; they implement `IUserOwned`, carry global query filters, and are RLS-protected like every other user-owned table. `SupportTicketAttachment` (Stage 12.5) follows the same shape. Corrected 2026-08-23 — the original claim had been stale since Stage 7.5.
 - `FailedLoginAttempt` — cross-tenant by design per [ADR-0067](decisions/ADR-0067-background-job-user-scope-with-iuserscope-and-runner.md); nullable `UserId`; retention sweep iterates all rows.
 - `AccountType`, `CategoryType`, `Currency`, `ReportType` — system reference tables.
 - `AspNetUsers`, `AspNetRoles`, `AspNetUserRoles`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserTokens`, `AspNetRoleClaims` — Identity-managed; cross-tenant by definition.
