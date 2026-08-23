@@ -115,17 +115,20 @@ Pure frontend wiring of the shipped Stage 6.12 API. Reuse `PasswordReset.tsx` (S
 > trigger is not subject to RLS, so the database alone will accept a cross-user
 > reference (bounded to an existence oracle — no content leaks).
 >
-> **2. `SupportTicketAttachment` is specified below but NOT built, and its status is
-> UNDECIDED.** The shipped migration creates one table, not two. This is an open scope
-> question for the user, not a settled descope:
+> **2. `SupportTicketAttachment` — RESOLVED: attachments are IN scope** (user ruling,
+> 2026-08-23). The entity and its own `user_isolation` migration shipped in `26d2f7f`.
+> It could not share the ticket's migration, which had already run, so the entity+policy
+> pairing rule holds within its own migration instead.
 >
-> - **If attachments are in scope**, they need their own entity, their own `user_isolation`
->   policy, and the `FileAttachmentService` reuse described below. Note they can no longer
->   share a migration with `SupportTicket` — that one has already run.
-> - **If attachments are descoped**, delete the attachment material from this section and
->   from the `/support` page description, and drop `GET /api/attachments/support/{id}`.
+> One deliberate difference from `SupportTicket`: the attachment's parent FK is
+> **`Cascade`**, not `Restrict`. An attachment has no meaning without its ticket and an
+> orphaned row would point at a file nothing can reach — whereas a follow-up ticket is an
+> independent record that must survive. The two behaviours are opposite on purpose and
+> both are pinned by tests, so "harmonising" them breaks a build rather than data.
 >
-> Until the user rules, treat the attachment material below as **proposed, not agreed**.
+> Everything else in the attachment material below — `FileAttachmentService` reuse,
+> magic-byte MIME inspection, the 10-file / 10 MB limits, the whitelist, the upload and
+> download endpoints — is still **to build** with the service half.
 >
 > Everything else in this section — the status/priority enums, `201 Created` + `Location`,
 > `AuditLogAction.SupportTicketCreated`, the `SupportTicketReceived` admin-notify template,

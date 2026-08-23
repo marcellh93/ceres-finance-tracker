@@ -1337,6 +1337,31 @@ Stores user-submitted support requests. Admin management is handled via a separa
 
 ---
 
+### SupportTicketAttachment (Phase 3)
+
+*Shipped 2026-08-23 — mirrors [TransactionAttachment](#transactionattachment). Files live on the filesystem, never as BLOBs.*
+
+| Column          | Type          | Constraints   | Notes                                                          |
+|-----------------|---------------|---------------|----------------------------------------------------------------|
+| Id              | uuid          | PK            |                                                                |
+| SupportTicketId | uuid          | FK, NOT NULL  | → SupportTicket. `OnDelete: Cascade`                           |
+| UserId          | uuid          | NOT NULL      | → User. Stamped by `UserOwnershipInterceptor`, pinned by the RLS `WITH CHECK` |
+| FileName        | varchar(255)  | NOT NULL      | The user's original filename. **Display only — never used to build a path** |
+| StoredPath      | varchar(500)  | NOT NULL      | System-generated relative path. The extension comes from the **detected** mime, never the upload |
+| ContentType     | varchar(100)  | NOT NULL      | Mime as detected by magic-byte inspection, not as claimed by the client |
+| FileSizeBytes   | bigint        | NOT NULL      |                                                                |
+| UploadedAt      | datetime      | NOT NULL      |                                                                |
+
+**Index:** `(SupportTicketId)` — the FK index, serving "attachments for this ticket".
+
+**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the same migration that creates the table (`20260823171518_AddSupportTicketAttachments`).
+
+**Deletion rule: `Cascade` from the parent ticket — deliberately the opposite of `SupportTicket.PrecedingTicketId`, which is `Restrict`.** An attachment has no meaning without its ticket, and an orphaned row would point at a file nothing can reach. A follow-up ticket, by contrast, is an independent record of what was reported and must survive the deletion of the ticket it continues. Both behaviours are pinned by tests in `UserOwnedModelTests`, so a future change that "harmonises" them fails the build rather than the data.
+
+**Known gap — the cascade orphans files.** `FileAttachmentService.DeleteAsync` removes the file from disk before removing the row, so an explicit delete is clean. A **database-level cascade never runs application code**, so deleting a ticket removes its attachment rows and leaves their files on disk permanently unreferenced. Tickets are not user-deletable today, so this only fires on an admin path that does not exist yet — but that path must delete files explicitly rather than relying on the cascade. Under GDPR erasure the same applies: a row-level purge alone leaves user-uploaded screenshots on disk.
+
+---
+
 ### AdminAuditLog (Phase 3)
 
 Append-only record of every action performed by an admin. No endpoint exposes edit or delete on this table. See ADR-0028.

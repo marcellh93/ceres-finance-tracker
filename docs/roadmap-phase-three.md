@@ -1449,6 +1449,7 @@ Server side:
 - [x] Global query filter applies (only owner sees own tickets) — derived from `UserOwnedModel.RlsTables`, pinned by `ArchitectureTests.UserOwnedModel_RlsTables_match_HasQueryFilter_registrations`
 - [ ] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). **Corrected 2026-08-23: this was marked `[x]` but nothing shipped** — `EmailTemplateKey` has no `SupportTicketReceived` member and there are no matching resx keys. Lands with the service half of 12.5, using a new `Email:SupportAddress` config key validated at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
 - [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
+- [ ] **Attachment files must be deleted explicitly, never via the FK cascade.** `SupportTicketAttachment` cascades from its ticket at the database level, and a DB cascade never runs application code — so deleting a ticket removes the rows and strands their files on disk permanently. `FileAttachmentService.DeleteAsync` already deletes the file before the row, which is the pattern any ticket-delete path must follow. Applies to the admin delete path (§ 12.5.2) and to GDPR erasure (Stage 13), where a row-level purge alone leaves user-uploaded screenshots behind. Found 2026-08-23 while documenting the entity.
 
 Tests:
 
