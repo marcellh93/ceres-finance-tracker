@@ -1,10 +1,13 @@
 using System.Net;
+using System.Reflection;
 using FluentAssertions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Admin;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Controllers.Api;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
@@ -192,5 +195,62 @@ public class AdminAuthorizationTests : IAsyncLifetime
         using var check = _factory.Services.CreateScope();
         var svc2 = check.ServiceProvider.GetRequiredService<AdminRoleService>();
         (await svc2.IsAdminAsync(caller.Id)).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The admin gate must be declared once at the class level, not repeated per action.
+    /// A per-action check is satisfiable by omission — a future action that simply forgets
+    /// it is admin-only in name and authenticated-only in fact, and no build or
+    /// architecture test would notice the missing lines.
+    /// </summary>
+    [Fact]
+    public void Every_action_on_the_admin_controller_is_gated_by_the_class_level_policy()
+    {
+        var controller = typeof(AdminUsersApiController);
+
+        controller.GetCustomAttributes(typeof(RequireAdminAttribute), inherit: true)
+            .Should().NotBeEmpty(
+                "the gate must sit on the class so it covers every present and future action");
+
+        var actions = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(m => !m.IsSpecialName)
+            .ToList();
+
+        actions.Should().NotBeEmpty("the controller must expose at least one action to be worth gating");
+
+        foreach (var action in actions)
+        {
+            action.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: true)
+                .Should().BeEmpty(
+                    $"{action.Name} would punch a hole in the class-level admin gate");
+        }
+    }
+
+    /// <summary>
+    /// Pins that the gate reads role membership live rather than from the auth cookie.
+    /// The caller signs in with no role, is granted Admin afterwards, and must be
+    /// admitted on the very next request without re-authenticating.
+    /// </summary>
+    [Fact]
+    public async Task A_role_granted_after_sign_in_takes_effect_without_re_login()
+    {
+        var (client, session, caller) = await SignedInAsync($"midsession{EmailSuffix}");
+        var target = await AuthTestFixture.RegisterUserAsync(_factory, $"midsession-target{EmailSuffix}");
+
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, caller.Id);
+        var before = await client.SendAsync(Promote(target.Id, session, csrfCookie, csrfHeader));
+        before.StatusCode.Should().Be(HttpStatusCode.Forbidden, "no role yet");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+            await svc.GrantAsync(caller.Id);
+        }
+
+        var after = await client.SendAsync(Promote(target.Id, session, csrfCookie, csrfHeader));
+
+        after.StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "the grant must be visible on the same session — a claims-based check would " +
+            "keep returning 403 until the cookie was reissued at next sign-in");
     }
 }

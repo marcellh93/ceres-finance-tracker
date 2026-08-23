@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using ProjectCeres.Admin;
@@ -13,32 +11,21 @@ namespace ProjectCeres.Controllers.Api;
 /// because there is no admin session available to authorize that first grant.
 /// </summary>
 /// <remarks>
-/// Admin membership is checked live via <see cref="AdminRoleService.IsAdminAsync"/>
-/// rather than <c>[Authorize(Roles = "Admin")]</c>: role claims are baked into the
-/// auth cookie at sign-in and this project's <c>OnValidatePrincipal</c> hook
-/// (<c>SessionRevocationValidator</c>) never re-issues them, so a grant made after
-/// login would be invisible to a claims-only check for the rest of that session.
+/// Gated by <see cref="RequireAdminAttribute"/> at the class level, so every present and
+/// future action on this controller is covered. See that attribute for why the project
+/// does not use <c>[Authorize(Roles = "Admin")]</c>.
 /// </remarks>
 [ApiController]
 [Route("api/admin/users")]
-[Authorize]
+[RequireAdmin]
 public class AdminUsersApiController(
     AdminRoleService adminRoles,
     UserManager<ApplicationUser> userManager) : ControllerBase
 {
-    private async Task<bool> CallerIsAdminAsync(CancellationToken ct)
-    {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(raw, out var callerId) && await adminRoles.IsAdminAsync(callerId, ct);
-    }
-
     [HttpPost("{id:guid}/promote")]
     public async Task<IActionResult> Promote(Guid id)
     {
-        var ct = HttpContext.RequestAborted;
-        if (!await CallerIsAdminAsync(ct)) return Forbid();
-
-        var granted = await adminRoles.GrantAsync(id, ct);
+        var granted = await adminRoles.GrantAsync(id, HttpContext.RequestAborted);
         return granted ? NoContent() : NotFound();
     }
 
@@ -53,7 +40,6 @@ public class AdminUsersApiController(
     public async Task<IActionResult> Demote(Guid id)
     {
         var ct = HttpContext.RequestAborted;
-        if (!await CallerIsAdminAsync(ct)) return Forbid();
 
         var target = await userManager.FindByIdAsync(id.ToString());
         if (target is null) return NotFound();

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Rewrite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using ProjectCeres.Admin;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
@@ -220,6 +221,7 @@ builder.Services.AddScoped<TotpReplayGuard>();
 builder.Services.AddScoped<FailedLoginRecorder>();
 builder.Services.AddScoped<IAuditLogWriter, AuditLogWriter>();
 builder.Services.AddSingleton<IAuthorizationHandler, RecentAuthRequirementHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, AdminLiveRequirementHandler>();
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, RecentAuthMiddlewareResultHandler>();
 
 if (builder.Environment.IsEnvironment("E2E"))
@@ -298,6 +300,9 @@ builder.Services.AddAuthorization(options =>
 
     options.AddPolicy(RequireRecentAuthAttribute.PolicyName, p =>
         p.AddRequirements(new RecentAuthRequirement()));
+
+    options.AddPolicy(RequireAdminAttribute.PolicyName, p =>
+        p.RequireAuthenticatedUser().AddRequirements(new AdminLiveRequirement()));
 });
 
 var rateLimitOptions = new ProjectCeres.Common.RateLimiting.RateLimitOptions();
@@ -544,7 +549,7 @@ builder.Services.AddScoped<ITransferDetectionService, TransferDetectionService>(
 builder.Services.AddScoped<ITransferReviewService, TransferReviewService>();
 builder.Services.AddScoped<IImportStagedTransactionService, ImportStagedTransactionService>();
 builder.Services.AddScoped<IHeaderDetectionService, HeaderDetectionService>();
-builder.Services.AddScoped<ProjectCeres.Admin.AdminRoleService>();
+builder.Services.AddScoped<AdminRoleService>();
 builder.Services.AddViteServices();
 
 // Development-only bootstrap tool: creates the first user + remaps sentinel-tagged data.

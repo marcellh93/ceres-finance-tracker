@@ -19,9 +19,14 @@ can be scoped with `.Owned(user)`, it belongs in `Services/`.
 1. Every cross-user query states its scope explicitly. Either `.Where(x => x.UserId ==
    targetUserId)` for a per-user admin action, or a comment saying why an unscoped
    aggregate is correct.
-2. Every entry point is gated by `[Authorize(Roles = "Admin")]`. The attribute takes a
-   literal string, so the value is repeated rather than referencing `AppRoles.Admin`;
-   `AppRolesTests` pins the two in sync. Being in this namespace is not itself an
-   authorization check.
+2. Every entry point is gated by `[RequireAdmin]` at the **class** level, never per action.
+   Do not use `[Authorize(Roles = "Admin")]`: role claims are baked into the auth cookie at
+   sign-in and `SessionRevocationValidator` never re-issues the principal, so a role granted
+   after login stays invisible and a role revoked after login is still honoured until the
+   cookie expires. `[RequireAdmin]` is backed by the `AdminLive` policy, which reads
+   membership from the database on every request. Class-level because a per-action check is
+   satisfiable by omission — a future action that simply forgets it is admin-only in name
+   and authenticated-only in fact. Being in this namespace is not itself an authorization
+   check.
 3. Bypassing the filter is a deliberate act. If you are reaching for
    `IgnoreQueryFilters()` to make a test pass, the query is wrong.
