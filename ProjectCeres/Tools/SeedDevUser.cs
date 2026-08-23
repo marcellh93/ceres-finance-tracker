@@ -119,7 +119,9 @@ public static class SeedDevUser
 
         if (existingUser is not null)
         {
-            Console.WriteLine($"[SeedDevUser] User {parsed.Email} already exists; skipping creation; running remap-only.");
+            Console.WriteLine(
+                $"[SeedDevUser] User {parsed.Email} already exists — not creating an account, " +
+                "and NOT changing the existing password (any password flag is ignored here).");
             // Skip password generation entirely on the existing-user path — generating a
             // password that won't be used would be misleading and wasteful.
             userId = existingUser.Id;
@@ -143,10 +145,21 @@ public static class SeedDevUser
                 Console.WriteLine("=============================================================");
                 Console.WriteLine();
             }
-            else
+            else if (parsed.PlainPassword is not null)
             {
                 // --password <pw> path: value already validated >=15 chars by ParseArgs.
-                password = parsed.PlainPassword!;
+                password = parsed.PlainPassword;
+            }
+            else
+            {
+                // --admin with no password flag, and the account does not exist. ParseArgs
+                // allows that combination because granting a role to an EXISTING account
+                // never needs a password; creating one does.
+                Console.Error.WriteLine(
+                    $"ERROR: no account exists for {parsed.Email}, so one must be created — " +
+                    "add --generate-password or --password <pw>. (A password flag is only " +
+                    "optional when --admin targets an account that already exists.)");
+                return 5;
             }
 
             var user = new ApplicationUser { UserName = parsed.Email, Email = parsed.Email };
@@ -354,7 +367,11 @@ public static class SeedDevUser
         }
 
         // --- Validate: exactly one of --password or --generate-password ---
-        if (!generatePw && plainPassword is null)
+        // Not required with --admin alone: granting a role to an existing account never
+        // touches the password, so demanding a password flag there would force the caller
+        // to pass one that is silently ignored. If the account turns out not to exist,
+        // creation still needs a password and fails loudly below.
+        if (!generatePw && plainPassword is null && !admin)
         {
             Console.Error.WriteLine("ERROR: Provide exactly one of --generate-password or --password <pw>.");
             PrintUsage();
@@ -388,13 +405,21 @@ public static class SeedDevUser
     {
         Console.Error.WriteLine();
         Console.Error.WriteLine(
-            "Usage: dotnet run --project ProjectCeres -- --seed-dev-user --email <addr> [--generate-password | --password <pw>]");
+            "Usage: dotnet run --project ProjectCeres -- --seed-dev-user --email <addr> [--generate-password | --password <pw>] [--admin]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("  --email <addr>           Email for the user account (required)");
-        Console.Error.WriteLine("  --generate-password      Generate a 32-char strong password and print it once");
-        Console.Error.WriteLine($"  --password <pw>          Use the provided password (must be >={MinPasswordLength} chars; appears in process args)");
+        Console.Error.WriteLine("  --generate-password      Generate a 32-char strong password and print it once.");
+        Console.Error.WriteLine("                           Applies ONLY when creating a new account — ignored if the");
+        Console.Error.WriteLine("                           account already exists. It never rotates an existing password.");
+        Console.Error.WriteLine($"  --password <pw>          Use the provided password (must be >={MinPasswordLength} chars; appears in process args).");
+        Console.Error.WriteLine("                           Same rule: ignored when the account already exists.");
         Console.Error.WriteLine("  --admin                  Grant the Admin role to this account; permitted outside Development only when no admin exists yet.");
         Console.Error.WriteLine("  --help                   Show this message");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("On an account that already exists this tool creates nothing and changes no");
+        Console.Error.WriteLine("password: category seeding no-ops, the sentinel remap no-ops once it has run,");
+        Console.Error.WriteLine("and --admin is the only flag that alters state. A password flag is therefore");
+        Console.Error.WriteLine("optional alongside --admin, and required otherwise.");
         Console.Error.WriteLine();
     }
 
