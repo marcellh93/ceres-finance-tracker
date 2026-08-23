@@ -42,7 +42,7 @@ namespace ProjectCeres.Tools;
 public static class SeedDevUser
 {
     /// <summary>Parsed and validated CLI arguments for this helper.</summary>
-    private sealed record Args(string Email, string? PlainPassword, bool GeneratePassword);
+    private sealed record Args(string Email, string? PlainPassword, bool GeneratePassword, bool Admin);
 
     // Sentinel UUID from Phase 1/2 — same as RemapSentinelToFirstUser migration.
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");
@@ -74,11 +74,15 @@ public static class SeedDevUser
             return validationExitCode;
 
         // === Environment gate ===
-        if (!builder.Environment.IsDevelopment())
+        // Development is always allowed. Outside Development the only permitted use is
+        // creating the FIRST admin — the bootstrap case, which closes as soon as one
+        // exists. Shell access to the server is the practical safeguard.
+        var isDevelopment = builder.Environment.IsDevelopment();
+        if (!isDevelopment && !parsed.Admin)
         {
             Console.Error.WriteLine(
-                "ERROR: SeedDevUser is gated on Development environment. " +
-                "ASPNETCORE_ENVIRONMENT is not 'Development'. Aborting.");
+                "ERROR: this tool is gated on Development unless --admin is used to create " +
+                "the first admin account. ASPNETCORE_ENVIRONMENT is not 'Development'. Aborting.");
             return 2;
         }
 
@@ -95,6 +99,16 @@ public static class SeedDevUser
         var adminDb        = sp.GetRequiredService<AdminDbContext>();
         var bgJobScope     = sp.GetRequiredService<IBackgroundJobScope>();
         var logger         = sp.GetRequiredService<ILogger<Program>>();
+
+        var adminRoles = sp.GetRequiredService<ProjectCeres.Admin.AdminRoleService>();
+
+        if (!isDevelopment && parsed.Admin && await adminRoles.AnyAdminExistsAsync())
+        {
+            Console.Error.WriteLine(
+                "ERROR: an admin account already exists. Outside Development this tool may " +
+                "only create the FIRST admin; promote further admins through the app. Aborting.");
+            return 2;
+        }
 
         // === Step 1: User creation (idempotent) ===
 
@@ -171,7 +185,19 @@ public static class SeedDevUser
             () => categorySeed.CopyDefaultsForUserAsync(userId));
         Console.WriteLine($"[SeedDevUser] Default categories seeded (idempotent — no-op if already present).");
 
-        // === Step 3: Sentinel remap ===
+        // === Step 3: Grant the Admin role ===
+        if (parsed.Admin)
+        {
+            var granted = await adminRoles.GrantAsync(userId);
+            if (!granted)
+            {
+                Console.Error.WriteLine("[SeedDevUser] ERROR: could not grant the Admin role.");
+                return 1;
+            }
+            Console.WriteLine($"[SeedDevUser] Granted Admin to {parsed.Email}.");
+        }
+
+        // === Step 4: Sentinel remap ===
 
         // Pre-check: exactly one user in AspNetUsers (the one we just created/confirmed).
         // If there are more, we cannot safely remap — ambiguous target.
@@ -256,6 +282,7 @@ public static class SeedDevUser
         string? email         = null;
         string? plainPassword = null;
         bool    generatePw    = false;
+        bool    admin         = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -290,6 +317,10 @@ public static class SeedDevUser
 
                 case "--generate-password":
                     generatePw = true;
+                    break;
+
+                case "--admin":
+                    admin = true;
                     break;
 
                 default:
@@ -344,7 +375,7 @@ public static class SeedDevUser
             return null;
         }
 
-        return new Args(email, plainPassword, generatePw);
+        return new Args(email, plainPassword, generatePw, admin);
     }
 
     /// <summary>Prints the canonical usage block to <c>Console.Error</c>.</summary>
@@ -357,6 +388,7 @@ public static class SeedDevUser
         Console.Error.WriteLine("  --email <addr>           Email for the user account (required)");
         Console.Error.WriteLine("  --generate-password      Generate a 32-char strong password and print it once");
         Console.Error.WriteLine($"  --password <pw>          Use the provided password (must be >={MinPasswordLength} chars; appears in process args)");
+        Console.Error.WriteLine("  --admin                  Grant the Admin role to this account; permitted outside Development only when no admin exists yet.");
         Console.Error.WriteLine("  --help                   Show this message");
         Console.Error.WriteLine();
     }
