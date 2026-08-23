@@ -37,6 +37,7 @@ pnpm dlx shadcn add <component>              # add a shadcn/ui component
 
 # .NET / Razor
 dotnet run --project ProjectCeres            # start the app (also builds CSS)
+tools/dev-watch.sh                           # start dotnet watch (reaps orphans, tears down cleanly)
 dotnet ef migrations add <Name>              # create a migration
 dotnet ef database update                    # apply migrations
 dotnet test                                  # run all server tests

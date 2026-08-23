@@ -99,9 +99,44 @@ cp -R ProjectCeres.Client/dist/. ProjectCeres/wwwroot/dist/
 The output filename is content-hashed, so once rebuilt a plain reload picks it up —
 no cache-buster needed.
 
+## Symptom 3 — build errors from a watcher you cannot see
+
+`dotnet watch` reports build or file-write failures, but the source compiles fine
+and nothing obvious is running.
+
+**Cause.** `dotnet watch` does not exit when the terminal that started it closes.
+It reparents to PID 1 and keeps file watches and MSBuild node handles on
+`bin/Debug/net10.0/`. A second watcher started later then intermittently fails to
+write the output DLL, because the dead one still holds those files.
+
+**Why a port check misses it.** The orphan holds no port — only the *app* process
+listens on 7081, and a watcher without a running app has nothing to find. Observed
+2026-08-23: two orphaned watchers, both over two days old, one with 17 open handles
+into the build output and zero CPU. It ignored `SIGTERM` and needed `kill -9`.
+
+**Detect:**
+
+```bash
+# Any watcher whose parent is PID 1 is orphaned, whether or not it is functional.
+pgrep -f "dotnet-watch.dll.*--project ProjectCeres" | while read -r p; do
+  echo "pid=$p ppid=$(ps -o ppid= -p "$p" | tr -d ' ')"
+done
+```
+
+**Fix — and prevent it recurring:** start the watcher through
+
+```bash
+tools/dev-watch.sh
+```
+
+It reaps orphaned watchers and port squatters before starting, and kills its own
+process group on exit so neither the watcher nor the app can outlive the terminal.
+Note it reaps *every* orphaned watcher for this project, including one that is
+still working — if you have a watcher you want to keep, stop it yourself first.
+
 ## Related
 
 - `dotnet watch` port conflicts (`AddressInUseException`) usually mean an orphaned
-  app process outlived its watcher. Check with
+  app process outlived its watcher — the mirror image of Symptom 3. Check with
   `lsof -nP -iTCP:7081 -sTCP:LISTEN`, then `kill -9` the owner. Same family of
   problem: something from an earlier run is still in the way.
