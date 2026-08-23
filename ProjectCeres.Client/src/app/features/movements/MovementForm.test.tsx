@@ -490,8 +490,12 @@ describe('MovementForm', () => {
     // The trigger should exist once goals load (aria-label="Old Trip" when archived goal selected)
     const trigger = await screen.findByRole('combobox', { name: /^Old Trip$/i });
     expect(trigger).toBeInTheDocument();
-    // Open the popover and verify the archived suffix is shown
+    // Open the popover and verify the archived suffix is shown.
+    // Explicit timeout: this reads a base-ui popover rendered into a portal, and the
+    // default 1000ms is too tight under full-suite CPU contention. Same fix as Tests 14/15.
     fireEvent.click(trigger);
-    expect(await screen.findByText('Old Trip (archived)')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Old Trip (archived)', {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
   });
 });
