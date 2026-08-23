@@ -1,6 +1,10 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using ProjectCeres.Common;
+using ProjectCeres.Data;
 
 namespace ProjectCeres.Tests.Integration.Rls;
 
@@ -19,6 +23,56 @@ public class ParityTests
     private readonly RlsTestFixture _fixture;
 
     public ParityTests(RlsTestFixture fixture) => _fixture = fixture;
+
+    /// <summary>
+    /// Names any migration that is committed but not applied to this database.
+    ///
+    /// Without this, a missing policy reads identically in two opposite situations:
+    /// the author forgot to write the SQL, or the SQL exists and the database has
+    /// not run it. The advice differs completely — write a migration vs apply one —
+    /// and the second is the normal state on every entity+migration slice.
+    ///
+    /// Reads __EFMigrationsHistory directly rather than GetPendingMigrationsAsync:
+    /// this fixture hands out an AdminDbContext, which carries no migrations
+    /// assembly, so the EF API reports zero pending and the hint never fires.
+    /// </summary>
+    private static async Task<string> PendingMigrationHintAsync(DbContext ctx)
+    {
+        try
+        {
+            var applied = new HashSet<string>(StringComparer.Ordinal);
+            var conn = ctx.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+
+            await using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT ""MigrationId"" FROM ""__EFMigrationsHistory""";
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync()) applied.Add(reader.GetString(0));
+            }
+
+            var onDisk = typeof(AppDbContext).Assembly.GetTypes()
+                .Where(t => typeof(Migration).IsAssignableFrom(t) && !t.IsAbstract)
+                .Select(t => t.GetCustomAttribute<MigrationAttribute>()?.Id)
+                .Where(id => id is not null)
+                .Select(id => id!)
+                .ToList();
+
+            var pending = onDisk.Where(id => !applied.Contains(id)).OrderBy(id => id, StringComparer.Ordinal).ToList();
+            if (pending.Count == 0) return "";
+
+            return $" NOTE: {pending.Count} migration(s) are committed but NOT applied to this "
+                 + $"database ({string.Join(", ", pending)}). Run `dotnet ef database update` before "
+                 + "reading this failure as missing SQL — the policy may already be written.";
+        }
+        catch (Exception ex)
+        {
+            // Surface the reason rather than hiding it: a silent empty hint is how
+            // this helper failed the first time it was written.
+            return $" (pending-migration check unavailable: {ex.GetType().Name})";
+        }
+    }
+
 
     [Fact]
     public async Task UserOwnedModel_RlsTables_match_pg_policies_user_isolation_set()
@@ -40,8 +94,10 @@ public class ParityTests
         }
 
         var expected = UserOwnedModel.RlsTables(admin.Model).Select(t => t.PostgresTableName).OrderBy(n => n).ToList();
+        var hint = await PendingMigrationHintAsync(admin);
         installed.Should().BeEquivalentTo(expected,
-            "every user-owned entity must have an RLS user_isolation policy installed by a migration, and no extra policies should exist");
+            "every user-owned entity must have an RLS user_isolation policy installed by a migration, "
+            + "and no extra policies should exist." + hint);
     }
 
     [Fact]

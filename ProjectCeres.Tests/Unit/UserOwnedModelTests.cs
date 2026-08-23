@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
+using ProjectCeres.Models;
 using Xunit;
 
 namespace ProjectCeres.Tests.Unit;
@@ -71,5 +72,70 @@ public class UserOwnedModelTests
         };
         var names = UserOwnedModel.FinanceTables(Ctx().Model).Select(t => t.PostgresTableName);
         names.Should().BeEquivalentTo(expected);
+    }
+    // ── SupportTicket model shape ────────────────────────────────────────────
+    //
+    // No test in this repo asserted EF model SHAPE before these — only model
+    // membership. SupportTicket is where that gap first has teeth: it carries the
+    // project's first self-referential FK, and the delete behaviour is
+    // load-bearing rather than incidental.
+
+    // Restrict, not Cascade. A follow-up ticket is its own record of what was
+    // reported; deleting an earlier ticket must never silently take the chain with
+    // it. Flipping to Cascade is a two-word edit that regenerates the migration
+    // cleanly and passes MigrationDriftTests, because model and snapshot still
+    // agree — the first symptom would be a support thread vanishing once an admin
+    // delete path exists. This is the negative assertion that guards it.
+    [Fact]
+    public void SupportTicket_self_reference_restricts_deletes_rather_than_cascading()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportTicket))!;
+
+        var selfFk = entity.GetForeignKeys()
+            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportTicket));
+
+        selfFk.DeleteBehavior.Should().Be(DeleteBehavior.Restrict,
+            "deleting a ticket must never cascade to the follow-ups that reference it — " +
+            "each is an independent record of what was reported");
+    }
+
+    // Widening these is silent (narrowing would fail loudly on existing rows), and
+    // there is no service-layer validator behind them yet, so the column width is
+    // the only bound on user-submitted text.
+    [Fact]
+    public void SupportTicket_free_text_columns_stay_bounded()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportTicket))!;
+
+        entity.FindProperty(nameof(SupportTicket.Subject))!.GetMaxLength().Should().Be(200);
+        entity.FindProperty(nameof(SupportTicket.Message))!.GetMaxLength().Should().Be(5000);
+    }
+
+    // Status is stored via HasConversion<int>(), so the ENUM ORDINAL is the real
+    // database contract, not the C# name. Inserting a value at the top of the enum
+    // — exactly what someone adding a "Pending" state would do — silently changes
+    // the meaning of every stored row. Nothing else catches that.
+    [Fact]
+    public void SupportTicket_status_ordinals_are_the_stored_contract()
+    {
+        ((int)SupportTicketStatus.Open).Should().Be(0);
+        ((int)SupportTicketStatus.InProgress).Should().Be(1);
+        ((int)SupportTicketStatus.Resolved).Should().Be(2);
+        ((int)SupportTicketStatus.Closed).Should().Be(3);
+
+        ((int)SupportTicketPriority.Low).Should().Be(0);
+        ((int)SupportTicketPriority.Normal).Should().Be(1);
+        ((int)SupportTicketPriority.High).Should().Be(2);
+        ((int)SupportTicketPriority.Urgent).Should().Be(3);
+    }
+
+    [Fact]
+    public void SupportTicket_defaults_to_an_open_normal_priority_ticket()
+    {
+        var ticket = new SupportTicket();
+
+        ticket.Status.Should().Be(SupportTicketStatus.Open);
+        ticket.Priority.Should().Be(SupportTicketPriority.Normal);
+        ticket.PrecedingTicketId.Should().BeNull("a standalone ticket continues nothing");
     }
 }
