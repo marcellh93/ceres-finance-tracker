@@ -2,6 +2,7 @@
 
 export const SESSIONS_URL = '/api/sessions';
 export const sessionUrl = (id: string) => `/api/sessions/${id}`;
+export const BLOCK_IP_URL = '/api/sessions/block-ip';
 
 // ---------- DTOs ----------
 

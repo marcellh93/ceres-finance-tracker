@@ -92,3 +92,30 @@ test('Sessions: revoking another device removes its row', async ({
 
   await other.dispose()
 })
+
+test('Sessions: no Block IP action is offered on the current device', async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const url = baseURL!
+  const user = await createVerifiedUser(request, url)
+  await postJson(request, url, '/api/auth/login', {
+    email: user.email,
+    password: DEFAULT_PASSWORD,
+    rememberMe: false,
+  })
+  const state = await request.storageState()
+  await page.context().addCookies(state.cookies)
+
+  await page.goto('/settings/sessions')
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Active sessions', exact: true }),
+  ).toBeVisible()
+
+  // Only the current session exists, so there must be no block affordance at
+  // all: blocking your own address 403s every later request and cannot be
+  // undone from the app.
+  await expect(page.getByText('This device')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Block IP' })).toHaveCount(0)
+})

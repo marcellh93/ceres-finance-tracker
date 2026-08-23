@@ -44,11 +44,24 @@ public class SessionService(
         return Result.Ok();
     }
 
-    public async Task<Result> TryBlockIpAsync(string? ipAddress)
+    public async Task<Result> TryBlockIpAsync(string? ipAddress, string? callerIpAddress)
     {
         if (string.IsNullOrWhiteSpace(ipAddress))
         {
             return Result.Fail("VALIDATION_ERROR", "IpAddress is required.");
+        }
+
+        // Self-lockout guard. UserBlockedIpMiddleware 403s every authenticated
+        // request from a blocked IP — including the login that would undo it —
+        // and there is no unblock endpoint, so this is unrecoverable in-app.
+        if (!string.IsNullOrWhiteSpace(callerIpAddress)
+            && string.Equals(ipAddress, callerIpAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Fail(
+                "SELF_LOCKOUT",
+                "You cannot block the address you are currently connected from — "
+                + "it would lock you out of your own account. Revoke the individual "
+                + "sessions instead.");
         }
 
         var userId = currentUser.UserId;

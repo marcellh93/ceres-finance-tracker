@@ -5,6 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionsPage } from './SessionsPage';
 import type { SessionDto } from './sessions-api';
 
+// vi.mock is hoisted above const declarations, so the spies must be created
+// inside vi.hoisted for the factory to see them.
+const { toastError, toastSuccess } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}));
+vi.mock('sonner', () => ({ toast: { error: toastError, success: toastSuccess } }));
+
 const logout = vi.fn();
 const navigate = vi.fn();
 
@@ -144,6 +152,88 @@ describe('SessionsPage', () => {
 
     await waitFor(() => expect(logout).toHaveBeenCalled());
     expect(navigate).toHaveBeenCalledWith('/login');
+  });
+
+  // The UI half of the self-lockout guard. Blocking the address you are
+  // connected from 403s every later request via UserBlockedIpMiddleware, and no
+  // unblock endpoint exists — so the action must not be offered on your own row.
+  // The server refuses it independently (409 SELF_LOCKOUT); this is defence in
+  // depth, not the only guard.
+  it('offers no block action on the current session', async () => {
+    apiFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [session({ isCurrent: true })],
+    });
+    renderPage();
+
+    await screen.findByText('This device');
+    expect(screen.queryByRole('button', { name: 'Block IP' })).not.toBeInTheDocument();
+  });
+
+  it('offers the block action on other sessions', async () => {
+    apiFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [session({ isCurrent: true }), session({ id: 'other', isCurrent: false })],
+    });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: 'Block IP' })).toBeInTheDocument();
+  });
+
+  it('blocks an address after confirmation and refetches', async () => {
+    const user = userEvent.setup();
+    apiFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        data: [session({ id: 'other', isCurrent: false, ipCreatedAt: '198.51.100.7' })],
+      })
+      .mockResolvedValueOnce({ ok: true, status: 204, data: null })
+      .mockResolvedValueOnce({ ok: true, status: 200, data: [] });
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Block IP' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/cannot undo this from the app/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Block address' }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/sessions/block-ip',
+        expect.objectContaining({ method: 'POST', body: { ipAddress: '198.51.100.7' } }),
+      );
+    });
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
+  });
+
+  it('surfaces the server refusal if a block is rejected', async () => {
+    const user = userEvent.setup();
+    apiFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        data: [session({ id: 'other', isCurrent: false })],
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        code: 'SELF_LOCKOUT',
+        message: 'You cannot block the address you are currently connected from.',
+      });
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Block IP' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Block address' }));
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        'You cannot block the address you are currently connected from.',
+      ),
+    );
   });
 
   // The load-bearing one. These endpoints answer 401 REAUTH_REQUIRED, and the

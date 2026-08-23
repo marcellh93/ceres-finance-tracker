@@ -12,7 +12,12 @@ public interface ISessionService
     /// unknown id or another user's session (IDOR guard).</summary>
     Task<Result> TryRevokeAsync(Guid sessionId);
 
-    /// <summary>Blocks an IP and revokes the caller's sessions created from it.
-    /// Idempotent — re-blocking an already-blocked IP succeeds.</summary>
-    Task<Result> TryBlockIpAsync(string? ipAddress);
+    /// <summary>
+    /// Blocks an IP and revokes the caller's sessions created from it. Idempotent —
+    /// re-blocking an already-blocked IP succeeds. Refuses SELF_LOCKOUT when the
+    /// target matches <paramref name="callerIpAddress"/>: UserBlockedIpMiddleware
+    /// 403s every authenticated request from a blocked IP, and no unblock path
+    /// exists, so blocking your own IP is unrecoverable without database access.
+    /// </summary>
+    Task<Result> TryBlockIpAsync(string? ipAddress, string? callerIpAddress);
 }

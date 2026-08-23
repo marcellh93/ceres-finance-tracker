@@ -33,13 +33,20 @@ public class SessionsApiController(ISessionService sessions) : ControllerBase
     [RequireRecentAuth]
     public async Task<IActionResult> BlockIp([FromBody] BlockIpRequest request)
     {
-        var result = await sessions.TryBlockIpAsync(request.IpAddress);
+        var callerIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await sessions.TryBlockIpAsync(request.IpAddress, callerIp);
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
     private IActionResult ToErrorResponse(ResultError error) => error.Code switch
     {
         "NOT_FOUND" => NotFound(),
+        // 409, not 422: the request is well-formed and the IP is valid — it is the
+        // current state (you are connected from it) that makes it refusable.
+        "SELF_LOCKOUT" => Conflict(new
+        {
+            error = new { code = error.Code, message = error.Message, details = Array.Empty<object>() }
+        }),
         _ => UnprocessableEntity(new
         {
             error = new { code = error.Code, message = error.Message, details = Array.Empty<object>() }

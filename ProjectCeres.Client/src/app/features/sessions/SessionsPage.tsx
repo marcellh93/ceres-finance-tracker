@@ -20,7 +20,7 @@ import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { apiFetch } from '../../lib/api-client';
 import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
 import { useAuth } from '../../auth/auth-context';
-import { SESSIONS_URL, sessionUrl, type SessionDto } from './sessions-api';
+import { BLOCK_IP_URL, SESSIONS_URL, sessionUrl, type SessionDto } from './sessions-api';
 import { summarizeUserAgent } from './user-agent-summary';
 
 /**
@@ -47,6 +47,8 @@ export function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [pendingRevoke, setPendingRevoke] = useState<SessionDto | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [pendingBlock, setPendingBlock] = useState<SessionDto | null>(null);
+  const [blockingIp, setBlockingIp] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,6 +113,36 @@ export function SessionsPage() {
       }
     } finally {
       setRevokingId(null);
+    }
+  }
+
+  async function confirmBlock() {
+    const target = pendingBlock;
+    if (target === null) return;
+    setPendingBlock(null);
+    setBlockingIp(target.ipCreatedAt);
+
+    try {
+      const result = await requireStepUp(() =>
+        apiFetch(BLOCK_IP_URL, { method: 'POST', body: { ipAddress: target.ipCreatedAt } }),
+      );
+
+      if (!result.ok) {
+        // 409 SELF_LOCKOUT: the server refuses to block the address the caller
+        // is connected from. The UI hides the action on the current row, so
+        // reaching this means the address is shared with the current session.
+        toast.error(result.message || 'Could not block that address.');
+        return;
+      }
+
+      toast.success(`Blocked ${target.ipCreatedAt}.`);
+      await load();
+    } catch (err) {
+      if (!(err instanceof ReauthCancelledError)) {
+        toast.error('Could not block that address.');
+      }
+    } finally {
+      setBlockingIp(null);
     }
   }
 
@@ -195,14 +227,29 @@ export function SessionsPage() {
                         Signed in {new Date(session.createdAt).toLocaleString()}
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={revokingId === session.id}
-                      onClick={() => setPendingRevoke(session)}
-                    >
-                      {session.isCurrent ? 'Sign out' : 'Revoke'}
-                    </Button>
+                    <div className="flex shrink-0 gap-2">
+                      {/* No block action on the current row: blocking the address
+                          you are connected from locks you out, and there is no
+                          unblock path. The server refuses it too (409). */}
+                      {!session.isCurrent && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={blockingIp === session.ipCreatedAt}
+                          onClick={() => setPendingBlock(session)}
+                        >
+                          Block IP
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={revokingId === session.id}
+                        onClick={() => setPendingRevoke(session)}
+                      >
+                        {session.isCurrent ? 'Sign out' : 'Revoke'}
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -231,6 +278,26 @@ export function SessionsPage() {
             <AlertDialogAction onClick={() => void confirmRevoke()}>
               {pendingRevoke?.isCurrent ? 'Sign out' : 'Revoke'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingBlock !== null}
+        onOpenChange={(open) => !open && setPendingBlock(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block {pendingBlock?.ipCreatedAt}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every session from this address is signed out, and future sign-ins from it are
+              refused. You cannot undo this from the app yet, so only block an address you are
+              sure you will not need.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmBlock()}>Block address</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

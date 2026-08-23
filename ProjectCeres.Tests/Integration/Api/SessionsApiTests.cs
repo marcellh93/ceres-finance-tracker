@@ -5,7 +5,9 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common;
 using ProjectCeres.Data;
+using ProjectCeres.Services;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
 
@@ -302,6 +304,94 @@ public class SessionsApiTests : IAsyncLifetime
         var any = await db.UserBlockedIps.IgnoreQueryFilters()
             .AnyAsync(b => b.UserId == user.Id && b.IpAddress == "   ");
         any.Should().BeFalse();
+    }
+
+    // ── Self-lockout guard ───────────────────────────────────────────────────────
+    //
+    // UserBlockedIpMiddleware 403s every authenticated request from a blocked IP,
+    // and it runs AFTER authentication — so logging in again from that address
+    // succeeds and the next request still 403s. No unblock endpoint exists. That
+    // makes blocking your own address unrecoverable without database access, which
+    // is why the service refuses it.
+
+    [Fact]
+    public async Task Block_ip_refuses_the_address_the_caller_is_connected_from()
+    {
+        var (_, user) = await LoginWithFreshReauthAsync("blockipself");
+
+        using var scope = _factory.Services.CreateScope();
+        var sessions = scope.ServiceProvider.GetRequiredService<ISessionService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var result = await sessions.TryBlockIpAsync("203.0.113.9", callerIpAddress: "203.0.113.9");
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Value.Code.Should().Be("SELF_LOCKOUT");
+
+        var written = await db.UserBlockedIps.IgnoreQueryFilters()
+            .AnyAsync(b => b.UserId == user.Id && b.IpAddress == "203.0.113.9");
+        written.Should().BeFalse("a refused block must not write the row it refused");
+    }
+
+    [Fact]
+    public async Task Block_ip_still_allows_an_address_the_caller_is_not_connected_from()
+    {
+        var (_, user) = await LoginWithFreshReauthAsync("blockipother");
+
+        using var scope = _factory.Services.CreateScope();
+        var sessions = scope.ServiceProvider.GetRequiredService<ISessionService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Establish the user context the service reads from ICurrentUserAccessor.
+        // Without it the row is written under Guid.Empty and RLS never sees it.
+        var jobScope = scope.ServiceProvider.GetRequiredService<IBackgroundJobScope>();
+        Result result = default!;
+        await jobScope.RunAsync(user.Id, nameof(Block_ip_still_allows_an_address_the_caller_is_not_connected_from),
+            async () => { result = await sessions.TryBlockIpAsync("198.51.100.7", callerIpAddress: "203.0.113.9"); });
+
+        result.IsSuccess.Should().BeTrue("the guard must only refuse the caller's own address");
+
+        var written = await db.UserBlockedIps.IgnoreQueryFilters()
+            .AnyAsync(b => b.UserId == user.Id && b.IpAddress == "198.51.100.7");
+        written.Should().BeTrue();
+    }
+
+    // The comparison must not be defeated by casing — IPv6 addresses are commonly
+    // written in either case and the two forms denote the same host.
+    [Fact]
+    public async Task Block_ip_self_guard_is_case_insensitive()
+    {
+        await LoginWithFreshReauthAsync("blockipcase");
+
+        using var scope = _factory.Services.CreateScope();
+        var sessions = scope.ServiceProvider.GetRequiredService<ISessionService>();
+
+        var result = await sessions.TryBlockIpAsync(
+            "2001:DB8::CAFE", callerIpAddress: "2001:db8::cafe");
+
+        result.Error!.Value.Code.Should().Be("SELF_LOCKOUT");
+    }
+
+    // A null caller IP must not silently disable the guard's counterpart: with no
+    // known caller address the block proceeds, which is the pre-existing behaviour.
+    [Fact]
+    public async Task Block_ip_proceeds_when_the_caller_address_is_unknown()
+    {
+        var (_, user) = await LoginWithFreshReauthAsync("blockipnullcaller");
+
+        using var scope = _factory.Services.CreateScope();
+        var sessions = scope.ServiceProvider.GetRequiredService<ISessionService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var jobScope = scope.ServiceProvider.GetRequiredService<IBackgroundJobScope>();
+        Result result = default!;
+        await jobScope.RunAsync(user.Id, nameof(Block_ip_proceeds_when_the_caller_address_is_unknown),
+            async () => { result = await sessions.TryBlockIpAsync("198.51.100.42", callerIpAddress: null); });
+
+        result.IsSuccess.Should().BeTrue();
+        (await db.UserBlockedIps.IgnoreQueryFilters()
+            .AnyAsync(b => b.UserId == user.Id && b.IpAddress == "198.51.100.42"))
+            .Should().BeTrue();
     }
 
     // ── Test 5 ───────────────────────────────────────────────────────────────────
