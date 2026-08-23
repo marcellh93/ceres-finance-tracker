@@ -92,6 +92,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<ImportStagedTransaction> ImportStagedTransactions => Set<ImportStagedTransaction>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<UserBlockedIp> UserBlockedIps => Set<UserBlockedIp>();
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
     public DbSet<UserMfaBackupCode> UserMfaBackupCodes => Set<UserMfaBackupCode>();
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
     public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
@@ -160,6 +161,26 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasIndex(i => new { i.UserId, i.IpAddress }).IsUnique();
             b.Property(i => i.IpAddress).HasMaxLength(45);
             b.Property(i => i.Reason).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<SupportTicket>(b =>
+        {
+            b.HasKey(t => t.Id);
+            b.HasIndex(t => new { t.UserId, t.CreatedAt });
+            b.Property(t => t.Subject).HasMaxLength(200).IsRequired();
+            b.Property(t => t.Message).HasMaxLength(5000).IsRequired();
+            b.Property(t => t.Status).HasConversion<int>();
+            b.Property(t => t.Priority).HasConversion<int>();
+
+            // Self-reference for the follow-up chain. Restrict, not Cascade: a
+            // follow-up is its own record of what was reported, so deleting an
+            // earlier ticket must never silently take the later ones with it.
+            // Tickets are not user-deletable anyway — this guards an admin path
+            // that does not exist yet.
+            b.HasOne(t => t.PrecedingTicket)
+                .WithMany()
+                .HasForeignKey(t => t.PrecedingTicketId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<FailedLoginAttempt>(b =>
