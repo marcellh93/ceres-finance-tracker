@@ -1810,7 +1810,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ## Stage 15.6 — Admin capability (Batch 5)
 
-**Status: 🟡 Code complete 2026-08-23, one manual verification outstanding.** All six sub-stages are implemented, reviewed and green; the single open checklist item is the `--admin` bootstrap run, which needs a human because the seed tool builds a full application host and cannot be exercised by an integration test. Flip to ✅ once that run is confirmed. First of three stages delivering the shared category catalogue — Stages 15.7 and 15.8 both depend on the role and the namespace boundary established here.
+**Status: ✅ Shipped 2026-08-23.** All six sub-stages implemented, reviewed and green, including the manual `--admin` bootstrap run confirmed against the dev database. First of three stages delivering the shared category catalogue — Stages 15.7 and 15.8 both depend on the role and the namespace boundary established here.
 
 > **Goal:** an account can hold an `Admin` role; admin-only surfaces are enforced; the `Admin/` namespace that `ADR-0065` reserves for cross-user queries exists and is guarded by an architecture test.
 
@@ -1845,7 +1845,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [x] A role granted after sign-in is honoured on the next request without re-login — `A_role_granted_after_sign_in_takes_effect_without_re_login`
 - [x] The admin gate is declared once at class level; no action opts out — `Every_action_on_the_admin_controller_is_gated_by_the_class_level_policy`
 - [x] Full `dotnet test` green — 1218 server + 50 analyzer tests, 0 failures at `230b1d3`
-- [ ] `--admin` creates the first admin outside Development, and refuses once one exists — **manual verification, owed.** The seed tool builds a full application host and cannot be exercised by an integration test. Run `dotnet run --project ProjectCeres -- --seed-dev-user --email <addr> --generate-password --admin`, then confirm the role landed with a join across `AspNetUsers`/`AspNetUserRoles`/`AspNetRoles`.
+- [x] `--admin` grants the role and refuses to create an account without a password — **manually verified 2026-08-23** against the dev database: `AspNetRoles` gained the single `Admin` row, `AspNetUserRoles` paired it to the operator account, the existing Argon2id password hash and account flags were unchanged, and category count held at 29. The refusal paths (`--admin` on a nonexistent account with no password flag; no password flag and no `--admin`) both exit 5 leaving zero state. The seed tool builds a full application host, so this step stays manual by design.
 
 ### Known gaps carried into Stage 15.8
 
