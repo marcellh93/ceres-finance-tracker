@@ -1447,7 +1447,7 @@ Server side:
 
 - [ ] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt`
 - [ ] Global query filter applies (only owner sees own tickets)
-- [x] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). The admin ticket-LIST UI is deferred to § Stage 12.5 (needs a roles/admin-identity system that does not exist yet).
+- [ ] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). **Corrected 2026-08-23: this was marked `[x]` but nothing shipped** — `EmailTemplateKey` has no `SupportTicketReceived` member and there are no matching resx keys. Lands with the service half of 12.5, using a new `Email:SupportAddress` config key validated at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
 - [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
 
 Tests:
