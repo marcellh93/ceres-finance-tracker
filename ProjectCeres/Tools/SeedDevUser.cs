@@ -10,8 +10,8 @@ using ProjectCeres.Services;
 namespace ProjectCeres.Tools;
 
 /// <summary>
-/// Development-only bootstrap helper. Creates a confirmed dev user account and remaps any
-/// sentinel-tagged (Phase 1/2) data onto that user across all 16 user-owned tables.
+/// Bootstrap helper. Creates a confirmed user account and remaps any sentinel-tagged
+/// (Phase 1/2) data onto that user across all 16 user-owned tables.
 ///
 /// <para>
 /// When to use this:
@@ -24,7 +24,8 @@ namespace ProjectCeres.Tools;
 /// </para>
 ///
 /// <para>
-/// Gated on <c>IsDevelopment</c>. Will not run in Staging or Production.
+/// Gated on <c>IsDevelopment</c>, with one exception: <c>--admin</c> may create the
+/// FIRST admin outside Development. That window closes as soon as an admin exists.
 /// </para>
 ///
 /// <para>

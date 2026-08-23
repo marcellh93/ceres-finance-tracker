@@ -253,4 +253,69 @@ public class AdminAuthorizationTests : IAsyncLifetime
             "the grant must be visible on the same session — a claims-based check would " +
             "keep returning 403 until the cookie was reissued at next sign-in");
     }
+
+    /// <summary>
+    /// The mirror of the grant case, and the reason ADR-0080 accepts the live check over
+    /// [Authorize(Roles = ...)]: a revoked admin must lose access on the very next request,
+    /// not when their cookie eventually expires. A gate that cached the first lookup per
+    /// session would pass every other test in this class.
+    /// </summary>
+    [Fact]
+    public async Task A_role_revoked_after_sign_in_takes_effect_immediately()
+    {
+        var (client, session, caller) = await SignedInAsync($"revoked{EmailSuffix}");
+        var keeper = await AuthTestFixture.RegisterUserAsync(_factory, $"revoked-keeper{EmailSuffix}");
+        var target = await AuthTestFixture.RegisterUserAsync(_factory, $"revoked-target{EmailSuffix}");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+            await svc.GrantAsync(caller.Id);
+            await svc.GrantAsync(keeper.Id);   // so revoking the caller is not a last-admin 409
+        }
+
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, caller.Id);
+        var before = await client.SendAsync(Promote(target.Id, session, csrfCookie, csrfHeader));
+        before.StatusCode.Should().Be(HttpStatusCode.NoContent, "the caller is an admin at this point");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+            await svc.RevokeAsync(caller.Id);
+        }
+
+        var after = await client.SendAsync(Promote(target.Id, session, csrfCookie, csrfHeader));
+
+        after.StatusCode.Should().Be(HttpStatusCode.Forbidden,
+            "the same session must lose admin access the moment the role is revoked — under " +
+            "a claims-based check the stale role claim would stay valid until the cookie " +
+            "expired, up to 30 days on a persistent session");
+    }
+
+    /// <summary>
+    /// AdminCountAsync is only exercised transitively through the last-admin 409, where a
+    /// handler returning a constant would still produce the expected status. This asserts
+    /// the count itself moves with the number of admins.
+    /// </summary>
+    [Fact]
+    public async Task AdminCountAsync_tracks_the_number_of_admins()
+    {
+        var first = await AuthTestFixture.RegisterUserAsync(_factory, $"count-one{EmailSuffix}");
+        var second = await AuthTestFixture.RegisterUserAsync(_factory, $"count-two{EmailSuffix}");
+
+        using var scope = _factory.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+
+        var baseline = await svc.AdminCountAsync();
+
+        await svc.GrantAsync(first.Id);
+        (await svc.AdminCountAsync()).Should().Be(baseline + 1);
+
+        await svc.GrantAsync(second.Id);
+        (await svc.AdminCountAsync()).Should().Be(baseline + 2);
+
+        await svc.RevokeAsync(first.Id);
+        (await svc.AdminCountAsync()).Should().Be(baseline + 1,
+            "the count must fall when a role is revoked, not only rise when one is granted");
+    }
 }

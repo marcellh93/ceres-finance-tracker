@@ -217,7 +217,7 @@ Phase 3 is single-role (all authenticated users have the same permissions over t
 
 **Admin access model (ADR-0028):**
 
-- Admin routes live under `/admin/*` in an ASP.NET Core Area, gated at the area level with `[Authorize(Roles = "Admin")]` — not per-controller
+- Admin routes live under `api/admin/*` as API controllers, gated by `[RequireAdmin]` at the **class** level — never per-action, because a per-action check is satisfiable by omission. `[Authorize(Roles = "Admin")]` is not used anywhere: role claims are baked into the auth cookie at sign-in and are never re-issued mid-session, so a revoked admin would keep access until the cookie expired. `[RequireAdmin]` is backed by the `AdminLive` policy, which reads the role from the database on every request. See [ADR-0080](decisions/ADR-0080-admin-gating-via-live-role-policy.md), which supersedes [ADR-0028](decisions/ADR-0028-admin-dashboard-architecture.md) on this point; the ASP.NET Core Area that ADR-0028 describes is obsolete because no Razor views remain. The `ProjectCeres/Admin/` **namespace** remains the isolation boundary ([ADR-0065](decisions/ADR-0065-ef-global-query-filters-with-explicit-redundancy.md)), enforced by an architecture test
 - Admins do not have direct read access to a user's transaction data. Support access goes through an **impersonation session**, which is fully audited (start, every action, end) via `AdminAuditLog`
 - Every admin mutation writes an append-only `AdminAuditLog` record. No endpoint exposes edit or delete on this table — not even to admins
 - Impersonation of other admin accounts is not permitted
