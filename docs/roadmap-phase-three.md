@@ -1426,13 +1426,13 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 `/settings/sessions`:
 
-- [ ] Reauthentication-gated route (per `security-model.md` § Reauthentication)
-- [ ] Lists all active `UserSession` rows: created-at, last-used, IP, user-agent summary, "this session" indicator on the current row
-- [ ] Per-row "Revoke" action calls `DELETE /api/sessions/{id}`
-- [ ] Revoking the current session logs the user out + redirects to `/login`
-- [ ] Per-row "Block this IP" action: adds the IP to `UserBlockedIp`, revokes all sessions from that IP simultaneously
-- [ ] List refreshes optimistically after revoke / block
-- [ ] Empty state: "No other active sessions" when only the current row exists
+- [x] Reauthentication-gated route (per `security-model.md` § Reauthentication) — the page fetches through `apiFetch` wrapped in `requireStepUp`, **not** the usual `useApi` hook, which treats every 401 as a sign-out and would have logged the user out on arrival. First production consumer of `requireStepUp`; the 5-minute window does not roll forward on use, so every request is wrapped, not just the initial load
+- [x] Lists all active `UserSession` rows: created-at, last-used, IP, user-agent summary, "this session" indicator on the current row — the raw User-Agent (up to 512 chars) is never rendered; `summarizeUserAgent` resolves impersonators (VS Code and Edge both carry `Chrome/`) and reports non-browser clients like curl as the tool
+- [x] Per-row "Revoke" action calls `DELETE /api/sessions/{id}` — behind a confirmation dialog; pinned by `SessionsPage.test.tsx` + an e2e spec on chromium/firefox/webkit
+- [x] Revoking the current session logs the user out + redirects to `/login` — the row's action reads "Sign out" rather than "Revoke" since that is what it does to you
+- [x] Per-row "Block this IP" action: adds the IP to `UserBlockedIp`, revokes all sessions from that IP simultaneously. **The action is not offered on the current row, and the server refuses it with 409 `SELF_LOCKOUT`** — `UserBlockedIpMiddleware` 403s every authenticated request from a blocked IP and runs after authentication, so blocking your own address is unrecoverable without database access. Reversing a block on any *other* address is still not possible in-app: see § 12.5.4
+- [x] List refreshes after revoke / block — a refetch rather than a local splice, because after a mid-action reauth the list on screen may be minutes stale
+- [x] Empty state: "No other active sessions" when only the current row exists
 
 `/support`:
 
@@ -1452,7 +1452,7 @@ Server side:
 
 Tests:
 
-- [ ] Revoke own session, verify cookie no longer authenticates
+- [x] Revoke own session, verify cookie no longer authenticates — `SessionsApiTests` + the e2e revoke spec
 - [ ] Block own IP, verify subsequent requests from same IP rejected
 - [ ] Submit ticket, verify admin receives email
 - [ ] User A cannot view User B's ticket (IDOR)
@@ -1501,7 +1501,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ### 12.5.2 — Admin ticket-list UI
 
-*Deferral reason: tooling/infra gap — no roles/admin-identity system exists (no `api/admin`, no role claims). Stage 12 core ships admin-NOTIFY email only.*
+*Deferral reason (original): no roles/admin-identity system existed. **Updated 2026-08-23:** Stage 15.6 shipped the `Admin` role, `AdminRoleService`, `api/admin/users` and the `[RequireAdmin]` policy, so that blocker is gone — what remains is the ticket-list UI itself. Stage 12 core ships admin-NOTIFY email only.*
 
 - [ ] Decide + build the admin-identity mechanism (role claim / configured admin allow-list / single-operator)
 - [ ] `Admin/` endpoints to list all tickets, access-controlled, using the `ceres_admin` BYPASSRLS context deliberately (mirror `IUserJobRunner` discipline) per ADR-0065
@@ -1517,6 +1517,18 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx (`NewSessionAlert.Subject/BodyText/BodyHtml`)
 - [ ] Opt-out toggle in Settings notification preferences (the preferences surface itself may not exist yet — confirm)
 - *Tripwire: this checklist + the `planning-future.md` entry; `EmailTemplateKey` has no `NewSessionAlert` member until built.*
+
+### 12.5.4 — Unblock a blocked IP
+
+*Deferral reason: tooling gap — no unblock endpoint, service method, or UI exists anywhere in the codebase (verified 2026-08-23: zero matches for "unblock" under `ProjectCeres/`). Stage 12.3 shipped the guard that makes blocking safe; giving blocks an undo is separate work.*
+
+Stage 12.3 (2026-08-23) added `Block IP` to the session row plus a server-side `SELF_LOCKOUT` guard, so a user cannot block the address they are connected from. What it does **not** provide is a way to reverse a block on any *other* address — block your office IP and you cannot get it back without database access. The block confirmation dialog states this explicitly.
+
+- [ ] `ISessionService.TryUnblockIpAsync` + a `DELETE` endpoint under `api/sessions`
+- [ ] Blocked-address list on `/settings/sessions` — a block the user cannot see is a block they cannot reverse
+- [ ] Integration test: block an address, unblock it, confirm a request from it is no longer 403'd by `UserBlockedIpMiddleware`
+- [ ] Update the block confirmation dialog, which currently tells the user the action cannot be undone from the app
+- *Tripwire: the wording in `SessionsPage.tsx`'s block dialog and this checklist.*
 
 ---
 
