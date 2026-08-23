@@ -100,7 +100,7 @@ Five architectural decisions were locked before any Batch 3 implementation began
 ### Verification checklist
 
 - [x] Tokens shipped — color palette (deep teal primary + zinc neutrals + semantics + 8-color chart palette), typography (Inter + IBM Plex Mono), spacing, radius, shadow, motion
-- [x] `/design-system.html` internal route renders every token for visual reference
+- [x] Design-system showcase renders every token for visual reference — served at `/dist/design-system.html` against the running app (it is a separate Vite entry point, not a SPA route; `/design-system` falls through to the SPA and 404s)
 - [x] All 5 dashboard chart endpoints ship typed wrapper DTOs with `currencyCode`/`currencySymbol`
 - [x] React dashboard live at `/app/`
 - [x] Razor dashboard view, partial, and controller deleted

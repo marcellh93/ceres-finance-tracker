@@ -726,6 +726,15 @@ app.MapControllers();
 // the fallback policy.
 app.MapFallback("api/{*path}", () => Results.NotFound());
 
+// Convenience redirect: the design-system showcase is a separate Vite entry
+// point served as a static file, so its real URL is /dist/design-system.html.
+// Without this, /design-system falls through to the SPA shell below, React
+// Router finds no matching route, and the user sees "Page not found" on a page
+// that exists. Anonymous — it is a token reference, not user data.
+app.MapGet("/design-system", () => Results.Redirect("/dist/design-system.html"))
+   .AllowAnonymous()
+   .ExcludeFromDescription();
+
 // Stage 11 Task 5: serve the built SPA for any other unmatched path.
 // In manifest/E2E mode this resolves to wwwroot/dist/app.html (the Vite-built
 // host carrying hashed asset links). AllowAnonymous is required because the

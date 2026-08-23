@@ -282,4 +282,38 @@ public class DashboardApiTests(TestWebApplicationFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/html");
     }
+
+    // The design-system showcase is a separate Vite entry point served as a static
+    // file, so its real URL is /dist/design-system.html. Without this redirect the
+    // guessable /design-system falls through to the SPA shell, React Router finds no
+    // matching route, and the user is told a page that exists cannot be found.
+    [Fact]
+    public async Task GetDesignSystem_RedirectsToTheStaticShowcase()
+    {
+        using var noRedirectClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await noRedirectClient.GetAsync("/design-system");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Found);
+        response.Headers.Location!.ToString().Should().Be("/dist/design-system.html");
+    }
+
+    // The redirect must not require a session — it is a token reference, and the
+    // global FallbackPolicy authenticates every endpoint unless told otherwise.
+    [Fact]
+    public async Task GetDesignSystem_DoesNotRequireAuthentication()
+    {
+        using var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await anonymous.GetAsync("/design-system");
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Found);
+    }
 }

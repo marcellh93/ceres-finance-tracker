@@ -38,7 +38,7 @@ Every visual decision lives as a CSS custom property in `ProjectCeres.Client/src
 
 To retune a color or any other token, edit `index.css` only — no component changes required.
 
-The internal `/design-system.html` route renders every token live and doubles as a visual regression check. Open it during local development to verify any token change.
+The internal design-system showcase (`/dist/design-system.html` against the running app — see § Showcase route) renders every token live and doubles as a visual regression check. Open it during local development to verify any token change.
 
 ### Working rules (for any frontend change)
 
@@ -115,7 +115,7 @@ The App Shell sidebar is themed with its own token group so that future re-skins
 | `--sidebar-ring` | Focus ring inside the sidebar |
 | `--sidebar-w` | Layout width custom property — `240px` expanded, `56px` when `<html>` has the `sidebar-collapsed` class |
 
-Contrast ratios for every foreground/background pair are visible live on the `/design-system.html#/colors` page. Targets: WCAG AA (4.5:1 for body text, 3:1 for large text and UI components).
+Contrast ratios for every foreground/background pair are visible live on the `/dist/design-system.html#/colors` page. Targets: WCAG AA (4.5:1 for body text, 3:1 for large text and UI components).
 
 ---
 
@@ -1116,7 +1116,16 @@ Icons are rendered as `<entry.icon className="h-6 w-6 text-primary" aria-hidden=
 
 ## Showcase route
 
-`http://localhost:5173/design-system.html` (dev) — renders every token and shadcn primitive in every state, with light/dark toggle. Open it whenever a token changes; visual regressions show up here first.
+The showcase is a **separate Vite entry point**, not a route in the SPA — which is why guessing at `/design-system` lands on the SPA's "Page not found" instead.
+
+| How you're running | URL |
+|---|---|
+| `pnpm dev` (standalone Vite, port 5173) | `http://localhost:5173/design-system.html` |
+| `dotnet run` / `tools/dev-watch.sh` (Kestrel, port 7081) | **`https://localhost:7081/dist/design-system.html`** |
+
+Against the running app the path is `/dist/…` because `UseStaticFiles()` serves it out of `wwwroot/dist/`. Verified 2026-08-23: `/dist/design-system.html` returns 200 with the showcase; `/design-system.html` returns 401; `/design-system` returns 200 but serves the main SPA, which has no such route.
+
+Renders every token and shadcn primitive in every state, with a light/dark toggle. Open it whenever a token changes; visual regressions show up here first.
 
 The showcase mounts a separate React entry (`src/design-system/main.tsx`) and uses `HashRouter` so navigation works on a file-based route without server cooperation. It is isolated from the production-bound `src/main.tsx` Razor-island setup.
 
