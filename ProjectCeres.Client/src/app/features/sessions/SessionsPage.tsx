@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Ban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -233,11 +234,12 @@ export function SessionsPage() {
                           unblock path. The server refuses it too (409). */}
                       {!session.isCurrent && (
                         <Button
-                          variant="ghost"
+                          variant="destructive"
                           size="sm"
                           disabled={blockingIp === session.ipCreatedAt}
                           onClick={() => setPendingBlock(session)}
                         >
+                          <Ban aria-hidden="true" />
                           Block IP
                         </Button>
                       )}
@@ -275,7 +277,7 @@ export function SessionsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmRevoke()}>
+            <AlertDialogAction variant="destructive" onClick={() => void confirmRevoke()}>
               {pendingRevoke?.isCurrent ? 'Sign out' : 'Revoke'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -297,7 +299,9 @@ export function SessionsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void confirmBlock()}>Block address</AlertDialogAction>
+            <AlertDialogAction variant="destructive" onClick={() => void confirmBlock()}>
+              Block address
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
