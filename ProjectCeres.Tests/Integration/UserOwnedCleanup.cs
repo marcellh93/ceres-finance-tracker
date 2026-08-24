@@ -74,6 +74,17 @@ public static class UserOwnedCleanup
         var sentinel = new Guid("00000000-0000-0000-0000-000000000001");
         var total = 0;
 
+        // Second, independent guard. The WHERE clause below already excludes the
+        // sentinel, but a bug in that one clause destroys fixtures that no migration can
+        // fully restore — the seeded categories come back from InitialCreate, the fixture
+        // Accounts (10000000-…) come back from nothing at all. That happened on
+        // 2026-08-24 and cost 249 failing tests plus a hand-written restore.
+        //
+        // So: count the fixtures first, sweep, count again. If the sweep touched them,
+        // throw before the damage can spread further. Cheap, and it does not rely on the
+        // clause it is checking being correct.
+        var fixturesBefore = await CountSentinelFixturesAsync(db, sentinel, ct);
+
         foreach (var table in DeletionOrder(db))
         {
             total += await db.Database.ExecuteSqlRawAsync(
@@ -83,7 +94,28 @@ public static class UserOwnedCleanup
                 [sentinel], ct);
         }
 
+        var fixturesAfter = await CountSentinelFixturesAsync(db, sentinel, ct);
+        if (fixturesAfter < fixturesBefore)
+        {
+            throw new InvalidOperationException(
+                $"Orphan sweep destroyed sentinel fixtures ({fixturesBefore} -> {fixturesAfter}). "
+                + "These are seeded test data with no AspNetUsers row by design; the fixture "
+                + "Accounts in particular are restorable from no migration. Restore the test "
+                + "database before running anything else.");
+        }
+
         return total;
+    }
+
+    /// <summary>Sentinel-owned Categories + Accounts — the fixtures a sweep must never touch.</summary>
+    private static async Task<int> CountSentinelFixturesAsync(
+        AppDbContext db, Guid sentinel, CancellationToken ct)
+    {
+        var categories = await db.Categories.IgnoreQueryFilters()
+            .CountAsync(c => c.UserId == sentinel, ct);
+        var accounts = await db.Accounts.IgnoreQueryFilters()
+            .CountAsync(a => a.UserId == sentinel, ct);
+        return categories + accounts;
     }
 
     /// <summary>

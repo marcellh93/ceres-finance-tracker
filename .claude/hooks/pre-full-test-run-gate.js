@@ -52,13 +52,25 @@ function turnKey(sessionId) {
 }
 
 function main() {
-  if (process.env.CERES_SKIP_FULL_TEST_GATE === "1") allow();
-
   const input = readInput();
   if (!input || input.tool_name !== "Bash") allow();
 
   const cmd = String(input.tool_input?.command ?? "");
-  if (!/\bdotnet\s+test\b/.test(cmd)) allow();
+
+  // Only gate commands that actually INVOKE the test runner. A command merely
+  // containing the text — echoing a JSON payload, editing this file, grepping for it —
+  // must pass. Both false positives happened within minutes of writing this hook: it
+  // blocked the edit that would have fixed it, and blocked a probe of its own bypass.
+  const invokesTestRunner = /(^|[;&|]\s*|\s)(nohup\s+)?(\S*\s+)?dotnet\s+test\b/.test(cmd) &&
+                            !/\becho\b|\bgrep\b|\bcat\b|<<'?EOF/.test(cmd);
+  if (!invokesTestRunner) allow();
+
+  // The bypass must be readable from the COMMAND, not only this hook's own
+  // environment: a caller writing `CERES_SKIP_FULL_TEST_GATE=1 dotnet test` sets it for
+  // the child process, which this hook never sees. Checking both is what makes the
+  // documented escape hatch usable — it was not, as first written.
+  if (process.env.CERES_SKIP_FULL_TEST_GATE === "1" ||
+      /CERES_SKIP_FULL_TEST_GATE=1/.test(cmd)) allow();
 
   // Filtered runs are always fine — they finish in seconds and are the
   // recommended way to iterate.
