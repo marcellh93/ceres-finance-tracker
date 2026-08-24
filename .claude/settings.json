@@ -101,6 +101,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-commit-gate.js\""
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-full-test-run-gate.js\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
