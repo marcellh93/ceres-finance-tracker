@@ -254,6 +254,56 @@ public class AttachmentsApiTests : IAsyncLifetime
         }
     }
 
+    // Uploading onto someone else's transaction must look like the transaction does not
+    // exist, per security-model.md § IDOR.
+    //
+    // Verified 2026-08-24 that the controller's own existence check already returns 404
+    // here, so the composite FK's 23503 is unreachable on this path — removing the
+    // ForeignKeyViolationException guard does NOT make this test fail. The guard is
+    // defence in depth for a future caller that reaches the service directly; this test
+    // pins the OBSERVABLE contract (404, and no constraint name in the body) rather than
+    // the mechanism that produces it.
+    [Fact]
+    public async Task Upload_onto_another_users_transaction_returns_404_not_422()
+    {
+        var intruderAccountId = Guid.NewGuid();
+        var intruderTxId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Accounts.Add(new Account { Id = intruderAccountId, Name = "intruder-upload", AccountTypeId = 1, CurrencyId = 1, IsActive = true, UserId = _intruderUserId });
+            db.Transactions.Add(new Transaction { Id = intruderTxId, UserId = _intruderUserId, Date = new DateOnly(2026, 4, 1), Amount = 1m, AccountId = intruderAccountId, CategoryId = HousingCategoryId });
+            await db.SaveChangesAsync();
+        }
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            var file = new ByteArrayContent(png);
+            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            content.Add(file, "file", "probe.png");
+
+            var res = await _client.PostAsync($"/api/transactions/{intruderTxId}/attachments", content);
+
+            res.StatusCode.Should().Be(HttpStatusCode.NotFound,
+                "a transaction the caller cannot see must appear not to exist, rather than " +
+                "returning a 422 that names the foreign-key constraint");
+
+            var body = await res.Content.ReadAsStringAsync();
+            body.Should().NotContain("FK_TransactionAttachments",
+                "the response must never carry an internal constraint name");
+        }
+        finally
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.TransactionAttachments.IgnoreQueryFilters().Where(a => a.TransactionId == intruderTxId).ExecuteDeleteAsync();
+            await db.Transactions.IgnoreQueryFilters().Where(t => t.Id == intruderTxId).ExecuteDeleteAsync();
+            await db.Accounts.IgnoreQueryFilters().Where(a => a.Id == intruderAccountId).ExecuteDeleteAsync();
+        }
+    }
+
     [Fact]
     public async Task Delete_intruder_transaction_attachment_returns_404()
     {

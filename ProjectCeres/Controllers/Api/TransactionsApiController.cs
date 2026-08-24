@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
+using ProjectCeres.Common.Exceptions;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
@@ -144,6 +145,18 @@ public class TransactionsApiController(
                 contentType = saved.ContentType,
                 uploadedAt  = saved.UploadedAt
             });
+        }
+        catch (ForeignKeyViolationException)
+        {
+            // The composite (ParentId, UserId) FK refused the write, which means the
+            // parent belongs to someone else. security-model.md § IDOR requires a
+            // resource the caller cannot see to appear not to exist — a 422 naming the
+            // constraint would confirm the parent is real and leak the schema. 404 here
+            // matches the delete and download paths.
+            // Defence in depth: the action's own existence check already 404s before the
+            // service runs, so this is unreachable today. It guards a future caller that
+            // reaches the service directly.
+            return NotFound();
         }
         catch (InvalidOperationException ex)
         {

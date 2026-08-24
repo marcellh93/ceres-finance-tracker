@@ -425,6 +425,14 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         // TPC: each concrete Movement subtype maps to its own existing table — no schema change.
         modelBuilder.Entity<Movement>().UseTpcMappingStrategy();
 
+        // Alternate key on the TPC ROOT, not the derived types. EF rejects
+        // HasAlternateKey on a derived type ("must be configured on the root"), but the
+        // root accepts it and TPC propagates a UNIQUE (Id, UserId) into each concrete
+        // table — Transactions, Transfers and LiabilityPayments. That is what lets the
+        // attachment FKs below be composite, so the model describes the same shape the
+        // database enforces instead of diverging from it.
+        modelBuilder.Entity<Movement>().HasAlternateKey(m => new { m.Id, m.UserId });
+
         // LiabilityPayment references Account twice — explicit config required.
         modelBuilder.Entity<LiabilityPayment>()
             .HasOne(p => p.AssetAccount)
@@ -520,10 +528,22 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             .OnDelete(DeleteBehavior.SetNull);
 
         // TransferAttachment → Transfer: cascade delete (attachment has no life outside transfer).
+        // Composite FKs on (ParentId, UserId). Postgres runs FK checks and ON DELETE
+        // CASCADE through a referential-integrity trigger that RLS is NOT applied to, so
+        // a single-column FK lets user B attach a row to user A's movement and A's own
+        // delete then destroys it. Referencing (Id, UserId) makes that unrepresentable.
+        modelBuilder.Entity<TransactionAttachment>()
+            .HasOne(a => a.Transaction)
+            .WithMany(t => t.Attachments)
+            .HasForeignKey(a => new { a.TransactionId, a.UserId })
+            .HasPrincipalKey(t => new { t.Id, t.UserId })
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<TransferAttachment>()
             .HasOne(a => a.Transfer)
             .WithMany(t => t.Attachments)
-            .HasForeignKey(a => a.TransferId)
+            .HasForeignKey(a => new { a.TransferId, a.UserId })
+            .HasPrincipalKey(t => new { t.Id, t.UserId })
             .OnDelete(DeleteBehavior.Cascade);
 
         // Budget.LinkedAccount: optional FK for Savings goal type — no cascade (Account soft-deletes).

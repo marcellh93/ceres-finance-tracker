@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ProjectCeres.Data;
@@ -11,9 +12,11 @@ using ProjectCeres.Data;
 namespace ProjectCeres.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260823233954_AlignAttachmentFksWithModel")]
+    partial class AlignAttachmentFksWithModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -189,7 +192,7 @@ namespace ProjectCeres.Migrations
                         .IsDescending(false, true)
                         .HasDatabaseName("IX_EmailDeliveryEvents_EmailAddress_OccurredAt");
 
-                    b.ToTable("EmailDeliveryEvents", (string)null);
+                    b.ToTable("EmailDeliveryEvents");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Account", b =>
@@ -237,7 +240,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Accounts", (string)null);
+                    b.ToTable("Accounts");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.AccountType", b =>
@@ -254,7 +257,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AccountTypes", (string)null);
+                    b.ToTable("AccountTypes");
 
                     b.HasData(
                         new
@@ -376,7 +379,7 @@ namespace ProjectCeres.Migrations
                         .IsDescending(false, true)
                         .HasDatabaseName("IX_AuditLog_UserId_OccurredAt");
 
-                    b.ToTable("AuditLogs", null, t =>
+                    b.ToTable("AuditLogs", t =>
                         {
                             t.HasCheckConstraint("CK_AuditLog_EntityPair", "(\"EntityType\" IS NULL AND \"EntityId\" IS NULL) OR (\"EntityType\" IS NOT NULL AND \"EntityId\" IS NOT NULL)");
                         });
@@ -428,7 +431,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Budgets", (string)null);
+                    b.ToTable("Budgets");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Category", b =>
@@ -465,7 +468,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.CategoryBudget", b =>
@@ -497,7 +500,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CategoryBudgets", (string)null);
+                    b.ToTable("CategoryBudgets");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.CategoryType", b =>
@@ -514,7 +517,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("CategoryTypes", (string)null);
+                    b.ToTable("CategoryTypes");
 
                     b.HasData(
                         new
@@ -551,7 +554,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Currencies", (string)null);
+                    b.ToTable("Currencies");
 
                     b.HasData(
                         new
@@ -643,7 +646,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId", "ConsumedAt");
 
-                    b.ToTable("EmailChangeTokens", (string)null);
+                    b.ToTable("EmailChangeTokens");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.EmailConfirmationToken", b =>
@@ -683,7 +686,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId", "ConsumedAt");
 
-                    b.ToTable("EmailConfirmationTokens", (string)null);
+                    b.ToTable("EmailConfirmationTokens");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.FailedLoginAttempt", b =>
@@ -724,7 +727,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("IpAddress", "OccurredAt");
 
-                    b.ToTable("FailedLoginAttempts", (string)null);
+                    b.ToTable("FailedLoginAttempts");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.ImportProfile", b =>
@@ -810,7 +813,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ImportStagedTransactions", (string)null);
+                    b.ToTable("ImportStagedTransactions");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.ImportStagedTransfer", b =>
@@ -922,7 +925,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId", "ConsumedAt");
 
-                    b.ToTable("LockoutUnlockTokens", (string)null);
+                    b.ToTable("LockoutUnlockTokens");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Movement", b =>
@@ -996,7 +999,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId", "ConsumedAt");
 
-                    b.ToTable("PasswordResetTokens", (string)null);
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.RecurringTransaction", b =>
@@ -1046,7 +1049,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RecurringTransactions", (string)null);
+                    b.ToTable("RecurringTransactions");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.ReportType", b =>
@@ -1063,7 +1066,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ReportTypes", (string)null);
+                    b.ToTable("ReportTypes");
 
                     b.HasData(
                         new
@@ -1157,7 +1160,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("SavedReports", (string)null);
+                    b.ToTable("SavedReports");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Settings", b =>
@@ -1196,7 +1199,7 @@ namespace ProjectCeres.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Settings", (string)null);
+                    b.ToTable("Settings");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.SupportTicket", b =>
@@ -1239,7 +1242,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId", "CreatedAt");
 
-                    b.ToTable("SupportTickets", (string)null);
+                    b.ToTable("SupportTickets");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.SupportTicketAttachment", b =>
@@ -1281,7 +1284,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("SupportTicketId", "UserId");
 
-                    b.ToTable("SupportTicketAttachments", (string)null);
+                    b.ToTable("SupportTicketAttachments");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.TotpReplayEntry", b =>
@@ -1307,7 +1310,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("TotpReplayEntries", (string)null);
+                    b.ToTable("TotpReplayEntries");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.TransactionAttachment", b =>
@@ -1344,7 +1347,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("TransactionId", "UserId");
 
-                    b.ToTable("TransactionAttachments", (string)null);
+                    b.ToTable("TransactionAttachments");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.TransferAttachment", b =>
@@ -1381,7 +1384,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("TransferId", "UserId");
 
-                    b.ToTable("TransferAttachments", (string)null);
+                    b.ToTable("TransferAttachments");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.UserBlockedIp", b =>
@@ -1410,7 +1413,7 @@ namespace ProjectCeres.Migrations
                     b.HasIndex("UserId", "IpAddress")
                         .IsUnique();
 
-                    b.ToTable("UserBlockedIps", (string)null);
+                    b.ToTable("UserBlockedIps");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.UserMfaBackupCode", b =>
@@ -1445,7 +1448,7 @@ namespace ProjectCeres.Migrations
                         .HasDatabaseName("IX_UserMfaBackupCodes_UserId_Unused")
                         .HasFilter("\"UsedAt\" IS NULL");
 
-                    b.ToTable("UserMfaBackupCodes", (string)null);
+                    b.ToTable("UserMfaBackupCodes");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.UserSession", b =>
@@ -1492,7 +1495,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId", "RevokedAt");
 
-                    b.ToTable("UserSessions", (string)null);
+                    b.ToTable("UserSessions");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.LiabilityPayment", b =>
@@ -1511,7 +1514,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("LiabilityPayments", (string)null);
+                    b.ToTable("LiabilityPayments");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Transaction", b =>
@@ -1538,7 +1541,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Transactions", (string)null);
+                    b.ToTable("Transactions");
                 });
 
             modelBuilder.Entity("ProjectCeres.Models.Transfer", b =>
@@ -1557,7 +1560,7 @@ namespace ProjectCeres.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Transfers", (string)null);
+                    b.ToTable("Transfers");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

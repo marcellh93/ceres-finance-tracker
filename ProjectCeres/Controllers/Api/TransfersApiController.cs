@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
+using ProjectCeres.Common.Exceptions;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 
@@ -184,6 +185,15 @@ public class TransfersApiController(
                 contentType = saved.ContentType,
                 uploadedAt  = saved.UploadedAt
             });
+        }
+        catch (ForeignKeyViolationException)
+        {
+            // Composite (TransferId, UserId) FK refused the write — the parent belongs to
+            // someone else. 404 per security-model.md § IDOR, matching delete/download.
+            // Defence in depth: the action's own existence check already 404s before the
+            // service runs, so this is unreachable today. It guards a future caller that
+            // reaches the service directly.
+            return NotFound();
         }
         catch (InvalidOperationException ex)
         {
