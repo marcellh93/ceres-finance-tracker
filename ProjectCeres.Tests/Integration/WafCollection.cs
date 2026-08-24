@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
+using ProjectCeres.Data;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
@@ -180,11 +181,46 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void Dispose(bool disposing)
     {
+        if (disposing) SweepOrphanedRows();
+
         base.Dispose(disposing);
         if (disposing && Directory.Exists(_uploadsRoot))
         {
             try { Directory.Delete(_uploadsRoot, recursive: true); }
             catch { /* best-effort cleanup; never mask test failures */ }
+        }
+    }
+
+    /// <summary>
+    /// Backstop for the shared test database: deletes rows whose owning user is gone.
+    ///
+    /// Of 69 test files that create users, 22 call UserOwnedCleanup.PurgeUserAsync. The
+    /// rest leave 26 seeded categories behind per user, because no user-owned table has a
+    /// foreign key to AspNetUsers so nothing cascades. That reached 229,840 categories by
+    /// 2026-08-24 and pushed the suite from ~3:30 to over 11 minutes.
+    ///
+    /// Running it here — once, when the collection tears down — fixes the class rather
+    /// than editing 47 files that would drift again. Best-effort by design: a cleanup
+    /// failure must never turn a green run red, so it swallows and reports rather than
+    /// throwing.
+    /// </summary>
+    private void SweepOrphanedRows()
+    {
+        try
+        {
+            using var scope = Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var deleted = UserOwnedCleanup.SweepOrphanedRowsAsync(db).GetAwaiter().GetResult();
+            if (deleted > 0)
+            {
+                Console.WriteLine($"[test-db sweep] removed {deleted} orphaned user-owned row(s).");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Never mask a test result. A failed sweep only means the next run starts
+            // with more rows, which the run-tests tooling surfaces separately.
+            Console.WriteLine($"[test-db sweep] skipped: {ex.GetType().Name}: {ex.Message}");
         }
     }
 }

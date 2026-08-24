@@ -52,6 +52,41 @@ public static class UserOwnedCleanup
     }
 
     /// <summary>
+    /// Deletes every user-owned row whose owning user no longer exists.
+    ///
+    /// The per-user purge above only helps suites that remember to call it, and most do
+    /// not: of 69 test files that create users, 22 call it. The rest delete the user (or
+    /// nothing at all) and leave 26 seeded categories behind each time, because no
+    /// user-owned table has a foreign key to AspNetUsers. By 2026-08-24 that had reached
+    /// 229,840 categories and pushed the suite from ~3:30 to over 11 minutes.
+    ///
+    /// This is the backstop: a sweep that does not depend on any individual suite
+    /// remembering anything. Safe to run at any time — a row whose UserId is absent from
+    /// AspNetUsers can never be read by the application, which filters every query by the
+    /// current user.
+    ///
+    /// The sentinel user is EXCLUDED. Its rows are fixtures with fixed ids and no
+    /// AspNetUsers row by design; deleting them broke 243 tests on 2026-08-21 and needed
+    /// a pg_dump restore.
+    /// </summary>
+    public static async Task<int> SweepOrphanedRowsAsync(AppDbContext db, CancellationToken ct = default)
+    {
+        var sentinel = new Guid("00000000-0000-0000-0000-000000000001");
+        var total = 0;
+
+        foreach (var table in DeletionOrder(db))
+        {
+            total += await db.Database.ExecuteSqlRawAsync(
+                $"DELETE FROM \"{table}\" x WHERE x.\"UserId\" IS NOT NULL "
+                + "AND x.\"UserId\" <> {0} "
+                + "AND NOT EXISTS (SELECT 1 FROM \"AspNetUsers\" u WHERE u.\"Id\" = x.\"UserId\")",
+                [sentinel], ct);
+        }
+
+        return total;
+    }
+
+    /// <summary>
     /// User-owned tables ordered so children are deleted before the rows they
     /// reference. Accounts and Categories go last: Transactions, Budgets and the
     /// import staging tables all point at them.
