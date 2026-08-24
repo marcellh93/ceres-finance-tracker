@@ -179,9 +179,21 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
+    /// <summary>
+    /// Whether disposing this factory sweeps abandoned test users. FALSE by default,
+    /// because tests construct ad-hoc factories mid-run (five in ArchitectureTests alone)
+    /// and disposing one of those must not delete users other tests are still using —
+    /// which is exactly what happened: the sweep ran on an ArchitectureTests factory and
+    /// deleted the user AuditLogIntegrationTests had just registered, failing it.
+    ///
+    /// Only the shared collection fixture opts in, via SweepingTestWebApplicationFactory,
+    /// because it alone is disposed after every test in the collection has finished.
+    /// </summary>
+    protected virtual bool SweepOnDispose => false;
+
     protected override void Dispose(bool disposing)
     {
-        if (disposing) SweepAbandonedTestUsers();
+        if (disposing && SweepOnDispose) SweepAbandonedTestUsers();
 
         base.Dispose(disposing);
         if (disposing && Directory.Exists(_uploadsRoot))
@@ -357,6 +369,22 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
 /// </summary>
 [CollectionDefinition("IntegrationTests")]
 public class IntegrationCollection
-    : ICollectionFixture<TestWebApplicationFactory>,
+    : ICollectionFixture<SweepingTestWebApplicationFactory>,
+      ICollectionFixture<TestWebApplicationFactory>,
       ICollectionFixture<AuthTestWebApplicationFactory>
 { }
+
+/// <summary>
+/// The one factory that sweeps abandoned test users on teardown.
+///
+/// xUnit disposes collection fixtures after every test in the collection has run, so
+/// this is the only disposal point where deleting test users cannot pull the ground out
+/// from under a test still executing. Ad-hoc factories built inside a test must NOT
+/// sweep — see TestWebApplicationFactory.SweepOnDispose.
+///
+/// It exists purely for its teardown; no test needs to inject it.
+/// </summary>
+public class SweepingTestWebApplicationFactory : TestWebApplicationFactory
+{
+    protected override bool SweepOnDispose => true;
+}
