@@ -431,6 +431,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         // table — Transactions, Transfers and LiabilityPayments. That is what lets the
         // attachment FKs below be composite, so the model describes the same shape the
         // database enforces instead of diverging from it.
+        //
+        // Side effect: LiabilityPayments gets the key too, and has no attachment table
+        // referencing it. Accepted — a unique index on (Id, UserId) where Id is already
+        // the primary key is redundant but cheap, and the alternative is dropping back to
+        // raw SQL, which is the divergence this exists to remove. If a third movement
+        // type ever gains attachments the key is already there.
         modelBuilder.Entity<Movement>().HasAlternateKey(m => new { m.Id, m.UserId });
 
         // LiabilityPayment references Account twice — explicit config required.
