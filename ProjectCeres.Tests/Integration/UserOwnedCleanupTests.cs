@@ -51,104 +51,57 @@ public class UserOwnedCleanupTests
     }
 
     /// <summary>
-    /// The backstop: a suite that forgets to purge still gets cleaned up, because the
-    /// sweep keys on the owner being gone rather than on anyone remembering to call it.
-    /// This is the case that actually matters — 47 of 69 user-creating test files never
-    /// call PurgeUserAsync.
+    /// The leak as it actually is: a suite that registers a user and simply walks away.
+    /// No deletion, no purge — so nothing is ever "orphaned" and the user keeps holding
+    /// its 26 seeded categories forever. This is the shape 579 leftover users had on
+    /// 2026-08-24; the first version of the sweep missed all of them because it only
+    /// looked for rows whose user was already gone.
     /// </summary>
     [Fact]
-    public async Task SweepOrphanedRowsAsync_removes_rows_a_forgetful_suite_left_behind()
+    public async Task SweepAbandonedTestUsersAsync_removes_users_a_suite_walked_away_from()
     {
         var user = await AuthTestFixture.RegisterUserAsync(_factory, $"sweep{EmailSuffix}");
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-        // Delete the user WITHOUT purging — exactly what the 47 files do.
-        await um.DeleteAsync(user);
+        // No DeleteAsync, no PurgeUserAsync — the user is simply abandoned.
+        var held = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == user.Id);
+        held.Should().BeGreaterThan(0, "the leak must exist for the sweep to prove anything");
 
-        var stranded = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == user.Id);
-        stranded.Should().BeGreaterThan(0, "the leak must exist for the sweep to prove anything");
+        await UserOwnedCleanup.SweepAbandonedTestUsersAsync(db);
 
-        await UserOwnedCleanup.SweepOrphanedRowsAsync(db);
+        var rowsAfter = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == user.Id);
+        rowsAfter.Should().Be(0, "the sweep reclaims rows held by abandoned test users");
 
-        var remaining = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == user.Id);
-        remaining.Should().Be(0, "the sweep must reclaim rows whose owner no longer exists");
+        var userAfter = await db.Users.IgnoreQueryFilters().CountAsync(u => u.Id == user.Id);
+        userAfter.Should().Be(0, "and the user row itself, or the rows come back next run");
     }
 
     /// <summary>
-    /// The guard that matters more than the sweep itself. Sentinel-owned rows are
-    /// fixtures with fixed ids and NO AspNetUsers row by design, so a naive
-    /// "delete where the owner is missing" would take them — which happened on
-    /// 2026-08-21, broke 243 tests, and needed a pg_dump restore.
+    /// The guard that matters. The sentinel owns 26 seeded categories and three fixture
+    /// Accounts that NO migration recreates. A broken sweep destroyed them on 2026-08-24
+    /// and cost 249 failing tests plus a hand-written restore, so this asserts survival
+    /// directly rather than trusting the WHERE clause to be right.
     /// </summary>
     [Fact]
-    public async Task SweepOrphanedRowsAsync_spares_the_sentinel_fixtures()
+    public async Task SweepAbandonedTestUsersAsync_spares_the_sentinel_fixtures()
     {
         var sentinel = new Guid("00000000-0000-0000-0000-000000000001");
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var before = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == sentinel);
-        before.Should().BeGreaterThan(0, "the sentinel fixtures must exist for this to prove anything");
+        var categoriesBefore = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == sentinel);
+        var accountsBefore   = await db.Accounts.IgnoreQueryFilters().CountAsync(a => a.UserId == sentinel);
+        categoriesBefore.Should().BeGreaterThan(0, "the fixtures must exist for this to prove anything");
+        accountsBefore.Should().BeGreaterThan(0);
 
-        (await db.Users.AnyAsync(u => u.Id == sentinel)).Should().BeFalse(
-            "the sentinel deliberately has no AspNetUsers row — which is exactly why a naive "
-            + "orphan sweep would delete its fixtures");
+        await UserOwnedCleanup.SweepAbandonedTestUsersAsync(db);
 
-        await UserOwnedCleanup.SweepOrphanedRowsAsync(db);
-
-        var after = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == sentinel);
-        after.Should().Be(before, "sentinel fixtures must survive the sweep untouched");
-    }
-
-    /// <summary>
-    /// Documents WHY the helper is needed: deleting the user on its own strands the
-    /// categories. If this ever fails, real FK cascades exist and the helper can go.
-    /// </summary>
-    [Fact]
-    public async Task Deleting_a_user_alone_strands_categories_which_is_why_purge_exists()
-    {
-        var user = await AuthTestFixture.RegisterUserAsync(_factory, $"strand{EmailSuffix}");
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-
-        await um.DeleteAsync(user);
-
-        var stranded = await db.Categories.IgnoreQueryFilters()
-            .CountAsync(c => c.UserId == user.Id);
-        stranded.Should().BeGreaterThan(0,
-            "no FK cascades from AspNetUsers to Categories — this is the leak the helper covers");
-
-        // Leave the database as clean as we found it.
-        await UserOwnedCleanup.PurgeUserAsync(db, user.Id);
-        (await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == user.Id))
-            .Should().Be(0);
-    }
-
-    /// <summary>
-    /// The table list is derived from the EF model, so a newly added IUserOwned
-    /// entity is covered without editing a registry.
-    /// </summary>
-    [Fact]
-    public async Task Cleanup_covers_every_user_owned_table_in_the_model()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var modelTables = UserOwnedModel.RlsTables(db.Model)
-            .Select(t => t.PostgresTableName).ToHashSet(StringComparer.Ordinal);
-
-        modelTables.Should().Contain("Categories", "the table that leaked");
-        modelTables.Should().Contain("Accounts");
-
-        // A purge of a nonexistent user must be a harmless no-op across every table.
-        var act = async () => await UserOwnedCleanup.PurgeUserAsync(db, Guid.NewGuid());
-        await act.Should().NotThrowAsync(
-            "the helper must tolerate a user with no rows, on every table in the model");
+        var categoriesAfter = await db.Categories.IgnoreQueryFilters().CountAsync(c => c.UserId == sentinel);
+        var accountsAfter   = await db.Accounts.IgnoreQueryFilters().CountAsync(a => a.UserId == sentinel);
+        categoriesAfter.Should().Be(categoriesBefore, "sentinel categories are seeded fixtures, not leaked rows");
+        accountsAfter.Should().Be(accountsBefore, "and the fixture Accounts come back from no migration at all");
     }
 }
