@@ -16,7 +16,7 @@
 - **File attachments (CLAUDE.md):** filesystem, never BLOB; `FileName` (original) separate from `StoredPath` (system-generated); reuse `FileAttachmentService` (magic-byte MIME via MimeDetective, whitelist JPEG/PNG/GIF/WebP/PDF, 10 MB cap, max 10 per parent, extension derived from detected MIME never user input).
 - **Frontend:** `pnpm --dir ProjectCeres.Client …` only; design-system tokens/recipes, no hard-coded values; `<Badge variant>` for status, never hand-rolled spans; base-ui idioms (`render={...}` not `asChild`); show rendered result + wait for approval before commit; UX checklist (golden path / empty / error / 375px / nav) before done.
 - **Test-DB rule:** never run `dotnet test` in background or concurrently (shared `project_ceres_test` collision). Run ONE scoped filter at a time, foreground. The Stop hook runs the full suite on turn-end.
-- **Commit messages** end with: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
+- **No `Co-Authored-By` trailer** — no attribution trailer of any kind, in any commit. This plan originally mandated one here and embedded it in four copy-paste commit blocks; corrected 2026-08-27. See CLAUDE.md § What NOT to Do (violated 2026-08-09 across 14 commits, required a full-history rewrite to undo).
 
 ---
 
@@ -194,9 +194,7 @@ git commit -m "feat(12.9): reauthentication dialog + useStepUp auto-replay
 <ReauthenticationDialog> (password or TOTP per twoFactorEnabled) + StepUpProvider;
 useStepUp captures the gated action, opens the dialog on 401 REAUTH_REQUIRED,
 and replays the action on success. Shared dependency for the sessions list (12.1)
-and email-change request form (12.8).
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+and email-change request form (12.8)."
 ```
 
 ---
@@ -268,9 +266,7 @@ Write all five with explicit asserts (`resp.StatusCode.Should().Be(...)`, body s
 
 ```bash
 git add ProjectCeres/Controllers/Api/SessionsApiController.cs ProjectCeres/ViewModels/Sessions/ ProjectCeres.Client/src/app/pages/Sessions.tsx ProjectCeres.Client/src/app/features/sessions/ ProjectCeres.Client/src/app/App.tsx ProjectCeres.Tests/Integration/Api/SessionsApiTests.cs
-git commit -m "feat(12.1-12.3): sessions list + revoke + block-IP (reauth-gated)
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(12.1-12.3): sessions list + revoke + block-IP (reauth-gated)"
 ```
 
 ---
@@ -315,9 +311,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ```bash
 git add ProjectCeres.Client/src/app/pages/auth/EmailChange*.tsx ProjectCeres.Client/src/app/features/settings/EmailChangeForm.tsx ProjectCeres.Client/src/app/App.tsx ProjectCeres.Client/e2e/auth/email-change.spec.ts ProjectCeres/Common/Authentication/EmailChangeService.cs ProjectCeres.Client/src/app/**/EmailChange*.test.tsx
-git commit -m "feat(12.8): email-change SPA pages (request/confirm/revoke); clear FIXME
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+git commit -m "feat(12.8): email-change SPA pages (request/confirm/revoke); clear FIXME"
 ```
 
 ---
@@ -418,9 +412,7 @@ git commit -m "feat(12.4-12.7): support tickets + optional attachments + admin-n
 
 SupportTicket + SupportTicketAttachment (IUserOwned, forced RLS), reuse
 FileAttachmentService for hardened uploads, admin notification email, /support
-page. Admin ticket-LIST UI deferred to Stage 12.5.
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+page. Admin ticket-LIST UI deferred to Stage 12.5."
 ```
 
 ---
