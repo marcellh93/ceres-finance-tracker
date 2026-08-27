@@ -13,7 +13,9 @@ public sealed class SupportTicket : IUserOwned
     public Guid UserId { get; set; }
 
     public string Subject { get; set; } = "";
-    public string Message { get; set; } = "";
+
+    /// <summary>External reference for the ticket (e.g. an issue-tracker id), set by an agent. Optional.</summary>
+    public string? ExternalRef { get; set; }
 
     public SupportTicketStatus Status { get; set; } = SupportTicketStatus.Open;
     public SupportTicketPriority Priority { get; set; } = SupportTicketPriority.Normal;
@@ -28,8 +30,8 @@ public sealed class SupportTicket : IUserOwned
     public Guid? PrecedingTicketId { get; set; }
     public SupportTicket? PrecedingTicket { get; set; }
 
-    /// <summary>Files attached when the ticket was filed — typically screenshots.</summary>
-    public ICollection<SupportTicketAttachment> Attachments { get; set; } = [];
+    /// <summary>The conversation — one row per message, oldest first.</summary>
+    public ICollection<SupportMessage> Messages { get; set; } = [];
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

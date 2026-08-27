@@ -93,7 +93,10 @@ public class SupportApiController(
         var ticket = await tickets.GetOwnAsync(ticketId, ct);
         // 404 rather than 403: a ticket that is not yours must not be distinguishable
         // from one that does not exist.
-        return ticket is null ? NotFound() : Ok(ToDto(ticket, ticket.Attachments));
+        // Task 9: full thread DTO + reply endpoint lands here — GetOne will return the
+        // ordered message thread via ISupportMessageService.GetThreadAsync instead of a
+        // single-body DTO with flattened attachments.
+        return ticket is null ? NotFound() : Ok(ToDto(ticket, ticket.Messages.SelectMany(m => m.Attachments)));
     }
 
     [HttpPost("tickets/{ticketId:guid}/close")]
@@ -125,9 +128,16 @@ public class SupportApiController(
     [RequestSizeLimit(11 * 1024 * 1024)] // 10 MB payload + multipart overhead
     public async Task<IActionResult> Upload(Guid ticketId, IFormFile file, CancellationToken ct)
     {
+        // Task 9: this route attaches to the ticket's first message as a compile-bridge;
+        // the real per-message upload route (scoped to a specific reply) lands with the
+        // thread GET + reply endpoint.
         try
         {
-            var saved = await attachments.UploadForSupportTicketAsync(ticketId, file);
+            var ticket = await tickets.GetOwnAsync(ticketId, ct)
+                ?? throw new InvalidOperationException($"Support ticket {ticketId} not found.");
+            var firstMessageId = ticket.Messages.OrderBy(m => m.CreatedAt).First().Id;
+
+            var saved = await attachments.UploadForSupportMessageAsync(firstMessageId, file);
             return Ok(new AttachmentDto(
                 saved.Id, saved.FileName, saved.ContentType, saved.FileSizeBytes, saved.UploadedAt));
         }
@@ -138,10 +148,15 @@ public class SupportApiController(
     }
 
     private static TicketDto ToDto(SupportTicket t, IEnumerable<SupportTicketAttachment> files) =>
-        new(t.Id, t.Subject, t.Message, t.Status, t.Priority, t.PrecedingTicketId,
+        new(t.Id, t.Subject, FirstMessageBody(t), t.Status, t.Priority, t.PrecedingTicketId,
             t.CreatedAt, t.UpdatedAt,
             [.. files.Select(a => new AttachmentDto(
                 a.Id, a.FileName, a.ContentType, a.FileSizeBytes, a.UploadedAt))]);
+
+    // Task 9: TicketDto.Message (singular) is a compile-bridge — the real thread DTO
+    // returns the ordered message list instead of one flattened body.
+    private static string FirstMessageBody(SupportTicket t) =>
+        t.Messages.OrderBy(m => m.CreatedAt).FirstOrDefault()?.Body ?? "";
 
     private IActionResult Validation(InvalidOperationException ex) =>
         UnprocessableEntity(new
@@ -180,7 +195,7 @@ public class SupportApiController(
                 ticket.Subject,
                 User.Identity?.Name ?? currentUser.UserId.ToString(),
                 ticket.Id.ToString(),
-                ticket.Message) with { To = recipient };
+                FirstMessageBody(ticket)) with { To = recipient };
             await email.SendAsync(message, ct);
         }
         catch (Exception ex)

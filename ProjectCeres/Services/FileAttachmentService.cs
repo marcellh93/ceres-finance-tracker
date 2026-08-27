@@ -178,40 +178,40 @@ public class FileAttachmentService : IFileAttachmentService
     }
 
     /// <summary>
-    /// Attaches a file to one of the current user's support tickets.
+    /// Attaches a file to one of the current user's support messages.
     ///
     /// Unlike the transaction and transfer paths, this one sets <c>UserId</c> on the row
     /// explicitly. SupportTicketAttachments carries a COMPOSITE foreign key
-    /// (SupportTicketId, UserId) against the ticket's alternate key, added after a review
+    /// (SupportMessageId, UserId) against the message's alternate key, added after a review
     /// found the single-column shape allowed a cross-tenant destructive write: Postgres
     /// runs FK checks and ON DELETE CASCADE through a referential-integrity trigger that
     /// RLS does not apply to. Leaving UserId unset does not silently mis-scope the row —
     /// the insert fails outright.
     /// </summary>
-    public async Task<SupportTicketAttachment> UploadForSupportTicketAsync(Guid supportTicketId, IFormFile file)
+    public async Task<SupportTicketAttachment> UploadForSupportMessageAsync(Guid supportMessageId, IFormFile file)
     {
-        var parentExists = await db.SupportTickets.Owned(user).AnyAsync(t => t.Id == supportTicketId);
+        var parentExists = await db.SupportMessages.Owned(user).AnyAsync(m => m.Id == supportMessageId);
         if (!parentExists)
-            throw new InvalidOperationException($"Support ticket {supportTicketId} not found.");
+            throw new InvalidOperationException($"Support message {supportMessageId} not found.");
 
         var existingCount = await db.SupportTicketAttachments
-            .CountAsync(a => a.SupportTicketId == supportTicketId);
+            .CountAsync(a => a.SupportMessageId == supportMessageId);
         if (existingCount >= MaxFilesPerParent)
-            throw new InvalidOperationException($"A support ticket may not have more than {MaxFilesPerParent} attachments.");
+            throw new InvalidOperationException($"A support message may not have more than {MaxFilesPerParent} attachments.");
 
         var (bytes, mime, relativePath) =
-            await ValidateAndStoreAsync(file, "uploads", "support", supportTicketId.ToString());
+            await ValidateAndStoreAsync(file, "uploads", "support", supportMessageId.ToString());
 
         var attachment = new SupportTicketAttachment
         {
-            Id              = Guid.NewGuid(),
-            SupportTicketId = supportTicketId,
-            UserId          = user.UserId,
-            FileName        = file.FileName,
-            StoredPath      = relativePath,
-            ContentType     = mime,
-            FileSizeBytes   = bytes.Length,
-            UploadedAt      = _timeProvider.GetUtcNow().UtcDateTime
+            Id               = Guid.NewGuid(),
+            SupportMessageId = supportMessageId,
+            UserId           = user.UserId,
+            FileName         = file.FileName,
+            StoredPath       = relativePath,
+            ContentType      = mime,
+            FileSizeBytes    = bytes.Length,
+            UploadedAt       = _timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.SupportTicketAttachments.Add(attachment);
@@ -222,7 +222,7 @@ public class FileAttachmentService : IFileAttachmentService
     public async Task<(byte[] Data, string ContentType, string FileName)> GetSupportTicketAttachmentAsync(Guid attachmentId)
     {
         var attachment = await db.SupportTicketAttachments
-            .Where(a => a.Id == attachmentId && a.SupportTicket.UserId == user.UserId)
+            .Where(a => a.Id == attachmentId && a.SupportMessage.SupportTicket.UserId == user.UserId)
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
@@ -238,7 +238,7 @@ public class FileAttachmentService : IFileAttachmentService
     public async Task DeleteSupportTicketAttachmentAsync(Guid attachmentId)
     {
         var attachment = await db.SupportTicketAttachments
-            .Where(a => a.Id == attachmentId && a.SupportTicket.UserId == user.UserId)
+            .Where(a => a.Id == attachmentId && a.SupportMessage.SupportTicket.UserId == user.UserId)
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 

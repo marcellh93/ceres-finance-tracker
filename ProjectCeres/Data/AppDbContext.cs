@@ -93,6 +93,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<UserBlockedIp> UserBlockedIps => Set<UserBlockedIp>();
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+    public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
     public DbSet<SupportTicketAttachment> SupportTicketAttachments => Set<SupportTicketAttachment>();
     public DbSet<UserMfaBackupCode> UserMfaBackupCodes => Set<UserMfaBackupCode>();
     public DbSet<TotpReplayEntry> TotpReplayEntries => Set<TotpReplayEntry>();
@@ -169,7 +170,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasKey(t => t.Id);
             b.HasIndex(t => new { t.UserId, t.CreatedAt });
             b.Property(t => t.Subject).HasMaxLength(200).IsRequired();
-            b.Property(t => t.Message).HasMaxLength(5000).IsRequired();
+            b.Property(t => t.ExternalRef).HasMaxLength(200);
             b.Property(t => t.Status).HasConversion<int>();
             b.Property(t => t.Priority).HasConversion<int>();
 
@@ -184,43 +185,61 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Alternate key so a child can reference (Id, UserId) rather than Id alone.
-            // See the SupportTicketAttachment config below for why that matters.
+            // See the SupportMessage config below for why that matters.
             b.HasAlternateKey(t => new { t.Id, t.UserId });
+        });
+
+        modelBuilder.Entity<SupportMessage>(b =>
+        {
+            b.HasKey(m => m.Id);
+            b.HasAlternateKey(m => new { m.Id, m.UserId });   // principal key for attachment→message
+            b.HasIndex(m => m.UserId);                          // RLS policy filters on UserId
+            b.Property(m => m.Body).IsRequired();
+
+            // Composite FK message → ticket, so an agent message can only ever hang off a ticket with
+            // the SAME owner. Postgres runs FK checks + cascade through an RI trigger RLS does not touch,
+            // so a single-column FK would allow a cross-tenant write. Mirrors TransactionAttachment.
+            b.HasOne(m => m.SupportTicket)
+                .WithMany(t => t.Messages)
+                .HasForeignKey(m => new { m.SupportTicketId, m.UserId })
+                .HasPrincipalKey(t => new { t.Id, t.UserId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SupportTicketAttachment>(b =>
         {
             b.HasKey(a => a.Id);
-            // The composite FK below creates (SupportTicketId, UserId), whose leading
-            // column already serves "attachments for this ticket" — so no separate
-            // SupportTicketId index is declared. UserId gets its own because the RLS
+            // The composite FK below creates (SupportMessageId, UserId), whose leading
+            // column already serves "attachments for this message" — so no separate
+            // SupportMessageId index is declared. UserId gets its own because the RLS
             // policy injects "UserId" = $1 into every query on this table.
             b.HasIndex(a => a.UserId);
             b.Property(a => a.FileName).HasMaxLength(255).IsRequired();
             b.Property(a => a.StoredPath).HasMaxLength(500).IsRequired();
             b.Property(a => a.ContentType).HasMaxLength(100).IsRequired();
 
-            // COMPOSITE foreign key on (SupportTicketId, UserId), not SupportTicketId
+            // COMPOSITE foreign key on (SupportMessageId, UserId), not SupportMessageId
             // alone. Postgres runs foreign-key checks and ON DELETE CASCADE through an
             // internal referential-integrity trigger that RLS does not apply to — FORCE
             // does not change this. With a single-column FK, user B could attach a row
-            // to user A's ticket (the RLS WITH CHECK pins UserId to the WRITER, and says
-            // nothing about the parent's owner), and A deleting their own ticket would
+            // to user A's message (the RLS WITH CHECK pins UserId to the WRITER, and says
+            // nothing about the parent's owner), and A deleting their own message would
             // then silently destroy B's row via the cascade. Both were reproduced against
-            // the real database on 2026-08-23 before this key was added.
+            // the real database on 2026-08-23 before this key was added (on the ticket
+            // predecessor of this FK).
             //
             // Referencing (Id, UserId) makes the divergence unrepresentable: an
-            // attachment can only ever hang off a ticket with the same owner, so the
+            // attachment can only ever hang off a message with the same owner, so the
             // RLS-bypassing cascade has nothing to reach that the deleter does not
             // already own.
             //
             // Cascade itself is right, unlike the ticket self-FK's Restrict: an
-            // attachment has no meaning without its ticket, and Restrict would make a
-            // ticket with attachments undeletable.
-            b.HasOne(a => a.SupportTicket)
-                .WithMany(t => t.Attachments)
-                .HasForeignKey(a => new { a.SupportTicketId, a.UserId })
-                .HasPrincipalKey(t => new { t.Id, t.UserId })
+            // attachment has no meaning without its message, and Restrict would make a
+            // message with attachments undeletable.
+            b.HasOne(a => a.SupportMessage)
+                .WithMany(m => m.Attachments)
+                .HasForeignKey(a => new { a.SupportMessageId, a.UserId })
+                .HasPrincipalKey(m => new { m.Id, m.UserId })
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -12,7 +12,7 @@ namespace ProjectCeres.Models;
 public class SupportTicketAttachment : IUserOwned
 {
     public Guid Id { get; set; }
-    public Guid SupportTicketId { get; set; }
+    public Guid SupportMessageId { get; set; }
     public Guid UserId { get; set; }
 
     /// <summary>Original name, for display only. Never used to build a path.</summary>
@@ -27,5 +27,5 @@ public class SupportTicketAttachment : IUserOwned
     public long FileSizeBytes { get; set; }
     public DateTime UploadedAt { get; set; }
 
-    public SupportTicket SupportTicket { get; set; } = null!;
+    public SupportMessage SupportMessage { get; set; } = null!;
 }

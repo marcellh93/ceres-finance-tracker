@@ -54,17 +54,15 @@ public sealed class SupportTicketService : ISupportTicketService
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var ticket = new SupportTicket
         {
-            Id = Guid.NewGuid(),
-            UserId = _user.UserId,
-            Subject = subject.Trim(),
-            Message = message.Trim(),
-            Status = SupportTicketStatus.Open,
-            Priority = priority,
-            PrecedingTicketId = precedingTicketId,
-            CreatedAt = now,
-            UpdatedAt = now,
+            Id = Guid.NewGuid(), UserId = _user.UserId, Subject = subject.Trim(),
+            Status = SupportTicketStatus.Open, Priority = priority,
+            PrecedingTicketId = precedingTicketId, CreatedAt = now, UpdatedAt = now,
         };
-
+        ticket.Messages.Add(new SupportMessage
+        {
+            Id = Guid.NewGuid(), UserId = _user.UserId, SupportTicketId = ticket.Id,
+            AuthorRole = SupportMessageAuthor.User, Body = message.Trim(), CreatedAt = now,
+        });
         _db.SupportTickets.Add(ticket);
         await _db.SaveChangesAsync(ct);
         return ticket;
@@ -79,7 +77,7 @@ public sealed class SupportTicketService : ISupportTicketService
     public async Task<SupportTicket?> GetOwnAsync(Guid ticketId, CancellationToken ct = default) =>
         await _db.SupportTickets.Owned(_user)
             .AsNoTracking()
-            .Include(t => t.Attachments)
+            .Include(t => t.Messages).ThenInclude(m => m.Attachments)
             .FirstOrDefaultAsync(t => t.Id == ticketId, ct);
 
     public async Task<CloseTicketResult> CloseAsync(Guid ticketId, CancellationToken ct = default)

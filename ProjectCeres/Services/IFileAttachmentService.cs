@@ -15,7 +15,7 @@ public interface IFileAttachmentService
     Task<(byte[] Data, string ContentType, string FileName)> GetTransferAttachmentAsync(Guid attachmentId);
     Task DeleteTransferAttachmentAsync(Guid attachmentId);
 
-    Task<SupportTicketAttachment> UploadForSupportTicketAsync(Guid supportTicketId, IFormFile file);
+    Task<SupportTicketAttachment> UploadForSupportMessageAsync(Guid supportMessageId, IFormFile file);
     Task<(byte[] Data, string ContentType, string FileName)> GetSupportTicketAttachmentAsync(Guid attachmentId);
     Task DeleteSupportTicketAttachmentAsync(Guid attachmentId);
 }
