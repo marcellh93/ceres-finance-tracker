@@ -650,12 +650,31 @@ public class DashboardServiceTests : IAsyncLifetime
 
         // A date inside the cycle but in NEXT calendar month, and beyond the 7-day
         // imminent window so it lands in LaterBills.
+        //
+        // Both halves have to be derived, not hardcoded. An earlier version pinned the
+        // 2nd of next month, which stops being "beyond the imminent window" once today
+        // passes the 25th — the test then silently measured ImminentBills instead and
+        // failed. Found 2026-08-27, when the cutoff (3 Sep) had overtaken the fixed date
+        // (2 Sep). Anchor to the cycle end instead: it is always inside the period and
+        // always well clear of a 7-day window.
         var today = DateOnly.FromDateTime(DateTime.Today);
-        var nextMonth = today.AddMonths(1);
-        var dueNextMonth = new DateOnly(nextMonth.Year, nextMonth.Month, 2);
 
         // Only meaningful when the cycle actually reaches into next month.
         if (today.Day < 17) return;
+
+        var (_, cycleEnd) = BudgetPeriod.GetBoundsForMonth(
+            BudgetPeriod.GetCurrentPeriodMonth(today, 17).Year,
+            BudgetPeriod.GetCurrentPeriodMonth(today, 17).Month,
+            17);
+        var dueNextMonth = cycleEnd;
+
+        // Guard the premise rather than assume it: the date must be in the next calendar
+        // month AND outside the 7-day imminent window, or this test is not measuring
+        // what its name says.
+        dueNextMonth.Month.Should().NotBe(today.Month,
+            "the point of this test is a bill in the NEXT calendar month but inside the cycle");
+        dueNextMonth.Should().BeAfter(today.AddDays(7),
+            "a bill inside the imminent window lands in ImminentBills, not LaterBills");
 
         _fixture.Db.RecurringTransactions.Add(new RecurringTransaction
         {

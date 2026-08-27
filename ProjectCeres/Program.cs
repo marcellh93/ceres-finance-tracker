@@ -547,7 +547,15 @@ builder.Services.AddScoped<ISupportRecipientResolver, SupportRecipientResolver>(
 // fundamental failure (no mail at all, not just no support mail), and
 // ResendEmailServiceTests.Production_without_api_key_throws_at_startup pins its
 // message. Checking SupportAddress first would mask it.
+//
+// The opt-out exists because several integration tests boot a Production-environment
+// host to assert unrelated Production behaviour (E2eEnvironmentRegistrationTests,
+// ShelvedEndpointFencingTests). Requiring each of them to invent a support mailbox
+// spreads the cost of this guard with no safety gained — the guard protects real
+// deployments, and no deployment sets this flag. Same shape as
+// E2E:SkipDatabaseGuard and Stage75:SkipPrivilegeLeakCheck above.
 if (builder.Environment.IsProduction()
+    && !builder.Configuration.GetValue<bool>("Email:SkipSupportAddressCheck")
     && string.IsNullOrWhiteSpace(builder.Configuration["Email:SupportAddress"]))
 {
     throw new InvalidOperationException(

@@ -22,6 +22,7 @@ public class ShelvedEndpointFencingTests
         {
             b.UseEnvironment("Production");
             b.UseSetting("Stage75:SkipPrivilegeLeakCheck", "true");
+            b.UseSetting("Email:SkipSupportAddressCheck", "true");
             b.UseSetting("ConnectionStrings:ApplicationConnection",
                 "Host=localhost;Database=project_ceres_test;Username=ceres_app;Password=ceres_app_dev_password");
             b.UseSetting("ConnectionStrings:AdminConnection",
