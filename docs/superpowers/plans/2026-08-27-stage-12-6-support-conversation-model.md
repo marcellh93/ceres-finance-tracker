@@ -30,11 +30,12 @@
 
 The 12.5 support suites assert the old model (single `Message`, four statuses, attachments-on-ticket, `CloseAsync` as the user's own action). Each is classified below against `docs/testing.md` § Rules. **Task 0 applies this inventory; nothing else starts until it is done.** Verdicts: **migrate** (still valid, compiles + passes as-is after the reshape), **rewrite** (contract intentionally changed — name the change), **retire** (behaviour genuinely deleted).
 
-### `ProjectCeres.Tests/Integration/SupportTicketServiceTests.cs` (15 tests)
+### `ProjectCeres.Tests/Integration/SupportTicketServiceTests.cs` (16 tests)
 
 | Test | Verdict | Reason |
 |---|---|---|
 | `CreateAsync_opens_the_ticket_and_stamps_the_current_user` | **rewrite** | Create now also inserts the first `SupportMessage`; assert the message exists, `AuthorRole=User`, owner-stamped, Body = the supplied text. |
+| `CreateAsync_rejects_a_blank_subject_or_message` (Theory) | **migrate** | Blank subject/message guards unchanged. |
 | `ListOwnAsync_returns_only_the_callers_tickets_newest_first` | **migrate** | Ownership + ordering unchanged. |
 | `CloseAsync_closes_an_open_ticket_and_moves_UpdatedAt` | **migrate** | Close semantics unchanged; still `CloseTicketResult.Closed`. |
 | `CloseAsync_refuses_to_close_an_already_closed_ticket` | **migrate** | `CloseTicketResult.AlreadyClosed` unchanged. |
@@ -50,7 +51,7 @@ The 12.5 support suites assert the old model (single `Message`, four statuses, a
 | `UploadForSupportTicketAsync_cannot_attach_to_another_users_ticket` | **rewrite** | Re-pointed to message; the composite FK now guards message→attachment. |
 | `GetSupportTicketAttachmentAsync_cannot_read_another_users_attachment` | **migrate** | Download owner-scope walks message→ticket→owner; the assertion (foreign attachment unreadable) holds. |
 
-### `ProjectCeres.Tests/Integration/Api/SupportApiTests.cs` (15 tests)
+### `ProjectCeres.Tests/Integration/Api/SupportApiTests.cs` (16 tests)
 
 | Test | Verdict | Reason |
 |---|---|---|
@@ -69,6 +70,7 @@ The 12.5 support suites assert the old model (single `Message`, four statuses, a
 | `Upload_to_another_users_ticket_is_422` | **rewrite** | Re-pointed; a Closed-ticket message-post also 422 (new). |
 | `Download_of_another_users_attachment_is_404` | **migrate** | Owner-scope IDOR unchanged. |
 | `A_ticket_with_no_attachment_is_perfectly_valid` | **migrate** | Optional-attachment invariant holds at the message level. |
+| `Create_rejects_a_missing_subject_or_message_with_422` (Theory) | **migrate** | `[Required, MinLength(1)]` model-binding unchanged. |
 
 ### `ProjectCeres.Tests/Integration/Api/SupportNotificationTests.cs` (3 tests)
 
@@ -78,7 +80,7 @@ The 12.5 support suites assert the old model (single `Message`, four statuses, a
 | `A_send_failure_does_not_fail_the_ticket` | **migrate** | Best-effort-notify ordering unchanged. |
 | `No_configured_address_means_no_notification_but_still_a_ticket` | **migrate** | Unconfigured-address branch unchanged. |
 
-**Net:** 18 migrate, 15 rewrite, 0 retire. No test is deleted; the rewrites all trace to two contract changes (message replaces Message; attachments move to message). New tests are added by the tasks below; the reconciliation only touches existing ones.
+**Net:** 20 migrate, 15 rewrite, 0 retire (35 total). No test is deleted; the rewrites all trace to two contract changes (message replaces Message; attachments move to message). New tests are added by the tasks below; the reconciliation only touches existing ones.
 
 ---
 
