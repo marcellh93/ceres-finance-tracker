@@ -1620,6 +1620,8 @@ Right-to-erasure:
 - [ ] Audit-log record of the erasure ITSELF retained (per legal basis) but pseudonymized (user id hashed via `UserRef`, see Stage 15)
 - [ ] After erasure: account row marked `ErasedAt`; no future logins possible; email address freed for re-registration after a documented cooling period
 - [ ] Test: User A initiates erasure → background job completes → no User A data remains in `accounts`, `transactions`, etc.; only audit-log records persist with pseudonymized identifier
+- [ ] **Agent-message erasure/purge policy decided (from Stage 12.6).** Support `SupportMessage` rows are owner-stamped `IUserOwned`, so the operator's replies inherit the owner's erasure/purge fate — `UserOwnedCleanup` auto-includes them and a day-180 hard-delete would destroy them. `legal.md` has no carve-out for support correspondence. Decide: purge / anonymise-and-retain / retain-separately. The `AdminAuditLog` row from the operator-reply endpoint is the accountability record that survives regardless. Raised by the Stage 12.6 spec review 2026-08-27.
+- [ ] **Support-attachment files deleted on erasure (from Stage 12.6).** The composite-FK `ON DELETE CASCADE` on `SupportTicketAttachment` removes the row but leaves the file on disk (a `models.md` known gap that Stage 12.6 multiplies with per-message attachments). Erasure must delete the files explicitly via `FileAttachmentService`, not rely on the DB cascade. Same class as the general attachment-file cleanup already flagged for this stage.
 
 Breach notification + DPIA:
 

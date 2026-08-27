@@ -58,7 +58,7 @@ SupportTicket : IUserOwned
   Status        SupportTicketStatus   // now 5 values (was 4)
   Priority      SupportTicketPriority // unchanged
   PrecedingTicketId  Guid?            // unchanged — the follow-up chain
-  ExternalRef   string?               // NEW — the provider-agnostic seam, null today
+  ExternalRef   string?               // NEW — a correlation-id column, null today (see § ExternalRef)
   CreatedAt     DateTime
   UpdatedAt     DateTime
   Messages      ICollection<SupportMessage>   // NEW — replaces Message + Attachments
@@ -92,10 +92,31 @@ Three deliberate choices:
   an agent message through the admin (BYPASSRLS) path but stamps it with the owner's id, so it
   sits inside the owner's tenant. `AuthorRole=Agent` — not ownership — is what marks it as the
   operator's.
-- **Attachments move to `SupportMessageId`.** The 12.5 composite-FK protection carries forward,
-  re-pointed: `(SupportMessageId, UserId)` against a new `SupportMessage` alternate key
-  `(Id, UserId)`, same `ON DELETE CASCADE`, same reason (the Postgres RI trigger bypasses RLS,
-  so a single-column FK would allow a cross-tenant destructive write).
+
+  The isolation claim above is only true if two invariants hold; both reviews found the spec
+  *asserted* them without pinning them, so they are now requirements (see § Security invariants):
+  the owner id is taken from the **loaded ticket row, never the request**, and **both** FK hops
+  are composite.
+
+- **BOTH foreign keys are composite, not just the attachment hop.** `SupportMessage` sits
+  *between* ticket and attachment, so both hops cross an `IUserOwned` boundary and both need the
+  owner-carrying composite FK — the same pattern `TransactionAttachment` / `TransferAttachment`
+  use (`AppDbContext.cs` ~541–553). The earlier draft specified only the attachment hop; a
+  single-column `SupportMessage.SupportTicketId` FK would let an agent message reference a ticket
+  owned by a different user, and the RI-trigger cascade (which RLS does not touch) would cross
+  tenants — the identical hole 12.5 fixed one level down.
+
+  | Hop | Foreign key | Principal key | On delete |
+  |---|---|---|---|
+  | message → ticket | `(SupportTicketId, UserId)` | `SupportTicket(Id, UserId)` | Cascade |
+  | attachment → message | `(SupportMessageId, UserId)` | `SupportMessage(Id, UserId)` | Cascade |
+
+  New alternate key: `SupportMessage.HasAlternateKey((Id, UserId))`. `SupportTicket` already has
+  `(Id, UserId)` (keep it). Because `SupportMessage.UserId` is copied straight from the ticket,
+  the `(…, UserId)` pair always matches — so the cross-owner reference is structurally
+  unrepresentable. Required negative test (against the real DB, as 12.5 did): insert a
+  `SupportMessage` referencing a ticket owned by a different user → the composite FK rejects it;
+  delete the owner's ticket → no other tenant's row is touched by the cascade.
 
 ### `SupportTicketAttachment` (modified)
 
@@ -154,19 +175,22 @@ ticket with `PrecedingTicketId` set.
 
 ### Structure
 
-`SupportTicketStateMachine` is a single **stateless `sealed` class** — no interface, no
-inheritance, no `DbContext`, no request awareness, no fields. It is registered as a DI
-singleton purely so it can be constructor-injected into the two services like everything else
-(it holds no state, so singleton is safe). No interface, because there is nothing to fake
-(it is pure — tests call it directly with real enums) and there will never be a second
-implementation; the rules *are* the product decision. This follows the project's precedent for
-pure domain helpers (`BudgetPeriod` is a plain class, no interface).
+`SupportTicketStateMachine` is a **`static class` with static methods** — no interface, no
+instance, no DI registration, no `DbContext`, no request awareness, no fields. The architect
+review corrected the earlier draft here: it proposed a DI-singleton instance class and cited
+`BudgetPeriod` as precedent, but `BudgetPeriod` (`ProjectCeres/Services/BudgetPeriod.cs:9`) is a
+`public static class` — the opposite shape. A static class *is* the "nothing to fake, tests call
+it directly, no second implementation" design the rules argue for, and it needs no
+constructor-injection into the two services and no "singleton is safe because it is stateless"
+justification (that justification only existed because the draft picked the instance form). If a
+future reason to inject ever appears, promote it then; a `[Theory]` calls a static method just as
+directly.
 
 ```csharp
-public sealed class SupportTicketStateMachine
+public static class SupportTicketStateMachine
 {
-    public TransitionResult ResolveUserReply(SupportTicketStatus current);
-    public TransitionResult ResolveOperatorAction(SupportTicketStatus current, SupportTicketStatus chosen);
+    public static TransitionResult ResolveUserReply(SupportTicketStatus current);
+    public static TransitionResult ResolveOperatorAction(SupportTicketStatus current, SupportTicketStatus chosen);
 }
 
 public readonly record struct TransitionResult(
@@ -206,14 +230,53 @@ Attachment upload: the plan settles whether attachments ride the message-create 
 payload or a `POST .../messages/{messageId}/attachments` sub-route, against the actual
 `FileAttachmentService` shape. Either way the file attaches to a **message**.
 
-### Operator surface — new, under `Admin/`, `[RequireAdmin]`, admin BYPASSRLS context
+### Operator surface — new, under the `ProjectCeres/Admin/` **namespace**, `[RequireAdmin]`
 
 | Endpoint | Behaviour |
 |---|---|
-| `POST /api/admin/support/tickets/{id}/messages` | The operator reply **and** status set, in one call. Body carries the message text (may be empty) + the chosen status. Empty text + a status = the silent OnHold / stale-Close case. Writes a `SupportMessage` with `AuthorRole=Agent`, stamped with the **ticket owner's** `UserId`, and applies the chosen transition through the state machine. |
+| `POST /api/admin/support/tickets/{id}/messages` | The operator reply **and/or** status set, in one call (see § Empty body below). Writes a `SupportMessage` with `AuthorRole=Agent`, stamped with the ticket owner's `UserId` **taken from the loaded ticket row**, and applies the chosen transition through the state machine. |
 
 That is the entire operator surface this stage. No inbox, no list, no assignment. The operator
 reaches a ticket by the id in their notification email until the § 12.5.2 admin list ships.
+
+**The endpoint's mechanics are non-obvious and both reviews flagged them — the plan MUST spell
+these out, because there is no existing cross-user-write template under `Admin/` to copy (this is
+the first one):**
+
+1. **Location.** The controller lives under the `ProjectCeres/Admin/` **namespace**, not merely
+   an `api/admin/*` route. The cross-tenant-write allow-list (ADR-0065,
+   `ArchitectureTests.Admin_namespace_is_allow_listed_for_IgnoreQueryFilters`) keys on the
+   namespace; a file in `Controllers/Api/` with an `api/admin` route would trip that test.
+2. **Read via `AdminDbContext` + `IgnoreQueryFilters()`.** Load the ticket by `{id}`; the global
+   query filter would otherwise scope the read to the *admin's* own id and return zero rows.
+   **404 if not found** (matching the user surface and the IDOR 404-not-403 rule). This is the
+   *not* the `AdminUsersApiController` pattern — that one uses `UserManager` against Identity
+   tables and never writes an `IUserOwned` row into a tenant. The right precedent is
+   `AdminDbContext` + `[RequiresAdminContext]`, pinned by `AdminContextDisciplineTests`.
+3. **Stamp `message.UserId = ticket.UserId` EXPLICITLY** before `SaveChanges`. This is the
+   load-bearing line. `UserOwnershipInterceptor` (`UserOwnershipInterceptor.cs:38–41`) auto-stamps
+   the *current* user on any Added `IUserOwned` whose `UserId` is still `default` — and on an
+   operator request the current user is the **admin**. Leave it unset and the message lands in the
+   admin's tenant, invisible to the user and unattachable to the owner's ticket via the composite
+   FK. The owner id comes from the ticket row (step 2), **never from the request** — a
+   request-supplied owner is exactly the cross-tenant write the composite FK exists to stop, and
+   under BYPASSRLS the `WITH CHECK` policy will not catch it.
+4. **Write via `AdminDbContext` (BYPASSRLS).** On the normal RLS connection the `WITH CHECK`
+   pins the inserted `UserId` to the admin's GUC and rejects the owner-stamped insert (42501).
+5. **Validate the transition** through `SupportTicketStateMachine.ResolveOperatorAction` before
+   writing; reject an illegal transition (Closed is terminal).
+6. **Audit.** An operator reply is an admin mutation of another user's data. It writes an
+   `AdminAuditLog` row (actor = admin, target = owner; append-only, no delete endpoint — this is
+   the record that survives a Stage-13 erasure of the user) AND adds an owner-scoped
+   `AuditLogAction.SupportMessageByAgent` so the owner's own trail shows it. The new
+   `AuditLogAction` value lands in the same commit as
+   `AuditLogAction_enum_values_match_documented_set`, or that test goes red.
+
+**Empty body.** The endpoint conflates "reply" and "status-only change". Resolve in the plan
+(both reviews, M2): a status-only change (silent OnHold, stale-Close) creates **no message row** —
+it is a status transition with no `SupportMessage`. A reply requires a non-empty `Body`. This
+avoids an empty-`Body` row fighting the `[Required, MinLength(1)]` shape `SupportTicket.Message`
+carries today.
 
 ### Notifications — `SupportNotificationService` (extracted from the controller)
 
@@ -229,17 +292,30 @@ machine.
 | Operator sets Solved | user | `FromVerifiedUser` |
 | Operator sets OnHold | nobody | — |
 
-**Recipient-lock consequence** (flagged so the security review is not surprised): notifying the
-user means composing an email `To:` the user's own verified address, which uses
-`FromVerifiedUser` — the existing, sanctioned factory for exactly that. No new hole, but the
-notification service now uses **both** recipient factories. The whole-tree recipient-lock
-architecture test gains one call site, and the `security-model.md` factory table stays accurate.
+**Recipient-lock: sound, but two separate rules apply.** The *recipient* mechanics are fine —
+`FromVerifiedUser` is the sanctioned factory for the user's own verified address, and adding it as
+a second call site correctly requires extending the whole-tree recipient-lock architecture test's
+allow-list and the `security-model.md` factory table. That covers the Layer-2 *recipient* lock.
+
+The **content** rule is separate and the security review (H2) flagged the spec was silent on it.
+The `SupportReplyToUser` email **includes the operator's reply text** (user decision, 2026-08-27:
+a Zendesk/Intercom-style reply email, not notification-only). Because agent-authored free text now
+renders into an email delivered to the user, it MUST be sanitised/escaped into the template the
+same way user content is (security-model.md § Email Security Layer 2, "sanitize all
+user-controlled content"). Required negative test: an agent body containing HTML / template-
+breaking characters asserts escaped output. The reply email also carries a link to
+`/support/<id>` so the user can open the thread.
 
 Two new `EmailTemplateKey` values — `SupportReplyToUser`, `SupportTicketSolved` — each with the
 EN/ES resx triple and the `EmailComposer` switch arm.
 
-**Carried forward from 12.5:** the rate limit (now also on `POST .../messages`, since it sends
-mail), and the per-user storage quota (unchanged — it already sums across attachment families).
+**Carried forward from 12.5:** the rate limit and the per-user storage quota. `POST .../messages`
+(user reply) sends mail, so it carries `[EnableRateLimiting(EmailByUser)]` + `[ApplyEmailIpRateLimit]`.
+Both reviews (security H3, architect) flag that
+`ArchitectureTests.Email_triggering_endpoints_carry_a_rate_limit` hard-codes only
+`(SupportApiController, "Create")` in its `mailSendingActions` array — the plan MUST add the new
+user-reply and operator-reply actions to that array, or the test passes while not covering the new
+mail-senders (the "green and lying" failure this spec warns about elsewhere).
 
 ---
 
@@ -250,20 +326,37 @@ mail), and the per-user storage quota (unchanged — it already sums across atta
 The feature is pre-launch beta; the dev DB holds test tickets but no real uploaded files
 (user-confirmed), so the attachment repoint is low-risk.
 
-1. Create the `SupportMessages` table **and** its `user_isolation` RLS policy in the same
-   migration (the entity+policy pairing rule; `RlsParityStartupCheck` / `ParityTests` fail
-   until it lands).
-2. Add `ExternalRef` (nullable) to `SupportTickets`. Remap status values:
-   `Open→Open`, `InProgress→Open`, `Resolved→Solved`, `Closed→Closed`.
-3. **Data move:** for each existing ticket, insert one `SupportMessage`
+Order matters — run the whole migration in **one transaction** so a mid-migration failure cannot
+strand attachments pointing at a dropped column.
+
+1. Create the `SupportMessages` table **with its `(Id, UserId)` alternate key** and its
+   `user_isolation` RLS policy in the same migration (the entity+policy pairing rule;
+   `RlsParityStartupCheck` / `ParityTests` fail until it lands).
+2. Add `ExternalRef` (nullable) to `SupportTickets`.
+3. **Remap status as an explicit value map, not a name map — this is a data-corruption trap.**
+   The statuses are stored *ints* and the ordinals changed meaning (old `Closed=3`; new `Solved=3`,
+   `Closed=4`). A `SET status = status + 1` or a name-only rewrite collides old `Closed=3` into the
+   new `Solved=3` slot. The correct rewrite is a single `CASE`:
+
+   | Old (name = int) | New (name = int) |
+   |---|---|
+   | `Open = 0` | `Open = 0` |
+   | `InProgress = 1` | `Open = 0` |
+   | `Resolved = 2` | `Solved = 3` |
+   | `Closed = 3` | `Closed = 4` |
+
+   With a pre-flight guard that aborts readably if an unexpected stored value is present.
+4. **Data move:** for each existing ticket, insert one `SupportMessage`
    (`AuthorRole=User`, `Body`=old `Message`, `UserId`=ticket owner,
    `CreatedAt`=ticket's `CreatedAt`).
-4. **Repoint attachments:** `SupportTicketId` → the new first message's `SupportMessageId`;
-   swap the composite FK to `(SupportMessageId, UserId)` against `SupportMessage`'s alternate
-   key `(Id, UserId)`.
-5. Drop `SupportTicket.Message`.
+5. **Repoint attachments:** `SupportTicketId` → the new first message's `SupportMessageId`;
+   swap the attachment composite FK to `(SupportMessageId, UserId)` → `SupportMessage(Id, UserId)`,
+   and add the message→ticket composite FK `(SupportTicketId, UserId)` → `SupportTicket(Id, UserId)`.
+   Because each message's `UserId` is copied from its ticket (step 4), the `(…, UserId)` pairs are
+   guaranteed to match, so the repoint cannot create a cross-owner row.
+6. Drop `SupportTicket.Message`.
 
-Steps 3–4 are raw SQL inside the migration with a pre-flight guard (the shape used by
+Steps 3–5 are raw SQL inside the migration with a pre-flight guard (the shape used by
 `ScopeOlderAttachmentFksToOwner`: abort with a readable message rather than a bare constraint
 violation if the data is already in an unexpected shape). **Any DB-destructive step is run only
 after explicit user confirmation** — a standing project rule independent of this spec.
@@ -343,19 +436,71 @@ which is the inventory anyway, just less visible and less reviewable.
 - **Per-user storage quota** — unchanged.
 - **Follow-up chain (`PrecedingTicketId`)** — unchanged; now orthogonal to conversations.
 
+## ExternalRef — a correlation column, not a seam
+
+The architect review (Q5) corrected the earlier framing. `ExternalRef` is a nullable
+correlation-id column, added now because a nullable column is cheap and avoids a schema
+migration on a populated table later. It is **not** an architectural seam that makes a future
+Zendesk integration "an adapter rather than a rewrite" — that integration still needs an
+outbound sync, an inbound sync (Zendesk replies → `SupportMessage` rows), a bidirectional status
+map, idempotency/conflict handling, and an adapter interface with a real second implementation.
+`ExternalRef` participates in exactly one of those (the correlation id) and reshapes no control
+flow. Adding the column now is the right YAGNI call; claiming it de-risks the integration is not,
+because a later spec that reasons "we already have the seam" would skip the real design. Keep the
+column, drop the seam claim.
+
 ## Out of scope (YAGNI — keeps the stage shippable)
 
 - Admin ticket-list / inbox UI (roadmap § 12.5.2).
 - Assignment, triage, agent identity beyond the `User | Agent` role.
-- The actual Zendesk adapter — only the `ExternalRef` seam and status-mapping shape ship.
+- The actual Zendesk adapter (see § ExternalRef — only the correlation column ships).
 - Inbound email parsing (operator-replies-by-email).
 - Digest / batched notifications (no background-job scheduler exists).
 - Rich-text or Markdown message bodies — plain text this stage.
 
+## Deferred to Stage 13 (receiving-stage checkboxes required)
+
+Both reviews found two policy questions this stage *creates* but the next stage (GDPR baseline,
+`roadmap-phase-three.md` Stage 13) must answer. Per the deferral rules, each gets a `[ ]` under
+Stage 13, not a silent gap:
+
+- **Agent-message erasure/purge policy.** Owner-stamped agent messages are `IUserOwned`, so
+  `UserOwnedCleanup` auto-includes `SupportMessage` and a natural-churn purge (legal.md day-180
+  hard-delete) would destroy the operator's replies with the user's. `legal.md` has no carve-out
+  classifying support correspondence. Stage 13 must decide: purge / anonymise-and-retain /
+  retain-separately. The `AdminAuditLog` row (from the operator-endpoint audit) is the
+  accountability record that survives erasure regardless.
+- **Support-attachment file cleanup on delete.** The composite-FK `ON DELETE CASCADE` removes
+  the attachment *row* but leaves the *file* on disk (a `models.md` known gap). This stage
+  multiplies the delete surface (per-message attachments, cascade-on-message), so tie the fix to
+  the Stage-13 erasure work (`FileAttachmentService` already flags GDPR file handling there).
+
 ## Cross-references
 
 - Supersedes: `2026-06-30-stage-12-sessions-support-spa-design.md` § Commit 4.
-- Roadmap: `docs/roadmap-phase-three.md` → new Stage 12.6.
+- Roadmap: `docs/roadmap-phase-three.md` → new Stage 12.6; two `[ ]` receiving items under Stage 13.
 - `docs/models.md` § SupportTicket / SupportTicketAttachment (updated by the cutover).
 - `docs/security-model.md` § Email Security Rules (recipient-lock factory table gains a row).
 - `docs/api-contract.md` SupportTickets row (gains the message endpoints).
+
+## Review revisions (2026-08-27)
+
+Dispatched `ceres-architect` and `ceres-security-reviewer` against the approved design before
+writing the plan. Neither rejected the shape; both found invariants the spec asserted without
+pinning. Each finding was verified against the real code before folding in.
+
+| Finding | Source | Change |
+|---|---|---|
+| Owner id must come from the loaded ticket row, never the request (C1) | security | § Operator surface, step 3 — explicit, with the `UserOwnershipInterceptor` trap spelled out |
+| Both FK hops must be composite, not just attachment→message (C2) | security | § Section 1 — message→ticket FK added; table + negative test |
+| State machine is a `static class`, not a DI-singleton; `BudgetPeriod` is static | architect | § Structure — rewritten |
+| Status remap is a value-rewrite with a collision trap (`Closed=3`→`4`) | architect | § Migration step 3 — explicit CASE map |
+| Operator reply needs an audit action; it's the GDPR-surviving record | both | § Operator surface, step 6 |
+| Agent reply body emailed to user must be sanitised; include-text chosen | security | § Notifications — sanitise + negative test |
+| Rate-limit `mailSendingActions` array must gain the two new endpoints | both | § Notifications carry-forward |
+| Empty-body operator action → no message row (status-only change) | both | § Operator surface, Empty body |
+| `ExternalRef` is a correlation column, not a seam — downgrade language | architect | § ExternalRef |
+| Two Stage-13 policy questions this stage creates | both | § Deferred to Stage 13 |
+
+The owner-stamping isolation model, status-as-stored-column, and the clean-cutover migration were
+all confirmed sound.
