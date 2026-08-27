@@ -136,22 +136,23 @@ public class SupportApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_writes_a_SupportTicketCreated_audit_row()
+    public async Task Create_writes_a_SupportTicketCreated_audit_row_naming_the_ticket()
     {
-        var before = DateTime.UtcNow.AddSeconds(-5);
-
         var id = await CreateTicketAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var written = await db.AuditLogs.IgnoreQueryFilters().AsNoTracking()
-            .Where(a => a.UserId == Sentinel
-                     && a.Action == AuditLogAction.SupportTicketCreated
-                     && a.OccurredAt >= before)
-            .ToListAsync();
 
-        written.Should().NotBeEmpty("filing a ticket is an auditable account event");
-        id.Should().NotBeEmpty();
+        // Keyed on the ticket id, not a time window: the shared test database is
+        // sequential and full of other runs' rows, so a window query would pass on
+        // somebody else's audit row and keep passing if this feature were removed.
+        var written = await db.AuditLogs.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(a => a.EntityId == id);
+
+        written.Action.Should().Be(AuditLogAction.SupportTicketCreated);
+        written.UserId.Should().Be(Sentinel);
+        written.EntityType.Should().Be(nameof(SupportTicket),
+            "the row must say WHICH kind of thing it refers to, or EntityId is ambiguous");
     }
 
     [Theory]

@@ -73,7 +73,8 @@ public class SupportApiController(
             return Validation(ex);
         }
 
-        await auditLog.RecordAsync(currentUser.UserId, AuditLogAction.SupportTicketCreated, ct: ct);
+        await auditLog.RecordAsync(currentUser.UserId, AuditLogAction.SupportTicketCreated,
+            nameof(SupportTicket), ticket.Id, ct);
         await NotifySupportAsync(ticket, ct);
 
         return CreatedAtAction(nameof(GetOne), new { ticketId = ticket.Id }, new { id = ticket.Id });

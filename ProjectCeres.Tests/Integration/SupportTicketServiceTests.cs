@@ -299,6 +299,35 @@ public class SupportTicketServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UploadForSupportTicketAsync_rejects_a_file_over_the_10_MB_cap()
+    {
+        var ticket = await _service.CreateAsync($"too big {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        // 11 MB. The cap lives in the core the three attachment families now share, so
+        // this also guards against a refactor that drops it for support only.
+        var file = MakeFormFile(new byte[11 * 1024 * 1024], "huge.jpg", "image/jpeg");
+
+        var act = () => _attachments.UploadForSupportTicketAsync(ticket.Id, file);
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*10 MB*");
+    }
+
+    [Fact]
+    public async Task UploadForSupportTicketAsync_caps_a_ticket_at_ten_attachments()
+    {
+        var ticket = await _service.CreateAsync($"many files {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        for (var i = 0; i < 10; i++)
+        {
+            await _attachments.UploadForSupportTicketAsync(
+                ticket.Id, MakeFormFile(MinimalJpegBytes(), $"shot{i}.jpg", "image/jpeg"));
+        }
+
+        var act = () => _attachments.UploadForSupportTicketAsync(
+            ticket.Id, MakeFormFile(MinimalJpegBytes(), "eleventh.jpg", "image/jpeg"));
+
+        (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*more than 10*");
+    }
+
+    [Fact]
     public async Task UploadForSupportTicketAsync_cannot_attach_to_another_users_ticket()
     {
         var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Open);
