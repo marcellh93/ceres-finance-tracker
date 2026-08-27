@@ -28,6 +28,9 @@ public sealed class SupportTicket : IUserOwned
     public Guid? PrecedingTicketId { get; set; }
     public SupportTicket? PrecedingTicket { get; set; }
 
+    /// <summary>Files attached when the ticket was filed — typically screenshots.</summary>
+    public ICollection<SupportTicketAttachment> Attachments { get; set; } = [];
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

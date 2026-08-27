@@ -31,7 +31,7 @@ public class FileAttachmentService : IFileAttachmentService
     }
 
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
-    private const int  MaxFilesPerTransaction = 10;
+    private const int  MaxFilesPerParent = 10;
 
     // MIME types that are allowed. Extension is derived from this list — never from user input.
     private static readonly Dictionary<string, string> AllowedMimeTypes = new()
@@ -66,11 +66,6 @@ public class FileAttachmentService : IFileAttachmentService
 
     public async Task<TransactionAttachment> UploadAsync(Guid transactionId, IFormFile file)
     {
-        if (file.Length == 0)
-            throw new InvalidOperationException("Uploaded file is empty.");
-        if (file.Length > MaxFileSizeBytes)
-            throw new InvalidOperationException("File exceeds the 10 MB limit.");
-
         // Ownership gate: parent transaction must belong to the current user.
         var parentExists = await db.Transactions.Owned(user).AnyAsync(t => t.Id == transactionId);
         if (!parentExists)
@@ -78,24 +73,11 @@ public class FileAttachmentService : IFileAttachmentService
 
         var existingCount = await db.TransactionAttachments
             .CountAsync(a => a.TransactionId == transactionId);
-        if (existingCount >= MaxFilesPerTransaction)
-            throw new InvalidOperationException($"A transaction may not have more than {MaxFilesPerTransaction} attachments.");
+        if (existingCount >= MaxFilesPerParent)
+            throw new InvalidOperationException($"A transaction may not have more than {MaxFilesPerParent} attachments.");
 
-        // Read file bytes for magic-byte inspection.
-        using var ms = new MemoryStream();
-        await file.CopyToAsync(ms);
-        var bytes = ms.ToArray();
-
-        var detectedMime = DetectMime(bytes);
-        if (!AllowedMimeTypes.TryGetValue(detectedMime, out var extension))
-            throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
-
-        // Build a safe stored path — no user-supplied values touch the filesystem.
-        var relativePath = Path.Combine("uploads", transactionId.ToString(), $"{Guid.NewGuid()}{extension}");
-        var fullPath     = Path.Combine(_root, relativePath);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        await File.WriteAllBytesAsync(fullPath, bytes);
+        var (bytes, mime, relativePath) =
+            await ValidateAndStoreAsync(file, "uploads", transactionId.ToString());
 
         var attachment = new TransactionAttachment
         {
@@ -103,7 +85,7 @@ public class FileAttachmentService : IFileAttachmentService
             TransactionId = transactionId,
             FileName      = file.FileName,   // stored for display only
             StoredPath    = relativePath,
-            ContentType   = detectedMime,
+            ContentType   = mime,
             FileSizeBytes = bytes.Length,
             UploadedAt    = _timeProvider.GetUtcNow().UtcDateTime
         };
@@ -120,17 +102,7 @@ public class FileAttachmentService : IFileAttachmentService
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
-        var fullPath = Path.Combine(_root, attachment.StoredPath);
-        if (!File.Exists(fullPath))
-            throw new InvalidOperationException("Attachment file not found on disk.");
-
-        var bytes = await File.ReadAllBytesAsync(fullPath);
-
-        // Re-verify MIME at serve time.
-        var detectedMime = DetectMime(bytes);
-        if (!AllowedMimeTypes.ContainsKey(detectedMime))
-            throw new InvalidOperationException("Attachment failed MIME verification at serve time.");
-
+        var bytes = await ReadVerifiedAsync(attachment.StoredPath);
         return (bytes, attachment.ContentType, attachment.FileName);
     }
 
@@ -151,28 +123,12 @@ public class FileAttachmentService : IFileAttachmentService
 
     public async Task<TransferAttachment> UploadForTransferAsync(Guid transferId, IFormFile file)
     {
-        if (file.Length == 0)
-            throw new InvalidOperationException("Uploaded file is empty.");
-        if (file.Length > MaxFileSizeBytes)
-            throw new InvalidOperationException("File exceeds the 10 MB limit.");
-
         var parentExists = await db.Transfers.Owned(user).AnyAsync(t => t.Id == transferId);
         if (!parentExists)
             throw new InvalidOperationException($"Transfer {transferId} not found.");
 
-        using var ms = new MemoryStream();
-        await file.CopyToAsync(ms);
-        var bytes = ms.ToArray();
-
-        var detectedMime = DetectMime(bytes);
-        if (!AllowedMimeTypes.TryGetValue(detectedMime, out var extension))
-            throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
-
-        var relativePath = Path.Combine("uploads", "transfers", transferId.ToString(), $"{Guid.NewGuid()}{extension}");
-        var fullPath     = Path.Combine(_root, relativePath);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        await File.WriteAllBytesAsync(fullPath, bytes);
+        var (bytes, mime, relativePath) =
+            await ValidateAndStoreAsync(file, "uploads", "transfers", transferId.ToString());
 
         var attachment = new TransferAttachment
         {
@@ -180,7 +136,7 @@ public class FileAttachmentService : IFileAttachmentService
             TransferId    = transferId,
             FileName      = file.FileName,
             StoredPath    = relativePath,
-            ContentType   = detectedMime,
+            ContentType   = mime,
             FileSizeBytes = bytes.Length,
             UploadedAt    = _timeProvider.GetUtcNow().UtcDateTime
         };
@@ -197,16 +153,7 @@ public class FileAttachmentService : IFileAttachmentService
             .FirstOrDefaultAsync()
             ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
 
-        var fullPath = Path.Combine(_root, attachment.StoredPath);
-        if (!File.Exists(fullPath))
-            throw new InvalidOperationException("Attachment file not found on disk.");
-
-        var bytes = await File.ReadAllBytesAsync(fullPath);
-
-        var detectedMime = DetectMime(bytes);
-        if (!AllowedMimeTypes.ContainsKey(detectedMime))
-            throw new InvalidOperationException("Attachment failed MIME verification at serve time.");
-
+        var bytes = await ReadVerifiedAsync(attachment.StoredPath);
         return (bytes, attachment.ContentType, attachment.FileName);
     }
 
@@ -223,6 +170,129 @@ public class FileAttachmentService : IFileAttachmentService
 
         db.TransferAttachments.Remove(attachment);
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Attaches a file to one of the current user's support tickets.
+    ///
+    /// Unlike the transaction and transfer paths, this one sets <c>UserId</c> on the row
+    /// explicitly. SupportTicketAttachments carries a COMPOSITE foreign key
+    /// (SupportTicketId, UserId) against the ticket's alternate key, added after a review
+    /// found the single-column shape allowed a cross-tenant destructive write: Postgres
+    /// runs FK checks and ON DELETE CASCADE through a referential-integrity trigger that
+    /// RLS does not apply to. Leaving UserId unset does not silently mis-scope the row —
+    /// the insert fails outright.
+    /// </summary>
+    public async Task<SupportTicketAttachment> UploadForSupportTicketAsync(Guid supportTicketId, IFormFile file)
+    {
+        var parentExists = await db.SupportTickets.Owned(user).AnyAsync(t => t.Id == supportTicketId);
+        if (!parentExists)
+            throw new InvalidOperationException($"Support ticket {supportTicketId} not found.");
+
+        var existingCount = await db.SupportTicketAttachments
+            .CountAsync(a => a.SupportTicketId == supportTicketId);
+        if (existingCount >= MaxFilesPerParent)
+            throw new InvalidOperationException($"A support ticket may not have more than {MaxFilesPerParent} attachments.");
+
+        var (bytes, mime, relativePath) =
+            await ValidateAndStoreAsync(file, "uploads", "support", supportTicketId.ToString());
+
+        var attachment = new SupportTicketAttachment
+        {
+            Id              = Guid.NewGuid(),
+            SupportTicketId = supportTicketId,
+            UserId          = user.UserId,
+            FileName        = file.FileName,
+            StoredPath      = relativePath,
+            ContentType     = mime,
+            FileSizeBytes   = bytes.Length,
+            UploadedAt      = _timeProvider.GetUtcNow().UtcDateTime
+        };
+
+        db.SupportTicketAttachments.Add(attachment);
+        await db.SaveChangesAsync();
+        return attachment;
+    }
+
+    public async Task<(byte[] Data, string ContentType, string FileName)> GetSupportTicketAttachmentAsync(Guid attachmentId)
+    {
+        var attachment = await db.SupportTicketAttachments
+            .Where(a => a.Id == attachmentId && a.SupportTicket.UserId == user.UserId)
+            .FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
+
+        var bytes = await ReadVerifiedAsync(attachment.StoredPath);
+        return (bytes, attachment.ContentType, attachment.FileName);
+    }
+
+    /// <summary>
+    /// Deletes the file THEN the row. A database cascade never runs application code, so
+    /// deleting a ticket directly would strand its files on disk forever — every
+    /// ticket-delete path must come through here (roadmap § 12.5, GDPR erasure Stage 13).
+    /// </summary>
+    public async Task DeleteSupportTicketAttachmentAsync(Guid attachmentId)
+    {
+        var attachment = await db.SupportTicketAttachments
+            .Where(a => a.Id == attachmentId && a.SupportTicket.UserId == user.UserId)
+            .FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException($"Attachment {attachmentId} not found.");
+
+        var fullPath = Path.Combine(_root, attachment.StoredPath);
+        if (File.Exists(fullPath))
+            File.Delete(fullPath);
+
+        db.SupportTicketAttachments.Remove(attachment);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Validate, magic-byte inspect, and write one upload to disk. Returns everything the
+    /// caller needs to build its own attachment row.
+    ///
+    /// The three attachment families (transaction, transfer, support ticket) differ only in
+    /// their parent check, their storage folder, and the row type. Everything security-
+    /// relevant — the size limit, the magic-byte inspection, the extension coming from the
+    /// DETECTED mime rather than the filename — is here, once, so a fix cannot land on one
+    /// family and miss the others.
+    /// </summary>
+    private async Task<(byte[] Bytes, string Mime, string RelativePath)> ValidateAndStoreAsync(
+        IFormFile file, params string[] folderSegments)
+    {
+        if (file.Length == 0)
+            throw new InvalidOperationException("Uploaded file is empty.");
+        if (file.Length > MaxFileSizeBytes)
+            throw new InvalidOperationException("File exceeds the 10 MB limit.");
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+
+        var detectedMime = DetectMime(bytes);
+        if (!AllowedMimeTypes.TryGetValue(detectedMime, out var extension))
+            throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
+
+        var relativePath = Path.Combine([.. folderSegments, $"{Guid.NewGuid()}{extension}"]);
+        var fullPath = Path.Combine(_root, relativePath);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        await File.WriteAllBytesAsync(fullPath, bytes);
+
+        return (bytes, detectedMime, relativePath);
+    }
+
+    /// <summary>Reads an attachment off disk and re-verifies its magic bytes at serve time.</summary>
+    private async Task<byte[]> ReadVerifiedAsync(string storedPath)
+    {
+        var fullPath = Path.Combine(_root, storedPath);
+        if (!File.Exists(fullPath))
+            throw new InvalidOperationException("Attachment file not found on disk.");
+
+        var bytes = await File.ReadAllBytesAsync(fullPath);
+
+        if (!AllowedMimeTypes.ContainsKey(DetectMime(bytes)))
+            throw new InvalidOperationException("Attachment failed MIME verification at serve time.");
+
+        return bytes;
     }
 
     private static string DetectMime(byte[] bytes)

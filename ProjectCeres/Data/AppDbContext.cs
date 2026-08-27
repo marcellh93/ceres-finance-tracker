@@ -218,7 +218,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             // attachment has no meaning without its ticket, and Restrict would make a
             // ticket with attachments undeletable.
             b.HasOne(a => a.SupportTicket)
-                .WithMany()
+                .WithMany(t => t.Attachments)
                 .HasForeignKey(a => new { a.SupportTicketId, a.UserId })
                 .HasPrincipalKey(t => new { t.Id, t.UserId })
                 .OnDelete(DeleteBehavior.Cascade);

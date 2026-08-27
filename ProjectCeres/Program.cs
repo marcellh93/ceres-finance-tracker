@@ -535,6 +535,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.Configure<FileAttachmentOptions>(
     builder.Configuration.GetSection("FileAttachments"));
 builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
+builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();
