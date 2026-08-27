@@ -1447,8 +1447,10 @@ Server side:
 
 - [x] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt` — **plus `PrecedingTicketId`** (nullable self-reference for the follow-up chain; close is final, there is no reopen — see `models.md` § SupportTicket). Shipped 2026-08-23 with its RLS policy in the same migration
 - [x] Global query filter applies (only owner sees own tickets) — derived from `UserOwnedModel.RlsTables`, pinned by `ArchitectureTests.UserOwnedModel_RlsTables_match_HasQueryFilter_registrations`
-- [ ] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). **Corrected 2026-08-23: this was marked `[x]` but nothing shipped** — `EmailTemplateKey` has no `SupportTicketReceived` member and there are no matching resx keys. Lands with the service half of 12.5, using a new `Email:SupportAddress` config key validated at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
-- [ ] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
+- [x] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). Shipped 2026-08-27 (`31efe348`) with `Email:SupportAddress`, required at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
+- [x] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
+- [x] **`POST /api/support/tickets` is rate-limited.** Every create sends mail, so `security-model.md` § Email Security Rules ("rate-limit ALL email-triggering endpoints … to prevent the app being used as a spam relay") applies. Shipped with `[ApplyEmailIpRateLimit]` + the `EmailByUser` per-user cap. Found by the Stage 12.5 security review 2026-08-27 — the endpoint had shipped unlimited in the first draft.
+- [ ] **Accepted risk, expires when § 12.5.2 ships: a dropped notification makes a ticket invisible.** With no admin ticket list, this email is the ONLY way an operator learns a ticket exists. The ticket itself is durable — it is committed before the send, and a send failure is logged and swallowed so a mail outage cannot tell a user their report failed when it did not. But nobody is watching: the user believes it was filed (correctly), and the operator never finds out. Not an outbox or a retry — the data is already durable, so that would be building a delivery subsystem to compensate for a missing read path. The real fix is any operator read path that does not depend on mail; § 12.5.2 is it. Until then: a log-based alert on "was filed but the notification email failed" belongs in the Stage 16 hosting checklist. Raised by the Stage 12.5 security review, 2026-08-27.
 - [x] **Scope the two older attachment FKs to their owner, as `SupportTicketAttachment` now is.** Done 2026-08-24 (`ScopeOlderAttachmentFksToOwner`). Raw SQL rather than the EF model: `Transaction` and `Transfer` are TPC subtypes of the abstract `Movement` root, and EF refuses `HasAlternateKey` on a derived type while the root has no table. Postgres has no such restriction. The migration pre-flights for already-divergent rows and aborts with a readable message rather than a bare 23503. Exploit re-run after applying: the cross-user insert now fails with an FK violation on all three tables. `TransactionAttachments → Transactions` and `TransferAttachments → Transfers` are single-column FKs with `ON DELETE CASCADE`, and both parents are `IUserOwned`. That is the identical shape that produced a Critical cross-tenant destructive write on `SupportTicketAttachments`: Postgres runs FK checks and cascades through a referential-integrity trigger that RLS is not applied to, so a row can be attached to another user's parent and destroyed when that user deletes it. Verified against the live schema 2026-08-23 — see the table below. Unlike the support case these tables hold real data, so the fix needs a pre-flight query for existing divergent rows before the composite FK can be added. Found by the Stage 12.5 spec review; **the fix there closed the instance, not the class.**
 
   | Table | FK columns | On delete | Scoped to owner? |
@@ -1517,6 +1519,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] Decide + build the admin-identity mechanism (role claim / configured admin allow-list / single-operator)
 - [ ] `Admin/` endpoints to list all tickets, access-controlled, using the `ceres_admin` BYPASSRLS context deliberately (mirror `IUserJobRunner` discipline) per ADR-0065
 - [ ] Admin list/triage SPA surface
+- [ ] **Retires the Stage 12.5 accepted risk:** once an operator can read tickets without email, a dropped notification stops being a silent loss. Tick the § 12.5 "accepted risk" line when this ships.
 - *Tripwire: this checklist + the `planning-future.md` entry.*
 
 ### 12.5.3 — New-session-from-new-IP alert email
@@ -1953,6 +1956,11 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 | 16.16 | **Stage 9.11 follow-up.** Playwright E2E suite (shipped in Stage 9.11) wired into `.github/workflows/ci.yml`: `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. Suite runs on every PR + on `main`. | [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates / Stage 9.11 |
 
 ### Verification checklist
+
+Alerting:
+
+- [ ] **Log-based alert on a dropped support-ticket notification.** Alert on the `LogError` message "was filed but the notification email failed" (`SupportApiController.NotifySupportAsync`). Until the § 12.5.2 admin ticket list ships, that email is the only way an operator learns a ticket exists, so a silent send failure means an invisible ticket. One alerting rule, no code. Raised by the Stage 12.5 security review 2026-08-27.
+- [ ] **`Email__SupportAddress` set in the Production environment.** The app refuses to boot without it (`Program.cs`), so a missing value is a failed deploy, not a silent degradation.
 
 HTTPS + TLS:
 
