@@ -447,7 +447,7 @@ The table below lists every `error.code` value the API can return, grouped by do
 | Notifications | GET (list preferences), PATCH (update preferences) | Controls: weekly digest opt-in, new session alert opt-out, Safe to Spend alert |
 | DataExport | POST (request export), GET (download by token) | Async: POST returns `202 Accepted` with a job ID; user notified by email when ready; download link is time-limited (24 h) and authenticated |
 | AuditLog | GET (list, paginated) | User's own audit log entries only — no delete endpoint. **Writes ship in Stage 6.14; read endpoint ships in Stage 12.** |
-| SupportTickets | POST (submit), GET list, GET by ID | User-facing; admin management surface is separate |
+| SupportTickets | POST (submit), GET list, GET by ID, POST `{id}/close`, POST `{id}/attachments`, GET `/api/attachments/support/{id}` | User-facing; admin management surface is separate. Close is final — no reopen; a follow-up is a new ticket carrying `precedingTicketId`. Close answers 404 for a ticket you cannot reach (matching GET) and 422 `TICKET_ALREADY_CLOSED` for your own already-closed ticket. Create is rate-limited: it sends mail. |
 | Sessions | List active sessions, revoke session | Security settings |
 | BlockedIps | List, add, remove | Security settings |
 | Auth | See § *Auth endpoints* below | Cookie-based; sets `__Host-Session` HttpOnly cookie on successful login (or after second-step TOTP for MFA users). MFA is opt-in per [ADR-0069](decisions/ADR-0069-mfa-opt-in-for-personal-users.md). |

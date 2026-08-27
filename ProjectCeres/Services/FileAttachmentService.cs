@@ -33,6 +33,11 @@ public class FileAttachmentService : IFileAttachmentService
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
     private const int  MaxFilesPerParent = 10;
 
+    // security-model.md § File Access Control: "enforce a maximum total file storage per
+    // user (e.g. 500 MB for Phase 3 beta) ... Without a quota, a single user can exhaust
+    // server disk space and take down the application for all users."
+    private const long MaxTotalBytesPerUser = 500L * 1024 * 1024;
+
     // MIME types that are allowed. Extension is derived from this list — never from user input.
     private static readonly Dictionary<string, string> AllowedMimeTypes = new()
     {
@@ -271,6 +276,12 @@ public class FileAttachmentService : IFileAttachmentService
         if (!AllowedMimeTypes.TryGetValue(detectedMime, out var extension))
             throw new InvalidOperationException($"File type not allowed. Accepted types: JPEG, PNG, GIF, WebP, PDF.");
 
+        // Quota is checked HERE — after validation, before the write — so it covers all
+        // three attachment families at once and cannot be forgotten by a fourth. The
+        // per-parent cap above does not bound a user's total: 10 files x 10 MB is only a
+        // per-ticket ceiling, and nothing limits how many parents they create.
+        await EnsureWithinStorageQuotaAsync(bytes.LongLength);
+
         var relativePath = Path.Combine([.. folderSegments, $"{Guid.NewGuid()}{extension}"]);
         var fullPath = Path.Combine(_root, relativePath);
 
@@ -278,6 +289,29 @@ public class FileAttachmentService : IFileAttachmentService
         await File.WriteAllBytesAsync(fullPath, bytes);
 
         return (bytes, detectedMime, relativePath);
+    }
+
+    /// <summary>
+    /// Refuses a write that would take the current user past their total storage
+    /// allowance, counting every attachment family they own.
+    /// </summary>
+    private async Task EnsureWithinStorageQuotaAsync(long incomingBytes)
+    {
+        var used = await db.TransactionAttachments.Where(a => a.Transaction.UserId == user.UserId)
+                       .SumAsync(a => (long?)a.FileSizeBytes) ?? 0L;
+        used += await db.TransferAttachments.Where(a => a.Transfer.UserId == user.UserId)
+                    .SumAsync(a => (long?)a.FileSizeBytes) ?? 0L;
+        used += await db.SupportTicketAttachments.Where(a => a.UserId == user.UserId)
+                    .SumAsync(a => (long?)a.FileSizeBytes) ?? 0L;
+
+        if (used + incomingBytes > MaxTotalBytesPerUser)
+        {
+            var limitMb = MaxTotalBytesPerUser / (1024 * 1024);
+            var usedMb = used / (1024 * 1024);
+            throw new InvalidOperationException(
+                $"Storage limit reached. Attachments may total {limitMb} MB per account; "
+                + $"you are using {usedMb} MB. Delete an attachment to free space.");
+        }
     }
 
     /// <summary>Reads an attachment off disk and re-verifies its magic bytes at serve time.</summary>

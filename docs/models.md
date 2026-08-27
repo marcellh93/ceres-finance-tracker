@@ -1329,13 +1329,15 @@ Stores user-submitted support requests. Admin management is handled via a separa
 
 **RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the same migration that creates the table (`20260823084630_AddSupportTickets`). The two are inseparable: `ParityTests` fails and `RlsParityStartupCheck` refuses to boot the moment the entity exists without a matching policy.
 
-**Email notification:** on creation, an email is sent to the configurable admin address (`Email:SupportAddress`). Not yet built — see the Stage 12 roadmap.
+**Email notification:** on creation, an email is sent to the configured support address (`Email:SupportAddress`, required at startup in Production). Shipped 2026-08-27. The recipient is built by `EmailRecipient.ForConfiguredSupportAddress`, which takes `IOptions<EmailOptions>` rather than a string so no caller can substitute an address — see `security-model.md` § Email Security Rules for the recipient-lock carve-out. A send failure is logged and swallowed: the ticket is already committed, and a mail outage must not tell a user their report failed when it did not.
 
 **Deletion rule:** no deletion — tickets are the audit trail of user contact.
 
 **Close is final; there is no reopen.** A user may move their own ticket `Open → Closed`, and that is the only transition available to them. Continuing a conversation means filing a **follow-up ticket** — a new ticket with its own Subject and Message, linked to the closed one via `PrecedingTicketId`. Every ticket therefore keeps a single immutable lifecycle and a thread is a chain rather than a reopened record. Decided 2026-08-23; the `Restrict` delete behaviour exists so a follow-up survives the deletion of the ticket it continues.
 
-**Cross-user reference caveat:** PostgreSQL's referential-integrity trigger is not subject to RLS, so the database will accept a `PrecedingTicketId` pointing at another user's ticket. The exposure is bounded to an existence oracle over an unguessable GUID — no ticket content crosses the boundary, because every read passes through both the EF query filter and the policy's `USING` clause. The service enforces same-owner-and-closed; a composite `(Id, UserId)` FK to make it structurally impossible is queued with the service half.
+**Cross-user reference caveat:** PostgreSQL's referential-integrity trigger is not subject to RLS, so the database will accept a `PrecedingTicketId` pointing at another user's ticket. The exposure is bounded to an existence oracle over an unguessable GUID — no ticket content crosses the boundary, because every read passes through both the EF query filter and the policy's `USING` clause. The service enforces same-owner-and-closed (`SupportTicketService.CreateAsync`, pinned at both the service and API layers).
+
+A composite `(Id, UserId)` FK would make the cross-user reference structurally impossible, as it does for `SupportTicketAttachments`. It was **not** built with the service half (2026-08-27) and remains service-enforced only. The distinction from the attachment case is that the attachment FK carried `ON DELETE CASCADE`, so a bad reference let one user's delete destroy another's row — a destructive write. `PrecedingTicketId` is `Restrict` and read-only, so the residual exposure stays an existence oracle over an unguessable GUID. Tracked in roadmap § 12.5.
 
 ---
 

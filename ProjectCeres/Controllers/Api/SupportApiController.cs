@@ -99,15 +99,26 @@ public class SupportApiController(
     [HttpPost("tickets/{ticketId:guid}/close")]
     public async Task<IActionResult> Close(Guid ticketId, CancellationToken ct)
     {
-        try
+        // 404 and 422 mean different things and must not be collapsed. A ticket you
+        // cannot reach answers 404, matching GetOne above, so an id you do not own is
+        // indistinguishable from one that does not exist — and the id never appears in a
+        // response body. Already-closed is a real state-transition refusal on a ticket
+        // you do own, so it is a 422 the UI can act on.
+        return await tickets.CloseAsync(ticketId, ct) switch
         {
-            await tickets.CloseAsync(ticketId, ct);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Validation(ex);
-        }
+            CloseTicketResult.Closed => NoContent(),
+            CloseTicketResult.NotFound => NotFound(),
+            CloseTicketResult.AlreadyClosed => UnprocessableEntity(new
+            {
+                error = new
+                {
+                    code = "TICKET_ALREADY_CLOSED",
+                    message = "This ticket is already closed. File a follow-up ticket to continue.",
+                    details = Array.Empty<object>(),
+                }
+            }),
+            _ => throw new InvalidOperationException("Unhandled CloseTicketResult."),
+        };
     }
 
     [HttpPost("tickets/{ticketId:guid}/attachments")]

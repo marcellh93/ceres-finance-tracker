@@ -186,7 +186,7 @@ public class SupportTicketServiceTests : IAsyncLifetime
         var createdUpdatedAt = ticket.UpdatedAt;
 
         await Task.Delay(10);
-        await _service.CloseAsync(ticket.Id);
+        (await _service.CloseAsync(ticket.Id)).Should().Be(CloseTicketResult.Closed);
 
         var persisted = await _fixture.Db.SupportTickets.AsNoTracking().SingleAsync(t => t.Id == ticket.Id);
         persisted.Status.Should().Be(SupportTicketStatus.Closed);
@@ -199,9 +199,9 @@ public class SupportTicketServiceTests : IAsyncLifetime
         var ticket = await _service.CreateAsync($"twice {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
         await _service.CloseAsync(ticket.Id);
 
-        var act = () => _service.CloseAsync(ticket.Id);
+        var result = await _service.CloseAsync(ticket.Id);
 
-        await act.Should().ThrowAsync<InvalidOperationException>(
+        result.Should().Be(CloseTicketResult.AlreadyClosed,
             "closing is final — there is no reopen, so a second close is a contradiction");
     }
 
@@ -210,9 +210,10 @@ public class SupportTicketServiceTests : IAsyncLifetime
     {
         var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Open);
 
-        var act = () => _service.CloseAsync(foreign.Id);
+        var result = await _service.CloseAsync(foreign.Id);
 
-        await act.Should().ThrowAsync<InvalidOperationException>("IDOR — it must look like it does not exist");
+        result.Should().Be(CloseTicketResult.NotFound,
+            "IDOR — someone else's ticket must be indistinguishable from one that does not exist");
 
         // Reading another user's row needs BOTH escapes: the admin connection to get past
         // Postgres RLS, and IgnoreQueryFilters to get past EF's per-user filter. They are
@@ -231,7 +232,7 @@ public class SupportTicketServiceTests : IAsyncLifetime
     public async Task CreateAsync_links_a_follow_up_to_the_closed_ticket_it_continues()
     {
         var original = await _service.CreateAsync($"original {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
-        await _service.CloseAsync(original.Id);
+        (await _service.CloseAsync(original.Id)).Should().Be(CloseTicketResult.Closed);
 
         var followUp = await _service.CreateAsync(
             $"follow up {Guid.NewGuid():N}", "still broken", SupportTicketPriority.High, original.Id);
@@ -325,6 +326,34 @@ public class SupportTicketServiceTests : IAsyncLifetime
             ticket.Id, MakeFormFile(MinimalJpegBytes(), "eleventh.jpg", "image/jpeg"));
 
         (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*more than 10*");
+    }
+
+    [Fact]
+    public async Task UploadForSupportTicketAsync_refuses_a_write_past_the_per_user_storage_quota()
+    {
+        // security-model.md § File Access Control requires a per-user total, not just a
+        // per-parent cap: 10 files x 10 MB bounds one ticket, but nothing bounds how many
+        // tickets a user opens. Seed the quota as already-consumed rather than uploading
+        // 500 MB, which would make this test unusable.
+        var ticket = await _service.CreateAsync($"quota {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        _fixture.Db.SupportTicketAttachments.Add(new SupportTicketAttachment
+        {
+            Id = Guid.NewGuid(),
+            SupportTicketId = ticket.Id,
+            UserId = Sentinel,
+            FileName = "already-used.pdf",
+            StoredPath = Path.Combine("uploads", "support", ticket.Id.ToString(), "prior.pdf"),
+            ContentType = "application/pdf",
+            FileSizeBytes = 500L * 1024 * 1024,
+            UploadedAt = DateTime.UtcNow,
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var act = () => _attachments.UploadForSupportTicketAsync(
+            ticket.Id, MakeFormFile(MinimalJpegBytes(), "one-more.jpg", "image/jpeg"));
+
+        (await act.Should().ThrowAsync<InvalidOperationException>())
+            .WithMessage("*Storage limit reached*");
     }
 
     [Fact]

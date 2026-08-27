@@ -216,22 +216,105 @@ public class SupportApiTests : IAsyncLifetime
         var second = await _client.PostAsync($"/api/support/tickets/{id}/close", null);
         second.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity,
             "closing is final — there is no reopen, so a second close is a contradiction");
+        (await second.Content.ReadAsStringAsync()).Should().Contain("TICKET_ALREADY_CLOSED",
+            "a machine-readable code, so the SPA need not string-match server English");
     }
 
     [Fact]
-    public async Task Close_another_users_ticket_is_422_and_leaves_it_open()
+    public async Task Close_another_users_ticket_is_404_and_leaves_it_open()
     {
         var theirs = await SeedForeignTicketAsync();
 
         var response = await _client.PostAsync($"/api/support/tickets/{theirs}/close", null);
 
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        // 404, matching GET on the same id. A 422 here would have been a different shape
+        // from the sibling endpoint for the identical condition, and echoed the id back.
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "someone else's ticket must be indistinguishable from one that does not exist");
+        (await response.Content.ReadAsStringAsync()).Should().NotContain(theirs.ToString(),
+            "a not-found body must not echo the id that was probed");
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var untouched = await db.SupportTickets.IgnoreQueryFilters().AsNoTracking()
             .SingleAsync(t => t.Id == theirs);
         untouched.Status.Should().Be(SupportTicketStatus.Open);
+    }
+
+    [Fact]
+    public async Task Close_an_unknown_ticket_is_also_404()
+    {
+        var response = await _client.PostAsync($"/api/support/tickets/{Guid.NewGuid()}/close", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "and it must be the SAME answer as a foreign ticket, or the pair is an oracle");
+    }
+
+    // -------------------------------------------------------------------------
+    // Follow-up chain — the wire format, which the service tests cannot reach
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Create_links_a_follow_up_to_the_closed_ticket_it_continues()
+    {
+        var original = await CreateTicketAsync();
+        (await _client.PostAsync($"/api/support/tickets/{original}/close", null))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var response = await _client.PostAsJsonAsync("/api/support/tickets", new
+        {
+            subject = $"Follow-up {Guid.NewGuid():N}",
+            message = "Still broken after the last ticket was closed.",
+            priority = SupportTicketPriority.High,
+            precedingTicketId = original,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var followUpId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        _seededTicketIds.Add(followUpId);
+
+        // The persisted link is the assertion that matters. A 201 alone would also be
+        // returned if precedingTicketId silently failed to bind — the follow-up would
+        // just be a standalone ticket, which looks identical from the status code.
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persisted = await db.SupportTickets.AsNoTracking().SingleAsync(t => t.Id == followUpId);
+        persisted.PrecedingTicketId.Should().Be(original,
+            "the follow-up must carry context from the ticket it continues");
+        persisted.Status.Should().Be(SupportTicketStatus.Open, "a follow-up has its own lifecycle");
+    }
+
+    [Fact]
+    public async Task Create_of_a_follow_up_to_another_users_ticket_is_422()
+    {
+        var theirs = await SeedForeignTicketAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/support/tickets", new
+        {
+            subject = $"Piggyback {Guid.NewGuid():N}",
+            message = "Trying to chain onto someone else's ticket.",
+            priority = SupportTicketPriority.Normal,
+            precedingTicketId = theirs,
+        });
+
+        // The RI trigger bypasses RLS, so the database alone would accept this reference.
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Create_of_a_follow_up_to_a_still_open_ticket_is_422()
+    {
+        var open = await CreateTicketAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/support/tickets", new
+        {
+            subject = $"Premature follow-up {Guid.NewGuid():N}",
+            message = "The original is still open.",
+            priority = SupportTicketPriority.Normal,
+            precedingTicketId = open,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     // -------------------------------------------------------------------------

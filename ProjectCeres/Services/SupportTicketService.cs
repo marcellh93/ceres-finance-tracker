@@ -82,17 +82,19 @@ public sealed class SupportTicketService : ISupportTicketService
             .Include(t => t.Attachments)
             .FirstOrDefaultAsync(t => t.Id == ticketId, ct);
 
-    public async Task CloseAsync(Guid ticketId, CancellationToken ct = default)
+    public async Task<CloseTicketResult> CloseAsync(Guid ticketId, CancellationToken ct = default)
     {
         var ticket = await _db.SupportTickets.Owned(_user)
-            .FirstOrDefaultAsync(t => t.Id == ticketId, ct)
-            ?? throw new InvalidOperationException($"Support ticket {ticketId} not found.");
+            .FirstOrDefaultAsync(t => t.Id == ticketId, ct);
 
-        if (ticket.Status == SupportTicketStatus.Closed)
-            throw new InvalidOperationException("This ticket is already closed.");
+        // Owned() already scoped the query, so "someone else's" and "does not exist" are
+        // the same answer here — which is the point.
+        if (ticket is null) return CloseTicketResult.NotFound;
+        if (ticket.Status == SupportTicketStatus.Closed) return CloseTicketResult.AlreadyClosed;
 
         ticket.Status = SupportTicketStatus.Closed;
         ticket.UpdatedAt = _timeProvider.GetUtcNow().UtcDateTime;
         await _db.SaveChangesAsync(ct);
+        return CloseTicketResult.Closed;
     }
 }

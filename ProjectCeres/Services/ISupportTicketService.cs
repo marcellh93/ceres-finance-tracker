@@ -21,6 +21,24 @@ public interface ISupportTicketService
     /// <summary>One of the caller's own tickets, with its attachments. Null if it is not theirs.</summary>
     Task<SupportTicket?> GetOwnAsync(Guid ticketId, CancellationToken ct = default);
 
-    /// <summary>Closes one of the caller's open tickets. Closing is final — there is no reopen.</summary>
-    Task CloseAsync(Guid ticketId, CancellationToken ct = default);
+    /// <summary>
+    /// Closes one of the caller's own open tickets. Closing is final — there is no reopen.
+    ///
+    /// Returns a result rather than throwing so the caller can tell the two failure modes
+    /// apart: a ticket you cannot reach must answer 404 (indistinguishable from one that
+    /// does not exist), while a ticket you own that is already closed is a genuine 422.
+    /// A single exception type collapsed both into one status.
+    /// </summary>
+    Task<CloseTicketResult> CloseAsync(Guid ticketId, CancellationToken ct = default);
+}
+
+public enum CloseTicketResult
+{
+    Closed,
+
+    /// <summary>No such ticket, or it belongs to someone else — the caller must not learn which.</summary>
+    NotFound,
+
+    /// <summary>The caller's own ticket, but already closed. Closing is final.</summary>
+    AlreadyClosed,
 }

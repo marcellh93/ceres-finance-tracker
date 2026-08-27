@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using FluentAssertions;
+using ProjectCeres.Controllers.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -536,6 +537,40 @@ public class ArchitectureTests
             .ToList();
         impls.Should().ContainSingle()
             .Which.Should().Be(typeof(AuditLogWriter));
+    }
+
+    [Fact]
+    public void Email_triggering_endpoints_carry_a_rate_limit()
+    {
+        // security-model.md § Email Security Rules: "Rate-limit ALL email-triggering
+        // endpoints ... to prevent the app from being used as a spam relay."
+        //
+        // A reflection test rather than a 429 test on purpose. The WAF stubs every
+        // limiter to a no-op so unrelated suites do not trip on burst, so a live 429
+        // assertion would need its own factory and would still only cover one endpoint.
+        // This asserts the thing that actually regresses: someone adds a mail-sending
+        // action and forgets the attribute.
+        //
+        // POST /api/support/tickets shipped unlimited in its first draft (2026-08-27) and
+        // was caught in review, not by a test. This is that test.
+        var mailSendingActions = new (Type Controller, string Action)[]
+        {
+            (typeof(SupportApiController), "Create"),
+        };
+
+        foreach (var (controller, actionName) in mailSendingActions)
+        {
+            var action = controller.GetMethod(actionName)
+                ?? throw new InvalidOperationException($"{controller.Name}.{actionName} not found");
+
+            var hasUserLimit = action.GetCustomAttributes(typeof(EnableRateLimitingAttribute), true).Length > 0;
+            var hasIpLimit = action.GetCustomAttributes(typeof(ApplyEmailIpRateLimitAttribute), true).Length > 0;
+
+            hasUserLimit.Should().BeTrue(
+                $"{controller.Name}.{actionName} sends email and needs a per-user rate limit");
+            hasIpLimit.Should().BeTrue(
+                $"{controller.Name}.{actionName} sends email and needs the per-IP backstop");
+        }
     }
 
     [Fact]
