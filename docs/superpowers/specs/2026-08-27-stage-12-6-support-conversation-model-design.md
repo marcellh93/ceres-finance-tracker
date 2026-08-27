@@ -266,11 +266,18 @@ the first one):**
 5. **Validate the transition** through `SupportTicketStateMachine.ResolveOperatorAction` before
    writing; reject an illegal transition (Closed is terminal).
 6. **Audit.** An operator reply is an admin mutation of another user's data. It writes an
-   `AdminAuditLog` row (actor = admin, target = owner; append-only, no delete endpoint — this is
-   the record that survives a Stage-13 erasure of the user) AND adds an owner-scoped
-   `AuditLogAction.SupportMessageByAgent` so the owner's own trail shows it. The new
+   `AuditLog` row via the existing interim (`UserId` = ticket owner, `EntityType` =
+   `"SupportTicket"`, `EntityId` = ticketId) with a new `AuditLogAction.SupportMessageByAgent`.
+   The full append-only `AdminAuditLog` entity is documented in `models.md` but does not exist in
+   code, and building it is stage-sized work Stage 15.6 already declined for exactly this reason;
+   12.6 uses the same interim 15.6 chose (`roadmap-phase-three.md` § 15.6 audit note). The new
    `AuditLogAction` value lands in the same commit as
    `AuditLogAction_enum_values_match_documented_set`, or that test goes red.
+
+   **Honest limitation:** because the interim row is owner-stamped `AuditLog`, it is erased with
+   the user in a Stage-13 GDPR erasure — it does NOT survive erasure the way a true append-only
+   `AdminAuditLog` would. The erasure-surviving accountability record is deferred with the full
+   entity. This is captured by the § Deferred to Stage 13 item and the § 15.6 note.
 
 **Empty body.** The endpoint conflates "reply" and "status-only change". Resolve in the plan
 (both reviews, M2): a status-only change (silent OnHold, stale-Close) creates **no message row** —
@@ -468,8 +475,9 @@ Stage 13, not a silent gap:
   `UserOwnedCleanup` auto-includes `SupportMessage` and a natural-churn purge (legal.md day-180
   hard-delete) would destroy the operator's replies with the user's. `legal.md` has no carve-out
   classifying support correspondence. Stage 13 must decide: purge / anonymise-and-retain /
-  retain-separately. The `AdminAuditLog` row (from the operator-endpoint audit) is the
-  accountability record that survives erasure regardless.
+  retain-separately. Note the operator-endpoint audit uses the *interim* owner-stamped `AuditLog`
+  (not the deferred append-only `AdminAuditLog`), so it too is erased with the user — a true
+  erasure-surviving admin record waits on that deferred entity. Stage 13 should weigh that gap.
 - **Support-attachment file cleanup on delete.** The composite-FK `ON DELETE CASCADE` removes
   the attachment *row* but leaves the *file* on disk (a `models.md` known gap). This stage
   multiplies the delete surface (per-message attachments, cascade-on-message), so tie the fix to
