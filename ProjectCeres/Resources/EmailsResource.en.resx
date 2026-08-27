@@ -104,4 +104,14 @@ If this wasn't you, your account may be at risk — reset your password immediat
 
 If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.</value></data>
   <data name="BackupCodesRegenerated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your two-factor backup codes were &lt;strong&gt;regenerated&lt;/strong&gt; on your Ceres account on {0} (UTC) from IP &lt;strong&gt;{1}&lt;/strong&gt;. Any previous backup codes no longer work.&lt;/p&gt;&lt;p&gt;If this wasn't you, your account may be at risk — reset your password immediately from the Ceres sign-in page ("Forgot password?") and review your security settings.&lt;/p&gt;</value></data>
+  <data name="SupportTicketReceived.Subject" xml:space="preserve"><value>[Ceres ticket {3}] {0} priority — {1}</value></data>
+  <data name="SupportTicketReceived.BodyText" xml:space="preserve"><value>A user filed a support ticket.
+
+Priority: {0}
+Subject:  {1}
+From:     {2}
+Ticket:   {3}
+
+{4}</value></data>
+  <data name="SupportTicketReceived.BodyHtml" xml:space="preserve"><value>&lt;p&gt;A user filed a support ticket.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Priority:&lt;/strong&gt; {0}&lt;br /&gt;&lt;strong&gt;Subject:&lt;/strong&gt; {1}&lt;br /&gt;&lt;strong&gt;From:&lt;/strong&gt; {2}&lt;br /&gt;&lt;strong&gt;Ticket:&lt;/strong&gt; {3}&lt;/p&gt;&lt;p&gt;{4}&lt;/p&gt;</value></data>
 </root>

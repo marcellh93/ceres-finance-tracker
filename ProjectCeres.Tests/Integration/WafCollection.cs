@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
 
@@ -235,6 +236,34 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             Console.WriteLine($"[test-db sweep] skipped: {ex.GetType().Name}: {ex.Message}");
         }
     }
+}
+
+/// <summary>
+/// Test-only configuration hooks on the base factory. Both return the base
+/// WebApplicationFactory type (the configuration methods do not live on the derived type),
+/// so they chain left-to-right rather than fluently onto TestWebApplicationFactory.
+/// </summary>
+public static class TestWebApplicationFactoryExtensions
+{
+    /// <summary>Binds Email:SupportAddress so the Stage 12.5 notification has a recipient.</summary>
+    public static WebApplicationFactory<Program> WithConfiguredSupportAddress(
+        this WebApplicationFactory<Program> factory, string address) =>
+        factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, cfg) =>
+                cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Email:SupportAddress"] = address,
+                })));
+
+    /// <summary>Swaps IEmailService for a test double so nothing leaves the process.</summary>
+    public static WebApplicationFactory<Program> WithReplacedEmailService(
+        this WebApplicationFactory<Program> factory, IEmailService replacement) =>
+        factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IEmailService>();
+                services.AddSingleton(replacement);
+            }));
 }
 
 /// <summary>

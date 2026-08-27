@@ -172,6 +172,7 @@ builder.Services.AddSingleton<LockoutCache>();
 // with no signal. Dev/Test without a key keeps using LogOnlyEmailService.
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
 
+
 var resendApiKey = builder.Configuration["Email:Resend:ApiKey"];
 if (builder.Environment.IsEnvironment("E2E"))
 {
@@ -536,6 +537,24 @@ builder.Services.Configure<FileAttachmentOptions>(
     builder.Configuration.GetSection("FileAttachments"));
 builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
+builder.Services.AddScoped<ISupportRecipientResolver, SupportRecipientResolver>();
+
+// Stage 12.5 — support-ticket notifications have nowhere to go without this.
+// Production fails to boot rather than accept tickets nobody will read; other
+// environments skip the notification so tests and fresh clones need no mailbox.
+//
+// Deliberately AFTER the Email:Resend:ApiKey guard above: that one is the more
+// fundamental failure (no mail at all, not just no support mail), and
+// ResendEmailServiceTests.Production_without_api_key_throws_at_startup pins its
+// message. Checking SupportAddress first would mask it.
+if (builder.Environment.IsProduction()
+    && string.IsNullOrWhiteSpace(builder.Configuration["Email:SupportAddress"]))
+{
+    throw new InvalidOperationException(
+        "Email:SupportAddress is required in Production. " +
+        "Set the Email__SupportAddress environment variable to the mailbox that " +
+        "should receive support-ticket notifications.");
+}
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();

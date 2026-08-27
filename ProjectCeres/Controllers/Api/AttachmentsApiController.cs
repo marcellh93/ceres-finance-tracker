@@ -28,6 +28,25 @@ public class AttachmentsApiController(IFileAttachmentService attachmentService) 
         }
     }
 
+    /// <summary>
+    /// Streams a support-ticket attachment. Same ownership gate as the two above: the
+    /// service scopes the lookup to the parent ticket's owner, so another user's
+    /// attachment id is indistinguishable from a nonexistent one.
+    /// </summary>
+    [HttpGet("support/{attachmentId:guid}")]
+    public async Task<IActionResult> DownloadSupportTicketAttachment(Guid attachmentId)
+    {
+        try
+        {
+            var (data, contentType, fileName) = await attachmentService.GetSupportTicketAttachmentAsync(attachmentId);
+            return File(data, contentType, fileDownloadName: fileName);
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpGet("transfers/{attachmentId:guid}")]
     public async Task<IActionResult> DownloadTransferAttachment(Guid attachmentId)
     {

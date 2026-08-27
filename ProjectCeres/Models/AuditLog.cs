@@ -35,4 +35,6 @@ public enum AuditLogAction
 
     EmailVerificationRequested, // wired in Stage 9.3
     EmailVerified,              // wired in Stage 9.3
+
+    SupportTicketCreated,       // wired in Stage 12.5
 }

@@ -7,6 +7,15 @@ namespace ProjectCeres.Common.Email;
 public sealed class EmailOptions
 {
     public ResendOptions Resend { get; init; } = new();
+
+    /// <summary>
+    /// Where support-ticket notifications are sent (Stage 12.5). Required in Production —
+    /// Program.cs refuses to boot without it, because a silently-unset address means
+    /// tickets are filed and nobody is ever told. Outside Production an unset value simply
+    /// skips the notification, so the test suite and a fresh clone run without configuring
+    /// a mailbox.
+    /// </summary>
+    public string? SupportAddress { get; init; }
 }
 
 /// <summary>

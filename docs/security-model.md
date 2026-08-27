@@ -1199,7 +1199,17 @@ The app holds an API key for the email service provider. A leaked key allows an 
 
 **Operational runbook for DNS configuration:** [`docs/runbooks/email-dns-setup.md`](runbooks/email-dns-setup.md).
 
-**Compile-time recipient lock (Stage 8a):** `ProjectCeres.Common.Email.EmailMessage.To` is of type `EmailRecipient`, not `string`. There is no public constructor accepting a raw string for the `To` slot. The two legitimate factories are `EmailRecipient.FromVerifiedUser` (reads `ApplicationUser.Email` by server-context `UserId`) and `EmailRecipient.OverrideForEmailChange` (used only by `EmailChangeService` to send notifications to the OLD address during an email change). Pinned by reflection tests in `ProjectCeres.Tests/Integration/Email/EmailRecipientTests.cs`.
+**Compile-time recipient lock (Stage 8a):** `ProjectCeres.Common.Email.EmailMessage.To` is of type `EmailRecipient`, not `string`. There is no public constructor accepting a raw string for the `To` slot. The three legitimate factories are:
+
+| Factory | Recipient source | Sole caller |
+|---|---|---|
+| `EmailRecipient.FromVerifiedUser` | `ApplicationUser.Email`, by server-context `UserId` | `EmailRecipientResolver` |
+| `EmailRecipient.OverrideForEmailChange` | `EmailChangeToken` — the OLD address during an email change | `EmailChangeService` |
+| `EmailRecipient.ForConfiguredSupportAddress` | `Email:SupportAddress` operator configuration (Stage 12.5) | `SupportRecipientResolver` |
+
+The third is the **operator-configured carve-out** to the session-derived rule above: the support mailbox belongs to whoever runs the deployment, not to any user, so it cannot be derived from a session. It stays within the rule's intent — the address never originates from a request payload, a database row, or anything a user can influence. The factory takes `IOptions<EmailOptions>` rather than a `string` precisely so no caller can substitute a value; there is no address parameter to smuggle one through.
+
+Pinned by `ProjectCeres.Tests/Integration/Email/EmailRecipientTests.cs`, which asserts the constructor stays private, that no implicit `string` conversion exists, and — scanning the whole of `ProjectCeres/` — that the set of construction sites equals the five files above. Adding a fourth recipient source means extending that allow-list and this table in the same commit.
 
 ---
 

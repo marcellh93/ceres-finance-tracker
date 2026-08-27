@@ -62,6 +62,80 @@ public sealed class EmailRecipientTests
         matches.Should().BeEquivalentTo(["EmailChangeService.cs"]);
     }
 
+    [Fact]
+    public void EmailRecipient_is_constructed_only_at_known_call_sites()
+    {
+        // The recipient lock's real guarantee is not "there are exactly N factories" — it
+        // is that the set of construction sites is CLOSED and enumerable, so "what
+        // addresses can this app send to?" is answerable by reading a short list of files.
+        //
+        // This scans all of ProjectCeres/ rather than one directory. The older
+        // OverrideForEmailChange test below greps Common/Authentication/ only, which means
+        // a factory call from a new namespace (Controllers/, Admin/, a future
+        // Services/Notifications/) would pass unnoticed simply because the scan pointed
+        // somewhere else. Same idiom as ArchitectureTests'
+        // IgnoreQueryFilters_only_appears_in_documented_exception_paths.
+        var allowed = new[]
+        {
+            "ProjectCeres/Common/Email/EmailRecipient.cs",             // the declarations
+            "ProjectCeres/Common/Email/EmailRecipientResolver.cs",     // FromVerifiedUser
+            "ProjectCeres/Common/Email/SupportRecipientResolver.cs",   // ForConfiguredSupportAddress
+            "ProjectCeres/Common/Email/EmailComposer.cs",              // EmailRecipient.None
+            "ProjectCeres/Common/Authentication/EmailChangeService.cs" // OverrideForEmailChange
+        };
+
+        var tokens = new[]
+        {
+            "FromVerifiedUser", "OverrideForEmailChange",
+            "ForConfiguredSupportAddress", "EmailRecipient.None",
+        };
+
+        var root = FindRepoRoot();
+        var projectDir = Path.Combine(root, "ProjectCeres");
+
+        var found = Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                     && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Where(f => tokens.Any(t => FileContainsCallSite(f, t)))
+            .Select(f => Path.GetRelativePath(root, f).Replace(Path.DirectorySeparatorChar, '/'))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToList();
+
+        found.Should().BeEquivalentTo(allowed,
+            "every EmailRecipient construction site must be on the allow-list above. A new "
+            + "entry is either a genuinely new server-resolved recipient source (extend the "
+            + "list AND the security-model § Email Security Rules Layer 2 carve-out in the "
+            + "same commit) or a recipient-lock regression.");
+    }
+
+    [Fact]
+    public void EmailRecipient_cannot_be_built_from_a_bare_string()
+    {
+        // The mutation that would silently void every grep above: a public constructor, or
+        // an implicit string conversion, either of which makes `To = "anything"` legal
+        // project-wide without touching a single file the scans look at.
+        typeof(EmailRecipient)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Should().OnlyContain(c => c.IsPrivate,
+                "EmailRecipient's constructor must stay private — the factories are the only way in.");
+
+        typeof(EmailRecipient)
+            .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(m => m.Name is "op_Implicit" or "op_Explicit")
+            .Should().BeEmpty(
+                "a string->EmailRecipient conversion would bypass the recipient lock entirely.");
+    }
+
+    /// <summary>Repo root, located by the solution file — matches ArchitectureTests.FindRepoRoot.</summary>
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "ProjectCeres.sln")))
+            dir = dir.Parent;
+        dir.Should().NotBeNull("test must be able to locate the repo root (ProjectCeres.sln)");
+        return dir!.FullName;
+    }
+
     /// <summary>
     /// Returns true if any non-comment line in the file contains the given token.
     /// Drops lines whose first non-whitespace characters are "//" (line comment) or

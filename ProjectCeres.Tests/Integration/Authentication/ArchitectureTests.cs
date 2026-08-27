@@ -544,6 +544,7 @@ public class ArchitectureTests
         // Pins the enum against docs/superpowers/specs/2026-05-11-stage-6-14-audit-log-design.md § 3.1.
         // Stage 9.3 (2026-05-22) added EmailVerificationRequested + EmailVerified for the
         // registration confirmation flow — both wired by EmailConfirmationService.
+        // Stage 12.5 (2026-08-27) added SupportTicketCreated, wired by SupportApiController.
         var expected = new[]
         {
             "LoginSucceeded", "LoginSucceededMfa", "LoginSucceededBackupCode",
@@ -554,6 +555,7 @@ public class ArchitectureTests
             "MfaDisabled", "LockoutSelfServiceUnlock",
             "DataExportRequested", "GdprErasureRequested",
             "EmailVerificationRequested", "EmailVerified",
+            "SupportTicketCreated",
         };
         Enum.GetNames<AuditLogAction>()
             .Should().BeEquivalentTo(expected);

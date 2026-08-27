@@ -104,4 +104,14 @@ Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de in
 
 Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.</value></data>
   <data name="BackupCodesRegenerated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Los códigos de respaldo de verificación en dos pasos de tu cuenta de Ceres se &lt;strong&gt;regeneraron&lt;/strong&gt; el {0} (UTC) desde la IP &lt;strong&gt;{1}&lt;/strong&gt;. Los códigos anteriores ya no son válidos.&lt;/p&gt;&lt;p&gt;Si no fuiste tú, tu cuenta podría estar en riesgo: cambia tu contraseña de inmediato desde la página de inicio de sesión de Ceres ("¿Olvidaste tu contraseña?") y revisa tu configuración de seguridad.&lt;/p&gt;</value></data>
+  <data name="SupportTicketReceived.Subject" xml:space="preserve"><value>[Ticket Ceres {3}] prioridad {0} — {1}</value></data>
+  <data name="SupportTicketReceived.BodyText" xml:space="preserve"><value>Un usuario ha abierto un ticket de soporte.
+
+Prioridad: {0}
+Asunto:    {1}
+De:        {2}
+Ticket:    {3}
+
+{4}</value></data>
+  <data name="SupportTicketReceived.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Un usuario ha abierto un ticket de soporte.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Prioridad:&lt;/strong&gt; {0}&lt;br /&gt;&lt;strong&gt;Asunto:&lt;/strong&gt; {1}&lt;br /&gt;&lt;strong&gt;De:&lt;/strong&gt; {2}&lt;br /&gt;&lt;strong&gt;Ticket:&lt;/strong&gt; {3}&lt;/p&gt;&lt;p&gt;{4}&lt;/p&gt;</value></data>
 </root>
