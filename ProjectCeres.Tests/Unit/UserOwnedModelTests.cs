@@ -42,11 +42,13 @@ public class UserOwnedModelTests
     // A deliberate count pin: adding a user-owned entity must fail this test so the
     // author consciously confirms the new table reached every registry (RLS policy
     // migration, query filter, cleanup) rather than only the DbSet.
-    // 25 -> 26: SupportTickets (Stage 12.5). 26 -> 27: SupportTicketAttachments (Stage 12.5).
+    // 25 -> 26: SupportTickets (Stage 12.5). 26 -> 27: SupportTicketAttachments (Stage
+    // 12.5). 27 -> 28: SupportMessages (Stage 12.6) — the conversation model split the
+    // ticket's single Message column out into its own IUserOwned table.
     [Fact]
-    public void RlsTables_has_exactly_27_entries()
+    public void RlsTables_has_exactly_28_entries()
     {
-        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(27);
+        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(28);
     }
 
     [Fact]
@@ -70,12 +72,17 @@ public class UserOwnedModelTests
         // user's financial screenshots belongs with its two sibling attachment tables in
         // the finance set that GDPR erasure, export and quota sweeps iterate. Excluding
         // it would have hidden those files from every one of them.
+        // 17 -> 18: SupportMessages (Stage 12.6). SupportTickets itself stays out (it is
+        // in AuthInternalTables — created after the sentinel era, never holds seed rows),
+        // but the conversation body that used to live on SupportTicket.Message now lives
+        // here, and it is not auth machinery — it belongs with the finance-and-attachment
+        // subset for the same reason SupportTicketAttachments does.
         var expected = new[]
         {
             "Accounts", "Budgets", "Categories", "CategoryBudgets", "ImportProfiles",
             "ImportStagedTransactions", "ImportStagedTransfers", "ImportTransferExclusions",
             "LiabilityPayments", "RecurringTransactions", "SavedReports", "Settings",
-            "SupportTicketAttachments",
+            "SupportMessages", "SupportTicketAttachments",
             "TransactionAttachments", "Transactions", "TransferAttachments", "Transfers",
         };
         var names = UserOwnedModel.FinanceTables(Ctx().Model).Select(t => t.PostgresTableName);
@@ -107,29 +114,36 @@ public class UserOwnedModelTests
             "each is an independent record of what was reported");
     }
 
-    // Widening these is silent (narrowing would fail loudly on existing rows), and
-    // there is no service-layer validator behind them yet, so the column width is
-    // the only bound on user-submitted text.
+    // Widening this is silent (narrowing would fail loudly on existing rows), and
+    // there is no service-layer validator behind it yet, so the column width is
+    // the only bound on user-submitted text. The conversation body moved to
+    // SupportMessage.Body (Stage 12.6) and is asserted unbounded there — it is
+    // IsRequired() but carries no HasMaxLength, unlike Subject.
     [Fact]
-    public void SupportTicket_free_text_columns_stay_bounded()
+    public void SupportTicket_subject_stays_bounded()
     {
         var entity = Ctx().Model.FindEntityType(typeof(SupportTicket))!;
 
         entity.FindProperty(nameof(SupportTicket.Subject))!.GetMaxLength().Should().Be(200);
-        entity.FindProperty(nameof(SupportTicket.Message))!.GetMaxLength().Should().Be(5000);
     }
 
     // Status is stored via HasConversion<int>(), so the ENUM ORDINAL is the real
     // database contract, not the C# name. Inserting a value at the top of the enum
     // — exactly what someone adding a "Pending" state would do — silently changes
     // the meaning of every stored row. Nothing else catches that.
+    //
+    // Stage 12.6 widened the enum from 4 values to 5 (Open, InProgress, Resolved,
+    // Closed -> Open, Pending, OnHold, Solved, Closed) as part of the conversation
+    // model: a ticket now has a real back-and-forth, so "waiting on the user" and
+    // "blocked on something other than the user" needed to be distinguishable states.
     [Fact]
     public void SupportTicket_status_ordinals_are_the_stored_contract()
     {
         ((int)SupportTicketStatus.Open).Should().Be(0);
-        ((int)SupportTicketStatus.InProgress).Should().Be(1);
-        ((int)SupportTicketStatus.Resolved).Should().Be(2);
-        ((int)SupportTicketStatus.Closed).Should().Be(3);
+        ((int)SupportTicketStatus.Pending).Should().Be(1);
+        ((int)SupportTicketStatus.OnHold).Should().Be(2);
+        ((int)SupportTicketStatus.Solved).Should().Be(3);
+        ((int)SupportTicketStatus.Closed).Should().Be(4);
 
         ((int)SupportTicketPriority.Low).Should().Be(0);
         ((int)SupportTicketPriority.Normal).Should().Be(1);
@@ -138,49 +152,66 @@ public class UserOwnedModelTests
     }
 
     // Cascade here, unlike the ticket self-FK: an attachment has no meaning without its
-    // ticket, and an orphaned row would point at a file nothing can reach. The two
+    // message, and an orphaned row would point at a file nothing can reach. The two
     // behaviours are deliberately opposite, so both are pinned — a future reader
     // "harmonising" them would silently break one or the other.
+    //
+    // Stage 12.6 moved the attachment's parent from SupportTicket to SupportMessage: a
+    // screenshot now belongs to the specific message it was attached to, not the ticket
+    // as a whole.
     [Fact]
-    public void SupportTicketAttachment_cascades_from_its_ticket()
+    public void SupportTicketAttachment_cascades_from_its_message()
     {
         var entity = Ctx().Model.FindEntityType(typeof(SupportTicketAttachment))!;
 
         var parentFk = entity.GetForeignKeys()
-            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportTicket));
+            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportMessage));
 
         parentFk.DeleteBehavior.Should().Be(DeleteBehavior.Cascade,
-            "an attachment cannot outlive the ticket it belongs to — the stored file would be unreachable");
+            "an attachment cannot outlive the message it belongs to — the stored file would be unreachable");
     }
 
-    // The security review's Critical finding, pinned. With a single-column FK, user B
-    // could attach to user A's ticket (the RLS WITH CHECK pins UserId to the WRITER and
+    // The security review's Critical finding, pinned — now against SupportMessage rather
+    // than SupportTicket after the Stage 12.6 reshape. With a single-column FK, user B
+    // could attach to user A's message (the RLS WITH CHECK pins UserId to the WRITER and
     // says nothing about the parent's owner, and Postgres runs FK checks through an RI
-    // trigger that RLS does not apply to). A deleting their own ticket then destroyed
+    // trigger that RLS does not apply to). A deleting their own message then destroyed
     // B's row via the cascade. Both were reproduced against the real database before the
     // composite key was added, and the same insert now fails with an FK violation.
     //
     // Referencing (Id, UserId) is what makes the divergence unrepresentable. A future
     // change back to a single-column FK reopens a cross-tenant destructive write.
     [Fact]
-    public void SupportTicketAttachment_fk_is_scoped_to_the_ticket_owner()
+    public void SupportTicketAttachment_fk_is_scoped_to_the_message_owner()
     {
         var entity = Ctx().Model.FindEntityType(typeof(SupportTicketAttachment))!;
 
         var parentFk = entity.GetForeignKeys()
-            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportTicket));
+            .Single(fk => fk.PrincipalEntityType.ClrType == typeof(SupportMessage));
 
         parentFk.Properties.Select(p => p.Name).Should().BeEquivalentTo(
-            new[] { nameof(SupportTicketAttachment.SupportTicketId), nameof(SupportTicketAttachment.UserId) },
-            "a single-column FK lets an attachment hang off another user's ticket, which the " +
+            new[] { nameof(SupportTicketAttachment.SupportMessageId), nameof(SupportTicketAttachment.UserId) },
+            "a single-column FK lets an attachment hang off another user's message, which the " +
             "RLS-bypassing cascade then destroys");
 
         parentFk.PrincipalKey.Properties.Select(p => p.Name).Should().BeEquivalentTo(
-            new[] { nameof(SupportTicket.Id), nameof(SupportTicket.UserId) });
+            new[] { nameof(SupportMessage.Id), nameof(SupportMessage.UserId) });
     }
 
     [Fact]
-    public void SupportTicket_exposes_the_alternate_key_the_attachment_fk_needs()
+    public void SupportMessage_exposes_the_alternate_key_the_attachment_fk_needs()
+    {
+        var entity = Ctx().Model.FindEntityType(typeof(SupportMessage))!;
+
+        entity.GetKeys().Should().Contain(
+            k => k.Properties.Count == 2
+                 && k.Properties.Any(p => p.Name == nameof(SupportMessage.Id))
+                 && k.Properties.Any(p => p.Name == nameof(SupportMessage.UserId)),
+            "dropping this alternate key would force the attachment FK back to a single column");
+    }
+
+    [Fact]
+    public void SupportTicket_exposes_the_alternate_key_the_message_fk_needs()
     {
         var entity = Ctx().Model.FindEntityType(typeof(SupportTicket))!;
 
@@ -188,7 +219,7 @@ public class UserOwnedModelTests
             k => k.Properties.Count == 2
                  && k.Properties.Any(p => p.Name == nameof(SupportTicket.Id))
                  && k.Properties.Any(p => p.Name == nameof(SupportTicket.UserId)),
-            "dropping this alternate key would force the attachment FK back to a single column");
+            "dropping this alternate key would force the message->ticket FK back to a single column");
     }
 
     [Fact]

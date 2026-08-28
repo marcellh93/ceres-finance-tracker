@@ -49,9 +49,9 @@ public class SupportTicketServiceTests : IAsyncLifetime
     {
         if (_foreignTicketIds.Count > 0)
         {
+            // Attachment -> message and message -> ticket are both Cascade, so deleting
+            // the tickets takes their messages and attachments with them.
             await using var admin = _fixture.CreateAdminContext();
-            await admin.SupportTicketAttachments
-                .Where(a => _foreignTicketIds.Contains(a.SupportTicketId)).ExecuteDeleteAsync();
             await admin.SupportTickets
                 .Where(t => _foreignTicketIds.Contains(t.Id)).ExecuteDeleteAsync();
         }
@@ -85,7 +85,7 @@ public class SupportTicketServiceTests : IAsyncLifetime
         };
 
     /// <summary>
-    /// A ticket owned by someone other than the current user.
+    /// A ticket AND its first message, owned by someone other than the current user.
     ///
     /// Inserted through the admin (BYPASSRLS) context on purpose: the app-role connection
     /// the fixture normally uses is subject to the same RLS policy as production, so it
@@ -93,25 +93,34 @@ public class SupportTicketServiceTests : IAsyncLifetime
     /// row is the wall working — but the tests below need the row to exist in order to
     /// prove the SERVICE also refuses to reach it.
     /// </summary>
-    private async Task<SupportTicket> InsertForeignTicketAsync(SupportTicketStatus status)
+    private async Task<(SupportTicket Ticket, SupportMessage Message)> InsertForeignTicketAsync(SupportTicketStatus status)
     {
         var ticket = new SupportTicket
         {
             Id = Guid.NewGuid(),
             UserId = OtherUser,
             Subject = $"foreign {Guid.NewGuid():N}",
-            Message = "not yours",
             Status = status,
             Priority = SupportTicketPriority.Normal,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
+        var message = new SupportMessage
+        {
+            Id = Guid.NewGuid(),
+            UserId = OtherUser,
+            SupportTicketId = ticket.Id,
+            AuthorRole = SupportMessageAuthor.User,
+            Body = "not yours",
+            CreatedAt = DateTime.UtcNow,
+        };
 
         await using var admin = _fixture.CreateAdminContext();
         admin.SupportTickets.Add(ticket);
+        admin.SupportMessages.Add(message);
         await admin.SaveChangesAsync();
         _foreignTicketIds.Add(ticket.Id);
-        return ticket;
+        return (ticket, message);
     }
 
     /// <summary>
@@ -119,6 +128,11 @@ public class SupportTicketServiceTests : IAsyncLifetime
     /// the automatic rollback does not reach them. Deleted explicitly on teardown.
     /// </summary>
     private readonly List<Guid> _foreignTicketIds = [];
+
+    /// <summary>The first (only) message CreateAsync wrote for the given ticket subject.</summary>
+    private async Task<SupportMessage> GetFirstMessageAsync(string subject) =>
+        await _fixture.Db.SupportMessages.AsNoTracking()
+            .SingleAsync(m => m.SupportTicket.Subject == subject);
 
     // -------------------------------------------------------------------------
     // CreateAsync
@@ -139,7 +153,12 @@ public class SupportTicketServiceTests : IAsyncLifetime
 
         var persisted = await _fixture.Db.SupportTickets.AsNoTracking()
             .SingleAsync(t => t.Subject == subject);
-        persisted.Message.Should().Be("The CSV comes out empty.");
+        persisted.Id.Should().Be(ticket.Id);
+
+        var firstMessage = await GetFirstMessageAsync(subject);
+        firstMessage.AuthorRole.Should().Be(SupportMessageAuthor.User, "the ticket text IS the first message");
+        firstMessage.UserId.Should().Be(Sentinel);
+        firstMessage.Body.Should().Be("The CSV comes out empty.");
     }
 
     [Theory]
@@ -161,7 +180,7 @@ public class SupportTicketServiceTests : IAsyncLifetime
     [Fact]
     public async Task ListOwnAsync_returns_only_the_callers_tickets_newest_first()
     {
-        var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Open);
+        var (foreign, _) = await InsertForeignTicketAsync(SupportTicketStatus.Open);
         var older = await _service.CreateAsync($"older {Guid.NewGuid():N}", "m", SupportTicketPriority.Low);
         var newer = await _service.CreateAsync($"newer {Guid.NewGuid():N}", "m", SupportTicketPriority.Low);
 
@@ -208,7 +227,7 @@ public class SupportTicketServiceTests : IAsyncLifetime
     [Fact]
     public async Task CloseAsync_cannot_reach_another_users_ticket()
     {
-        var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Open);
+        var (foreign, _) = await InsertForeignTicketAsync(SupportTicketStatus.Open);
 
         var result = await _service.CloseAsync(foreign.Id);
 
@@ -231,14 +250,21 @@ public class SupportTicketServiceTests : IAsyncLifetime
     [Fact]
     public async Task CreateAsync_links_a_follow_up_to_the_closed_ticket_it_continues()
     {
-        var original = await _service.CreateAsync($"original {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        var originalSubject = $"original {Guid.NewGuid():N}";
+        var original = await _service.CreateAsync(originalSubject, "m", SupportTicketPriority.Normal);
         (await _service.CloseAsync(original.Id)).Should().Be(CloseTicketResult.Closed);
 
+        var followUpSubject = $"follow up {Guid.NewGuid():N}";
         var followUp = await _service.CreateAsync(
-            $"follow up {Guid.NewGuid():N}", "still broken", SupportTicketPriority.High, original.Id);
+            followUpSubject, "still broken", SupportTicketPriority.High, original.Id);
 
         followUp.PrecedingTicketId.Should().Be(original.Id);
         followUp.Status.Should().Be(SupportTicketStatus.Open, "a follow-up is a new ticket with its own lifecycle");
+
+        var followUpMessage = await GetFirstMessageAsync(followUpSubject);
+        followUpMessage.AuthorRole.Should().Be(SupportMessageAuthor.User);
+        followUpMessage.UserId.Should().Be(Sentinel);
+        followUpMessage.Body.Should().Be("still broken");
     }
 
     [Fact]
@@ -255,7 +281,7 @@ public class SupportTicketServiceTests : IAsyncLifetime
     [Fact]
     public async Task CreateAsync_refuses_a_follow_up_to_another_users_ticket()
     {
-        var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Closed);
+        var (foreign, _) = await InsertForeignTicketAsync(SupportTicketStatus.Closed);
 
         var act = () => _service.CreateAsync("follow up", "m", SupportTicketPriority.Normal, foreign.Id);
 
@@ -268,16 +294,18 @@ public class SupportTicketServiceTests : IAsyncLifetime
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task UploadForSupportTicketAsync_writes_the_file_and_stamps_the_owner()
+    public async Task UploadForSupportMessageAsync_writes_the_file_and_stamps_the_owner()
     {
-        var ticket = await _service.CreateAsync($"with file {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        var subject = $"with file {Guid.NewGuid():N}";
+        await _service.CreateAsync(subject, "m", SupportTicketPriority.Normal);
+        var message = await GetFirstMessageAsync(subject);
         var file = MakeFormFile(MinimalJpegBytes(), "screenshot.jpg", "image/jpeg");
 
-        var attachment = await _attachments.UploadForSupportTicketAsync(ticket.Id, file);
+        var attachment = await _attachments.UploadForSupportMessageAsync(message.Id, file);
 
-        attachment.SupportTicketId.Should().Be(ticket.Id);
+        attachment.SupportMessageId.Should().Be(message.Id);
         attachment.UserId.Should().Be(Sentinel,
-            "the composite FK is (SupportTicketId, UserId) — an unset UserId cannot satisfy it");
+            "the composite FK is (SupportMessageId, UserId) — an unset UserId cannot satisfy it");
         attachment.ContentType.Should().Be("image/jpeg");
         attachment.FileName.Should().Be("screenshot.jpg", "the original name is kept for display");
         attachment.StoredPath.Should().NotContain("screenshot",
@@ -287,82 +315,90 @@ public class SupportTicketServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UploadForSupportTicketAsync_rejects_a_disallowed_type_by_content_not_extension()
+    public async Task UploadForSupportMessageAsync_rejects_a_disallowed_type_by_content_not_extension()
     {
-        var ticket = await _service.CreateAsync($"bad type {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        var subject = $"bad type {Guid.NewGuid():N}";
+        await _service.CreateAsync(subject, "m", SupportTicketPriority.Normal);
+        var message = await GetFirstMessageAsync(subject);
         // Claims to be a JPEG by name and header; the bytes are a Windows executable.
         var file = MakeFormFile([0x4D, 0x5A, 0x90, 0x00, 0x03], "totally-an-image.jpg", "image/jpeg");
 
-        var act = () => _attachments.UploadForSupportTicketAsync(ticket.Id, file);
+        var act = () => _attachments.UploadForSupportMessageAsync(message.Id, file);
 
         (await act.Should().ThrowAsync<InvalidOperationException>())
             .WithMessage("*Accepted types: JPEG, PNG, GIF, WebP, PDF*");
     }
 
     [Fact]
-    public async Task UploadForSupportTicketAsync_rejects_a_file_over_the_10_MB_cap()
+    public async Task UploadForSupportMessageAsync_rejects_a_file_over_the_10_MB_cap()
     {
-        var ticket = await _service.CreateAsync($"too big {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        var subject = $"too big {Guid.NewGuid():N}";
+        await _service.CreateAsync(subject, "m", SupportTicketPriority.Normal);
+        var message = await GetFirstMessageAsync(subject);
         // 11 MB. The cap lives in the core the three attachment families now share, so
         // this also guards against a refactor that drops it for support only.
         var file = MakeFormFile(new byte[11 * 1024 * 1024], "huge.jpg", "image/jpeg");
 
-        var act = () => _attachments.UploadForSupportTicketAsync(ticket.Id, file);
+        var act = () => _attachments.UploadForSupportMessageAsync(message.Id, file);
 
         (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*10 MB*");
     }
 
     [Fact]
-    public async Task UploadForSupportTicketAsync_caps_a_ticket_at_ten_attachments()
+    public async Task UploadForSupportMessageAsync_caps_a_message_at_ten_attachments()
     {
-        var ticket = await _service.CreateAsync($"many files {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        var subject = $"many files {Guid.NewGuid():N}";
+        await _service.CreateAsync(subject, "m", SupportTicketPriority.Normal);
+        var message = await GetFirstMessageAsync(subject);
         for (var i = 0; i < 10; i++)
         {
-            await _attachments.UploadForSupportTicketAsync(
-                ticket.Id, MakeFormFile(MinimalJpegBytes(), $"shot{i}.jpg", "image/jpeg"));
+            await _attachments.UploadForSupportMessageAsync(
+                message.Id, MakeFormFile(MinimalJpegBytes(), $"shot{i}.jpg", "image/jpeg"));
         }
 
-        var act = () => _attachments.UploadForSupportTicketAsync(
-            ticket.Id, MakeFormFile(MinimalJpegBytes(), "eleventh.jpg", "image/jpeg"));
+        var act = () => _attachments.UploadForSupportMessageAsync(
+            message.Id, MakeFormFile(MinimalJpegBytes(), "eleventh.jpg", "image/jpeg"));
 
         (await act.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*more than 10*");
     }
 
     [Fact]
-    public async Task UploadForSupportTicketAsync_refuses_a_write_past_the_per_user_storage_quota()
+    public async Task UploadForSupportMessageAsync_refuses_a_write_past_the_per_user_storage_quota()
     {
         // security-model.md § File Access Control requires a per-user total, not just a
-        // per-parent cap: 10 files x 10 MB bounds one ticket, but nothing bounds how many
-        // tickets a user opens. Seed the quota as already-consumed rather than uploading
-        // 500 MB, which would make this test unusable.
-        var ticket = await _service.CreateAsync($"quota {Guid.NewGuid():N}", "m", SupportTicketPriority.Normal);
+        // per-parent cap: 10 files x 10 MB bounds one message, but nothing bounds how many
+        // tickets/messages a user opens. Seed the quota as already-consumed rather than
+        // uploading 500 MB, which would make this test unusable.
+        var subject = $"quota {Guid.NewGuid():N}";
+        await _service.CreateAsync(subject, "m", SupportTicketPriority.Normal);
+        var message = await GetFirstMessageAsync(subject);
         _fixture.Db.SupportTicketAttachments.Add(new SupportTicketAttachment
         {
             Id = Guid.NewGuid(),
-            SupportTicketId = ticket.Id,
+            SupportMessageId = message.Id,
             UserId = Sentinel,
             FileName = "already-used.pdf",
-            StoredPath = Path.Combine("uploads", "support", ticket.Id.ToString(), "prior.pdf"),
+            StoredPath = Path.Combine("uploads", "support", message.Id.ToString(), "prior.pdf"),
             ContentType = "application/pdf",
             FileSizeBytes = 500L * 1024 * 1024,
             UploadedAt = DateTime.UtcNow,
         });
         await _fixture.Db.SaveChangesAsync();
 
-        var act = () => _attachments.UploadForSupportTicketAsync(
-            ticket.Id, MakeFormFile(MinimalJpegBytes(), "one-more.jpg", "image/jpeg"));
+        var act = () => _attachments.UploadForSupportMessageAsync(
+            message.Id, MakeFormFile(MinimalJpegBytes(), "one-more.jpg", "image/jpeg"));
 
         (await act.Should().ThrowAsync<InvalidOperationException>())
             .WithMessage("*Storage limit reached*");
     }
 
     [Fact]
-    public async Task UploadForSupportTicketAsync_cannot_attach_to_another_users_ticket()
+    public async Task UploadForSupportMessageAsync_cannot_attach_to_another_users_message()
     {
-        var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Open);
+        var (_, foreignMessage) = await InsertForeignTicketAsync(SupportTicketStatus.Open);
         var file = MakeFormFile(MinimalJpegBytes(), "shot.jpg", "image/jpeg");
 
-        var act = () => _attachments.UploadForSupportTicketAsync(foreign.Id, file);
+        var act = () => _attachments.UploadForSupportMessageAsync(foreignMessage.Id, file);
 
         await act.Should().ThrowAsync<InvalidOperationException>(
             "this is the cross-tenant write the composite FK was added to close");
@@ -371,11 +407,11 @@ public class SupportTicketServiceTests : IAsyncLifetime
     [Fact]
     public async Task GetSupportTicketAttachmentAsync_cannot_read_another_users_attachment()
     {
-        var foreign = await InsertForeignTicketAsync(SupportTicketStatus.Open);
+        var (foreign, foreignMessage) = await InsertForeignTicketAsync(SupportTicketStatus.Open);
         var row = new SupportTicketAttachment
         {
             Id = Guid.NewGuid(),
-            SupportTicketId = foreign.Id,
+            SupportMessageId = foreignMessage.Id,
             UserId = OtherUser,
             FileName = "theirs.jpg",
             StoredPath = Path.Combine("uploads", "support", foreign.Id.ToString(), "x.jpg"),
