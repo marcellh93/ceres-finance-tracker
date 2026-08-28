@@ -134,6 +134,71 @@ public sealed class EmailComposerTests
         msg.BodyHtml.Should().Contain("203.0.113.5");
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    public void SupportReplyToUser_renders_subject_reply_body_and_link(string culture)
+    {
+        // {0} = subject, {1} = agent reply body, {2} = /support/<id> thread link.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.SupportReplyToUser,
+            new CultureInfo(culture),
+            "Login broken on mobile",
+            "We shipped a fix; please retry.",
+            "https://ceres.invalid/support/abc123");
+
+        msg.Subject.Should().NotBeNullOrWhiteSpace().And.NotContain("{0}");
+        msg.BodyText.Should().Contain("Login broken on mobile");
+        msg.BodyText.Should().Contain("We shipped a fix; please retry.");
+        msg.BodyText.Should().Contain("https://ceres.invalid/support/abc123");
+        msg.BodyHtml.Should().Contain("We shipped a fix; please retry.");
+        msg.BodyHtml.Should().Contain("href=\"https://ceres.invalid/support/abc123\"");
+    }
+
+    [Fact]
+    public void SupportReplyToUser_escapes_agent_authored_body_in_html()
+    {
+        // Spec § Notifications H2 — MANDATORY sanitisation negative test. The reply email
+        // carries agent-authored free text to a USER's inbox. A body containing HTML /
+        // template-breaking characters MUST be HTML-escaped in the rendered BodyHtml, so a
+        // hostile or careless agent cannot inject markup/script into the user's mail client.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.SupportReplyToUser,
+            new CultureInfo("en"),
+            "Subject line",
+            "<script>alert(1)</script>",
+            "https://ceres.invalid/support/abc123");
+
+        msg.BodyHtml.Should().NotContain("<script>alert(1)</script>");
+        msg.BodyHtml.Should().Contain("&lt;script&gt;");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    public void SupportTicketSolved_renders_subject_and_link(string culture)
+    {
+        // {0} = subject, {1} = /support/<id> thread link.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.SupportTicketSolved,
+            new CultureInfo(culture),
+            "Export fails",
+            "https://ceres.invalid/support/xyz789");
+
+        msg.Subject.Should().Contain("Export fails");
+        msg.BodyText.Should().Contain("https://ceres.invalid/support/xyz789");
+        msg.BodyHtml.Should().Contain("href=\"https://ceres.invalid/support/xyz789\"");
+    }
+
     [Fact]
     public void All_resx_keys_present_in_both_cultures()
     {
@@ -155,6 +220,6 @@ public sealed class EmailComposerTests
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(42, "14 templates × 3 keys each (SupportTicketReceived added Stage 12.5)");
+        enKeys.Should().HaveCount(48, "16 templates × 3 keys each (SupportReplyToUser + SupportTicketSolved added Stage 12.6)");
     }
 }

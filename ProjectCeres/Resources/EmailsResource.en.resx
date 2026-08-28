@@ -114,4 +114,16 @@ Ticket:   {3}
 
 {4}</value></data>
   <data name="SupportTicketReceived.BodyHtml" xml:space="preserve"><value>&lt;p&gt;A user filed a support ticket.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Priority:&lt;/strong&gt; {0}&lt;br /&gt;&lt;strong&gt;Subject:&lt;/strong&gt; {1}&lt;br /&gt;&lt;strong&gt;From:&lt;/strong&gt; {2}&lt;br /&gt;&lt;strong&gt;Ticket:&lt;/strong&gt; {3}&lt;/p&gt;&lt;p&gt;{4}&lt;/p&gt;</value></data>
+  <data name="SupportReplyToUser.Subject" xml:space="preserve"><value>Re: {0} — a reply from Ceres support</value></data>
+  <data name="SupportReplyToUser.BodyText" xml:space="preserve"><value>Ceres support replied to your ticket "{0}".
+
+{1}
+
+View the full conversation: {2}</value></data>
+  <data name="SupportReplyToUser.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Ceres support replied to your ticket &lt;strong&gt;{0}&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;{1}&lt;/p&gt;&lt;p&gt;&lt;a href="{2}"&gt;View the full conversation&lt;/a&gt;&lt;/p&gt;</value></data>
+  <data name="SupportTicketSolved.Subject" xml:space="preserve"><value>Your Ceres ticket "{0}" was marked solved</value></data>
+  <data name="SupportTicketSolved.BodyText" xml:space="preserve"><value>Ceres support marked your ticket "{0}" as solved.
+
+If your issue isn't resolved, reply to the ticket to reopen it: {1}</value></data>
+  <data name="SupportTicketSolved.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Ceres support marked your ticket &lt;strong&gt;{0}&lt;/strong&gt; as &lt;strong&gt;solved&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;If your issue isn't resolved, &lt;a href="{1}"&gt;reply to the ticket&lt;/a&gt; to reopen it.&lt;/p&gt;</value></data>
 </root>

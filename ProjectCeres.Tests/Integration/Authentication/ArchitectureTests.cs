@@ -556,6 +556,9 @@ public class ArchitectureTests
         var mailSendingActions = new (Type Controller, string Action)[]
         {
             (typeof(SupportApiController), "Create"),
+            // Stage 12.6: the user-reply endpoint now notifies the operator, so it is a
+            // mail-sending action and must carry the same rate limit as Create.
+            (typeof(SupportApiController), "Reply"),
         };
 
         foreach (var (controller, actionName) in mailSendingActions)

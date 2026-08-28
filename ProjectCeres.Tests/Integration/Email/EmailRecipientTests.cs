@@ -82,6 +82,9 @@ public sealed class EmailRecipientTests
             "ProjectCeres/Common/Email/SupportRecipientResolver.cs",   // ForConfiguredSupportAddress
             "ProjectCeres/Common/Email/EmailComposer.cs",              // EmailRecipient.None
             "ProjectCeres/Common/Authentication/EmailChangeService.cs" // OverrideForEmailChange
+            // SupportNotificationService does NOT construct EmailRecipient directly — it
+            // resolves via ISupportRecipientResolver / IEmailRecipientResolver (both above),
+            // so it holds no factory call site and stays off this list by design.
         };
 
         var tokens = new[]

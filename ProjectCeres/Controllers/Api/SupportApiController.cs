@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -19,11 +18,8 @@ public class SupportApiController(
     ISupportMessageService messages,
     IFileAttachmentService attachments,
     IAuditLogWriter auditLog,
-    IEmailComposer composer,
-    IEmailService email,
-    ISupportRecipientResolver supportRecipient,
-    ICurrentUserAccessor currentUser,
-    ILogger<SupportApiController> logger) : ControllerBase
+    ISupportNotificationService notify,
+    ICurrentUserAccessor currentUser) : ControllerBase
 {
     // Validation attributes target the PARAMETER, not the property. On a record primary
     // constructor, [property: Required] lands where model binding does not look, and
@@ -98,7 +94,7 @@ public class SupportApiController(
 
         await auditLog.RecordAsync(currentUser.UserId, AuditLogAction.SupportTicketCreated,
             nameof(SupportTicket), ticket.Id, ct);
-        await NotifySupportAsync(ticket, ct);
+        await notify.NotifyOperatorOfNewTicketAsync(ticket, FromDisplay(), ct);
 
         return CreatedAtAction(nameof(GetOne), new { ticketId = ticket.Id }, new { id = ticket.Id });
     }
@@ -145,7 +141,12 @@ public class SupportApiController(
             return Validation(ex);
         }
 
-        // Task 11: notify operator of the new user reply.
+        // Notify the operator of the new user reply. The ticket carries the subject/priority
+        // the notification quotes; GetThreadAsync scopes to the caller, so a foreign or
+        // absent ticket would have already thrown out of PostUserReplyAsync above.
+        var ticket = await messages.GetThreadAsync(ticketId, ct);
+        if (ticket is not null)
+            await notify.NotifyOperatorOfUserReplyAsync(ticket, FromDisplay(), message.Body, ct);
 
         return Ok(new MessageDto(
             message.Id, message.AuthorRole, message.Body, message.CreatedAt, []));
@@ -206,11 +207,6 @@ public class SupportApiController(
                     [.. m.Attachments.Select(a => new AttachmentDto(
                         a.Id, a.FileName, a.ContentType, a.FileSizeBytes, a.UploadedAt))]))]);
 
-    // The notification email quotes the opening message. On a freshly created ticket that
-    // is the only message; CreateAsync populates Messages before returning.
-    private static string FirstMessageBody(SupportTicket t) =>
-        t.Messages.OrderBy(m => m.CreatedAt).FirstOrDefault()?.Body ?? "";
-
     private IActionResult Validation(InvalidOperationException ex) =>
         UnprocessableEntity(new
         {
@@ -222,39 +218,7 @@ public class SupportApiController(
             }
         });
 
-    /// <summary>
-    /// Emails the configured support address. Failures are logged and swallowed: the
-    /// ticket is already committed, and a mail outage must not tell the user their report
-    /// failed when it did not. Production cannot reach the unconfigured branch — Program.cs
-    /// refuses to boot without Email:SupportAddress.
-    /// </summary>
-    private async Task NotifySupportAsync(SupportTicket ticket, CancellationToken ct)
-    {
-        var recipient = supportRecipient.Resolve();
-        if (recipient is null)
-        {
-            logger.LogInformation(
-                "Support ticket {TicketId} filed; no Email:SupportAddress configured, so no notification was sent.",
-                ticket.Id);
-            return;
-        }
-
-        try
-        {
-            var message = composer.Compose(
-                EmailTemplateKey.SupportTicketReceived,
-                CultureInfo.CurrentUICulture,
-                ticket.Priority.ToString(),
-                ticket.Subject,
-                User.Identity?.Name ?? currentUser.UserId.ToString(),
-                ticket.Id.ToString(),
-                FirstMessageBody(ticket)) with { To = recipient };
-            await email.SendAsync(message, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "Support ticket {TicketId} was filed but the notification email failed.", ticket.Id);
-        }
-    }
+    // The operator notification names who filed the ticket. Prefer the display identity;
+    // fall back to the user id when the principal has no name claim.
+    private string FromDisplay() => User.Identity?.Name ?? currentUser.UserId.ToString();
 }
