@@ -123,6 +123,8 @@ export function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="settings/sessions" element={<Sessions />} />
         <Route path="support" element={<Support />} />
+        <Route path="support/new" element={<Support />} />
+        <Route path="support/:ticketId" element={<Support />} />
         <Route path="profile" element={<Profile />} />
         <Route
           path="security"

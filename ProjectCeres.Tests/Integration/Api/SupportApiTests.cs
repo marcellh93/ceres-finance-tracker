@@ -149,7 +149,8 @@ public class SupportApiTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         response.Headers.Location.Should().NotBeNull("201 carries a Location per the api contract");
 
-        var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var id = payload.GetProperty("id").GetGuid();
         _seededTicketIds.Add(id);
 
         using var scope = _factory.Services.CreateScope();
@@ -164,6 +165,10 @@ public class SupportApiTests : IAsyncLifetime
         firstMessage.AuthorRole.Should().Be(SupportMessageAuthor.User);
         firstMessage.UserId.Should().Be(Sentinel);
         firstMessage.Body.Should().Be("The CSV comes out empty.");
+
+        // The response exposes that first message's id so the client can attach files to
+        // it (create is text + optional attachments; the attachment hangs off a message).
+        payload.GetProperty("firstMessageId").GetGuid().Should().Be(firstMessage.Id);
     }
 
     [Fact]

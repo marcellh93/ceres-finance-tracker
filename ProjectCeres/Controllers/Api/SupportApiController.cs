@@ -96,7 +96,12 @@ public class SupportApiController(
             nameof(SupportTicket), ticket.Id, ct);
         await notify.NotifyOperatorOfNewTicketAsync(ticket, FromDisplay(), ct);
 
-        return CreatedAtAction(nameof(GetOne), new { ticketId = ticket.Id }, new { id = ticket.Id });
+        // Return the first message's id alongside the ticket id: the client attaches any
+        // buffered files by posting them to that message (create is text + optional
+        // attachments, and the attachment hangs off a message, not the ticket).
+        var firstMessageId = ticket.Messages.Single().Id;
+        return CreatedAtAction(nameof(GetOne), new { ticketId = ticket.Id },
+            new { id = ticket.Id, firstMessageId });
     }
 
     [HttpGet("tickets")]
