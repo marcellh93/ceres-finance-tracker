@@ -1404,7 +1404,7 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 ## Stage 12 — Sessions + Support SPA pages (Batch 5)
 
-**Status: ❌ Pending.** Two SPA pages still pending from Batch 2 that depend on Auth being live.
+**Status: ⏳ In progress.** The two SPA pages are shipped — `/settings/sessions` (12.1–12.3) and `/support` (12.4–12.7, reshaped into the conversation model by Stage 12.6). Two sub-stages remain before Stage 12 closes: **12.8** (email-change SPA confirm/revoke pages — the Stage 6.12 API's emailed links still dead-end on unmatched SPA routes) and **12.9** (the reauth dialog is built + mounted but not yet wired to its trigger surfaces, so reauth-gated actions still force a manual re-login). Stage 12.5 (IP-anchor / admin ticket list / new-session alert) is separately deferred, user-authorized. Remaining `[ ]` items under this heading are accepted-risk deferrals, future-path items (Stage 13 / 16), or open 12.1-sessions tests.
 
 > **Goal:** users can review and revoke their active sessions, block IPs, and submit support tickets. The pages exist in the SPA at `/settings/sessions` and `/support`.
 
