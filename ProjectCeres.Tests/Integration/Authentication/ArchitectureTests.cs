@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using FluentAssertions;
+using ProjectCeres.Admin;
 using ProjectCeres.Controllers.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -559,6 +560,11 @@ public class ArchitectureTests
             // Stage 12.6: the user-reply endpoint now notifies the operator, so it is a
             // mail-sending action and must carry the same rate limit as Create.
             (typeof(SupportApiController), "Reply"),
+            // Stage 12.6: the operator-reply endpoint emails the user (agent reply / Solved),
+            // so it is equally a mail-sending action — spec § Notifications carry-forward,
+            // flagged by both reviews (security H3). RequireAdmin gates it, but the invariant
+            // is "a mail-sender carries the limit", not "a public one does".
+            (typeof(SupportAdminApiController), "PostMessage"),
         };
 
         foreach (var (controller, actionName) in mailSendingActions)

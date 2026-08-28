@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Analyzers.Annotations;
@@ -46,7 +47,14 @@ public sealed class SupportAdminApiController(
     /// </summary>
     public sealed record OperatorMessageRequest(string? Body, SupportTicketStatus Status);
 
+    // Sends the agent-reply / Solved email to the user, so it is a mail-sending action and
+    // carries the same rate limit as the user endpoints — the invariant the spec (§ Notifications
+    // carry-forward) and both reviews (security H3) pinned in ArchitectureTests' mailSendingActions.
+    // The EmailByUser partition falls to the operator's id here (the body has no email field), so
+    // the cap is per-operator; ApplyEmailIpRateLimit is the per-IP backstop.
     [HttpPost("tickets/{id:guid}/messages")]
+    [ApplyEmailIpRateLimit]
+    [EnableRateLimiting(AuthRateLimitPolicies.EmailByUser)]
     public async Task<IActionResult> PostMessage(Guid id, [FromBody] OperatorMessageRequest request, CancellationToken ct)
     {
         // Cross-tenant read: the ticket belongs to another user, so IgnoreQueryFilters() is
