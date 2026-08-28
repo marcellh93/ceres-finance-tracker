@@ -262,6 +262,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/evidence-bundle-check.js\""
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spa-dist-freshness.js\""
+          }
+        ]
       }
     ]
   }

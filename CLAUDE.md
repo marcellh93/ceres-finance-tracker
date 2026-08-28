@@ -46,6 +46,8 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 
 **Stale-artifact trip-ups.** Both halves of the stack can silently serve old code: `dotnet watch` keeps running a process whose DLL has moved on, and the SPA falls back to the last-built bundle in `wwwroot/dist/` whenever no Vite process is running (`dotnet watch` never rebuilds the SPA — only `pnpm build` does). Neither raises an error, and the source file on disk looks correct. Symptoms, detection commands, and fixes: `docs/runbooks/local-dev-troubleshooting.md`.
 
+**To verify a frontend change against a non-Vite app** (plain `dotnet run`, or the `tools/agent-env` Smoke profile), run **`tools/stage-spa.sh`** first — it does `pnpm build` + stages the fresh bundle into `wwwroot/dist/` (the same copy the Release `BuildSpaClient` MSBuild target does, which does NOT run in Debug). Without it the app serves a stale `wwwroot/dist/`. Not needed when the Vite dev server is running (`dotnet run` in Development / `tools/dev-watch.sh`) — that serves live with HMR. The `spa-dist-freshness` Stop hook prints an advisory when a turn edits SPA source but leaves `wwwroot/dist/` stale.
+
 **Before reporting any change as done, confirm the running app is serving it** — not just that the source file contains it.
 
 ## When the Stop hook actually fires
