@@ -16,6 +16,7 @@ namespace ProjectCeres.Controllers.Api;
 [Authorize]
 public class SupportApiController(
     ISupportTicketService tickets,
+    ISupportMessageService messages,
     IFileAttachmentService attachments,
     IAuditLogWriter auditLog,
     IEmailComposer composer,
@@ -33,19 +34,41 @@ public class SupportApiController(
         SupportTicketPriority Priority,
         Guid? PrecedingTicketId);
 
+    public sealed record ReplyRequest(
+        [Required, StringLength(5000, MinimumLength = 1)] string Body);
+
     public sealed record AttachmentDto(
         Guid Id, string FileName, string ContentType, long FileSizeBytes, DateTime UploadedAt);
 
-    public sealed record TicketDto(
+    public sealed record MessageDto(
+        Guid Id,
+        SupportMessageAuthor AuthorRole,
+        string Body,
+        DateTime CreatedAt,
+        IReadOnlyList<AttachmentDto> Attachments);
+
+    // The list item and the thread are two different shapes. The list is a rollup — one row
+    // per ticket with a message count, no bodies. The thread is the full conversation.
+    public sealed record TicketListItemDto(
         Guid Id,
         string Subject,
-        string Message,
         SupportTicketStatus Status,
         SupportTicketPriority Priority,
         Guid? PrecedingTicketId,
         DateTime CreatedAt,
         DateTime UpdatedAt,
-        IReadOnlyList<AttachmentDto> Attachments);
+        int MessageCount,
+        DateTime LastMessageAt);
+
+    public sealed record TicketThreadDto(
+        Guid Id,
+        string Subject,
+        SupportTicketStatus Status,
+        SupportTicketPriority Priority,
+        Guid? PrecedingTicketId,
+        DateTime CreatedAt,
+        DateTime UpdatedAt,
+        IReadOnlyList<MessageDto> Messages);
 
     // Every successful create sends mail to the support mailbox, so this endpoint is
     // an email-triggering one and security-model.md § Email Security Rules requires it
@@ -84,19 +107,48 @@ public class SupportApiController(
     public async Task<IActionResult> List(CancellationToken ct)
     {
         var own = await tickets.ListOwnAsync(ct);
-        return Ok(own.Select(t => ToDto(t, [])));
+        return Ok(own.Select(t => new TicketListItemDto(
+            t.Id, t.Subject, t.Status, t.Priority, t.PrecedingTicketId,
+            t.CreatedAt, t.UpdatedAt, t.MessageCount, t.LastMessageAt)));
     }
 
     [HttpGet("tickets/{ticketId:guid}")]
     public async Task<IActionResult> GetOne(Guid ticketId, CancellationToken ct)
     {
-        var ticket = await tickets.GetOwnAsync(ticketId, ct);
+        var ticket = await messages.GetThreadAsync(ticketId, ct);
         // 404 rather than 403: a ticket that is not yours must not be distinguishable
-        // from one that does not exist.
-        // Task 9: full thread DTO + reply endpoint lands here — GetOne will return the
-        // ordered message thread via ISupportMessageService.GetThreadAsync instead of a
-        // single-body DTO with flattened attachments.
-        return ticket is null ? NotFound() : Ok(ToDto(ticket, ticket.Messages.SelectMany(m => m.Attachments)));
+        // from one that does not exist. GetThreadAsync scopes to the caller and returns
+        // null for a ticket that is absent or foreign — the same answer, which is the point.
+        return ticket is null ? NotFound() : Ok(ToThreadDto(ticket));
+    }
+
+    // POST a user reply onto one of the caller's own tickets. The state machine (not this
+    // controller) decides whether the ticket's status allows a reply — a Closed ticket
+    // throws, and the throw becomes the 422 Validation envelope. On success the ticket
+    // returns to Open (any user reply hands the ball back to the operator).
+    //
+    // Rate-limited like Create: a reply notifies the operator, so it is an email-triggering
+    // endpoint and security-model.md § Email Security Rules requires the cap. EmailByUser has
+    // no email field to partition on here, so it keys on the authenticated user.
+    [HttpPost("tickets/{ticketId:guid}/messages")]
+    [ApplyEmailIpRateLimit]
+    [EnableRateLimiting(AuthRateLimitPolicies.EmailByUser)]
+    public async Task<IActionResult> Reply(Guid ticketId, [FromBody] ReplyRequest request, CancellationToken ct)
+    {
+        SupportMessage message;
+        try
+        {
+            message = await messages.PostUserReplyAsync(ticketId, request.Body, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Validation(ex);
+        }
+
+        // Task 11: notify operator of the new user reply.
+
+        return Ok(new MessageDto(
+            message.Id, message.AuthorRole, message.Body, message.CreatedAt, []));
     }
 
     [HttpPost("tickets/{ticketId:guid}/close")]
@@ -124,20 +176,18 @@ public class SupportApiController(
         };
     }
 
-    [HttpPost("tickets/{ticketId:guid}/attachments")]
+    // Attachments hang off a MESSAGE, not a ticket: the composite FK is (SupportMessageId,
+    // UserId), and the service scopes the message to the caller so a foreign or absent
+    // message is a 422 the same way. A Closed ticket's thread is frozen — the user cannot
+    // post a new message to attach to — so the state-machine gate on the reply endpoint is
+    // what keeps files off a closed conversation; this route does not re-check status.
+    [HttpPost("messages/{messageId:guid}/attachments")]
     [RequestSizeLimit(11 * 1024 * 1024)] // 10 MB payload + multipart overhead
-    public async Task<IActionResult> Upload(Guid ticketId, IFormFile file, CancellationToken ct)
+    public async Task<IActionResult> Upload(Guid messageId, IFormFile file, CancellationToken ct)
     {
-        // Task 9: this route attaches to the ticket's first message as a compile-bridge;
-        // the real per-message upload route (scoped to a specific reply) lands with the
-        // thread GET + reply endpoint.
         try
         {
-            var ticket = await tickets.GetOwnAsync(ticketId, ct)
-                ?? throw new InvalidOperationException($"Support ticket {ticketId} not found.");
-            var firstMessageId = ticket.Messages.OrderBy(m => m.CreatedAt).First().Id;
-
-            var saved = await attachments.UploadForSupportMessageAsync(firstMessageId, file);
+            var saved = await attachments.UploadForSupportMessageAsync(messageId, file);
             return Ok(new AttachmentDto(
                 saved.Id, saved.FileName, saved.ContentType, saved.FileSizeBytes, saved.UploadedAt));
         }
@@ -147,14 +197,17 @@ public class SupportApiController(
         }
     }
 
-    private static TicketDto ToDto(SupportTicket t, IEnumerable<SupportTicketAttachment> files) =>
-        new(t.Id, t.Subject, FirstMessageBody(t), t.Status, t.Priority, t.PrecedingTicketId,
-            t.CreatedAt, t.UpdatedAt,
-            [.. files.Select(a => new AttachmentDto(
-                a.Id, a.FileName, a.ContentType, a.FileSizeBytes, a.UploadedAt))]);
+    private static TicketThreadDto ToThreadDto(SupportTicket t) =>
+        new(t.Id, t.Subject, t.Status, t.Priority, t.PrecedingTicketId, t.CreatedAt, t.UpdatedAt,
+            [.. t.Messages
+                .OrderBy(m => m.CreatedAt)
+                .Select(m => new MessageDto(
+                    m.Id, m.AuthorRole, m.Body, m.CreatedAt,
+                    [.. m.Attachments.Select(a => new AttachmentDto(
+                        a.Id, a.FileName, a.ContentType, a.FileSizeBytes, a.UploadedAt))]))]);
 
-    // Task 9: TicketDto.Message (singular) is a compile-bridge — the real thread DTO
-    // returns the ordered message list instead of one flattened body.
+    // The notification email quotes the opening message. On a freshly created ticket that
+    // is the only message; CreateAsync populates Messages before returning.
     private static string FirstMessageBody(SupportTicket t) =>
         t.Messages.OrderBy(m => m.CreatedAt).FirstOrDefault()?.Body ?? "";
 

@@ -35,6 +35,12 @@ public class SupportMessageServiceTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
+        // Roll back the fixture's app transaction FIRST. A successful PostUserReplyAsync
+        // UPDATEs the seeded ticket inside that still-open transaction, holding a row lock;
+        // the admin DELETE below on the same row would block on it until the command times
+        // out. Releasing the lock before the cross-user cleanup avoids the deadlock.
+        await _fixture.DisposeAsync();
+
         if (_adminSeededTicketIds.Count > 0)
         {
             await using var admin = _fixture.CreateAdminContext();
@@ -43,8 +49,6 @@ public class SupportMessageServiceTests : IAsyncLifetime
             await admin.SupportTickets
                 .Where(t => _adminSeededTicketIds.Contains(t.Id)).ExecuteDeleteAsync();
         }
-
-        await _fixture.DisposeAsync();
     }
 
     // -------------------------------------------------------------------------

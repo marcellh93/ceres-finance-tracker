@@ -68,10 +68,18 @@ public sealed class SupportTicketService : ISupportTicketService
         return ticket;
     }
 
-    public async Task<IReadOnlyList<SupportTicket>> ListOwnAsync(CancellationToken ct = default) =>
+    public async Task<IReadOnlyList<SupportTicketListItem>> ListOwnAsync(CancellationToken ct = default) =>
         await _db.SupportTickets.Owned(_user)
             .AsNoTracking()
             .OrderByDescending(t => t.CreatedAt)
+            .Select(t => new SupportTicketListItem(
+                t.Id, t.Subject, t.Status, t.Priority, t.PrecedingTicketId,
+                t.CreatedAt, t.UpdatedAt,
+                t.Messages.Count,
+                // MAX over the join is NULL for a ticket with no messages, which the SQL
+                // translation surfaces as a nullable even though creation always writes the
+                // first message. Coalesce to CreatedAt so the projection stays non-nullable.
+                t.Messages.Max(m => (DateTime?)m.CreatedAt) ?? t.CreatedAt))
             .ToListAsync(ct);
 
     public async Task<SupportTicket?> GetOwnAsync(Guid ticketId, CancellationToken ct = default) =>

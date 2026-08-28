@@ -43,8 +43,11 @@ public class SupportApiTests : IAsyncLifetime
         var all = _seededTicketIds.Concat(_foreignTicketIds).ToList();
         if (all.Count > 0)
         {
-            await db.SupportTicketAttachments.IgnoreQueryFilters()
-                .Where(a => all.Contains(a.SupportTicketId)).ExecuteDeleteAsync();
+            // Attachment -> message and message -> ticket are both Cascade, so deleting the
+            // tickets takes their messages and attachments with them. Messages are removed
+            // first only to keep the intent explicit; the cascade would handle it either way.
+            await db.SupportMessages.IgnoreQueryFilters()
+                .Where(m => all.Contains(m.SupportTicketId)).ExecuteDeleteAsync();
             await db.SupportTickets.IgnoreQueryFilters()
                 .Where(t => all.Contains(t.Id)).ExecuteDeleteAsync();
         }
@@ -77,7 +80,11 @@ public class SupportApiTests : IAsyncLifetime
         return id;
     }
 
-    /// <summary>A ticket owned by someone else, written past RLS via the seeding context.</summary>
+    /// <summary>
+    /// A ticket AND its opening message, owned by someone else, written past RLS via the
+    /// factory's admin-connected context. The opening text is a message row now, not a
+    /// column on the ticket.
+    /// </summary>
     private async Task<Guid> SeedForeignTicketAsync()
     {
         using var scope = _factory.Services.CreateScope();
@@ -87,12 +94,20 @@ public class SupportApiTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             UserId = OtherUser,
             Subject = $"Theirs {Guid.NewGuid():N}",
-            Message = "not yours",
             Status = SupportTicketStatus.Open,
             Priority = SupportTicketPriority.Normal,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
+        ticket.Messages.Add(new SupportMessage
+        {
+            Id = Guid.NewGuid(),
+            UserId = OtherUser,
+            SupportTicketId = ticket.Id,
+            AuthorRole = SupportMessageAuthor.User,
+            Body = "not yours",
+            CreatedAt = DateTime.UtcNow,
+        });
         db.SupportTickets.Add(ticket);
         await db.SaveChangesAsync();
         _foreignTicketIds.Add(ticket.Id);
@@ -104,6 +119,15 @@ public class SupportApiTests : IAsyncLifetime
         var content = new ByteArrayContent(bytes);
         content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         return new MultipartFormDataContent { { content, "file", name } };
+    }
+
+    /// <summary>The id of the ticket's opening message, read back through the thread GET.</summary>
+    private async Task<Guid> FirstMessageIdAsync(Guid ticketId)
+    {
+        var response = await _client.GetAsync($"/api/support/tickets/{ticketId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var thread = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return thread.GetProperty("messages")[0].GetProperty("id").GetGuid();
     }
 
     // -------------------------------------------------------------------------
@@ -133,6 +157,13 @@ public class SupportApiTests : IAsyncLifetime
         var persisted = await db.SupportTickets.AsNoTracking().SingleAsync(t => t.Id == id);
         persisted.Status.Should().Be(SupportTicketStatus.Open);
         persisted.UserId.Should().Be(Sentinel);
+
+        // The ticket text IS the first message now, not a column on the ticket.
+        var firstMessage = await db.SupportMessages.AsNoTracking()
+            .SingleAsync(m => m.SupportTicketId == id);
+        firstMessage.AuthorRole.Should().Be(SupportMessageAuthor.User);
+        firstMessage.UserId.Should().Be(Sentinel);
+        firstMessage.Body.Should().Be("The CSV comes out empty.");
     }
 
     [Fact]
@@ -325,8 +356,9 @@ public class SupportApiTests : IAsyncLifetime
     public async Task Upload_then_download_round_trips_the_file()
     {
         var id = await CreateTicketAsync();
+        var messageId = await FirstMessageIdAsync(id);
 
-        var upload = await _client.PostAsync($"/api/support/tickets/{id}/attachments",
+        var upload = await _client.PostAsync($"/api/support/messages/{messageId}/attachments",
             FileContent(MinimalJpegBytes(), "screenshot.jpg", "image/jpeg"));
         upload.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -345,9 +377,10 @@ public class SupportApiTests : IAsyncLifetime
     public async Task Upload_of_a_disallowed_type_is_422_with_the_friendly_message()
     {
         var id = await CreateTicketAsync();
+        var messageId = await FirstMessageIdAsync(id);
 
         // Names itself a JPEG; the bytes are a Windows executable.
-        var response = await _client.PostAsync($"/api/support/tickets/{id}/attachments",
+        var response = await _client.PostAsync($"/api/support/messages/{messageId}/attachments",
             FileContent([0x4D, 0x5A, 0x90, 0x00, 0x03], "totally-an-image.jpg", "image/jpeg"));
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -356,11 +389,21 @@ public class SupportApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Upload_to_another_users_ticket_is_422()
+    public async Task Upload_to_another_users_message_is_422()
     {
         var theirs = await SeedForeignTicketAsync();
 
-        var response = await _client.PostAsync($"/api/support/tickets/{theirs}/attachments",
+        // The foreign message id has to come from the admin-connected context: the thread
+        // GET reads as Sentinel and cannot see it.
+        Guid foreignMessageId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreignMessageId = await db.SupportMessages.IgnoreQueryFilters().AsNoTracking()
+                .Where(m => m.SupportTicketId == theirs).Select(m => m.Id).SingleAsync();
+        }
+
+        var response = await _client.PostAsync($"/api/support/messages/{foreignMessageId}/attachments",
             FileContent(MinimalJpegBytes(), "shot.jpg", "image/jpeg"));
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity,
@@ -376,13 +419,15 @@ public class SupportApiTests : IAsyncLifetime
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var foreignMessageId = await db.SupportMessages.IgnoreQueryFilters().AsNoTracking()
+                .Where(m => m.SupportTicketId == theirs).Select(m => m.Id).SingleAsync();
             var row = new SupportTicketAttachment
             {
                 Id = Guid.NewGuid(),
-                SupportTicketId = theirs,
+                SupportMessageId = foreignMessageId,
                 UserId = OtherUser,
                 FileName = "theirs.jpg",
-                StoredPath = Path.Combine("uploads", "support", theirs.ToString(), "x.jpg"),
+                StoredPath = Path.Combine("uploads", "support", foreignMessageId.ToString(), "x.jpg"),
                 ContentType = "image/jpeg",
                 FileSizeBytes = 22,
                 UploadedAt = DateTime.UtcNow,
@@ -405,8 +450,10 @@ public class SupportApiTests : IAsyncLifetime
         var response = await _client.GetAsync($"/api/support/tickets/{id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await response.Content.ReadFromJsonAsync<JsonElement>())
-            .GetProperty("attachments").GetArrayLength().Should().Be(0,
-                "attachments are optional — most tickets will not have one");
+        var thread = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var messages = thread.GetProperty("messages");
+        messages.GetArrayLength().Should().Be(1, "a fresh ticket has exactly its opening message");
+        messages[0].GetProperty("attachments").GetArrayLength().Should().Be(0,
+            "attachments are optional — most tickets will not have one");
     }
 }

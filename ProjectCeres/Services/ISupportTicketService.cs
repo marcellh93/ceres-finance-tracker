@@ -15,8 +15,13 @@ public interface ISupportTicketService
         Guid? precedingTicketId = null,
         CancellationToken ct = default);
 
-    /// <summary>The caller's own tickets, newest first.</summary>
-    Task<IReadOnlyList<SupportTicket>> ListOwnAsync(CancellationToken ct = default);
+    /// <summary>
+    /// The caller's own tickets, newest first, each carrying its message-thread rollup
+    /// (<see cref="SupportTicketListItem.MessageCount"/> and
+    /// <see cref="SupportTicketListItem.LastMessageAt"/>) so the list view need not fetch
+    /// each thread. Projected in SQL — the messages themselves are never materialised.
+    /// </summary>
+    Task<IReadOnlyList<SupportTicketListItem>> ListOwnAsync(CancellationToken ct = default);
 
     /// <summary>One of the caller's own tickets, with its attachments. Null if it is not theirs.</summary>
     Task<SupportTicket?> GetOwnAsync(Guid ticketId, CancellationToken ct = default);
@@ -31,6 +36,23 @@ public interface ISupportTicketService
     /// </summary>
     Task<CloseTicketResult> CloseAsync(Guid ticketId, CancellationToken ct = default);
 }
+
+/// <summary>
+/// A ticket for the list view, with its conversation rolled up. <paramref name="MessageCount"/>
+/// is the number of messages in the thread (never zero — creation writes the first one);
+/// <paramref name="LastMessageAt"/> is the newest message's timestamp, so the UI can sort or
+/// badge on recency without loading the thread.
+/// </summary>
+public sealed record SupportTicketListItem(
+    Guid Id,
+    string Subject,
+    SupportTicketStatus Status,
+    SupportTicketPriority Priority,
+    Guid? PrecedingTicketId,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    int MessageCount,
+    DateTime LastMessageAt);
 
 public enum CloseTicketResult
 {
