@@ -159,7 +159,7 @@ public class ParityTests
     /// that would not produce the constraint. This reads pg_constraint.
     /// </summary>
     [Theory]
-    [InlineData("SupportTicketAttachments", "SupportTicketId")]
+    [InlineData("SupportTicketAttachments", "SupportMessageId")]
     [InlineData("TransactionAttachments", "TransactionId")]
     [InlineData("TransferAttachments", "TransferId")]
     public async Task Attachment_fks_are_scoped_to_the_parent_owner_in_the_database(
