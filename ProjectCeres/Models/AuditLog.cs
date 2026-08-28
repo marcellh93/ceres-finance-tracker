@@ -37,4 +37,5 @@ public enum AuditLogAction
     EmailVerified,              // wired in Stage 9.3
 
     SupportTicketCreated,       // wired in Stage 12.5
+    SupportMessageByAgent,      // wired in Stage 12.6 — operator reply/status set
 }

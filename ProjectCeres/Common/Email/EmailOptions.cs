@@ -16,6 +16,15 @@ public sealed class EmailOptions
     /// a mailbox.
     /// </summary>
     public string? SupportAddress { get; init; }
+
+    /// <summary>
+    /// The public origin (scheme + host, e.g. <c>https://app.ceres.example</c>) used to build
+    /// absolute links in outbound email — currently the support-thread link in operator-reply
+    /// and Solved notifications (Stage 12.6). Configured, never request-derived: the operator
+    /// endpoint that triggers these mails must not let a caller influence the URL the user is
+    /// sent to. When unset (dev / tests), the caller falls back to the incoming request origin.
+    /// </summary>
+    public string? PublicBaseUrl { get; init; }
 }
 
 /// <summary>

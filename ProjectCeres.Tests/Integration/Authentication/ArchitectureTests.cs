@@ -583,6 +583,8 @@ public class ArchitectureTests
         // Stage 9.3 (2026-05-22) added EmailVerificationRequested + EmailVerified for the
         // registration confirmation flow — both wired by EmailConfirmationService.
         // Stage 12.5 (2026-08-27) added SupportTicketCreated, wired by SupportApiController.
+        // Stage 12.6 (2026-08-28) added SupportMessageByAgent, wired by SupportAdminApiController
+        // for an operator reply/status set on another user's ticket.
         var expected = new[]
         {
             "LoginSucceeded", "LoginSucceededMfa", "LoginSucceededBackupCode",
@@ -593,7 +595,7 @@ public class ArchitectureTests
             "MfaDisabled", "LockoutSelfServiceUnlock",
             "DataExportRequested", "GdprErasureRequested",
             "EmailVerificationRequested", "EmailVerified",
-            "SupportTicketCreated",
+            "SupportTicketCreated", "SupportMessageByAgent",
         };
         Enum.GetNames<AuditLogAction>()
             .Should().BeEquivalentTo(expected);
