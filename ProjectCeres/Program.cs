@@ -537,6 +537,7 @@ builder.Services.Configure<FileAttachmentOptions>(
     builder.Configuration.GetSection("FileAttachments"));
 builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
 builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
+builder.Services.AddScoped<ISupportMessageService, SupportMessageService>();
 builder.Services.AddScoped<ISupportRecipientResolver, SupportRecipientResolver>();
 
 // Stage 12.5 — support-ticket notifications have nowhere to go without this.
