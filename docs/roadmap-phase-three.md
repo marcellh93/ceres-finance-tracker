@@ -1462,8 +1462,6 @@ Server side:
   | `TransferAttachments` | `TransferId` | cascade | ❌ |
   | `SupportTicketAttachments` | `SupportMessageId, UserId` (→ SupportMessage, Stage 12.6; was `SupportTicketId, UserId` → SupportTicket in 12.5) | cascade | ✅ |
 
-- [ ] **Back up the `uploads/` directory alongside the database.** A database-only backup restores every attachment ROW while its FILE stays missing, leaving users with attachments that error on open. Confirmed on the dev database 2026-08-24: one `TransactionAttachments` row pointed at a PDF that no longer existed on disk (the directory is gitignored, so the file only ever lived on the machine that uploaded it). Harmless in development — the row was deleted — but in production it means restore-from-backup silently loses every user upload. Belongs with the Stage 16 hosting runbook.
-
 - [ ] **Attachment files must be deleted explicitly, never via the FK cascade.** `SupportTicketAttachment` cascades from its ticket at the database level, and a DB cascade never runs application code — so deleting a ticket removes the rows and strands their files on disk permanently. `FileAttachmentService.DeleteAsync` already deletes the file before the row, which is the pattern any ticket-delete path must follow. Applies to the admin delete path (§ 12.5.2) and to GDPR erasure (Stage 13), where a row-level purge alone leaves user-uploaded screenshots behind. Found 2026-08-23 while documenting the entity.
 
 Tests:
@@ -1999,6 +1997,7 @@ Alerting:
 
 - [ ] **Log-based alert on a dropped support-ticket notification.** Alert on the `LogError` message "was filed but the notification email failed" (`SupportApiController.NotifySupportAsync`). Until the § 12.5.2 admin ticket list ships, that email is the only way an operator learns a ticket exists, so a silent send failure means an invisible ticket. One alerting rule, no code. Raised by the Stage 12.5 security review 2026-08-27.
 - [ ] **`Email__SupportAddress` set in the Production environment.** The app refuses to boot without it (`Program.cs`), so a missing value is a failed deploy, not a silent degradation.
+- [ ] **`Email__PublicBaseUrl` set in the Production environment** to the app's public origin (e.g. `https://app.example.com`). The app refuses to boot without it (`Program.cs`, Stage 12.6), so outgoing-email links are never built from the request `Host` header. A missing value is a failed deploy, not a silent degradation.
 
 HTTPS + TLS:
 
@@ -2026,6 +2025,7 @@ Reverse proxy:
 Backups:
 
 - [ ] Automated nightly `pg_dump` to encrypted storage (cloud blob with encryption-at-rest)
+- [ ] **Back up the `uploads/` directory alongside the database.** A database-only backup restores every attachment ROW while its FILE stays missing, leaving users with attachments that error on open. Confirmed on the dev database 2026-08-24: one `TransactionAttachments` row pointed at a PDF that no longer existed on disk (the directory is gitignored, so the file only ever lived on the machine that uploaded it). Harmless in development, but in production it means restore-from-backup silently loses every user upload. Raised while documenting the support attachments (Stage 12.5).
 - [ ] Backup retention: 30 daily + 12 monthly minimum (per `security-model.md` § Retention Policy)
 - [ ] Backup encryption key separate from database credentials, stored in secrets store
 - [ ] Quarterly restoration test: actually restore a backup to a staging instance and verify integrity (per `security-model.md` § Restoration Testing)
