@@ -6,6 +6,17 @@
 
 #### Added
 
+**Support (Stage 12.6 — conversation model, 2026-08-28)**
+- The support surface is now a two-way conversation: a ticket holds an ordered thread of messages between the user and the operator, replacing the single-message ticket. Attachments now hang off a message (upload on the first message or any reply; download links in the thread).
+- New `/support` page — a list of your tickets, each opening its conversation in a slide-in panel whose address is in the URL (so a link opens straight to that thread). Compose a new ticket, reply, attach files, and close your own ticket; a closed ticket offers a follow-up.
+- Five ticket statuses (Open, Pending, On-hold, Solved, Closed). A reply to a Solved ticket reopens it; Closed is final and continues via a follow-up ticket.
+- Operators can reply and set a status through an admin-only endpoint (no operator screen yet); their replies appear in your thread and are emailed to you.
+- Two new user-facing emails: an operator reply (including the reply text) and a "ticket solved" notice.
+
+**Tooling (SPA staging, 2026-08-28)**
+- New `tools/stage-spa.sh` — builds the React client and stages it into the served bundle in one step, for verifying a change against a non-Vite build.
+- New advisory Stop hook (`spa-dist-freshness`) that warns when a turn edits SPA source but leaves the served bundle stale.
+
 **Authentication (Stage 9 close-out — security-event emails, 2026-06-14)**
 - Three security-event notification emails — sent when two-factor sign-in is enabled, turned off, or backup codes are regenerated. Each names the time and IP and advises resetting your password if it wasn't you.
 
@@ -264,6 +275,10 @@
 - `docs/api-contract.md` + the `AuthController.Register` code comment claimed Identity password-policy failures (too-short, breached) return `422` — they return `400` (the controller calls `ValidationProblem(ModelState)`, which bypasses the 422 factory). Documentation corrected to match the pinned behavior (`RegisterEndpointTests`); model-binding/DataAnnotations failures still return the `422` envelope
 
 #### Changed
+
+**Support (Stage 12.6, 2026-08-28)**
+- `SupportTicket` now owns a `SupportMessage` conversation (the old `Message` column moved to the first message) and gains `ExternalRef`; the attachment foreign key re-pointed from the ticket to the message. Ticket creation returns the first message's id so the client can attach files to it.
+- The operator reply endpoint is rate-limited like the user endpoints (it emails the user) — it had shipped without a limit.
 
 **Code quality (Stage 9.1.6 — code-shape cleanup, 2026-06-15)**
 - Replaced the remaining production raw SQL with safer forms: `PreAuthRlsScope` uses `SqlQuery` (interpolated constant) instead of `SqlQueryRaw`; the dev-seed table remap (`SeedDevUser`) uses `ExecuteSqlInterpolatedAsync` with the user/sentinel IDs as real parameters, behind a throwing allow-list guard that validates every table name against the EF-model-derived `UserOwnedModel.FinanceTables` set

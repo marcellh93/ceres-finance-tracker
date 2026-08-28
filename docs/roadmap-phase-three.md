@@ -1436,16 +1436,18 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 `/support`:
 
-- [ ] Ticket form: subject (required), message (required), priority (Low / Normal / High / Urgent)
-- [ ] On submit: ticket created with `Status = Open`, email sent to admin address
-- [ ] User's own tickets listed below the form: subject, status, last update, "view" link
-- [ ] Status indicators with semantic colours (Open = sky, InProgress = amber, Resolved = emerald, Closed = zinc)
-- [ ] No edit / delete (ticket history is immutable)
-- [ ] Admin reply mechanism: out of scope for Phase 3; users see "We'll respond by email"
+> **Superseded by Stage 12.6 (below).** This form-only design (single message, no thread, four statuses, "admin replies by email out of band") was replaced by the conversation model before it shipped a page. The delivered `/support` is the Stage 12.6 checklist further down. Items kept here for the design trail:
+
+- [x] Ticket form: subject (required), message (required), priority — shipped in the 12.6 new-ticket sheet
+- [x] On submit: ticket created with `Status = Open`, email sent to admin address
+- [x] User's own tickets listed: subject, status, last activity, opens the thread sheet
+- [~] Status indicators with semantic colours — **shipped, but the five 12.6 statuses** (Open=info, Pending=warning, OnHold=secondary, Solved=success, Closed=outline), not the four listed here
+- [x] No edit / delete (ticket history is immutable)
+- [~] Admin reply mechanism — **built** this stage (12.6 operator endpoint), not deferred; there is no operator UI yet, but agent replies land in the user's thread
 
 Server side:
 
-- [x] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Message`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt` — **plus `PrecedingTicketId`** (nullable self-reference for the follow-up chain; close is final, there is no reopen — see `models.md` § SupportTicket). Shipped 2026-08-23 with its RLS policy in the same migration
+- [x] `SupportTicket` entity exists: `Id`, `UserId`, `Subject`, `Status`, `Priority`, `CreatedAt`, `UpdatedAt` — **plus `PrecedingTicketId`** (nullable self-reference for the follow-up chain) and, from Stage 12.6, `ExternalRef` + an ordered `SupportMessage` conversation (the `Message` column moved to the first message). Solved is now reopenable by a user reply; Closed is terminal. Shipped 2026-08-23, reshaped 2026-08-27 — see `models.md` § SupportTicket / § SupportMessage
 - [x] Global query filter applies (only owner sees own tickets) — derived from `UserOwnedModel.RlsTables`, pinned by `ArchitectureTests.UserOwnedModel_RlsTables_match_HasQueryFilter_registrations`
 - [x] Admin *notification* email on new ticket (`EmailTemplateKey.SupportTicketReceived` → configured admin address). Shipped 2026-08-27 (`31efe348`) with `Email:SupportAddress`, required at startup in Production. The admin ticket-LIST UI stays deferred to § Stage 12.5.2.
 - [x] Email notification to admin uses `IEmailService` (Stage 8) and the EN/ES templates
@@ -1458,7 +1460,7 @@ Server side:
   |---|---|---|---|
   | `TransactionAttachments` | `TransactionId` | cascade | ❌ |
   | `TransferAttachments` | `TransferId` | cascade | ❌ |
-  | `SupportTicketAttachments` | `SupportTicketId, UserId` | cascade | ✅ (Stage 12.5) |
+  | `SupportTicketAttachments` | `SupportMessageId, UserId` (→ SupportMessage, Stage 12.6; was `SupportTicketId, UserId` → SupportTicket in 12.5) | cascade | ✅ |
 
 - [ ] **Back up the `uploads/` directory alongside the database.** A database-only backup restores every attachment ROW while its FILE stays missing, leaving users with attachments that error on open. Confirmed on the dev database 2026-08-24: one `TransactionAttachments` row pointed at a PDF that no longer existed on disk (the directory is gitignored, so the file only ever lived on the machine that uploaded it). Harmless in development — the row was deleted — but in production it means restore-from-backup silently loses every user upload. Belongs with the Stage 16 hosting runbook.
 
@@ -1468,9 +1470,35 @@ Tests:
 
 - [x] Revoke own session, verify cookie no longer authenticates — `SessionsApiTests` + the e2e revoke spec
 - [ ] Block own IP, verify subsequent requests from same IP rejected
-- [ ] Submit ticket, verify admin receives email
-- [ ] User A cannot view User B's ticket (IDOR)
+- [x] Submit ticket, verify admin receives email — `SupportNotificationTests`
+- [x] User A cannot view User B's ticket (IDOR) — `SupportApiTests` (404-not-403), `SupportConversationApiTests`
 - [ ] Reauthentication required to access `/settings/sessions`
+
+### Stage 12.6 — Support conversation model ✅ Done (2026-08-28)
+
+> **Goal:** replace the conversation-less ticket with a real two-way thread. A `SupportTicket` owns an ordered `SupportMessage` conversation; a five-status state machine tracks whose turn it is; both the user and a minimal `[RequireAdmin]` operator surface post to the thread. Spec: `docs/superpowers/specs/2026-08-27-stage-12-6-support-conversation-model-design.md`. Plan: `docs/superpowers/plans/2026-08-27-stage-12-6-support-conversation-model.md`.
+
+Backend:
+
+- [x] `SupportMessage : IUserOwned` entity + `SupportMessageAuthor` enum; `SupportTicket` gains `Messages` + `ExternalRef`, loses `Message`; attachments re-pointed to the message. Cutover migration `20260827215357_AddSupportConversationModel` (one transaction: RLS policy, status remap with the collision-safe CASE, data move, both composite FKs). Applied 2026-08-27
+- [x] Both FK hops composite `(childId, UserId)` → `(Id, UserId)`, `ON DELETE CASCADE`. `ParityTests` re-pointed to `SupportMessageId`
+- [x] `SupportTicketStateMachine` — static, pure; user reply → Open / reopen Solved / refuse Closed (422); operator action carries the chosen status, refused only out of Closed. Unit `[Theory]` covers the table
+- [x] `SupportMessageService` (user reply + thread), `SupportTicketService.CreateAsync` writes the first message, `FileAttachmentService` upload targets a message; create returns `firstMessageId`
+- [x] User API: thread GET, reply endpoint (rate-limited), list gains `messageCount`/`lastMessageAt`; attachment upload on `messages/{id}/attachments`
+- [x] Operator endpoint `POST /api/admin/support/tickets/{id}/messages` under `Admin/` namespace, `[RequireAdmin]`, owner-stamped agent message via `AdminDbContext` + `IgnoreQueryFilters`, state-machine-validated, interim `AuditLog(SupportMessageByAgent)`. **Rate-limited** (it emails the user) — added to `mailSendingActions` (Task 12 caught it shipping unlimited)
+- [x] `SupportNotificationService` — extracted operator-notify + two user-facing emails (agent reply incl. sanitised body, Solved); resolver-based (no new recipient-lock factory). `PublicBaseUrl` for the thread link
+
+Frontend (`/support`, supersedes the form-only checklist above):
+
+- [x] List with status badges (Open=info, Pending=warning, OnHold=secondary, Solved=success, Closed=outline), `messageCount`/`lastMessageAt`, empty/error/loading via `DataTransition`
+- [x] Thread in a URL-reflected slide-in sheet (`/support/<id>`), composer, attachments (upload on create + reply, download links in thread), user close-ticket action, Closed → follow-up affordance
+- [x] Vitest (15 support tests) + Playwright E2E (`e2e/auth/support-page.spec.ts`, 6 flows × 3 browsers incl. the API-seeded agent-reply leg)
+- [ ] `/support` touch targets: Send / reply / close / ticket-row tap targets ≥ 44×44px on mobile — **not met**; `sm` buttons are `h-7` like every shipped page (mirrors the open `/settings/sessions` touch-target item above). Design-system-wide mobile size bump, out of 12.6 scope
+- [ ] Manual browser pass: golden path, 375px mobile, all nav links — the E2E covers the flows headlessly; a human visual pass is still owed
+
+Carried to Stage 16 (hosting):
+
+- [ ] Set `Email:PublicBaseUrl` in Production — the operator-reply email's thread link falls back to the request `Host` header when unset (Host-header influenceable). `[RequireAdmin]`-gated and dev/test-only, but Production must set it. Raised by the Task 10 review
 
 Deferred out of Stage 12 core (2026-06-30, user-authorized — see § Stage 12.5 for the receiving checklist):
 
@@ -1491,9 +1519,9 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] `/settings/sessions` tablet: cards remain (per the responsive doc — Active sessions list is card-view through tablet, table only on desktop)
 - [ ] `/settings/sessions` desktop: standard table layout
 - [ ] `/settings/sessions` touch targets: per-row revoke and IP-block buttons each ≥ 44×44px on mobile; session-row card meets the same minimum across its tappable region
-- [ ] `/support` mobile: ticket form full-page; ticket list as cards; status badges legible
-- [ ] `/support` desktop: form modal or full-page (decided per the form-presentation rule), ticket list as table
-- [ ] `/support` touch targets: every form input, submit button, and ticket-row tap target ≥ 44×44px on mobile
+- [x] `/support` mobile: thread + compose in a full-width slide-in sheet (scoped width override), list rows wrap, no horizontal overflow at 375px — E2E-asserted (`support-page.spec.ts`)
+- [x] `/support` desktop: list in a card; thread/compose in a right-side sheet (`sm:max-w-lg`) — the sheet replaced the form-modal/table split (12.6 conversation model)
+- [ ] `/support` touch targets ≥ 44×44px on mobile — **not met** (see the Stage 12.6 checklist); `sm` buttons are `h-7`, a design-system-wide bump tracked alongside the `/settings/sessions` touch-target item
 
 ---
 

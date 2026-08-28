@@ -36,6 +36,8 @@
 10. [Phase 3 — Auth + MFA Entities](#phase-3--auth--mfa-entities)
     - [SavedSearch](#savedsearch-phase-3)
     - [SupportTicket](#supportticket-phase-3)
+    - [SupportMessage](#supportmessage-phase-3)
+    - [SupportTicketAttachment](#supportticketattachment-phase-3)
     - [UserSession](#usersession-phase-3)
     - [UserBlockedIp](#userblockedip-phase-3)
     - [CustomerArchive](#customerarchive-phase-3)
@@ -1307,62 +1309,89 @@ Stores a named set of filter parameters for a specific table, so users can re-ap
 
 ### SupportTicket (Phase 3)
 
-Stores user-submitted support requests. Admin management is handled via a separate admin surface.
+Stores user-submitted support requests. As of Stage 12.6 (2026-08-27) a ticket owns an ordered **conversation** of [SupportMessage](#supportmessage-phase-3) rows rather than a single `Message` column; admin management is handled via a separate admin surface.
 
-*Shipped 2026-08-23 — this table reflects the actual schema, verified against the migration.*
+*Shipped 2026-08-23; reshaped into the conversation model 2026-08-27 (`20260827215357_AddSupportConversationModel`). This table reflects the actual schema, verified against the migration.*
 
 | Column            | Type          | Constraints   | Notes                                                          |
 |-------------------|---------------|---------------|----------------------------------------------------------------|
 | Id                | uuid          | PK            |                                                                |
 | UserId            | uuid          | NOT NULL      | → User (the submitting user). No FK — same as every `IUserOwned` table |
 | Subject           | varchar(200)  | NOT NULL      |                                                                |
-| Message           | varchar(5000) | NOT NULL      | Bounded, not `text` — the column width is the only limit on user-submitted text until the service ships |
-| Status            | integer       | NOT NULL      | `HasConversion<int>()`: `Open`=0, `InProgress`=1, `Resolved`=2, `Closed`=3. **The ordinal is the stored contract** — reordering the enum silently changes the meaning of every existing row |
+| Status            | integer       | NOT NULL      | `HasConversion<int>()`: `Open`=0, `Pending`=1, `OnHold`=2, `Solved`=3, `Closed`=4. **The ordinal is the stored contract** — reordering the enum silently changes the meaning of every existing row. Moved by `SupportTicketStateMachine`; see the state-machine note below |
 | Priority          | integer       | NOT NULL      | `HasConversion<int>()`: `Low`=0, `Normal`=1, `High`=2, `Urgent`=3. Advisory only — nothing routes on it |
+| ExternalRef       | text          | NULL          | Correlation column for a future external help-desk (e.g. Zendesk). A nullable string, not a seam — nothing reads it yet |
 | PrecedingTicketId | uuid          | FK, NULL      | → SupportTicket. The closed ticket this one continues; null for a standalone ticket. `OnDelete: Restrict` |
 | CreatedAt         | datetime      | NOT NULL      |                                                                |
-| UpdatedAt         | datetime      | NOT NULL      | Stamped on every status or priority change                     |
+| UpdatedAt         | datetime      | NOT NULL      | Stamped on every status change or new message                  |
+
+The old `Message` column is **gone** — its text moved to each ticket's first `SupportMessage` (AuthorRole=User) in the cutover migration.
+
+**Conversation:** a ticket owns `ICollection<SupportMessage> Messages`, ordered by `CreatedAt`. The first message carries the original report; subsequent ones are user replies and owner-stamped operator replies. Attachments hang off a **message**, not the ticket (see [SupportTicketAttachment](#supportticketattachment-phase-3)).
+
+**Status is moved only by `SupportTicketStateMachine`** (`ProjectCeres/Services/SupportTicketStateMachine.cs`) — a static, pure class (no interface, no DI, no fields; the `BudgetPeriod` idiom). Rules live in the machine; the DB writes live in the services. A **user reply** returns any non-Closed ticket to `Open` (handing the ball back to the operator) and reopens a `Solved` ticket; a reply to a `Closed` ticket is refused server-side (422), not merely hidden in the UI. An **operator action** carries an explicit chosen status and is refused only out of `Closed`. `Closed` is terminal — continuing means a follow-up ticket via `PrecedingTicketId`.
 
 **Indexes:** `(UserId, CreatedAt)` — serves the "my tickets, newest first" query; `(PrecedingTicketId)` — the FK index.
 
-**Alternate key:** `AK_SupportTickets_Id_UserId` on `(Id, UserId)`. It exists solely so `SupportTicketAttachment` can reference `(Id, UserId)` rather than `Id` alone — see that entity for why. Dropping it reopens a cross-tenant destructive write.
+**Alternate key:** `AK_SupportTickets_Id_UserId` on `(Id, UserId)`. It is the principal key for **both** composite child FKs — `SupportMessage → SupportTicket` and (transitively) the attachment chain. Dropping it reopens a cross-tenant destructive write.
 
-**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the same migration that creates the table (`20260823084630_AddSupportTickets`). The two are inseparable: `ParityTests` fails and `RlsParityStartupCheck` refuses to boot the moment the entity exists without a matching policy.
+**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the migration that creates the table (`20260823084630_AddSupportTickets`). The two are inseparable: `ParityTests` fails and `RlsParityStartupCheck` refuses to boot the moment the entity exists without a matching policy.
 
 **Email notification:** on creation, an email is sent to the configured support address (`Email:SupportAddress`, required at startup in Production). Shipped 2026-08-27. The recipient is built by `EmailRecipient.ForConfiguredSupportAddress`, which takes `IOptions<EmailOptions>` rather than a string so no caller can substitute an address — see `security-model.md` § Email Security Rules for the recipient-lock carve-out. A send failure is logged and swallowed: the ticket is already committed, and a mail outage must not tell a user their report failed when it did not.
 
 **Deletion rule:** no deletion — tickets are the audit trail of user contact.
 
-**Close is final; there is no reopen.** A user may move their own ticket `Open → Closed`, and that is the only transition available to them. Continuing a conversation means filing a **follow-up ticket** — a new ticket with its own Subject and Message, linked to the closed one via `PrecedingTicketId`. Every ticket therefore keeps a single immutable lifecycle and a thread is a chain rather than a reopened record. Decided 2026-08-23; the `Restrict` delete behaviour exists so a follow-up survives the deletion of the ticket it continues.
+**Solved is reopenable; Closed is terminal.** Superseding the Stage 12.5 "close is final, no reopen" rule (2026-08-27): a `Solved` ticket a user replies to returns to `Open`, so a resolution the user disagrees with reopens the same thread rather than forcing a new ticket. `Closed` remains terminal — a user may still close their own ticket (`→ Closed`), and continuing a closed conversation means a **follow-up ticket** (new Subject + first message, linked via `PrecedingTicketId`). The `Restrict` delete on `PrecedingTicketId` exists so a follow-up survives deletion of the ticket it continues.
 
-**Cross-user reference caveat:** PostgreSQL's referential-integrity trigger is not subject to RLS, so the database will accept a `PrecedingTicketId` pointing at another user's ticket. The exposure is bounded to an existence oracle over an unguessable GUID — no ticket content crosses the boundary, because every read passes through both the EF query filter and the policy's `USING` clause. The service enforces same-owner-and-closed (`SupportTicketService.CreateAsync`, pinned at both the service and API layers).
+**Cross-user reference caveat (`PrecedingTicketId`):** PostgreSQL's referential-integrity trigger is not subject to RLS, so the database will accept a `PrecedingTicketId` pointing at another user's ticket. The exposure is bounded to an existence oracle over an unguessable GUID — no ticket content crosses the boundary, because every read passes through both the EF query filter and the policy's `USING` clause. The service enforces same-owner-and-closed (`SupportTicketService.CreateAsync`, pinned at both the service and API layers). This one FK stays single-column + service-enforced (it is `Restrict` and read-only, so the residual exposure is only the existence oracle); the **`SupportMessage → SupportTicket`** hop, by contrast, IS composite — see that entity, because it carries `ON DELETE CASCADE` and so needed the structural guarantee.
 
-A composite `(Id, UserId)` FK would make the cross-user reference structurally impossible, as it does for `SupportTicketAttachments`. It was **not** built with the service half (2026-08-27) and remains service-enforced only. The distinction from the attachment case is that the attachment FK carried `ON DELETE CASCADE`, so a bad reference let one user's delete destroy another's row — a destructive write. `PrecedingTicketId` is `Restrict` and read-only, so the residual exposure stays an existence oracle over an unguessable GUID. Tracked in roadmap § 12.5.
+---
+
+### SupportMessage (Phase 3)
+
+One message in a support ticket's conversation. `IUserOwned`. Shipped 2026-08-27 (`20260827215357_AddSupportConversationModel`).
+
+| Column          | Type          | Constraints   | Notes                                                          |
+|-----------------|---------------|---------------|----------------------------------------------------------------|
+| Id              | uuid          | PK            |                                                                |
+| UserId          | uuid          | NOT NULL      | → User. **Always the TICKET OWNER's id, even for an Agent message** — so the user reads the whole thread under their own RLS scope. Part of the composite FK, so it cannot diverge from the ticket's owner |
+| SupportTicketId | uuid          | FK, NOT NULL  | Part of a **composite** FK with `UserId` → SupportTicket `(Id, UserId)`. `OnDelete: Cascade` |
+| AuthorRole      | integer       | NOT NULL      | `HasConversion<int>()`: `User`=0, `Agent`=1. Ordinal is the stored contract. Marks a message as the operator's — ownership never does, because an Agent message is owner-stamped |
+| Body            | text          | NOT NULL      |                                                                |
+| CreatedAt       | datetime      | NOT NULL      | Thread order is `ORDER BY CreatedAt`                           |
+
+**Alternate key:** `(Id, UserId)` — the principal key for the `SupportTicketAttachment → SupportMessage` composite FK.
+
+**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the same migration. `ParityTests` / `RlsParityStartupCheck` enforce it.
+
+**The FK is composite `(SupportTicketId, UserId)` → `SupportTickets (Id, UserId)`, `ON DELETE CASCADE`.** Same reasoning as the attachment FK below: Postgres runs FK checks + cascade through an RI trigger RLS does not touch, so a single-column FK would let an operator (or a bug) write an Agent message onto a ticket with a *different* owner, and a cascade could then cross tenants. The composite key makes a cross-owner message **unrepresentable, not merely unenforced** — the property the Stage 12.6 security review confirmed for the operator write path.
+
+**Owner-stamping is load-bearing on the operator path.** An Agent message is written through the `[RequireAdmin]` operator endpoint with `UserId` set **explicitly to `ticket.UserId`**, read from the loaded ticket row — never the admin's id, never a request field. Left unset, the `UserOwnershipInterceptor` would stamp the current (admin) user and the message would land in the admin's tenant, invisible to the owner and unattachable via the composite FK. See `security-model.md`.
 
 ---
 
 ### SupportTicketAttachment (Phase 3)
 
-*Shipped 2026-08-23 — mirrors [TransactionAttachment](#transactionattachment). Files live on the filesystem, never as BLOBs.*
+*Shipped 2026-08-23 — mirrors [TransactionAttachment](#transactionattachment). Files live on the filesystem, never as BLOBs. Re-pointed from the ticket to a **message** in Stage 12.6 (2026-08-27) when the conversation model landed.*
 
-| Column          | Type          | Constraints   | Notes                                                          |
-|-----------------|---------------|---------------|----------------------------------------------------------------|
-| Id              | uuid          | PK            |                                                                |
-| SupportTicketId | uuid          | FK, NOT NULL  | Part of a **composite** FK with `UserId` → SupportTicket `(Id, UserId)`. `OnDelete: Cascade` |
-| UserId          | uuid          | NOT NULL      | → User. Stamped by `UserOwnershipInterceptor`, pinned by the RLS `WITH CHECK`, **and part of the composite FK** so it cannot diverge from the ticket's owner |
+| Column           | Type          | Constraints   | Notes                                                          |
+|------------------|---------------|---------------|----------------------------------------------------------------|
+| Id               | uuid          | PK            |                                                                |
+| SupportMessageId | uuid          | FK, NOT NULL  | Part of a **composite** FK with `UserId` → SupportMessage `(Id, UserId)`. `OnDelete: Cascade`. Was `SupportTicketId` before 12.6 — the attachment hangs off the message it was posted with, not the ticket |
+| UserId           | uuid          | NOT NULL      | → User. Stamped by `UserOwnershipInterceptor`, pinned by the RLS `WITH CHECK`, **and part of the composite FK** so it cannot diverge from the message's (hence the ticket's) owner |
 | FileName        | varchar(255)  | NOT NULL      | The user's original filename. **Display only — never used to build a path** |
 | StoredPath      | varchar(500)  | NOT NULL      | System-generated relative path. The extension comes from the **detected** mime, never the upload |
 | ContentType     | varchar(100)  | NOT NULL      | Mime as detected by magic-byte inspection, not as claimed by the client |
 | FileSizeBytes   | bigint        | NOT NULL      |                                                                |
 | UploadedAt      | datetime      | NOT NULL      |                                                                |
 
-**Indexes:** `(SupportTicketId, UserId)` — the composite FK index; `(UserId)` — matches every other user-owned table, because the RLS policy injects `"UserId" = $1` into every query and without it each read is a sequential scan.
+**Indexes:** `(SupportMessageId, UserId)` — the composite FK index; `(UserId)` — matches every other user-owned table, because the RLS policy injects `"UserId" = $1` into every query and without it each read is a sequential scan.
 
-**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by the same migration that creates the table (`20260823171518_AddSupportTicketAttachments`).
+**RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY` with a `user_isolation` policy, installed by `20260823171518_AddSupportTicketAttachments` (the FK re-point in 12.6 kept the policy).
 
-**The FK is composite `(SupportTicketId, UserId)` → `SupportTickets (Id, UserId)`, not a single column.** Postgres runs foreign-key checks and `ON DELETE CASCADE` through an internal referential-integrity trigger that row-level security is **not** applied to — `FORCE ROW LEVEL SECURITY` does not change this. With a single-column FK, both halves of the following were reproduced against the real database on 2026-08-23: user B inserted an attachment against user A's ticket (the RLS `WITH CHECK` pins `UserId` to the *writer* and says nothing about the parent's owner), and user A deleting their own ticket then destroyed B's row via the cascade, silently. Referencing `(Id, UserId)` makes that divergence unrepresentable, so the cascade can only reach rows the deleter already owns. `SupportTickets` carries an alternate key `AK_SupportTickets_Id_UserId` for this purpose; dropping it forces the FK back to one column and reopens the hole.
+**The FK is composite `(SupportMessageId, UserId)` → `SupportMessages (Id, UserId)`, not a single column.** Postgres runs foreign-key checks and `ON DELETE CASCADE` through an internal referential-integrity trigger that row-level security is **not** applied to — `FORCE ROW LEVEL SECURITY` does not change this. With a single-column FK, both halves of the following were reproduced against the real database on 2026-08-23 (against the *ticket* FK, before the message re-point): user B inserted an attachment against user A's parent (the RLS `WITH CHECK` pins `UserId` to the *writer* and says nothing about the parent's owner), and user A deleting their own parent then destroyed B's row via the cascade, silently. Referencing `(Id, UserId)` makes that divergence unrepresentable, so the cascade can only reach rows the deleter already owns. The message's alternate key `(Id, UserId)` is the principal key here; dropping it forces the FK back to one column and reopens the hole. Pinned by `ParityTests.Attachment_fks_are_scoped_to_the_parent_owner_in_the_database` (`[InlineData("SupportTicketAttachments", "SupportMessageId")]`).
 
-**Deletion rule: `Cascade` from the parent ticket — deliberately the opposite of `SupportTicket.PrecedingTicketId`, which is `Restrict`.** An attachment has no meaning without its ticket, and an orphaned row would point at a file nothing can reach. A follow-up ticket, by contrast, is an independent record of what was reported and must survive the deletion of the ticket it continues. Both behaviours are pinned by tests in `UserOwnedModelTests`, so a future change that "harmonises" them fails the build rather than the data.
+**Deletion rule: `Cascade` from the parent message — deliberately the opposite of `SupportTicket.PrecedingTicketId`, which is `Restrict`.** An attachment has no meaning without its message, and an orphaned row would point at a file nothing can reach. A follow-up ticket, by contrast, is an independent record and must survive the deletion of the ticket it continues. Both behaviours are pinned by tests in `UserOwnedModelTests`, so a future change that "harmonises" them fails the build rather than the data.
 
 **Known gap — the cascade orphans files.** `FileAttachmentService.DeleteAsync` removes the file from disk before removing the row, so an explicit delete is clean. A **database-level cascade never runs application code**, so deleting a ticket removes its attachment rows and leaves their files on disk permanently unreferenced. Tickets are not user-deletable today, so this only fires on an admin path that does not exist yet — but that path must delete files explicitly rather than relying on the cascade. Under GDPR erasure the same applies: a row-level purge alone leaves user-uploaded screenshots on disk.
 
