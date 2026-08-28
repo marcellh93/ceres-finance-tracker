@@ -184,11 +184,12 @@ public class SupportConversationApiTests : IAsyncLifetime
         var post = await _client.PostAsJsonAsync(
             $"/api/support/tickets/{foreignTicketId}/messages", new { body = "not yours to reply to" });
 
-        // IDOR — the service cannot reach a ticket it does not own and throws "not found";
-        // the controller surfaces that as 422 via the Validation envelope. Either way the
-        // caller learns nothing, and no message is written against a ticket we cannot reach.
-        post.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity,
-            "someone else's ticket must be indistinguishable from one that does not exist");
+        // IDOR — the service cannot reach a ticket it does not own and throws
+        // SupportTicketNotFoundException; the controller surfaces that as 404, matching
+        // GetOne / Close / thread GET. A foreign ticket is indistinguishable from an absent
+        // one, the caller learns nothing, and no message is written.
+        post.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "someone else's ticket must be indistinguishable from one that does not exist — 404, never 403");
         (await post.Content.ReadAsStringAsync()).Should().NotContain("not yours to reply to");
 
         using var scope = _factory.Services.CreateScope();

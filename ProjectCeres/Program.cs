@@ -565,6 +565,24 @@ if (builder.Environment.IsProduction()
         "Set the Email__SupportAddress environment variable to the mailbox that " +
         "should receive support-ticket notifications.");
 }
+
+// Stage 12.6: PublicBaseUrl backs the support-thread link in the operator-reply
+// email. Unset, SupportAdminApiController.SupportUrlBase() falls back to the
+// incoming request's Host header — which an operator could influence, putting an
+// attacker-chosen host into a user's inbox. That fallback is fine in dev/test
+// (no fixed public origin) but must never run in Production, so fail fast here,
+// mirroring the SupportAddress guard. Same opt-out flag idiom for the Production-
+// host integration tests that assert unrelated behaviour.
+if (builder.Environment.IsProduction()
+    && !builder.Configuration.GetValue<bool>("Email:SkipPublicBaseUrlCheck")
+    && string.IsNullOrWhiteSpace(builder.Configuration["Email:PublicBaseUrl"]))
+{
+    throw new InvalidOperationException(
+        "Email:PublicBaseUrl is required in Production. " +
+        "Set the Email__PublicBaseUrl environment variable to the app's public " +
+        "origin (e.g. https://app.example.com) so links in outgoing email are " +
+        "not built from the request Host header.");
+}
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();

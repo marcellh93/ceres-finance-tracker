@@ -1496,9 +1496,16 @@ Frontend (`/support`, supersedes the form-only checklist above):
 - [ ] `/support` touch targets: Send / reply / close / ticket-row tap targets ≥ 44×44px on mobile — **not met**; `sm` buttons are `h-7` like every shipped page (mirrors the open `/settings/sessions` touch-target item above). Design-system-wide mobile size bump, out of 12.6 scope
 - [ ] Manual browser pass: golden path, 375px mobile, all nav links — the E2E covers the flows headlessly; a human visual pass is still owed
 
+Whole-branch review follow-ups (2026-08-28, all addressed except the perf note):
+
+- [x] **`Email:PublicBaseUrl` now fails fast at Production boot** (mirrors the `SupportAddress` guard), so the `Request.Host` fallback in `SupportAdminApiController.SupportUrlBase()` can only run in dev/test. Pinned by `ResendEmailServiceTests.Production_without_public_base_url_throws_at_startup`
+- [x] **User-reply IDOR now returns 404, not 422** — `PostUserReplyAsync` throws `SupportTicketNotFoundException` (404) for a foreign/absent ticket and the generic `InvalidOperationException` (422) only for the Closed-ticket transition refusal, so the IDOR-as-404 shape is uniform across the surface
+- [x] Operator `Body` capped at 5000 (`[StringLength]`), matching the user surface
+- [ ] **Minor perf: `SupportApiController.Reply` re-fetches the full thread just to notify the operator.** After `PostUserReplyAsync` it calls `GetThreadAsync` again (loading all messages + attachments) only to pass the subject/priority to the notification. A header-only fetch — or returning the ticket from the reply service — would avoid the second query. Low-frequency endpoint; not worth the signature change now. Raised by the 12.6 whole-branch review
+
 Carried to Stage 16 (hosting):
 
-- [ ] Set `Email:PublicBaseUrl` in Production — the operator-reply email's thread link falls back to the request `Host` header when unset (Host-header influenceable). `[RequireAdmin]`-gated and dev/test-only, but Production must set it. Raised by the Task 10 review
+- [x] Set `Email:PublicBaseUrl` in Production — now enforced at boot (see above). The env var must still be set for a real deployment; the boot guard makes a missing value a loud startup failure rather than a silent Host-header fallback
 
 Deferred out of Stage 12 core (2026-06-30, user-authorized — see § Stage 12.5 for the receiving checklist):
 

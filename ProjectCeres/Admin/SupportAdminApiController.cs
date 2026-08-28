@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -43,9 +44,15 @@ public sealed class SupportAdminApiController(
     /// <summary>
     /// An operator reply and/or a status set. <c>Body</c> null/blank means status-only (no
     /// message row is written). <c>Status</c> is the chosen target status; the state machine
-    /// decides whether the transition is legal.
+    /// decides whether the transition is legal. The body caps at 5000 to match the user reply
+    /// surface — the operator is trusted, so this is defense-in-depth against an unbounded write.
+    /// The attribute targets the PARAMETER (bare, not `[property:]`) — on a record primary
+    /// constructor `[property:]` lands where model binding does not look and ASP.NET throws at
+    /// request time; same rule the user SupportApiController records document.
     /// </summary>
-    public sealed record OperatorMessageRequest(string? Body, SupportTicketStatus Status);
+    public sealed record OperatorMessageRequest(
+        [StringLength(5000)] string? Body,
+        SupportTicketStatus Status);
 
     // Sends the agent-reply / Solved email to the user, so it is a mail-sending action and
     // carries the same rate limit as the user endpoints — the invariant the spec (§ Notifications

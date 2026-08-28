@@ -27,7 +27,7 @@ public sealed class SupportMessageService : ISupportMessageService
     {
         var ticket = await _db.SupportTickets.Owned(_user)
             .FirstOrDefaultAsync(t => t.Id == ticketId, ct)
-            ?? throw new InvalidOperationException($"Support ticket {ticketId} not found.");
+            ?? throw new SupportTicketNotFoundException(ticketId);
 
         var result = SupportTicketStateMachine.ResolveUserReply(ticket.Status);
         if (!result.Allowed)

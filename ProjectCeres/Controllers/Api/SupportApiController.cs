@@ -141,8 +141,16 @@ public class SupportApiController(
         {
             message = await messages.PostUserReplyAsync(ticketId, request.Body, ct);
         }
+        catch (SupportTicketNotFoundException)
+        {
+            // 404, not 422: a ticket you cannot reach is indistinguishable from one that
+            // does not exist, matching GetOne / Close / thread GET (the IDOR-as-404 rule).
+            return NotFound();
+        }
         catch (InvalidOperationException ex)
         {
+            // A reachable ticket whose status refuses the reply (Closed) — a real
+            // transition refusal the UI can act on, so 422 with the reason.
             return Validation(ex);
         }
 

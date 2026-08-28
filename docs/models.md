@@ -1320,7 +1320,7 @@ Stores user-submitted support requests. As of Stage 12.6 (2026-08-27) a ticket o
 | Subject           | varchar(200)  | NOT NULL      |                                                                |
 | Status            | integer       | NOT NULL      | `HasConversion<int>()`: `Open`=0, `Pending`=1, `OnHold`=2, `Solved`=3, `Closed`=4. **The ordinal is the stored contract** — reordering the enum silently changes the meaning of every existing row. Moved by `SupportTicketStateMachine`; see the state-machine note below |
 | Priority          | integer       | NOT NULL      | `HasConversion<int>()`: `Low`=0, `Normal`=1, `High`=2, `Urgent`=3. Advisory only — nothing routes on it |
-| ExternalRef       | text          | NULL          | Correlation column for a future external help-desk (e.g. Zendesk). A nullable string, not a seam — nothing reads it yet |
+| ExternalRef       | varchar(200)  | NULL          | Correlation column for a future external help-desk (e.g. Zendesk). A nullable string, not a seam — nothing reads it yet |
 | PrecedingTicketId | uuid          | FK, NULL      | → SupportTicket. The closed ticket this one continues; null for a standalone ticket. `OnDelete: Restrict` |
 | CreatedAt         | datetime      | NOT NULL      |                                                                |
 | UpdatedAt         | datetime      | NOT NULL      | Stamped on every status change or new message                  |

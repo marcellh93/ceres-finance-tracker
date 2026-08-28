@@ -107,6 +107,28 @@ public sealed class ResendEmailServiceTests
             .WithMessage("*Email:Resend:ApiKey is required in Production*");
     }
 
+    [Fact]
+    public void Production_without_public_base_url_throws_at_startup()
+    {
+        // Stage 12.6: PublicBaseUrl backs the support-thread link in outgoing email;
+        // unset in Production it falls back to the request Host header, which an
+        // operator could influence. Must fail loud at boot like SupportAddress. The
+        // earlier api-key + support-address guards are satisfied so this one is what
+        // fires (guard order: api key → support address → public base url).
+        var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(b =>
+            {
+                b.UseEnvironment("Production");
+                b.UseSetting("Email:Resend:ApiKey", "re_test_key");
+                b.UseSetting("Email:SupportAddress", "support@example.com");
+                b.UseSetting("Email:PublicBaseUrl", "");
+            });
+
+        FluentActions.Invoking(() => _ = factory.Services)
+            .Should().Throw<InvalidOperationException>()
+            .WithMessage("*Email:PublicBaseUrl is required in Production*");
+    }
+
     /// <summary>
     /// EmailRecipient.FromVerifiedUser is internal to the production assembly and the test
     /// assembly has no InternalsVisibleTo, so we reach the factory via reflection. Same

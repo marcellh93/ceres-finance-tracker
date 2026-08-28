@@ -18,6 +18,7 @@ public class E2eEnvironmentRegistrationTests
             b.UseEnvironment("E2E");
             b.UseSetting("Stage75:SkipPrivilegeLeakCheck", "true");
             b.UseSetting("Email:SkipSupportAddressCheck", "true");
+            b.UseSetting("Email:SkipPublicBaseUrlCheck", "true");
             b.UseSetting("E2E:SkipDatabaseGuard", "true");
             b.UseSetting("ConnectionStrings:ApplicationConnection",
                 "Host=localhost;Database=project_ceres_test;Username=ceres_app;Password=ceres_app_dev_password");
@@ -49,6 +50,7 @@ public class E2eEnvironmentRegistrationTests
             b.UseEnvironment(environment);
             b.UseSetting("Stage75:SkipPrivilegeLeakCheck", "true");
             b.UseSetting("Email:SkipSupportAddressCheck", "true");
+            b.UseSetting("Email:SkipPublicBaseUrlCheck", "true");
             b.UseSetting("ConnectionStrings:ApplicationConnection",
                 "Host=localhost;Database=project_ceres_test;Username=ceres_app;Password=ceres_app_dev_password");
             b.UseSetting("ConnectionStrings:AdminConnection",
