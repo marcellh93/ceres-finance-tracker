@@ -459,7 +459,7 @@ public sealed class AuthController : ControllerBase
                     Secure = Request.IsHttps,
                     SameSite = SameSiteMode.Lax,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddDays(30),
+                    Expires = DateTimeOffset.UtcNow.Add(SessionConstants.PersistentLifetime),
                 });
         }
 
