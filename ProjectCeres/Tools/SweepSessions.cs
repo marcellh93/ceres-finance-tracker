@@ -24,10 +24,16 @@ public static class SweepSessions
 
         // IgnoreQueryFilters: cross-tenant by design — the sweep spans all users.
         // Stage 10 architecture test allow-lists this file.
+        //
+        // A row is dead past the 90-day horizon either by RevokedAt (explicitly
+        // revoked long ago) or by LastUsedAt (untouched long ago) — regardless of
+        // IsPersistent. An abandoned "remember me" row is never revoked (rotation
+        // only fires on a return visit), so without the LastUsedAt clause applying
+        // to persistent rows too, it would survive forever.
         return await db.UserSessions
             .IgnoreQueryFilters()
             .Where(s => (s.RevokedAt != null && s.RevokedAt < cutoff)
-                     || (s.RevokedAt == null && !s.IsPersistent && s.LastUsedAt < cutoff))
+                     || (s.RevokedAt == null && s.LastUsedAt < cutoff))
             .ExecuteDeleteAsync(ct);
     }
 

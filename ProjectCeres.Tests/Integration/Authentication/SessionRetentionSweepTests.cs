@@ -47,6 +47,7 @@ public class SessionRetentionSweepTests : AppRoleTestBase
                 Row("old-revoked", false, now.AddDays(-200), revoked: now.AddDays(-91)),  // deleted
                 Row("new-revoked", false, now.AddDays(-200), revoked: now.AddDays(-89)),  // kept
                 Row("old-dead-eph", false, now.AddDays(-91), revoked: null),              // deleted
+                Row("old-dead-persist", true, now.AddDays(-91), revoked: null),           // deleted
                 Row("live-persist", true, now.AddDays(-2), revoked: null));               // kept
             await admin.Context.SaveChangesAsync();
         }

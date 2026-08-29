@@ -53,7 +53,7 @@ Then the existing new-row insert runs unchanged. Net effect: one live ephemeral 
 
 **Safety against `SessionRevocationValidator`:** the validator rejects a request whose `sid` points at a `RevokedAt != null` row. The revoke here targets only the OLD row(s) (`Id <> newSessionId`); the new row is inserted unrevoked and carries the `sid` the new cookie holds. The just-logged-in user is unaffected. Confirmed by reading `SessionRevocationValidator.cs:42`.
 
-The revoke runs inside the same login persistence as the new-row insert, so a failure rolls back the whole login rather than leaving a half-deduped state. The superseded row survives as `RevokedAt != null` (audit intact), drops off the list immediately (Part A), and is reclaimed by the sweep at 90 days (Part C).
+The superseded row is revoked (ExecuteUpdateAsync, its own statement) before the new row is inserted; there is no enclosing transaction, so a rare failure between the two would leave the old session revoked and the new one absent — the user simply retries the login, which re-dedups idempotently. The superseded row survives as `RevokedAt != null` (audit intact), drops off the list immediately (Part A), and is reclaimed by the sweep at 90 days (Part C).
 
 The persistent-rotation path (`PersistentCookieRotationMiddleware`) already revokes the old row on each rotation, so it needs no dedup — only the shared-constant change (below).
 
@@ -64,11 +64,11 @@ A **flat cross-tenant `DELETE`** on `UserSessions`:
 ```
 DELETE FROM UserSessions
 WHERE (RevokedAt IS NOT NULL AND RevokedAt < now − 90 days)
-   OR (RevokedAt IS NULL AND IsPersistent = false AND LastUsedAt < now − 90 days)
+   OR (RevokedAt IS NULL AND LastUsedAt < now − 90 days)
 ```
 
 - The first clause is the documented "revoked rows, 90 days" retention. Deleting the row deletes its `UserAgent`, so the two `security-model.md` § Retention lines (revoked sessions + UA strings) are satisfied by one sweep.
-- The second clause reclaims expired-but-never-revoked ephemeral rows (dead sessions Part A already hides) past the same horizon. Persistent rows still inside their 30-day window are never touched.
+- The second clause reclaims any never-revoked row — ephemeral or persistent — past the same horizon, regardless of `IsPersistent`. This matters for an abandoned "remember me" row: it is never revoked (rotation only fires on a return visit), so a clause scoped to `IsPersistent = false` would never sweep it, violating the 90-day retention. Persistent rows still inside their 30-day window are untouched (`LastUsedAt` is recent).
 
 **Cross-tenant path — verified against Stage 7.5 conventions:**
 
@@ -107,14 +107,14 @@ Then `Program.cs` cookie config, `AuthController` persistent-cookie `Expires`, t
 ## Error handling
 
 - Part A: no failure mode (read-only).
-- Part B: revoke is inside the login persistence; a failure rolls back the whole login. The `Id <> newSessionId` guard prevents self-revocation.
+- Part B: the revoke (`ExecuteUpdateAsync`) and the new-row insert are separate statements with no enclosing transaction; a rare failure between them leaves the old row revoked and no new row, self-recovered by the user's next login attempt (idempotent re-dedup). The `Id <> newSessionId` guard prevents self-revocation.
 - Part C: single-statement DELETE, atomic and idempotent; non-zero exit on failure for cron alerting; never partial-commits.
 
 ## Testing
 
 - **Part A (integration, real DB, per-test marker):** expired ephemeral (LastUsedAt backdated >30 min) absent; live ephemeral present; persistent within 30 days present; persistent past 30 days absent; revoked always absent.
 - **Part B (integration):** same UA+IP login twice → first row `RevokedAt != null`, exactly one live row; different IP → two live rows; different UA → two live rows; the revoked old row still exists (audit intact, not deleted); the new session's own row is never revoked.
-- **Part C (integration):** seed rows at 91 vs 89 days (revoked + expired-ephemeral) → only >90-day rows deleted, persistent-within-window survives; a thin test that `--sweep-sessions` dispatches to the sweep logic and exits 0.
+- **Part C (integration):** seed rows at 91 vs 89 days (revoked + expired-ephemeral + abandoned-persistent) → only >90-day rows deleted regardless of `IsPersistent`, live-persistent-within-window survives; a thin test that `--sweep-sessions` dispatches to the sweep logic and exits 0.
 - **Architecture:** the sweep type carries `[RequiresAdminContext]` (pinned by `AdminContextDisciplineTests`); its `IgnoreQueryFilters()` call site (if any) is on the `ArchitectureTests` allow-list.
 
 ## Verify-against-codebase corrections folded in
