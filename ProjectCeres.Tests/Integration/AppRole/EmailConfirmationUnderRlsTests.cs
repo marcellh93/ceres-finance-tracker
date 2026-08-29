@@ -101,8 +101,16 @@ public class EmailConfirmationUnderRlsTests : AppRoleTestBase
 
         // Step 6: positive + negative RLS control — exactly one token row for this user, visible
         // only to the owner under ceres_app. Register issues exactly one token; verify consumes
-        // (updates) that same row rather than adding another. This is the assertion that pins the
-        // 9.3 gap shut: a missing RLS policy would let a different user's context see the row.
+        // (updates) that same row rather than adding another.
+        //
+        // NOTE (2026-08-29, Stage 12.8): this was described as "the assertion that pins the 9.3
+        // gap shut". It is not, and on this table the overstatement is pointed — 9.3 shipped
+        // BECAUSE EmailConfirmationTokens had no RLS policy. AssertRlsVisibility omits
+        // IgnoreQueryFilters(), so EF's global filter (EmailConfirmationToken is IUserOwned)
+        // excludes the foreign row before Postgres is consulted: the negative half would still
+        // read zero with the policy dropped. The policy is pinned elsewhere — RlsParityStartupCheck
+        // and the ParityTests policy-set comparison — not here. Fixing the helper is roadmap
+        // § 12.8.2; this comment is corrected now so it stops asserting coverage that is absent.
         await AssertRlsVisibility<EmailConfirmationToken>(
             owner: _userId, otherUser: Guid.NewGuid(),
             predicate: t => t.UserId == _userId, expectedOwnerCount: 1);

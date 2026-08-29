@@ -7,13 +7,16 @@ using Xunit;
 namespace ProjectCeres.Tests.Integration.AppRole;
 
 /// <summary>
-/// Stage 12.8. security-model.md § Email Address Change claims a foreign pending-change row is
-/// "invisible, not merely unreported" — a claim about the DATABASE, not just the endpoint's
-/// output. EmailChangePendingTests cannot establish it: it runs in the plain IntegrationTests
-/// collection, which is wired to ceres_admin (BYPASSRLS), so it passes on GetPendingAsync's
-/// explicit .Where(t =&gt; t.UserId == userId) alone. Delete the RLS policy and that test stays
-/// green. This one runs under ceres_app with RLS live, so the claim is earned rather than
-/// inferred. Raised by the 12.8 spec-intent review.
+/// Stage 12.8. security-model.md § Email Address Change once claimed a foreign pending-change
+/// row is "invisible, not merely unreported" — a claim about the DATABASE, not just the
+/// endpoint's output. That wording is GONE (corrected in acde2d92); it is quoted here only as
+/// the reason this test exists, and the live text at § Email Address Change now states both
+/// layers and names which test pins which.
+///
+/// EmailChangePendingTests could not establish the database half: it runs in the plain
+/// IntegrationTests collection, wired to ceres_admin (BYPASSRLS), so it passes on
+/// GetPendingAsync's explicit .Where(t =&gt; t.UserId == userId) alone. This one runs under
+/// ceres_app with RLS live. Raised by the 12.8 spec-intent review.
 /// </summary>
 [Collection("AppRoleTests")]
 public class EmailChangePendingUnderRlsTests : AppRoleTestBase
