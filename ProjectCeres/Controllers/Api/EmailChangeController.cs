@@ -79,6 +79,28 @@ public sealed class EmailChangeController : ControllerBase
         }
     }
 
+    // Authenticated but NOT [RequireRecentAuth]: this is the banner the settings page
+    // reads on load, and gating it behind a reauth prompt would pop the dialog on every
+    // visit. Safe because the payload is masked — see EmailChangePending.
+    [HttpGet("pending"), Authorize]
+    public async Task<IActionResult> GetPending()
+    {
+        var sid = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (sid is null || !Guid.TryParse(sid, out var userId))
+        {
+            return Unauthorized(new { error = new { code = "UNAUTHORIZED", message = "Authentication required." } });
+        }
+
+        var pending = await _service.GetPendingAsync(userId, HttpContext.RequestAborted);
+
+        return Ok(new
+        {
+            data = pending is null
+                ? new { pending = false, maskedEmail = (string?)null, expiresAt = (DateTime?)null, expired = false }
+                : new { pending = true, maskedEmail = (string?)pending.MaskedNewEmail, expiresAt = (DateTime?)pending.ExpiresAt, expired = pending.Expired }
+        });
+    }
+
     [HttpPost("confirm"), AllowAnonymous, PreAuthCallSite("EmailChange.ConfirmChange")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> ConfirmChange([FromBody] EmailChangeConfirmRequest body)

@@ -19,3 +19,13 @@ public abstract record EmailChangeRevokeOutcome
     public sealed record Success : EmailChangeRevokeOutcome;
     public sealed record InvalidToken : EmailChangeRevokeOutcome;
 }
+
+/// <summary>
+/// An email change awaiting confirmation. <paramref name="MaskedNewEmail"/> is already
+/// masked — the full address never leaves the server, so devtools cannot defeat the
+/// masking the settings banner relies on.
+/// </summary>
+public sealed record EmailChangePending(
+    string MaskedNewEmail,
+    DateTime ExpiresAt,
+    bool Expired);

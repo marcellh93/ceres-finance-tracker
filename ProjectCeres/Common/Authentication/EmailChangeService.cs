@@ -238,6 +238,35 @@ public sealed class EmailChangeService
         return new EmailChangeRequestOutcome.Accepted();
     }
 
+    /// <summary>
+    /// Reports whether the caller has an email change in flight, for the settings banner.
+    /// Reads through the RLS-filtered context — the caller is authenticated, so no bypass
+    /// applies and a foreign row is invisible rather than merely unreported.
+    /// </summary>
+    public async Task<EmailChangePending?> GetPendingAsync(Guid userId, CancellationToken ct)
+    {
+        // VerifyNew is the half that decides "in flight": it is the one the new address
+        // must click, and confirm/revoke consume both siblings together, so an unconsumed
+        // VerifyNew is exactly an outstanding change. Newest wins — a re-request supersedes.
+        var row = await _db.EmailChangeTokens
+            .AsNoTracking()
+            .Where(t => t.UserId == userId
+                     && t.Purpose == EmailChangeTokenPurpose.VerifyNew
+                     && t.ConsumedAt == null)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (row is null) return null;
+
+        // Expired rows are reported, not hidden: the user who missed the 30-minute
+        // window is precisely who needs telling, and an empty banner reads as
+        // "nothing happened" and invites a blind resubmit.
+        return new EmailChangePending(
+            EmailMask.Mask(row.NewEmail),
+            row.ExpiresAt,
+            row.ExpiresAt <= _timeProvider.GetUtcNow().UtcDateTime);
+    }
+
     [RlsBypassJustified("CER-1004")]
     public async Task<EmailChangeConfirmOutcome> ConfirmAsync(string rawToken, CancellationToken ct)
     {
