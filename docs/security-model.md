@@ -394,7 +394,7 @@ The following events must always trigger an email notification to the address of
 See `docs/decisions/ADR-0019-session-management-user-configurable-with-ip-controls.md` for the full decision.
 
 Summary:
-- Sessions are tracked server-side in `UserSession` (one row per active session per device)
+- Sessions are tracked server-side in `UserSession` (one row per active session per device — **enforced** since Stage 12.10: login revokes the same-device (UserAgent+IP) ephemeral duplicate, and the active-sessions list filters out sessions whose cookie has expired. See `models.md` § UserSession → Session lifecycle)
 - Session token regenerated on login (session fixation prevention) — always enforced
 - Logout marks the server-side record as revoked — always enforced
 - Session lifetime, IP enforcement, and IP blocking are user-configurable with risk disclosure
@@ -1456,9 +1456,9 @@ Define explicit numeric retention periods for every data category. Indefinite re
 | File attachments | Duration of parent transaction | Hard-delete from filesystem; row deleted |
 | Audit log (security events) | 6 months | Auto-purge via `IUserJobRunner` per-user fan-out — aligned with `planning-phase3.md` § Audit log entity + writer (Stage 6c sequencing) |
 | Application logs | 30 days | Log sink rotation |
-| UserSession rows (revoked) | 90 days | Auto-purge via scheduled job |
+| UserSession rows (revoked) | 90 days | Auto-purge via the `SweepSessions` daily cron (`--sweep-sessions`, Stage 12.10): a flat cross-tenant `DELETE` through `AdminDbContext` (BYPASSRLS) of revoked rows past 90 days plus expired unrevoked ephemeral rows. Deleting the row also removes its `UserAgent`. |
 | IP addresses | Retained within session/audit rows per the above schedule | Follows parent row deletion |
-| User-Agent strings | 90 days | Auto-purge via scheduled job |
+| User-Agent strings | 90 days | Purged with their `UserSession` row by the `SweepSessions` cron (above) |
 | Backup data | Per backup tier (30 days daily, 90 days weekly, 1 year monthly) | Automated backup lifecycle policy |
 | Failed login logs | 1 year | Auto-purge via scheduled job |
 | GDPR erasure requests | 3 years (for accountability documentation) | Keep the erasure record; delete all referenced personal data |

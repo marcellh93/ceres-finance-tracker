@@ -1528,6 +1528,21 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [x] `/support` desktop: list in a card; thread/compose in a right-side sheet (`sm:max-w-lg`) — the sheet replaced the form-modal/table split (12.6 conversation model)
 - [ ] `/support` touch targets ≥ 44×44px on mobile — **not met** (see the Stage 12.6 checklist); `sm` buttons are `h-7`, a design-system-wide bump tracked alongside the `/settings/sessions` touch-target item
 
+### Stage 12.10 — Session lifecycle (expiry filter, login dedup, retention sweep) ✅ Done (2026-08-29)
+
+> **Goal:** the active-sessions list stopped showing dead/duplicate sessions, and `UserSession` rows stopped piling up one-per-login. Root cause: `GetActiveAsync` filtered only `RevokedAt == null` (no expiry notion) and login created a new row with no dedup. Spec: `docs/superpowers/specs/2026-08-29-stage-12-10-session-lifecycle-design.md`. Plan: `docs/superpowers/plans/2026-08-29-stage-12-10-session-lifecycle.md`. No schema migration (`IsPersistent`/`LastUsedAt`/`RevokedAt` already existed).
+
+- [x] **Lifetime constants centralized** in `SessionConstants` (`EphemeralSlidingWindow` 30 min, `PersistentLifetime` 30 days, `RetentionHorizon` 90 days); the cookie config and persistent `Expires` consume them — no inline literals to drift
+- [x] **Display expiry filter** — `SessionService.GetActiveAsync` shows a row only if live by `LastUsedAt` (ephemeral within 30 min, persistent within 30 days) AND not revoked. Dead sessions leave the list; Revoke/Block-IP only appear on live ones
+- [x] **Login dedup** — `AuthController.IssueSessionAndCookiesAsync` revokes the same-device `(UserId, UserAgent, IpCreatedAt)` live ephemeral duplicate before inserting the new row (guarded `Id != newSessionId`; safe against `SessionRevocationValidator` because the new cookie carries the new `sid`). A different browser/IP still makes a distinct session
+- [x] **Retention sweep** — `SweepSessions` + `--sweep-sessions` CLI: a flat cross-tenant `DELETE` via `AdminDbContext` (BYPASSRLS, `ExecuteDeleteAsync`, not an `IUserJobRunner` fan-out) of rows past the 90-day horizon. Carries `[RequiresAdminContext]`; `IgnoreQueryFilters()` allow-listed in `ArchitectureTests`. `AdminContextDisciplineTests` + `ArchitectureTests` 42/42 green
+- [x] **Contract change surfaced by the full suite:** the dedup revokes a same-device session on the next login, so `BackupCodeLoginSessionFlagTests` (which logged in twice as the same user on the test host = same device) now needed the two sessions to be different devices (distinct User-Agent) to keep both live. Fixed test-only, both per-session assertions intact — the intended "one live session per device" behavior
+- [ ] Manual browser pass: open `/settings/sessions`, confirm expired sessions no longer appear and repeated logins from one browser show a single row — owed at a human verification pass
+
+Carried to Stage 16 (hosting):
+
+- [ ] **Register the `SweepSessions` daily cron.** Add a daily cron entry running `dotnet run --project ProjectCeres -- --sweep-sessions` (or the deployed equivalent) so revoked/expired `UserSession` rows are purged at the 90-day horizon per `security-model.md` § Retention. Same cron-command mechanism the Stage 13.6 audit-log purge can reuse.
+
 ---
 
 ## Stage 12.5 — Deferred from Stage 12 (not scheduled)

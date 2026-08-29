@@ -242,6 +242,9 @@
 
 #### Fixed
 
+**Sessions (Stage 12.10 — session lifecycle, 2026-08-29)**
+- The active-sessions list showed sessions whose login had long since expired, offering Revoke / Block-IP buttons on sessions that were already dead. The list now hides a session once its cookie has expired (30 minutes of inactivity for a normal session, 30 days for a "remember me" one).
+
 **Frontend / SPA host (Stage 9 close-out — production stylesheet, 2026-06-29)**
 - The single-page app shipped completely unstyled in production (manifest mode): the SPA host page emitted the JavaScript bundle but never emitted a stylesheet `<link>`, so no CSS loaded on any `/app/*` screen. This was invisible during local development, where the Vite dev server injects CSS through JavaScript. Fixed by adding the missing `<link vite-href="~/src/app/main.tsx" rel="stylesheet">` tag to `Views/App/Index.cshtml`. Found during the Stage 9 close-out responsive verification — the first check to render the production build rather than the dev server.
 - New E2E regression guard `ProjectCeres.Client/e2e/auth/spa-stylesheet.spec.ts` — fails if the host stops emitting the stylesheet or if the global styles stop applying on the auth surface.
@@ -275,6 +278,10 @@
 - `docs/api-contract.md` + the `AuthController.Register` code comment claimed Identity password-policy failures (too-short, breached) return `422` — they return `400` (the controller calls `ValidationProblem(ModelState)`, which bypasses the 422 factory). Documentation corrected to match the pinned behavior (`RegisterEndpointTests`); model-binding/DataAnnotations failures still return the `422` envelope
 
 #### Changed
+
+**Sessions (Stage 12.10 — session lifecycle, 2026-08-29)**
+- Signing in again from the same browser no longer stacks up a new session row each time — the previous session from that same device is superseded, so the active-sessions list shows one entry per device. Signing in from a different browser or network still appears as its own session.
+- Added a daily retention sweep (`--sweep-sessions`) that removes session records older than 90 days, so the sessions table no longer grows without bound. (The cron schedule is registered at deploy — Stage 16.)
 
 **Support (Stage 12.6, 2026-08-28)**
 - `SupportTicket` now owns a `SupportMessage` conversation (the old `Message` column moved to the first message) and gains `ExternalRef`; the attachment foreign key re-pointed from the ticket to the message. Ticket creation returns the first message's id so the client can attach files to it.
