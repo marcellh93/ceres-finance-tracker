@@ -40,7 +40,7 @@ Before saying "done," "ready," "complete," or "passing," run the tier-scoped pre
 
 - **TIER 0** — no `.cs` / `.ts` / `.tsx` / `.csproj` / `.sln` touched (doc/config only): skip steps 1 and 2 entirely.
 - **TIER F** — only `.ts` / `.tsx` under `ProjectCeres.Client/` touched: run the frontend pair in steps 1 and 2.
-- **TIER B** — only `.cs` / `.csproj` under `ProjectCeres/` touched (no test-project, no `.sln`): run the backend pair in steps 1 and 2.
+- **TIER B** — only `.cs` / `.csproj` under `ProjectCeres/` touched (no test-project, no `.sln`): run the backend pair in steps 1 and 2. **Exception — `ProjectCeres/Program.cs` is TIER M, not TIER B.** It is the composition root (middleware order, DI registration, environment branching); unit tests reach almost none of that, so the unit-only filter is no gate for it. Enforced in `tier-classify.py`; added 2026-08-29 after a `Program.cs`-only commit passed TIER B and left an integration test red on `main` (`dafee78c`, reverted in `19ff467a`).
 - **TIER M** — mixed, OR `.sln` touched, OR `ProjectCeres.Tests/` edits, OR anything ambiguous: run both pairs.
 
 Then:

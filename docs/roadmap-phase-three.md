@@ -1546,7 +1546,7 @@ Carried to Stage 16 (hosting):
 
 ### Stage 12.11 — Dev server serves a stale SPA shell (not scheduled)
 
-**Status: ❌ Open.** Raised 2026-08-29 while auditing an uncommitted working-tree change that attempted this fix. The attempt is **not committed** — it broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` (404 instead of 200) and the cause is structural, not a small oversight.
+**Status: ❌ Open.** Raised 2026-08-29. An attempted fix shipped as `dafee78c` and was **reverted in `19ff467a`** — it broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` (404 instead of 200), and the cause is structural, not a small oversight. It reached `main` because a `Program.cs`-only turn classified TIER 1 (unit tests only) and never ran the integration suite; that gate hole is closed in `a0261dcd`.
 
 The problem: in Development the SPA shell is served from `wwwroot/dist/app.html` by `UseStaticFiles`, so a developer with Vite running still gets the last `pnpm build` output — no HMR client, and no `Cache-Control`, so the browser pins it until a hard reload. This is the `CLAUDE.md` § Stale-artifact trip-up, at its source.
 
@@ -1555,10 +1555,27 @@ The attempted fix excluded that path from static files in Development so Vite wo
 Three ways to fix it properly, each its own piece of work:
 
 - [ ] **Option A — boot-time reachability probe.** Try Vite's port at startup; fall back to static files if nothing answers. Honest, but adds a network call to boot and races a Vite server that starts slightly later.
-- [ ] **Option B — give the test host its own environment (recommended).** Have the shared `WebApplicationFactory` set an environment other than Development, so `IsDevelopment()` stops carrying two meanings. Cleanest long-term and fixes the root confusion rather than working around it; touches the shared test factory every integration test depends on, so it needs its own stage and a full-suite run.
+- [ ] **Option B — give the test host its own environment.** Set an environment other than Development on the shared `WebApplicationFactory` so `IsDevelopment()` stops carrying two meanings. **Attempted 2026-08-29 and reverted: it fails 307 tests as written, and § 12.12 is the reason.** ASP.NET loads user secrets *only* under Development, and `Authentication:TokenLookupSecret:Secret` exists nowhere else — so moving off Development hands `TokenLookupHasher` the literal `"configure-via-user-secrets"` placeholder, which throws `FormatException` at `Convert.FromBase64String` (`TokenLookupHasher.cs:28`) on every register / login / confirmation path. **§ 12.12 is a hard prerequisite:** the factory must supply its own secrets before this option is viable at all.
 - [ ] **Option C — per-request fallback.** Attempt Vite, serve the built shell when the proxy fails. Most robust, most complexity.
 
 Until one ships, the workaround stands: `tools/stage-spa.sh` before verifying a frontend change against a non-Vite app, per `CLAUDE.md`.
+
+### Stage 12.12 — The test suite depends on a developer's local user-secrets store (not scheduled)
+
+**Status: ❌ Open.** Found 2026-08-29 while diagnosing the § 12.11 Option B failure. Not caused by that work — it has been latent since the Stage 6.15 token-lookup secret landed.
+
+`ProjectCeres.csproj` declares a `UserSecretsId`, and ASP.NET's default host builder loads the user-secrets provider **only when the environment is Development**. `TestWebApplicationFactory` sets no environment, so it inherits Development and silently picks up whatever is in the developer's `~/.microsoft/usersecrets/<id>/secrets.json`. It overrides the three connection strings itself, but **not** `Authentication:TokenLookupSecret:Secret` — that value comes from the personal secret store alone. `appsettings.json` ships it as the placeholder string `"configure-via-user-secrets"`, which is not valid base64.
+
+Consequences:
+
+- **A fresh clone cannot run the suite.** With no secrets configured, `TokenLookupHasher`'s constructor throws `FormatException` at `Convert.FromBase64String` and every register / login / email-confirmation / reauth path 500s — ~307 failures, observed directly on 2026-08-29.
+- **CI has the same shape.** Any runner without that file provisioned fails identically, which is the wrong failure to debug from a red pipeline.
+- **It blocks § 12.11 Option B**, and any other change that moves the test host off Development.
+
+- [ ] Have `TestWebApplicationFactory` supply `Authentication:TokenLookupSecret:Secret` itself (a fixed, obviously-test-only base64 value via `UseSetting`, alongside the connection strings it already overrides). Test-only secrets belong in the fixture, not in a developer's home directory.
+- [ ] Audit for other settings resolved from user secrets that the factory does not override — `Email:Resend:ApiKey` is present in the store; confirm whether any test path reaches it.
+- [ ] Add a test that fails loudly and legibly when a required secret is absent, so the symptom names the cause instead of surfacing as a base64 `FormatException` inside an unrelated auth test.
+- *Tripwire: this checklist. The placeholder string in `appsettings.json` is the marker to grep for (`configure-via-user-secrets`).*
 
 ---
 
