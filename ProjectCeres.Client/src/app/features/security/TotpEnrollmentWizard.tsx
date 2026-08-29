@@ -10,11 +10,10 @@ import { TotpEnrollStep3Done } from './TotpEnrollStep3Done';
 type Props = {
   otpAuthUri: string;
   manualEntryKey: string;
-  /** Called when the wizard exits (any path — done, cancelled, reauth, or restart). */
+  /** Called when the wizard exits (any path — done, cancelled, or restart). */
   onExit: () => void;
   /** Called when the user enrolled but cancelled out of the backup-codes step. */
   onCancelWithoutSavingCodes: () => void;
-  /** Called when a step needs reauth (server returned REAUTH_REQUIRED). */
 };
 
 export function TotpEnrollmentWizard({

@@ -1586,6 +1586,21 @@ It was NOT promoted in 12.8: building the component, converting five call sites,
 - [ ] Update `docs/design-system.md` — the caller list is stale, and the promotion rule should record that it fired.
 - *Tripwire: the caller list in § Inline warning strip, which is now wrong in the other direction (it will list five where it says three).*
 
+### Stage 12.8.4 — Test files are never type-checked (not scheduled)
+
+**Status: ❌ Open.** Found 2026-08-29 during the Stage 12.8 screen review, by a dead prop that nothing in the toolchain could see.
+
+`tsconfig.app.json` ends with `"exclude": ["src/test-setup.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]`, and no other project in the solution includes them — the root `tsconfig.json` has `"files": []` and references only `tsconfig.app.json` (src minus tests), `tsconfig.node.json` (vite config), and `tsconfig.e2e.json` (e2e). Vitest transpiles tests through esbuild, which strips types without checking them. So **no command in this repo type-checks a test file**: not `pnpm build`, not `pnpm test`, and CI would not catch it either.
+
+Concretely what slipped through: `TotpEnrollStep1ScanVerify.test.tsx` passed `onReauthRequired={vi.fn()}` to a component whose `Props` no longer declared it, and both the build and the full 1079-test suite stayed green. Found by inspection, not by tooling. Fixed in the same commit that found it; the *class* of defect is still invisible.
+
+Measured cost of closing it: type-checking `src` with the exclusions removed produces **256 errors** today. The bulk are `TS2304: Cannot find name 'global'` (a missing `@types/node` reference in the test tsconfig, not real bugs), but there is genuine drift too — e.g. `AccountCurrencySubtotals.test.tsx:7` builds an `AccountListItemDto` whose `excludeFromReports` no longer matches the type.
+
+- [ ] Add a `tsconfig.test.json` that includes `src/**/*.test.ts(x)` + `src/test-setup.ts` with `"types": ["node", "vitest/globals", "@testing-library/jest-dom"]`, referenced from the root solution file.
+- [ ] Fix the `global` errors first (one types entry should clear most of the 256), then triage what remains — each surviving error is a test asserting against a type that has moved.
+- [ ] Add the check to the `build` script or a `typecheck` script so it cannot rot again, and note it in `docs/testing.md` § Definition of Done.
+- *Tripwire: this checklist. Re-measure with a temporary tsconfig extending `tsconfig.app.json` with `"exclude": []`.*
+
 ### Stage 12.11 — Dev server serves a stale SPA shell (not scheduled)
 
 **Status: ❌ Open.** Raised 2026-08-29. An attempted fix shipped as `dafee78c` and was **reverted in `19ff467a`** — it broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` (404 instead of 200), and the cause is structural, not a small oversight. It reached `main` because a `Program.cs`-only turn classified TIER 1 (unit tests only) and never ran the integration suite; that gate hole is closed in `a0261dcd`.

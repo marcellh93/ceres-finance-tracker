@@ -25,7 +25,6 @@ function mount() {
         otpAuthUri={OTPAUTH}
         manualEntryKey={MANUAL}
         onEnrolled={vi.fn()}
-        onReauthRequired={vi.fn()}
         onRestart={vi.fn()}
       />
     </I18nextProvider>,
