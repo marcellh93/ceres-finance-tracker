@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Exceptions;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
@@ -15,9 +16,16 @@ public class SessionService(
     public async Task<IReadOnlyList<SessionDto>> GetActiveAsync(Guid currentSessionId)
     {
         var userId = currentUser.UserId;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var ephemeralCutoff = now - SessionConstants.EphemeralSlidingWindow;
+        var persistentCutoff = now - SessionConstants.PersistentLifetime;
 
         return await db.UserSessions
-            .Where(s => s.UserId == userId && s.RevokedAt == null)
+            .Where(s => s.UserId == userId
+                && s.RevokedAt == null
+                && (s.IsPersistent
+                    ? s.LastUsedAt > persistentCutoff
+                    : s.LastUsedAt > ephemeralCutoff))
             .OrderByDescending(s => s.LastUsedAt)
             .Select(s => new SessionDto(
                 s.Id,
