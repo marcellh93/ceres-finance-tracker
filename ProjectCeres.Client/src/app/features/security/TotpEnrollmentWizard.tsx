@@ -15,7 +15,6 @@ type Props = {
   /** Called when the user enrolled but cancelled out of the backup-codes step. */
   onCancelWithoutSavingCodes: () => void;
   /** Called when a step needs reauth (server returned REAUTH_REQUIRED). */
-  onReauthRequired: () => void;
 };
 
 export function TotpEnrollmentWizard({
@@ -23,7 +22,6 @@ export function TotpEnrollmentWizard({
   manualEntryKey,
   onExit,
   onCancelWithoutSavingCodes,
-  onReauthRequired,
 }: Props) {
   const { t } = useTranslation();
   const { user, refresh } = useAuth();
@@ -63,7 +61,6 @@ export function TotpEnrollmentWizard({
           otpAuthUri={otpAuthUri}
           manualEntryKey={manualEntryKey}
           onEnrolled={handleEnrolled}
-          onReauthRequired={onReauthRequired}
           onRestart={onExit}
         />
       )}

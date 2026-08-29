@@ -205,7 +205,9 @@ public sealed class EmailChangeService
             sem.Release();
         }
 
-        // FIXME: re-surface in Stage 12 — no SPA route exists yet for either link target (roadmap Stage 12.8).
+        // Stage 12.8: both link targets are live SPA routes (App.tsx, outside /app, under
+        // AuthLayout). The token rides in the fragment so it never reaches a server log or a
+        // referrer header; the pages read it with readTokenFromHash.
         var verifyUrl = $"{verifyUrlBase.TrimEnd('/')}/email-change/confirm#token={verifyRaw}";
         var revokeUrl = $"{revokeUrlBase.TrimEnd('/')}/email-change/revoke#token={revokeRaw}";
 

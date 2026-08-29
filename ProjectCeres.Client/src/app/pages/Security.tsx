@@ -12,10 +12,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useDocumentTitle } from '../lib/use-document-title';
-import { apiFetch, ReauthRequiredError } from '../lib/api-client';
+import { apiFetch } from '../lib/api-client';
+import { useStepUp, ReauthCancelledError } from '../auth/use-step-up';
 import { useAuth } from '../auth/auth-context';
 import { TotpEnrollmentWizard } from '../features/security/TotpEnrollmentWizard';
 import { RegenerateBackupCodesDialog } from '../features/security/RegenerateBackupCodesDialog';
+import { EmailAddressSection } from '../features/security/EmailAddressSection';
 
 type EnrollmentStart =
   | { kind: 'idle' }
@@ -25,24 +27,23 @@ type EnrollmentStart =
 export function Security() {
   const { t } = useTranslation();
   useDocumentTitle(t('security.title'));
-  const { user, refresh, logout } = useAuth();
+  const { user, refresh } = useAuth();
   const [enrollment, setEnrollment] = useState<EnrollmentStart>({ kind: 'idle' });
-  const [reauthRequired, setReauthRequired] = useState(false);
+  const { requireStepUp } = useStepUp();
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
-
-  const handleSignOut = async () => {
-    await logout();
-    window.location.href = '/login';
-  };
 
   const startEnrollment = async () => {
     if (enrollment.kind === 'starting') return;
     setEnrollment({ kind: 'starting' });
-    setReauthRequired(false);
     try {
-      const result = await apiFetch<{ otpAuthUri: string; manualEntryKey: string }>(
-        '/api/auth/mfa/enroll',
-        { method: 'POST', body: {} },
+      // Stage 12.9: reauth-gated. requireStepUp opens the password dialog on
+      // 401 REAUTH_REQUIRED and replays this call, instead of the old dead end
+      // that told the user to sign out and back in.
+      const result = await requireStepUp(() =>
+        apiFetch<{ otpAuthUri: string; manualEntryKey: string }>(
+          '/api/auth/mfa/enroll',
+          { method: 'POST', body: {} },
+        ),
       );
       if (result.ok && result.data) {
         setEnrollment({
@@ -61,8 +62,8 @@ export function Security() {
       }
       setEnrollment({ kind: 'idle' });
     } catch (err) {
-      if (err instanceof ReauthRequiredError) {
-        setReauthRequired(true);
+      // Cancelling the password prompt is a choice, not an error.
+      if (err instanceof ReauthCancelledError) {
         setEnrollment({ kind: 'idle' });
         return;
       }
@@ -73,18 +74,18 @@ export function Security() {
   const disable = async () => {
     setDisableDialogOpen(false);
     try {
-      const result = await apiFetch('/api/auth/mfa/disable', { method: 'POST', body: {} });
+      const result = await requireStepUp(() =>
+        apiFetch('/api/auth/mfa/disable', { method: 'POST', body: {} }),
+      );
       if (result.ok) {
         await refresh();
         return;
       }
       // 409 MFA_NOT_ENABLED — auth refresh will catch any race; silently drop.
       await refresh();
-    } catch (err) {
-      if (err instanceof ReauthRequiredError) {
-        setReauthRequired(true);
-        return;
-      }
+    } catch {
+      // Cancel or network failure: the dialog already surfaced its own error, and
+      // MFA state is unchanged. Nothing to add here.
     }
   };
 
@@ -103,10 +104,6 @@ export function Security() {
             await refresh();
             setEnrollment({ kind: 'idle' });
           }}
-          onReauthRequired={() => {
-            setReauthRequired(true);
-            setEnrollment({ kind: 'idle' });
-          }}
         />
       </div>
     );
@@ -118,6 +115,8 @@ export function Security() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">{t('security.title')}</h1>
 
+      <EmailAddressSection />
+
       <section className="space-y-3 rounded-lg border border-border bg-card p-5">
         <h2 className="text-base font-medium">
           {enabled ? t('security.totp.enabledHeading') : t('security.totp.disabledHeading')}
@@ -126,18 +125,9 @@ export function Security() {
           {enabled ? t('security.totp.enabledBody') : t('security.totp.disabledBody')}
         </p>
 
-        {reauthRequired && (
-          <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <p className="text-destructive">{t('security.totp.reauthRequired')}</p>
-            <Button type="button" variant="link" onClick={handleSignOut} className="mt-1 px-0">
-              {t('security.totp.signOutLink')}
-            </Button>
-          </div>
-        )}
-
         {enabled ? (
           <div className="flex flex-wrap gap-3">
-            <RegenerateBackupCodesDialog onReauthRequired={() => setReauthRequired(true)} />
+            <RegenerateBackupCodesDialog />
             <Button type="button" variant="outline" onClick={() => setDisableDialogOpen(true)}>
               {t('security.totp.disableButton')}
             </Button>

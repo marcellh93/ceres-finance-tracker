@@ -4,6 +4,17 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n/i18n';
 import { TotpEnrollStep1ScanVerify } from './TotpEnrollStep1ScanVerify';
 
+// Stage 12.9: these surfaces now route reauth through the step-up dialog, so they
+// depend on StepUpProvider's context. Mocked as a pass-through here — the dialog's
+// own behaviour (open, collect password, replay, cancel) has a dedicated suite in
+// use-step-up.test.tsx. Same pattern as SessionsPage.test.tsx.
+const requireStepUp = vi.fn(<T,>(action: () => Promise<T>) => action());
+vi.mock('../../auth/use-step-up', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../auth/use-step-up')>()),
+  useStepUp: () => ({ requireStepUp }),
+}));
+
+
 const OTPAUTH = 'otpauth://totp/Ceres:a@b.test?secret=JBSWY3DPEHPK3PXP&issuer=Ceres&algorithm=SHA1&digits=6&period=30';
 const MANUAL = 'JBSW Y3DP EHPK 3PXP';
 

@@ -43,6 +43,8 @@ import { useRecurringLayoutCtx } from './features/recurring/RecurringLayout';
 import { Login } from './pages/auth/Login';
 import { LoginTotp } from './pages/auth/LoginTotp';
 import { EmailVerify } from './pages/auth/EmailVerify';
+import { EmailChangeConfirm } from './pages/auth/EmailChangeConfirm';
+import { EmailChangeRevoke } from './pages/auth/EmailChangeRevoke';
 import { PasswordReset } from './pages/auth/PasswordReset';
 import { Register } from './pages/auth/Register';
 import { AccountUnlock } from './pages/auth/AccountUnlock';
@@ -77,6 +79,12 @@ export function App() {
         <Route path="register" element={<Register />} />
         <Route path="email-verify" element={<EmailVerify />} />
         <Route path="account/unlock" element={<AccountUnlock />} />
+        {/* Stage 12.8. The server emits these exact paths (no /app prefix) with the
+            token in the URL fragment — see EmailChangeService.cs. Anonymous: the
+            revoke notice goes to the OLD address, whose owner may not be signed in
+            and, in the case revoke exists for, is not the person who started it. */}
+        <Route path="email-change/confirm" element={<EmailChangeConfirm />} />
+        <Route path="email-change/revoke" element={<EmailChangeRevoke />} />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}

@@ -8,6 +8,17 @@ import { AuthProvider } from '../auth/auth-context';
 import { Security } from './Security';
 import { clearXsrfTokenCacheForTests } from '../auth/csrf';
 
+// Stage 12.9: these surfaces now route reauth through the step-up dialog, so they
+// depend on StepUpProvider's context. Mocked as a pass-through here — the dialog's
+// own behaviour (open, collect password, replay, cancel) has a dedicated suite in
+// use-step-up.test.tsx. Same pattern as SessionsPage.test.tsx.
+const requireStepUp = vi.fn(<T,>(action: () => Promise<T>) => action());
+vi.mock('../auth/use-step-up', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../auth/use-step-up')>()),
+  useStepUp: () => ({ requireStepUp }),
+}));
+
+
 function meResponse(twoFactorEnabled: boolean) {
   return new Response(
     JSON.stringify({

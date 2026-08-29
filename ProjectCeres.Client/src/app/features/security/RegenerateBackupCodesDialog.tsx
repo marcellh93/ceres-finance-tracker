@@ -11,13 +11,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { apiFetch, ReauthRequiredError } from '../../lib/api-client';
+import { apiFetch } from '../../lib/api-client';
+import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
 import { useAuth } from '../../auth/auth-context';
 import { TotpEnrollStep2BackupCodes } from './TotpEnrollStep2BackupCodes';
-
-type Props = {
-  onReauthRequired: () => void;
-};
 
 type State =
   | { kind: 'idle' }
@@ -25,17 +22,22 @@ type State =
   | { kind: 'pending' }
   | { kind: 'showCodes'; codes: string[] };
 
-export function RegenerateBackupCodesDialog({ onReauthRequired }: Props) {
+export function RegenerateBackupCodesDialog() {
   const { t } = useTranslation();
   const { user, refresh } = useAuth();
+  const { requireStepUp } = useStepUp();
   const [state, setState] = useState<State>({ kind: 'idle' });
 
   const onConfirm = async () => {
     setState({ kind: 'pending' });
     try {
-      const result = await apiFetch<{ backupCodes: string[] }>(
-        '/api/auth/mfa/backup-codes/regenerate',
-        { method: 'POST', body: {} },
+      // Stage 12.9: opens the reauth dialog and replays, instead of handing the
+      // dead end back up to the parent to render a sign-out-and-return message.
+      const result = await requireStepUp(() =>
+        apiFetch<{ backupCodes: string[] }>(
+          '/api/auth/mfa/backup-codes/regenerate',
+          { method: 'POST', body: {} },
+        ),
       );
       if (result.ok && result.data?.backupCodes) {
         // Refresh the auth context so consumers reading
@@ -50,13 +52,10 @@ export function RegenerateBackupCodesDialog({ onReauthRequired }: Props) {
       // Failure: drop back to idle. Toast surfaces the failure.
       setState({ kind: 'idle' });
     } catch (err) {
-      if (err instanceof ReauthRequiredError) {
-        // Reset our own dialog state BEFORE notifying the parent, so the
-        // dialog actually closes. Previous bug: we left state='pending'
-        // (dialog still open) and only told the parent to render the
-        // reauth alert — the user saw both surfaces stacked.
+      // Cancelling the password prompt is a choice, not a failure. Either way we
+      // drop back to idle so this dialog closes rather than sitting in 'pending'.
+      if (err instanceof ReauthCancelledError) {
         setState({ kind: 'idle' });
-        onReauthRequired();
         return;
       }
       setState({ kind: 'idle' });

@@ -7,13 +7,25 @@ import i18n from '../../i18n/i18n';
 import { AuthProvider } from '../../auth/auth-context';
 import { RegenerateBackupCodesDialog } from './RegenerateBackupCodesDialog';
 import { clearXsrfTokenCacheForTests } from '../../auth/csrf';
+import { ReauthCancelledError } from '../../auth/use-step-up';
 
-function mount(onReauthRequired = vi.fn()) {
+// Stage 12.9: these surfaces now route reauth through the step-up dialog, so they
+// depend on StepUpProvider's context. Mocked as a pass-through here — the dialog's
+// own behaviour (open, collect password, replay, cancel) has a dedicated suite in
+// use-step-up.test.tsx. Same pattern as SessionsPage.test.tsx.
+const requireStepUp = vi.fn(<T,>(action: () => Promise<T>) => action());
+vi.mock('../../auth/use-step-up', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../auth/use-step-up')>()),
+  useStepUp: () => ({ requireStepUp }),
+}));
+
+
+function mount() {
   return render(
     <I18nextProvider i18n={i18n}>
       <AuthProvider>
         <MemoryRouter>
-          <RegenerateBackupCodesDialog onReauthRequired={onReauthRequired} />
+          <RegenerateBackupCodesDialog />
         </MemoryRouter>
       </AuthProvider>
     </I18nextProvider>,
@@ -50,10 +62,14 @@ describe('RegenerateBackupCodesDialog', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('on REAUTH_REQUIRED, dialog closes AND parent is notified (no stacked surfaces)', async () => {
-    // Regression for the 2026-05-18 bug where REAUTH_REQUIRED kept the
-    // dialog stuck open (state stayed 'pending') and the parent's
-    // reauth alert rendered behind the still-open dialog.
+  it('on a cancelled reauth prompt, the dialog closes (no stacked surfaces)', async () => {
+    // Stage 12.9 contract change: REAUTH_REQUIRED no longer bubbles to the parent as
+    // a dead-end message — requireStepUp opens the password dialog and replays the
+    // call. What must NOT regress is the 2026-05-18 bug this test was written for:
+    // the dialog stayed stuck open in 'pending' while another surface rendered
+    // behind it. If the user CANCELS the password prompt, this dialog must still
+    // close rather than sit pending forever. requireStepUp is mocked to reject with
+    // ReauthCancelledError to drive exactly that path.
     fetchSpy.mockImplementation(async (url) => {
       if (typeof url === 'string' && url === '/api/auth/me') {
         return new Response(
@@ -80,9 +96,10 @@ describe('RegenerateBackupCodesDialog', () => {
       return new Response(null, { status: 204 });
     });
 
-    const onReauthRequired = vi.fn();
+    requireStepUp.mockRejectedValueOnce(new ReauthCancelledError());
+
     const user = userEvent.setup();
-    mount(onReauthRequired);
+    mount();
 
     // Open the dialog via the regenerate button (the trigger).
     await user.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
@@ -90,9 +107,8 @@ describe('RegenerateBackupCodesDialog', () => {
     const confirm = await screen.findByRole('button', { name: /^regenerate codes$/i });
     await user.click(confirm);
 
-    // Parent notified.
-    await waitFor(() => expect(onReauthRequired).toHaveBeenCalledTimes(1));
-    // Dialog DOM gone (no more "Regenerate codes" action button in the body).
+    // Dialog DOM gone (no more "Regenerate codes" action button in the body) — the
+    // stuck-in-pending regression this test exists for.
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /^regenerate codes$/i })).toBeNull(),
     );

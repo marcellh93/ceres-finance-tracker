@@ -152,6 +152,30 @@
       "cancel": "Cancelar",
       "submit": "Cerrar sesión",
       "submitting": "Cerrando sesión…"
+    },
+    "emailChangeConfirm": {
+      "title": "Confirmando tu nueva dirección",
+      "verifying": "Confirmando tu nueva dirección de correo…",
+      "successTitle": "Dirección de correo cambiada",
+      "successBody": "Esta es ahora la dirección con la que inicias sesión y a la que enviamos los avisos de seguridad.",
+      "signInLink": "Ir a iniciar sesión",
+      "invalidTitle": "Este enlace ya no es válido",
+      "invalidBody": "Los enlaces de confirmación duran 30 minutos y solo se pueden usar una vez. Vuelve a empezar el cambio desde los ajustes de seguridad.",
+      "alreadyInUseTitle": "Esa dirección ya está ocupada",
+      "alreadyInUseBody": "Otra persona la registró mientras tu solicitud estaba pendiente. Tu dirección no ha cambiado."
+    },
+    "emailChangeRevoke": {
+      "title": "Cancelando el cambio",
+      "verifying": "Cancelando el cambio de correo…",
+      "successTitle": "Cambio de correo cancelado",
+      "successBody": "Tu dirección no ha cambiado. Si no has solicitado este cambio, cambia tu contraseña ahora: alguien podría tener acceso a tu cuenta.",
+      "passwordResetLink": "Cambiar la contraseña",
+      "invalidTitle": "Este enlace ya no es válido",
+      "invalidBody": "O el cambio ya se canceló, o se completó antes de que llegaras aquí: los enlaces de confirmación se usan en 30 minutos y este enlace de cancelación dura una semana.",
+      "invalidActionIntro": "Si no solicitaste el cambio:",
+      "invalidActionReset": "Restablece tu contraseña para bloquear la cuenta",
+      "invalidActionSupport": "Después contacta con soporte para recuperar la dirección",
+      "signInLink": "Ir a iniciar sesión"
     }
   },
   "theme": {
@@ -177,8 +201,6 @@
         "dialogCancel": "Cancelar",
         "dialogConfirm": "Desactivar"
       },
-      "reauthRequired": "Tu sesión tiene más de 5 minutos. Cierra sesión e inicia sesión de nuevo para continuar.",
-      "signOutLink": "Cerrar sesión",
       "wizard": {
         "stepper": {
           "scanVerify": "Escanear y verificar",
@@ -239,6 +261,33 @@
         "dialogConfirm": "Regenerar códigos",
         "successHeading": "Aquí tienes tus nuevos códigos de respaldo",
         "successBody": "Tus códigos anteriores ya no son válidos. Guárdalos en un lugar seguro."
+      }
+    },
+    "email": {
+      "heading": "Dirección de correo",
+      "current": "Tu dirección",
+      "changeButton": "Cambiar dirección de correo",
+      "newLabel": "Nueva dirección de correo",
+      "submit": "Enviar enlace de confirmación",
+      "submitting": "Enviando…",
+      "cancel": "Cancelar",
+      "sentTitle": "Confirma tu nueva dirección",
+      "sentBody": "Hemos enviado un enlace a {{email}}: tu dirección cambiará cuando lo pulses.",
+      "sentNotice": "También hemos avisado a tu dirección actual, por si no has sido tú.",
+      "pendingHeading": "Esperando confirmación",
+      "pendingBody": "Hemos enviado un enlace a {{email}}.",
+      "pendingExpiresIn": "Caduca en {{count}} minuto",
+      "pendingExpiresIn_other": "Caduca en {{count}} minutos",
+      "pendingExpiresSoon": "Caduca en menos de un minuto",
+      "expiredHeading": "El enlace ha caducado",
+      "expiredBody": "El enlace de confirmación para {{email}} ya no es válido. Envía uno nuevo para volver a intentarlo.",
+      "resend": "Enviar un enlace nuevo",
+      "errors": {
+        "unchanged": "Esa ya es tu dirección.",
+        "alreadyInUse": "Esa dirección ya pertenece a otra cuenta.",
+        "rateLimited": "Demasiados intentos. Inténtalo de nuevo en un momento.",
+        "invalidEmail": "Introduce una dirección de correo válida.",
+        "network": "No se pudo contactar con el servidor. Inténtalo de nuevo."
       }
     }
   },

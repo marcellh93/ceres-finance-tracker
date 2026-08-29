@@ -152,6 +152,30 @@
       "cancel": "Cancel",
       "submit": "Sign out",
       "submitting": "Signing out…"
+    },
+    "emailChangeConfirm": {
+      "title": "Confirming your new address",
+      "verifying": "Confirming your new email address…",
+      "successTitle": "Email address changed",
+      "successBody": "This is now the address you sign in with, and where we send security notices.",
+      "signInLink": "Go to sign in",
+      "invalidTitle": "This link is no longer valid",
+      "invalidBody": "Confirmation links last 30 minutes and can only be used once. Start the change again from your security settings.",
+      "alreadyInUseTitle": "That address is taken",
+      "alreadyInUseBody": "Someone else registered it while your request was waiting. Your address is unchanged."
+    },
+    "emailChangeRevoke": {
+      "title": "Cancelling the change",
+      "verifying": "Cancelling the email change…",
+      "successTitle": "Email change cancelled",
+      "successBody": "Your address is unchanged. If you didn't request this change, change your password now — someone may have access to your account.",
+      "passwordResetLink": "Change your password",
+      "invalidTitle": "This link is no longer valid",
+      "invalidBody": "Either this change was already cancelled, or it went through before you got here — confirmation links are used within 30 minutes, and this cancel link lasts a week.",
+      "invalidActionIntro": "If you didn't request the change:",
+      "invalidActionReset": "Reset your password to lock the account",
+      "invalidActionSupport": "Then contact support to recover the address",
+      "signInLink": "Go to sign in"
     }
   },
   "theme": {
@@ -177,8 +201,6 @@
         "dialogCancel": "Cancel",
         "dialogConfirm": "Turn off"
       },
-      "reauthRequired": "Your sign-in is older than 5 minutes. Sign out and sign in again to continue.",
-      "signOutLink": "Sign out",
       "wizard": {
         "stepper": {
           "scanVerify": "Scan & verify",
@@ -239,6 +261,33 @@
         "dialogConfirm": "Regenerate codes",
         "successHeading": "Here are your new backup codes",
         "successBody": "Your old codes are no longer valid. Save these somewhere safe."
+      }
+    },
+    "email": {
+      "heading": "Email address",
+      "current": "Your address",
+      "changeButton": "Change email address",
+      "newLabel": "New email address",
+      "submit": "Send confirmation link",
+      "submitting": "Sending…",
+      "cancel": "Cancel",
+      "sentTitle": "Confirm your new address",
+      "sentBody": "We sent a link to {{email}} — your address changes once you click it.",
+      "sentNotice": "We also emailed your current address to let you know, in case this wasn't you.",
+      "pendingHeading": "Waiting for confirmation",
+      "pendingBody": "We sent a link to {{email}}.",
+      "pendingExpiresIn": "Expires in {{count}} minute",
+      "pendingExpiresIn_other": "Expires in {{count}} minutes",
+      "pendingExpiresSoon": "Expires in less than a minute",
+      "expiredHeading": "That link expired",
+      "expiredBody": "The confirmation link for {{email}} is no longer valid. Send a new one to try again.",
+      "resend": "Send a new link",
+      "errors": {
+        "unchanged": "That's already your address.",
+        "alreadyInUse": "That address is already registered to another account.",
+        "rateLimited": "Too many attempts. Try again shortly.",
+        "invalidEmail": "Enter a valid email address.",
+        "network": "Couldn't reach the server. Try again."
       }
     }
   },

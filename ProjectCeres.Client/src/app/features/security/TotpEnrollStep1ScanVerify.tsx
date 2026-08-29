@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import { ChevronDown, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { apiFetch, ReauthRequiredError } from '../../lib/api-client';
+import { apiFetch } from '../../lib/api-client';
+import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
 import {
   totpCodeSchema,
   type TotpCodeFormValues,
@@ -17,7 +18,6 @@ type Props = {
   otpAuthUri: string;
   manualEntryKey: string;
   onEnrolled: (backupCodes: string[]) => void;
-  onReauthRequired: () => void;
   onRestart: () => void;
 };
 
@@ -25,15 +25,23 @@ type SubmitOutcome =
   | { kind: 'ok'; backupCodes: string[] }
   | { kind: 'invalidCode' }
   | { kind: 'noEnrollment' }
-  | { kind: 'reauth' }
+  | { kind: 'cancelled' }
   | { kind: 'network' };
 
-async function submitVerify(code: string): Promise<SubmitOutcome> {
+async function submitVerify(
+  code: string,
+  requireStepUp: <T>(action: () => Promise<T>) => Promise<T>,
+): Promise<SubmitOutcome> {
   try {
-    const result = await apiFetch<{ backupCodes: string[] }>('/api/auth/mfa/enroll/verify', {
-      method: 'POST',
-      body: { code },
-    });
+    // Stage 12.9: the verify step is reauth-gated too. requireStepUp is passed in
+    // rather than called here — this function sits outside the component, so it
+    // cannot use a hook itself.
+    const result = await requireStepUp(() =>
+      apiFetch<{ backupCodes: string[] }>('/api/auth/mfa/enroll/verify', {
+        method: 'POST',
+        body: { code },
+      }),
+    );
     if (result.ok && result.data?.backupCodes) {
       return { kind: 'ok', backupCodes: result.data.backupCodes };
     }
@@ -43,7 +51,7 @@ async function submitVerify(code: string): Promise<SubmitOutcome> {
     }
     return { kind: 'invalidCode' };
   } catch (err) {
-    if (err instanceof ReauthRequiredError) return { kind: 'reauth' };
+    if (err instanceof ReauthCancelledError) return { kind: 'cancelled' };
     return { kind: 'network' };
   }
 }
@@ -52,10 +60,10 @@ export function TotpEnrollStep1ScanVerify({
   otpAuthUri,
   manualEntryKey,
   onEnrolled,
-  onReauthRequired,
   onRestart,
 }: Props) {
   const { t } = useTranslation();
+  const { requireStepUp } = useStepUp();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [restartRequired, setRestartRequired] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -75,13 +83,13 @@ export function TotpEnrollStep1ScanVerify({
     submitInFlightRef.current = true;
     setErrorMessage(null);
     try {
-      const outcome = await submitVerify(values.code);
+      const outcome = await submitVerify(values.code, requireStepUp);
       if (outcome.kind === 'ok') {
         onEnrolled(outcome.backupCodes);
         return;
       }
-      if (outcome.kind === 'reauth') {
-        onReauthRequired();
+      if (outcome.kind === 'cancelled') {
+        // The user dismissed the password prompt. No error — they chose this.
         return;
       }
       if (outcome.kind === 'noEnrollment') {
