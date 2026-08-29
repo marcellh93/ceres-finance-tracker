@@ -6,8 +6,12 @@
 // extra reminder paragraph; false negatives cost the user a re-read.
 
 const DECISION_PHRASES = [
-  // Should-we / is-it-worth
-  /\bshould (we|i)\b/i,
+  // Should-we / is-it-worth. `should we` needs a decision-shaped object —
+  // bare `\bshould (we|i)\b` fired on procedural asides ("should we run the
+  // tests first?"), which are task talk, not a call the user has to make.
+  /\bshould (we|i)\b.*\b(defer|ship|skip|drop|split|merge|refactor|rewrite|migrate|adopt|use|go with|wait|hold off|block|gate|scope|cut)\b/i,
+  /\bshould (we|i)\b.*\b(or|vs\.?|versus)\b/i,
+  /\bshould (we|i)\b.*\b(stage \d|phase \d|sprint|roadmap|scope|now or)\b/i,
   /\bis it worth\b/i,
   /\bworth (doing|the time|it)\b/i,
   /\bmake (the |a )?call\b/i,

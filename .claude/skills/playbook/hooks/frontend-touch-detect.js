@@ -29,8 +29,13 @@ const FRONTEND_PHRASES = [
   /\b(review|audit|check) (the |this |my )?(ui|interface|frontend|component|page|design|layout|accessibility|a11y|design system)\b/i,
   // Visual / tone adjustments
   /\bmake (this |it |the \w+ )?(bolder|quieter|tighter|looser|cleaner|more delightful|more compact|more spacious)\b/i,
-  // Design-system maintenance
-  /\b(design systems?|design tokens?|tokens?|primitives?|recipes?)\b/i,
+  // Design-system maintenance. The nouns need a design-domain qualifier —
+  // bare `token` / `primitive` / `recipe` have common non-UI senses (auth
+  // tokens, concurrency primitives, runbook recipes) and firing on those
+  // routed backend and docs turns through the orchestrator.
+  /\bdesign (systems?|tokens?|primitives?|recipes?)\b/i,
+  /\b(tokens?|primitives?|recipes?)\b.*\b(design system|ProjectCeres\.Client|design-system\.md)\b/i,
+  /\b(design system|ProjectCeres\.Client|design-system\.md)\b.*\b(tokens?|primitives?|recipes?)\b/i,
   // Direct invocation phrasing
   /\b(frontend|front-end|client(-side)?|ui|ux) (work|change|task|review|polish|refactor|spec|plan|design)\b/i,
   // Explicit slash-style invocation in chat (the orchestrator's own triggers)

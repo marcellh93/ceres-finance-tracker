@@ -17,10 +17,15 @@ const STAGE_START_PHRASES = [
   /\bmoving on to stage \w+/i,
   /\bkick off stage/i,
   /\bproceed with stage \w+/i,
-  /\blet'?s build (the )?\w+/i,
+  // `let's build` needs a roadmap-shaped object. Bare `\w+` fired on any noun
+  // ("let's build confidence in the hooks"), so ordinary talk paid the ~1.2KB.
+  /\blet'?s build (the )?(stage \w+|feature \w+)/i,
+  /\blet'?s build (the )?(\w+ )?(page|component|drawer|dialog|modal|sheet|form|layout|view|screen|panel|card|table|list|menu|nav|sidebar|header|footer)\b/i,
   /\bimplement (the )?\w+ from the roadmap/i,
   /\bimplement (the )?next/i,
-  /\bwhat'?s next\b/i,
+  // `what's next` only as the whole request — as a trailing aside it fires
+  // mid-task, when the stage is already open and brainstorming has run.
+  /^\s*(so |ok(ay)?,? |right,? )?what'?s next\b[\s?!.]*$/i,
   /\bnext step[s]? for\b/i,
 ];
 

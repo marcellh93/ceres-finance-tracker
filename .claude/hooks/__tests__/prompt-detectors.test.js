@@ -46,6 +46,29 @@ test("decision does NOT fire on a bare implementation request", () => {
   assert.strictEqual(decision("Add a null check to the parser."), false);
 });
 
+// `should we` and `what do you think` are as common in ordinary task talk as in
+// a real tech-lead decision, and each false fire injects ~1.1KB. Tightened
+// 2026-08-29 to require a decision-shaped object rather than any following verb.
+test("decision does NOT fire on procedural 'should we'", () => {
+  for (const t of [
+    "Should we run the tests first?",
+    "Should we start with the regex fix?",
+    "Should I open the file?",
+  ]) {
+    assert.strictEqual(decision(t), false, `expected NO fire for: ${t}`);
+  }
+});
+
+test("decision still fires on 'should we' + a real decision object", () => {
+  for (const t of [
+    "Should we defer this to Stage 13?",
+    "Should we ship this now or wait?",
+    "Should we use RLS or app-level filtering?",
+  ]) {
+    assert.strictEqual(decision(t), true, `expected a fire for: ${t}`);
+  }
+});
+
 // ── pushback-detect ──────────────────────────────────────────────────────
 
 for (const t of [
@@ -94,15 +117,45 @@ test("stage-start does NOT fire on a question about a stage", () => {
   assert.strictEqual(stageStart("Is stage 12 done yet?"), false);
 });
 
-// Known-broad patterns. These are documented, not endorsed: /let's build \w+/
-// and /what's next/ fire on ordinary conversation. Pinning them means a future
-// tightening shows up as a failing test rather than a silent behaviour change.
-test("KNOWN BROAD: 'let's build' fires on any noun, not just a roadmap feature", () => {
-  assert.strictEqual(stageStart("Let's build confidence in the hooks first."), true);
+// These two were pinned as KNOWN BROAD on 2026-08-11 — documented, not endorsed.
+// Tightened 2026-08-29: both fired on ordinary mid-task conversation and each
+// injected ~1.2KB of advisory context, so the common case paid for the rare one.
+//
+// `let's build` now needs a roadmap-shaped object (a stage/feature reference or
+// a UI noun), not any noun. `what's next` now needs to be the whole request, not
+// a trailing aside after work already in flight.
+test("stage-start does NOT fire on 'let's build' + an abstract noun", () => {
+  for (const t of [
+    "Let's build confidence in the hooks first.",
+    "Let's build a shared understanding of the flow.",
+  ]) {
+    assert.strictEqual(stageStart(t), false, `expected NO fire for: ${t}`);
+  }
 });
 
-test("KNOWN BROAD: 'what's next' fires mid-task", () => {
-  assert.strictEqual(stageStart("Nice, what's next?"), true);
+test("stage-start still fires on 'let's build' + a roadmap object", () => {
+  for (const t of [
+    "Let's build stage 13",
+    "Let's build the sessions page",
+    "Let's build feature X from the roadmap",
+  ]) {
+    assert.strictEqual(stageStart(t), true, `expected a fire for: ${t}`);
+  }
+});
+
+test("stage-start does NOT fire on 'what's next' as a mid-task aside", () => {
+  for (const t of [
+    "Nice, what's next?",
+    "That worked — what's next then?",
+  ]) {
+    assert.strictEqual(stageStart(t), false, `expected NO fire for: ${t}`);
+  }
+});
+
+test("stage-start still fires on 'what's next' as the whole request", () => {
+  for (const t of ["What's next?", "what's next"]) {
+    assert.strictEqual(stageStart(t), true, `expected a fire for: ${t}`);
+  }
 });
 
 // ── frontend-touch-detect ────────────────────────────────────────────────
@@ -120,10 +173,30 @@ for (const t of [
 }
 
 // Regression: the design-system phrase matched plurals only, so "Add a design
-// token" / "a new primitive" — both natural phrasings — silently skipped the
-// orchestrator. Fixed 2026-08-11 by making the plural optional.
+// token" / "a new design primitive" — both natural phrasings — silently skipped
+// the orchestrator. Fixed 2026-08-11 by making the plural optional.
+//
+// The singular coverage is preserved, but the bare nouns now need a design-domain
+// qualifier (2026-08-29) — see "does NOT fire on auth-domain 'token'" below.
 test("frontend fires on SINGULAR design-system nouns", () => {
-  for (const t of ["Add a design token", "a new primitive", "one recipe", "the design system"]) {
+  for (const t of [
+    "Add a design token",
+    "a new design primitive",
+    "one design recipe",
+    "the design system",
+  ]) {
+    assert.strictEqual(frontend(t), true, `expected a fire for: ${t}`);
+  }
+});
+
+// The design-system vocabulary also appears without the "design" prefix when the
+// sentence already establishes the domain some other way. These must still fire.
+test("frontend fires on design-system nouns qualified by context", () => {
+  for (const t of [
+    "Add a token to the design system",
+    "Extract this into a primitive in ProjectCeres.Client",
+    "Document the recipe in docs/design-system.md",
+  ]) {
     assert.strictEqual(frontend(t), true, `expected a fire for: ${t}`);
   }
 });
@@ -134,6 +207,37 @@ test("frontend does NOT fire on pure backend work", () => {
 
 test("frontend does NOT fire on a migration request", () => {
   assert.strictEqual(frontend("Write an EF migration for SupportTicket."), false);
+});
+
+// The design-system pattern carried bare `tokens?` / `primitives?` / `recipes?`
+// alternatives, so every non-UI sense of those words routed a backend or docs
+// turn through the orchestrator (~18KB of SKILL.md). Phase 3 is an auth phase —
+// "token" is a session/reset/JWT noun far more often than a design noun.
+// Tightened 2026-08-29 to require a design-domain qualifier.
+test("frontend does NOT fire on auth-domain 'token'", () => {
+  for (const t of [
+    "The reset token expires after 24 hours.",
+    "Store the refresh token hashed, never in plaintext.",
+    "The JWT token claims freeze at sign-in.",
+  ]) {
+    assert.strictEqual(frontend(t), false, `expected NO fire for: ${t}`);
+  }
+});
+
+test("frontend does NOT fire on context-window 'tokens'", () => {
+  assert.strictEqual(
+    frontend("We're wasting a lot of tokens on normal tasks."),
+    false
+  );
+});
+
+test("frontend does NOT fire on non-UI 'primitives' or 'recipes'", () => {
+  for (const t of [
+    "Use the framework's concurrency primitives instead of a lock.",
+    "The runbook has recipes for each failure mode.",
+  ]) {
+    assert.strictEqual(frontend(t), false, `expected NO fire for: ${t}`);
+  }
 });
 
 // Known-broad: the bare filename pattern matches any .ts/.tsx token, so
