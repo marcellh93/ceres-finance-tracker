@@ -240,8 +240,9 @@ public sealed class EmailChangeService
 
     /// <summary>
     /// Reports whether the caller has an email change in flight, for the settings banner.
-    /// Reads through the RLS-filtered context — the caller is authenticated, so no bypass
-    /// applies and a foreign row is invisible rather than merely unreported.
+    /// Reads through the RLS-filtered context with an explicit UserId predicate — the caller
+    /// is authenticated, so no bypass applies. Isolation is pinned at both layers: the endpoint
+    /// output by EmailChangePendingTests, the database half by EmailChangePendingUnderRlsTests.
     /// </summary>
     public async Task<EmailChangePending?> GetPendingAsync(Guid userId, CancellationToken ct)
     {
