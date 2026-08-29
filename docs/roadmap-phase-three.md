@@ -1554,6 +1554,21 @@ Carried to Stage 16 (hosting):
 - [ ] **In-app cancel of a pending change.** 12.8 ships a read-only pending banner; cancelling requires opening the revoke email. An in-app cancel needs a new server operation to consume the pending token pair, plus its own reauth question (a state-changing action on a security-sensitive flow probably needs a fresh password). Deliberately out of 12.8: it duplicates a capability the revoke email already provides, and it would turn a screen-building stage into a server-plus-screen stage. Considered as option C in the design discussion and rejected for now.
 - [ ] **No recovery path for an already-completed hostile change.** `RevokeAsync` cancels only a change still in flight. If an attacker with a live session initiates a change and confirms it inside the 30-minute window, the legitimate user's 7-day revoke link is already consumed — they get "invalid or expired" with no explanation, and the account's address of record now belongs to the attacker. The only recovery is out-of-band (support). 12.8 mitigates the *wording* (the revoke page must say the change may already have gone through, and point at password reset and support) but not the *capability*. A real fix means either an admin-assisted address rollback or a grace period during which the old address can still reclaim — both need design. Related: `security-model.md` § Email Address Change already documents that `/confirm` revokes all sessions and regenerates `SecurityStamp`, so the attacker's own session dies too — which limits the damage but does not return the address.
 
+### Stage 12.8.2 — `AssertRlsVisibility` does not observe RLS for filtered entities (not scheduled)
+
+**Status: ❌ Open.** Found 2026-08-29 by the Stage 12.8 spec-intent review, after a first attempt at closing a related gap fell into the same trap.
+
+`AppRoleTestBase.AssertRlsVisibility<TEntity>` is the AppRole suite's shared positive+negative control: the owner's `ceres_app` context must see its row, another user's must see zero. It issues `Set<TEntity>().CountAsync(predicate)` **without `IgnoreQueryFilters()`**. For any `IUserOwned` entity — which is every entity the RLS policies protect — EF's global query filter excludes the foreign row *before the query reaches Postgres*, so the negative half returns zero from the EF layer and **RLS is never consulted**. The helper therefore proves the EF filter holds, not the database wall, for exactly the entities whose database wall it exists to prove.
+
+Demonstrated, not inferred: `EmailChangePendingUnderRlsTests` was written against the helper, and with `ALTER TABLE "EmailChangeTokens" DISABLE ROW LEVEL SECURITY` it still passed. After adding `IgnoreQueryFilters()` to both halves it passes with RLS on and fails with RLS off — the discriminating behaviour. That test now asserts inline rather than through the helper, and says why.
+
+This is the hazard the Stage 9.5d spec named ("RLS policies are *silently inert*" in the admin-wired suite) partially reintroduced inside the suite built to escape it.
+
+- [ ] Add `IgnoreQueryFilters()` to both halves of `AssertRlsVisibility`, or give it an overload that does, and re-verify each of the **10 call sites** still passes for the right reason — several may currently be passing on the EF filter alone.
+- [ ] For each caller, confirm the negative assertion fails when its table's RLS policy is disabled. A caller that still passes is not testing RLS.
+- [ ] Consider a guard test that fails if `AssertRlsVisibility` is used on an entity in `UserOwnedModel.RlsTables` without filter-stripping, so the trap cannot be re-entered.
+- *Tripwire: the comment block in `EmailChangePendingUnderRlsTests.cs` pointing here.*
+
 ### Stage 12.11 — Dev server serves a stale SPA shell (not scheduled)
 
 **Status: ❌ Open.** Raised 2026-08-29. An attempted fix shipped as `dafee78c` and was **reverted in `19ff467a`** — it broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` (404 instead of 200), and the cause is structural, not a small oversight. It reached `main` because a `Program.cs`-only turn classified TIER 1 (unit tests only) and never ran the integration suite; that gate hole is closed in `a0261dcd`.

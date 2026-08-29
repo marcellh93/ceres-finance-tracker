@@ -67,14 +67,29 @@ public class EmailChangePendingUnderRlsTests : AppRoleTestBase
             await admin.Context.SaveChangesAsync();
         }
 
-        // Positive + negative control under the RLS-active role: the owner's ceres_app context
-        // sees exactly its own row; a different user's context sees zero. The negative half is
-        // what "invisible" means — Postgres refuses the row, not just the application predicate.
-        await AssertRlsVisibility<EmailChangeToken>(
-            owner: _ownerId,
-            otherUser: _otherId,
-            predicate: t => t.NewEmail == newEmail,
-            expectedOwnerCount: 1);
+        // Positive + negative control under the RLS-active role, with IgnoreQueryFilters() on
+        // BOTH halves. Without it this test proves nothing new: EmailChangeToken is IUserOwned,
+        // so EF's global query filter excludes the foreign row BEFORE the query reaches Postgres
+        // and the negative assertion returns zero from the EF layer with RLS never consulted.
+        // Verified by disabling RLS on the table entirely — the un-stripped version still passed.
+        // IgnoreQueryFilters strips EF's filter only; it does not bypass RLS (same reasoning as
+        // EmailChangeUnderRlsTests), so Postgres is the only thing left holding the line.
+        //
+        // Deliberately NOT routed through AppRoleTestBase.AssertRlsVisibility: that helper omits
+        // IgnoreQueryFilters and so has this same weakness for every filtered entity. Fixing it
+        // touches all nine callers and belongs in its own change — see roadmap § 12.8.2.
+        await using (var appOwner = Factory.NewAppContext(_ownerId))
+        {
+            (await appOwner.Context.EmailChangeTokens.IgnoreQueryFilters()
+                .CountAsync(t => t.NewEmail == newEmail))
+                .Should().Be(1, "the owner's ceres_app context must see its own row through RLS");
+        }
+        await using (var appOther = Factory.NewAppContext(_otherId))
+        {
+            (await appOther.Context.EmailChangeTokens.IgnoreQueryFilters()
+                .CountAsync(t => t.NewEmail == newEmail))
+                .Should().Be(0, "Postgres RLS — not EF's query filter — must refuse the foreign row");
+        }
     }
 
     public override async Task DisposeAsync()
