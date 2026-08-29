@@ -431,16 +431,20 @@ public sealed class AuthController : ControllerBase
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
         var ua = Request.Headers.UserAgent.ToString();
 
-        // Dedup: one live ephemeral session per device. Revoke any existing live
-        // ephemeral session from the same UA + IP before adding the new row, so the
-        // list shows one row per device instead of one per login. Guarded by
+        // Dedup: one live session per device, persistent or not. Revoke any existing
+        // live session from the same UA + IP before adding the new row, so the list
+        // shows one row per device instead of one per login. Guarded by
         // Id != sessionId so we never revoke the row we are about to create; the new
         // cookie already carries the new sid, so SessionRevocationValidator still
-        // accepts this request. Persistent sessions rotate via their own middleware.
+        // accepts this request.
+        //
+        // Persistent rows must be included. Their rotation middleware only revokes the
+        // row whose cookie the browser presents, and a browser holds exactly one
+        // persistent cookie — so a superseded row is unreachable by rotation and would
+        // otherwise keep a live PersistentTokenHash for the full 30-day lifetime.
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         await _db.UserSessions
             .Where(s => s.UserId == user.Id
-                && !s.IsPersistent
                 && s.RevokedAt == null
                 && s.UserAgent == ua
                 && s.IpCreatedAt == ip
