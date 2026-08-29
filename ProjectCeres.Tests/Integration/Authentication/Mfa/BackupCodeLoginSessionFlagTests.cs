@@ -111,19 +111,25 @@ public class BackupCodeLoginSessionFlagTests : IAsyncLifetime
             backupCode = codes.First();
         }
 
-        // Session A: log in with a backup code.
+        // Session A: log in with a backup code. Distinct User-Agent per client — on
+        // TestServer both clients share the same IP (RemoteIpAddress is null), and the
+        // login dedup (Stage 12.10) revokes the prior live ephemeral session sharing
+        // (UserId, UserAgent, IpCreatedAt). Same UA here would make A and B look like
+        // the same device, so B's login would revoke A before this test ever reads it.
+        // Distinct UAs makes them genuinely different devices, matching the dedup's
+        // intended contract, while leaving the per-session flag under test untouched.
         var clientA = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
-        var (twoFactorA, mfaRmA) = await DoCredentialsLoginAsync(clientA, email);
-        var loginA = await SubmitTotpAsync(clientA, twoFactorA!, mfaRmA, backupCode);
+        var (twoFactorA, mfaRmA) = await DoCredentialsLoginAsync(clientA, email, userAgent: "device-a-test-agent");
+        var loginA = await SubmitTotpAsync(clientA, twoFactorA!, mfaRmA, backupCode, userAgent: "device-a-test-agent");
         loginA.StatusCode.Should().Be(HttpStatusCode.NoContent);
         var sessionCookieA = ExtractSetCookie(loginA, SessionConstants.SessionCookieName);
         sessionCookieA.Should().NotBeNullOrEmpty();
 
-        // Session B: log in with a real TOTP code on a different HttpClient.
+        // Session B: log in with a real TOTP code on a different HttpClient + device.
         var clientB = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
-        var (twoFactorB, mfaRmB) = await DoCredentialsLoginAsync(clientB, email);
+        var (twoFactorB, mfaRmB) = await DoCredentialsLoginAsync(clientB, email, userAgent: "device-b-test-agent");
         var totpCode = AuthTestFixture.ComputeCurrentTotpCode(seed);
-        var loginB = await SubmitTotpAsync(clientB, twoFactorB!, mfaRmB, totpCode);
+        var loginB = await SubmitTotpAsync(clientB, twoFactorB!, mfaRmB, totpCode, userAgent: "device-b-test-agent");
         loginB.StatusCode.Should().Be(HttpStatusCode.NoContent);
         var sessionCookieB = ExtractSetCookie(loginB, SessionConstants.SessionCookieName);
         sessionCookieB.Should().NotBeNullOrEmpty();
@@ -135,7 +141,8 @@ public class BackupCodeLoginSessionFlagTests : IAsyncLifetime
         meB.UsedBackupCodeAtLastLogin.Should().BeFalse("session B authenticated via the authenticator app");
     }
 
-    private async Task<(string?, string?)> DoCredentialsLoginAsync(HttpClient client, string email)
+    private async Task<(string?, string?)> DoCredentialsLoginAsync(
+        HttpClient client, string email, string? userAgent = null)
     {
         var (csrf, header) = AuthTestFixture.MintCsrf(_factory);
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
@@ -149,13 +156,15 @@ public class BackupCodeLoginSessionFlagTests : IAsyncLifetime
         };
         req.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={csrf}");
         req.Headers.Add(SessionConstants.CsrfHeaderName, header);
+        if (userAgent is not null) req.Headers.Add("User-Agent", userAgent);
         var resp = await client.SendAsync(req);
         return (ExtractSetCookie(resp, "Identity.TwoFactorUserId"),
                 ExtractSetCookie(resp, "Mfa.RememberMe"));
     }
 
     private async Task<HttpResponseMessage> SubmitTotpAsync(
-        HttpClient client, string twoFactorCookie, string? mfaRememberMeCookie, string code)
+        HttpClient client, string twoFactorCookie, string? mfaRememberMeCookie, string code,
+        string? userAgent = null)
     {
         var (totpCsrf, totpHeader) = AuthTestFixture.MintCsrf(_factory);
         var totpReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/totp")
@@ -169,6 +178,7 @@ public class BackupCodeLoginSessionFlagTests : IAsyncLifetime
         }
         totpReq.Headers.Add("Cookie", cookieValue);
         totpReq.Headers.Add(SessionConstants.CsrfHeaderName, totpHeader);
+        if (userAgent is not null) totpReq.Headers.Add("User-Agent", userAgent);
         return await client.SendAsync(totpReq);
     }
 
