@@ -610,6 +610,13 @@ if (args.Length > 0 && args[0] == "--seed-dev-user")
     Environment.Exit(await ProjectCeres.Tools.SeedDevUser.RunAsync(builder, args[1..]));
 }
 
+// Cron-invokable retention sweep: deletes UserSession rows past the 90-day horizon.
+// Invocation: dotnet run --project ProjectCeres -- --sweep-sessions
+if (args.Length > 0 && args[0] == "--sweep-sessions")
+{
+    Environment.Exit(await ProjectCeres.Tools.SweepSessions.RunAsync(builder));
+}
+
 var app = builder.Build();
 
 // Stage 9.11 — under E2E, refuse to start unless pointed at a recognized e2e DB.

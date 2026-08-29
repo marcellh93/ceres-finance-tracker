@@ -771,6 +771,7 @@ public class ArchitectureTests
             "ProjectCeres/Common/Email/EmailRecipientResolver.cs",                    // Stage 8a: resolves To: from ApplicationUser.Email; callers include pre-auth flows (password reset, lockout) where the user is not yet signed in
             "ProjectCeres/Common/Email/LanguageResolver.cs",                          // Stage 8b: pre-auth flows may read Settings.Language before the user has signed in (password reset, lockout-unlock)
             "ProjectCeres/Controllers/Api/ResendWebhookController.cs",                // Stage 8e: Resend webhook is pre-auth (Svix HMAC IS the auth) and cross-tenant by design — looks up users by NormalizedEmail to attach an optional UserId to the recorded event
+            "ProjectCeres/Tools/SweepSessions.cs",                                    // Stage 12.10: cross-tenant by design — the retention sweep spans all users. Stage 10 architecture test allow-lists this file.
         };
 
         var repoRoot = FindRepoRoot();
