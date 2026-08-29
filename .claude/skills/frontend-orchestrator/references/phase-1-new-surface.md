@@ -1,0 +1,12 @@
+# Phase 1 — New surface
+
+A page/feature/component that does not yet exist. The user said "build the X page" or "design a component for Y" and there is no current implementation.
+
+1. **`/impeccable shape`** — interview the user about purpose, audience, business goal, anti-references. Output is a written brief and direction. **The user must explicitly approve the brief before any code is written.** This is impeccable's own gate (v2 hardened against autonomous agents) and you must respect it — do not infer approval from silence or from the user saying "ok let's go".
+2. **`frontend-design` skill** — do the initial code pass with bold aesthetic commitment, grounded in the approved brief plus `docs/design-system.md` tokens. Use `frontend-design` here rather than `/impeccable craft` because `frontend-design` is sharper on aesthetic point-of-view and is already wired into the project's CLAUDE.md flow. Always pull tokens from `docs/design-system.md` — never hard-code values; if a token is missing, add it to `index.css` and document it there first (CLAUDE.md rule).
+3. **`/impeccable critique`** — runs the deterministic detector (29 anti-pattern rules), scores against Nielsen's 10 heuristics, dispatches persona sub-agents in parallel, writes a snapshot to `.impeccable/critique/`. Treat **P0 and P1 findings as blocking**; P2/P3 are negotiable.
+4. **Loop on findings** — address P0/P1 by editing the implementation, re-run `/impeccable critique` on the same target. Snapshots accumulate; the tool reads the prior one as context. If a finding is an intentional deviation, add it to `.impeccable/critique/ignore.md` with a one-line reason — do not silently re-trigger it next run.
+5. **`vercel-react-best-practices`** — perf pass on the React code (re-render hygiene, bundle/import patterns). Skip the `server-*` rule family (project is SSR-via-Razor + SPA, no RSC). Read `bundle-dynamic-imports` as `React.lazy` (no `next/dynamic`).
+6. **`web-design-guidelines`** — final accessibility/UX audit on the changed files. CLAUDE.md already requires this.
+7. **UX/UI verification checklist** from `docs/design-system.md` § Working rules — golden path, layout context, empty state, error state, 375px mobile, all navigation links. CLAUDE.md already requires this. If browser access is unavailable, say so and hand the checklist to the user with specific URLs.
+8. **Show the rendered result and wait for explicit approval** before committing. CLAUDE.md rule, not negotiable.
