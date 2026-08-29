@@ -669,7 +669,38 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// Development WITH a Vite dev server: the SPA shell must come from Vite, never from
+// wwwroot/dist/. The built shell hard-references hashed bundles and carries no HMR
+// client, so serving it in dev runs the last `pnpm build` output instead of the working
+// tree — and because static files ship no Cache-Control, the browser pins a stale bundle
+// until a hard reload. UseStaticFiles would otherwise win this path, so skip it for the
+// shell only.
+//
+// Gated because Development does NOT imply Vite. The integration-test host runs as
+// Development (WebApplicationFactory sets no environment) and reads the same
+// appsettings.Development.json, so config alone cannot tell the two apart. What does:
+// the dev server's own precondition — Vite:Server:PackageDirectory must resolve from
+// the content root, which it does for `dotnet run` in ProjectCeres/ and does not for
+// the test host, whose content root is the test project. When it cannot resolve, Vite
+// cannot start, so rewriting to a path only Vite answers would 404 every page-level
+// GET. There, keep the built shell for MapFallbackToFile to hand back.
+var vitePackageDirectory = app.Configuration["Vite:Server:PackageDirectory"];
+var viteDevServerConfigured = app.Environment.IsDevelopment()
+    && !string.IsNullOrWhiteSpace(app.Configuration["Vite:Server:ScriptName"])
+    && !string.IsNullOrWhiteSpace(vitePackageDirectory)
+    && Directory.Exists(Path.Combine(app.Environment.ContentRootPath, vitePackageDirectory));
+
+if (viteDevServerConfigured)
+{
+    app.UseWhen(
+        static ctx => !ctx.Request.Path.Equals("/dist/app.html", StringComparison.OrdinalIgnoreCase),
+        static branch => branch.UseStaticFiles());
+}
+else
+{
+    app.UseStaticFiles();
+}
 
 // Vite dev middleware runs BEFORE the auth pipeline. The global authorization
 // fallback policy at line 252 requires authentication on every non-[AllowAnonymous]
@@ -719,7 +750,66 @@ if (app.Environment.IsDevelopment())
         return false;
     }
 
+    // Page-level GETs become /dist/app.html so IsViteRequest matches and Vite answers
+    // with the HMR-wired shell. Without this they fall through to MapFallbackToFile,
+    // which serves the built shell from wwwroot/dist/ — stale code plus a cacheable
+    // response, the cause of "placeholder until F5". Rewriting here (before the Vite
+    // branch) keeps a single shell source in dev.
+    //
+    // Excluded: /api/* (MapFallback returns JSON 404), /design-system (a real redirect
+    // endpoint), and anything with a file extension — a missed asset must 404, not
+    // silently return HTML. Non-GET is excluded so a POST to an unmatched route keeps
+    // its 404/405 instead of becoming a 200 HTML page.
+    static bool IsSpaShellRequest(HttpContext ctx)
+    {
+        if (!HttpMethods.IsGet(ctx.Request.Method) || ctx.WebSockets.IsWebSocketRequest)
+        {
+            return false;
+        }
+        var path = ctx.Request.Path.Value;
+        if (path is null || IsViteRequest(ctx))
+        {
+            return false;
+        }
+        if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/api", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/design-system", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        // A file extension in the last segment means an asset request, not a page.
+        return !Path.HasExtension(path);
+    }
+
     app.UseWebSockets();
+
+    // Rewrite page-level GETs to the shell path so the Vite branch below serves them.
+    // Vite's HTML carries no-cache and points at /dist/src/app/main.tsx, so first paint
+    // runs current source; the built shell in wwwroot/dist/ would instead pin whatever
+    // `pnpm build` last produced (it has no HMR client and no Cache-Control).
+    //
+    // Skipped when no Vite dev server is configured — the rewrite targets a path only
+    // Vite answers, so without it the request would 404 instead of falling through to
+    // MapFallbackToFile. Same gate as the UseStaticFiles branch above; the two must
+    // agree or the shell is either unreachable or served stale.
+    app.Use(async (ctx, next) =>
+    {
+        if (viteDevServerConfigured && IsSpaShellRequest(ctx))
+        {
+            ctx.Request.Path = "/dist/app.html";
+            // The shell tracks the working tree, so pin it explicitly rather than
+            // leaving the browser to apply heuristic freshness to a validator-less
+            // HTML response. Set on the response-starting callback because the proxy
+            // writes the headers itself.
+            ctx.Response.OnStarting(static state =>
+            {
+                ((HttpContext)state).Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+                return Task.CompletedTask;
+            }, ctx);
+        }
+        await next(ctx);
+    });
+
     app.MapWhen(IsViteRequest, branch =>
     {
         branch.UseViteDevelopmentServer(useMiddleware: true);
