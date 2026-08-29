@@ -12,7 +12,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 
 **Session is gated by `playbook`.** The skill orchestrates eight phases — four HARD (pre-spec-write, pre-deferral, pre-stage-close, pre-commit), three advisory (stage-start, mid-build, pre-PR-review), plus pre-handoff. Read `.claude/skills/playbook/references/constitution.md` before bypassing any HARD gate. Per-session state: `.claude/state/playbook/<session_id>.json`.
 
-**Post-compaction: read the snapshot before the next action.** When a SessionStart system reminder reports `♻️ state-rehydration: compaction detected. Operational snapshot available.`, the next tool call MUST be a `Read` on the snapshot path the reminder cites (`.claude/state/state-rehydration/<session_id>/snapshot.json`). No Edits, no Bash, no spec/plan writing, no `git commit` before that read. The reminder's index of `open_deferrals` / `open_spec` / `open_plan` / `last_code_writes` is intentionally terse — the snapshot itself carries fields the index omits, and the compacted-conversation summary will often drift from current disk state on at least one of those axes. Skipping the read once silently is fine if context happens to align; skipping it as a habit causes the drift that motivated the rehydration mechanism in the first place. Failure mode logged 2026-05-19 (Section D step 38 turn — hook fired, I acknowledged it in text but never opened the file).
+**Post-compaction: read the snapshot before the next action.** When the SessionStart reminder reports `♻️ state-rehydration: compaction detected`, the next tool call MUST be a `Read` on the snapshot path it cites. The reminder itself carries the full rule and the reason.
 
 ## Tech Stack
 
@@ -52,16 +52,13 @@ pnpm --dir ProjectCeres run watch:css        # watch and rebuild Razor CSS on vi
 
 ## When the Stop hook actually fires
 
-The Stop hook (`.claude/hooks/run-tests.sh`) is the project's `dotnet test` gate. Three facts to keep straight, because earlier drafts of Phase 3 specs got them wrong:
+The Stop hook (`.claude/hooks/run-tests.sh`) is the project's `dotnet test` gate. Three facts earlier Phase 3 specs got wrong:
 
-1. **It fires on the Stop event (turn-end), NOT on `git commit`.** Claude Code triggers it when the agent ends its turn. A commit is just a Bash call; the hook does not run as part of it.
-2. **It tiers by the session's _tracked-extension_ writes** (`.cs`/`.ts`/`.tsx`/`.csproj`/`.sln`, populated by `track-session-writes.js`):
-   - **Tier 0** — only `.tsx`/`.ts` touched, OR no tracked-extension writes at all (e.g. docs-only) → exit 0, no `dotnet test` runs.
-   - **Tier 1** — only `ProjectCeres/` `.cs`/`.csproj` (no test files, no `.sln`) → `dotnet test --filter "FullyQualifiedName~ProjectCeres.Tests.Unit"` (~30s).
-   - **Tier 2** — test files, `.sln`, or mixed → full suite (~4 min).
-3. **Do NOT run `dotnet test` preemptively in plans or specs for frontend-only / docs-only stages.** The hook would skip it; running it manually is wasted minutes. Run it only when the .NET suite is suspected red from a prior change, or when the diff genuinely touches `.cs`/`.csproj`/`.sln`.
+1. **It fires on turn-end, NOT on `git commit`.** A commit is just a Bash call; the hook does not run as part of it.
+2. **It tiers by the session's tracked-extension writes** (`.cs`/`.ts`/`.tsx`/`.csproj`/`.sln`): tier 0 skips (docs-only or `.ts`/`.tsx`-only), tier 1 runs unit-only (~30s, `ProjectCeres/` `.cs` only), tier 2 runs the full suite (~4 min, test files / `.sln` / mixed).
+3. **Do NOT run `dotnet test` preemptively for frontend-only or docs-only stages** — the hook would skip it, so a manual run is wasted minutes. Run it only when the suite is suspected red, or the diff genuinely touches `.cs`/`.csproj`/`.sln`.
 
-Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able from another terminal). Tier decision printed to stderr at start: `[stop-hook] tier N (scope) — running dotnet test ...` or `[stop-hook] tier 0: no .NET-impacting writes this turn — skipping dotnet test.`
+Live log at `.claude/state/run-tests/last.log`; the tier decision is printed to stderr at start.
 
 ## Architecture Rules (Non-Obvious)
 
@@ -93,28 +90,18 @@ Live log at `.claude/state/run-tests/last.log` (truncated each run; tail-able fr
 - Always exactly one row in Phase 1
 - In Phase 3 it migrates to a per-user preferences table — do not couple it to auth yet
 
-## Two lessons that cost real time (kept here because this file does not truncate)
+## Two lessons that cost real time
 
 **1. A commit's scope prefix names the stage the WORK belongs to, never the stage the text mentions.**
-`.claude/skills/verify-stage-completeness/hooks/evidence-bundle-check.js` (`getStageId`) picks the
-active stage from the **newest stage-tagged commit in the turn**. On 2026-08-23 a Stage 15.6 commit
-that edited the Stage 15.8 roadmap section was written as `docs(15.8):`, so the Stop hook demanded an
-evidence bundle for a stage that had not started. The right response is to **reword the commit**, not
-to satisfy the hook: fabricating a `stage-15.8/` bundle would assert build results for work that does
-not exist and leave a directory the next session reads as "15.8 is in progress." When a gate names a
-surprising stage, check what the commits in this turn are tagged with before touching the bundle.
+`evidence-bundle-check.js` picks the active stage from the newest stage-tagged commit in the turn. When
+a gate demands a bundle for a surprising stage, reword the commit — never fabricate the bundle, which
+would assert build results for work that does not exist. (Cost a wrong-stage bundle demand, 2026-08-23.)
 
-**2. A functional orphan is still an orphan — kill the tree, not the process.**
-`dotnet watch` does not exit when its terminal closes; it reparents to PID 1 and keeps running. On
-2026-08-23 two orphans existed, one idle and one working. Only the idle one was killed, and the
-"working" one — spared precisely because it still had an app — went on rebinding port 7081 on every
-`.cs` change for two more days (`DOTNET_WATCH_ITERATION=56`), causing `AddressInUseException` in a
-fresh watcher. Three facts to keep: **(a)** the port holder is the watcher's *grandchild*, so killing
-the watcher alone re-orphans the app, which survives as a new PID-1 process still on the port;
-**(b)** every level ignores `SIGTERM` and needs `kill -9` after a grace period; **(c)** `exec` in a
-wrapper script destroys the `EXIT` trap, so the wrapper itself produces the orphan it meant to
-prevent — run the child with `&` and `wait`. Start watchers with `tools/dev-watch.sh`. Symptoms and
-the trace-the-chain command: `docs/runbooks/local-dev-troubleshooting.md` § Symptom 3.
+**2. A functional orphan is still an orphan — kill the tree, not the process.** `dotnet watch`
+reparents to PID 1 and keeps rebinding its port; the port holder is the watcher's *grandchild*, so
+killing the watcher alone re-orphans the app. Start watchers with `tools/dev-watch.sh`. Full mechanics
+(SIGKILL-after-grace, the `exec`-destroys-the-EXIT-trap footgun, the trace-the-chain command):
+`docs/runbooks/local-dev-troubleshooting.md` § Symptom 3. (Cost two days of port collisions, 2026-08-23.)
 
 ## What NOT to Do
 
@@ -164,13 +151,7 @@ Three rules the orchestrator inherits from this file:
 
 Six codified `ceres-*` strategy roles ship at `.claude/agents/ceres-{architect,tech-lead,pm,cto,security-reviewer,researcher}.md`. Dispatch by `subagent_type` during brainstorm/spec/plan when a decision needs an outside perspective with a read-first contract. `ceres-researcher` is the pre-design fact-finder — dispatch it at stage-start, as brainstorming's first step, before a design exists. The six role files + dispatch guidance live in `docs/agents.md`.
 
-**The dispatcher-gate rule (binding on me, the orchestrator):** when I dispatch a `ceres-*` strategy agent, I MUST inspect its response before synthesizing from its output, and re-dispatch with a stricter prompt if any of these fail:
-
-1. The response's **first non-whitespace line is the literal `## What I read` heading** — no lead sentence, framing, or thinking-aloud before it.
-2. Both preamble sections are present and ordered: `## What I read` first, then the role's **designated second section** — `## Conflicts found` for the review-lens roles (architect / cto / pm / security-reviewer / tech-lead), or `## Subsystems & files touched` for `ceres-researcher` (the pre-design fact-finder, which has no design to find conflicts with) — then the rest of the body.
-3. The `## What I read` list includes the role's baseline files plus the files I named in the dispatch prompt.
-
-I do not build on a `ceres-*` response that skipped the read step or buried it under preamble. (The first-line rule was added 2026-05-30 after the 9.5k smoke-test found 2/5 roles opening with prose before the heading — see `docs/agents.md`.)
+**The dispatcher-gate rule (binding on me, the orchestrator):** I inspect every `ceres-*` response before synthesizing from it, and re-dispatch with a stricter prompt if the contract is missed — first line is literally `## What I read`, correct designated second section, and the read-list covers the role baselines plus the files I named. I do not build on a response that skipped the read step or buried it under preamble. Full contract: `docs/agents.md` § The dispatcher gate.
 
 This is the gate the PreToolUse hook cannot be: a strategy agent's deliverable is text, and a PreToolUse hook can only deny tool calls. The dispatcher is the enforcement layer.
 
@@ -194,4 +175,4 @@ Any new file under `docs/superpowers/specs/*.md` is gated by playbook **Phase B 
 - **Frontend signals only** (`ProjectCeres.Client/`, shadcn, Tailwind, design-system primitives) → `superpowers:brainstorming` + `verify-frontend`.
 - **Both signals** OR **no detectable signals** (default-safe) → `superpowers:brainstorming` + BOTH verify siblings. The legacy `verify-against-codebase` router name satisfies both.
 
-The gate exists because Stage 6b.1's first spec draft proposed a homegrown `MfaTicketService` + "issue then undo" pattern that duplicated framework features — the verify skills catch that class of error. The tiering exists because a `.tsx`-only spec gains nothing from running through `verify-backend`'s checks (and vice versa). Bypass: the path already exists on disk (rewrite of an existing spec is allowed).
+The gate catches specs that hand-roll what the framework already provides (Stage 6b.1 proposed a homegrown `MfaTicketService`). Bypass: the path already exists on disk — rewriting an existing spec is allowed.

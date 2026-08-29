@@ -96,7 +96,9 @@ process.stdin.on("end", () => {
     "Summary:",
     summarize(snapshot),
     "",
-    "Read the full snapshot before taking any non-trivial action — there may be open deferrals, an in-progress spec, or a recent code write that the compacted summary does not surface.",
+    "Your NEXT tool call must be a Read on that snapshot path. No Edit, no Bash, no spec/plan writing, no `git commit` before it.",
+    "",
+    "The summary above is deliberately terse — the snapshot carries fields it omits, and the compacted conversation will usually have drifted from disk state on at least one of open deferrals / open spec / open plan / last code writes. Acknowledging this reminder in text without opening the file is the failure mode it exists to prevent (logged 2026-05-19).",
   ].join("\n");
 
   process.stdout.write(JSON.stringify({
