@@ -53,13 +53,14 @@ public class EmailMaskTests
     [InlineData("not-an-email")]
     [InlineData("@nolocal.com")]
     [InlineData("nodomain@")]
+    [InlineData("two@ats@example.com")]
     public void Mask_never_echoes_input_it_cannot_parse(string input)
     {
         // A malformed address must not fall through to the raw value — that would
         // turn the mask into a disclosure on exactly the inputs nobody validated.
-        var masked = EmailMask.Mask(input);
-        masked.Should().NotBe(input);
-        masked.Should().NotContain("nolocal");
-        masked.Should().NotContain("nodomain");
+        // BeEmpty, not NotBe: NotBe is satisfied by a PARTIAL echo ("n•••••"), which
+        // is still a disclosure. Empty is what the code does and what
+        // security-model.md promises. Tightened by the 12.8 test audit.
+        EmailMask.Mask(input).Should().BeEmpty();
     }
 }

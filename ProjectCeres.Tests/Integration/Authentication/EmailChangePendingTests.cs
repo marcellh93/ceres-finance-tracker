@@ -41,7 +41,9 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         await AuthTestFixture.RegisterUserAsync(_factory, $"{marker}@pending-test.local");
 
     private async Task SeedTokenAsync(
-        Guid userId, string newEmail, DateTime expiresAt, DateTime? consumedAt = null)
+        Guid userId, string newEmail, DateTime expiresAt, DateTime? consumedAt = null,
+        EmailChangeTokenPurpose purpose = EmailChangeTokenPurpose.VerifyNew,
+        DateTime? createdAt = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -49,11 +51,11 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            Purpose = EmailChangeTokenPurpose.VerifyNew,
+            Purpose = purpose,
             NewEmail = newEmail,
             TokenLookup = Guid.NewGuid().ToByteArray(),
             TokenHash = "unused-by-this-read-path",
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = createdAt ?? DateTime.UtcNow,
             ExpiresAt = expiresAt,
             ConsumedAt = consumedAt,
         });
@@ -71,8 +73,12 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         var res = await GetPendingAsync(user);
 
         res.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await BodyAsync(res);
-        body.GetProperty("data").GetProperty("pending").GetBoolean().Should().BeFalse();
+        var data = (await BodyAsync(res)).GetProperty("data");
+        data.GetProperty("pending").GetBoolean().Should().BeFalse();
+        // The null-shape is the contract the not-yet-written banner binds against.
+        data.GetProperty("maskedEmail").ValueKind.Should().Be(JsonValueKind.Null);
+        data.GetProperty("expiresAt").ValueKind.Should().Be(JsonValueKind.Null);
+        data.GetProperty("expired").GetBoolean().Should().BeFalse();
     }
 
     [Fact]
@@ -94,6 +100,10 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         data.GetProperty("pending").GetBoolean().Should().BeTrue();
         data.GetProperty("maskedEmail").GetString().Should().Be(EmailMask.Mask("target@example.com"));
         data.GetProperty("expired").GetBoolean().Should().BeFalse();
+        // The banner's "expires in N minutes" copy derives from this; asserting only
+        // the derived `expired` flag would let the timestamp it comes from go missing.
+        data.GetProperty("expiresAt").GetDateTime().Should()
+            .BeCloseTo(DateTime.UtcNow.AddMinutes(20), TimeSpan.FromMinutes(1));
     }
 
     [Fact]
@@ -136,12 +146,74 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         var theirs = await NewUserAsync($"theirs-{Guid.NewGuid():N}");
         await SeedTokenAsync(theirs.Id, "notyours@example.com", DateTime.UtcNow.AddMinutes(20));
 
+        // Positive control FIRST. Without it a typo in the seed, a rolled-back save, or
+        // a Purpose mismatch leaves the negative assertion below green for the wrong
+        // reason — the row simply never existed. Same discipline as the AppRole suite.
+        var ownerRes = await GetPendingAsync(theirs);
+        (await BodyAsync(ownerRes)).GetProperty("data").GetProperty("pending")
+            .GetBoolean().Should().BeTrue("the owner must see their own pending change");
+
         var res = await GetPendingAsync(mine);
 
         var raw = await res.Content.ReadAsStringAsync();
         raw.Should().NotContain("notyours");
         JsonDocument.Parse(raw).RootElement.GetProperty("data").GetProperty("pending")
             .GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Pending_ignores_a_RevokeOld_token_even_though_it_is_unconsumed()
+    {
+        // The Purpose predicate is load-bearing and was untested. RevokeOld lives 7 days
+        // against VerifyNew's 30 minutes, so without the filter a change would show as
+        // pending for a WEEK after its real window closed — the exact stale-banner
+        // failure this endpoint exists to prevent. Found by the 12.8 test audit.
+        var user = await NewUserAsync($"revokeonly-{Guid.NewGuid():N}");
+        await SeedTokenAsync(user.Id, "sibling@example.com", DateTime.UtcNow.AddDays(7),
+            purpose: EmailChangeTokenPurpose.RevokeOld);
+
+        var res = await GetPendingAsync(user);
+
+        (await BodyAsync(res)).GetProperty("data").GetProperty("pending").GetBoolean()
+            .Should().BeFalse("only the VerifyNew half decides whether a change is in flight");
+    }
+
+    [Fact]
+    public async Task Pending_reports_the_newest_change_when_a_request_superseded_an_earlier_one()
+    {
+        // Ordering was untested: drop the OrderByDescending and the banner shows a
+        // superseded address, which is its own kind of confusion.
+        var user = await NewUserAsync($"superseded-{Guid.NewGuid():N}");
+        await SeedTokenAsync(user.Id, "older@example.com", DateTime.UtcNow.AddMinutes(20),
+            createdAt: DateTime.UtcNow.AddMinutes(-10));
+        await SeedTokenAsync(user.Id, "newer@example.com", DateTime.UtcNow.AddMinutes(20),
+            createdAt: DateTime.UtcNow);
+
+        var res = await GetPendingAsync(user);
+
+        var data = (await BodyAsync(res)).GetProperty("data");
+        data.GetProperty("maskedEmail").GetString().Should()
+            .Be(EmailMask.Mask("newer@example.com"), "a re-request supersedes the earlier one");
+    }
+
+    [Fact]
+    public async Task Pending_does_NOT_require_recent_auth_so_the_page_can_read_it_on_load()
+    {
+        // The absence of [RequireRecentAuth] is a deliberate design decision documented
+        // in security-model.md, and nothing pinned it — every other test mints a FRESH
+        // reauth stamp, so adding the attribute would not turn the suite red. To a
+        // reviewer who has not read the bullet the omission looks like an oversight.
+        var user = await NewUserAsync($"stale-{Guid.NewGuid():N}");
+        var stale = DateTimeOffset.UtcNow.AddHours(-3).ToUnixTimeSeconds();
+        var cookie = await AuthTestFixture.MintAuthCookieWithLastReauthAt(_factory, user, stale);
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/auth/email-change/pending");
+        req.Headers.Add("Cookie", $"{SessionConstants.SessionCookieName}={cookie}");
+
+        var res = await client.SendAsync(req);
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK,
+            "a stale reauth stamp must still read; the payload is masked, so no step-up is owed");
     }
 
     [Fact]
