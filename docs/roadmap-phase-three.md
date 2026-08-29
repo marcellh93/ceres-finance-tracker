@@ -1564,7 +1564,7 @@ Demonstrated, not inferred: `EmailChangePendingUnderRlsTests` was written agains
 
 This is the hazard the Stage 9.5d spec named ("RLS policies are *silently inert*" in the admin-wired suite) partially reintroduced inside the suite built to escape it.
 
-- [ ] Add `IgnoreQueryFilters()` to both halves of `AssertRlsVisibility`, or give it an overload that does, and re-verify each of the **10 call sites** still passes for the right reason — several may currently be passing on the EF filter alone.
+- [ ] Add `IgnoreQueryFilters()` to both halves of `AssertRlsVisibility`, or give it an overload that does, and re-verify each of the **9 call sites across 8 files** still passes for the right reason — several may currently be passing on the EF filter alone. (Entities involved: `Category`, `EmailChangeToken` ×2, `LockoutUnlockToken`, `UserMfaBackupCode`, `AuditLog`, `UserSession`, `PasswordResetToken`, `EmailConfirmationToken` — all `IUserOwned`, so all affected.)
 - [ ] For each caller, confirm the negative assertion fails when its table's RLS policy is disabled. A caller that still passes is not testing RLS.
 - [ ] Consider a guard test that fails if `AssertRlsVisibility` is used on an entity in `UserOwnedModel.RlsTables` without filter-stripping, so the trap cannot be re-entered.
 - *Tripwire: the comment block in `EmailChangePendingUnderRlsTests.cs` pointing here.*

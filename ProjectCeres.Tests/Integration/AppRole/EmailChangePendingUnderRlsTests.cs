@@ -77,7 +77,7 @@ public class EmailChangePendingUnderRlsTests : AppRoleTestBase
         //
         // Deliberately NOT routed through AppRoleTestBase.AssertRlsVisibility: that helper omits
         // IgnoreQueryFilters and so has this same weakness for every filtered entity. Fixing it
-        // touches all nine callers and belongs in its own change — see roadmap § 12.8.2.
+        // touches all 9 call sites (8 files) and belongs in its own change — see roadmap § 12.8.2.
         await using (var appOwner = Factory.NewAppContext(_ownerId))
         {
             (await appOwner.Context.EmailChangeTokens.IgnoreQueryFilters()
