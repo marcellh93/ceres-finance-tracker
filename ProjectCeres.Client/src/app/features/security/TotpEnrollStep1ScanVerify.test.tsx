@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n/i18n';
@@ -30,6 +31,20 @@ function mount() {
     </I18nextProvider>,
   );
 }
+
+describe('TotpEnrollStep1ScanVerify — reauth wiring', () => {
+  it('routes the verify call through requireStepUp', async () => {
+    // This is the structurally unusual call site: submitVerify sits OUTSIDE the
+    // component, so it cannot call the hook — the wrapper is threaded in as a
+    // parameter. Nothing pinned that it is actually threaded, so passing the wrong
+    // thing (or nothing) would have stayed green. Found by the 12.8 writer review.
+    mount();
+    // The 6-digit field auto-submits on the last digit — no button click needed.
+    await userEvent.type(screen.getByLabelText(/verification code/i), '123456');
+
+    await waitFor(() => expect(requireStepUp).toHaveBeenCalled());
+  });
+});
 
 describe('TotpEnrollStep1ScanVerify — QR rendering contract', () => {
   it('renders the QR wrapper with bg-white (NOT bg-card)', () => {

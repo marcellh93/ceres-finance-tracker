@@ -83,6 +83,25 @@ describe('Security page', () => {
     expect(screen.getByRole('button', { name: /turn off two-factor sign-in/i })).toBeDefined();
   });
 
+  it('routes the enroll call through requireStepUp', async () => {
+    // The 12.9 rewiring had no assertion on any of its four call sites except the
+    // sessions list: structurally the call moved inside requireStepUp, but nothing
+    // pinned it, so reverting to a bare apiFetch stayed green. Found by the 12.8
+    // writer review.
+    const { fetchSpy } = renderSecurity({ twoFactorEnabled: false });
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') return meResponse(false);
+      if (typeof url === 'string' && url === '/api/auth/csrf') {
+        return new Response(null, { status: 204, headers: { 'X-XSRF-TOKEN': 'tok' } });
+      }
+      return new Response(null, { status: 204 });
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: /set up two-factor/i }));
+
+    await waitFor(() => expect(requireStepUp).toHaveBeenCalled());
+  });
+
   it('clicking Enable fires POST /api/auth/mfa/enroll and advances to wizard step 1', async () => {
     const { fetchSpy } = renderSecurity({ twoFactorEnabled: false });
     fetchSpy.mockImplementation(async (url) => {

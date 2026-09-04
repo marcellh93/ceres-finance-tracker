@@ -35,7 +35,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const DEFAULT_ROUTES = ['/login', '/register', '/email-verify', '/account/unlock', '/password-reset'];
-const BASE_PATH = '/app'; // React Router basename — see ProjectCeres.Client/src/app/main.tsx
+// The SPA is served under /app, but BrowserRouter is mounted with NO basename
+// (src/app/main.tsx), so root-level routes like /email-change/confirm — the paths
+// EmailChangeService actually emits into its emails — live outside /app. Prefixing
+// those hit a 301 and only worked because the walker follows redirects; a route
+// that ever stops redirecting would be silently skipped. Routes starting with a
+// path in ROOT_LEVEL_ROUTES are requested as-is.
+const BASE_PATH = '/app';
+const ROOT_LEVEL_ROUTES = ['/email-change/'];
 const HEALTH_TIMEOUT_SECONDS = 2;
 
 function die(code: number, message: string): never {
@@ -142,7 +149,9 @@ async function main(): Promise<void> {
       });
     });
 
-    const target = `${BASE_PATH}${route}`;
+    const target = ROOT_LEVEL_ROUTES.some((p) => route.startsWith(p))
+      ? route
+      : `${BASE_PATH}${route}`;
     try {
       await page.goto(target, { waitUntil: 'networkidle', timeout: 30_000 });
     } catch (err) {
