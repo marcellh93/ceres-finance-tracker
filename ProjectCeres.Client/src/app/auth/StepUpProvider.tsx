@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- Why: exports both StepUpProvider (component) and useStepUpContext (hook); splitting would require a separate context file with no consumer benefit. */
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { ReauthenticationDialog } from './ReauthenticationDialog';
-import { ReauthCancelledError } from './use-step-up';
+import { ReauthCancelledError, ReauthBusyError } from './use-step-up';
 
 type StepUpContextValue = {
   openStepUp: () => Promise<void>;
@@ -26,11 +26,13 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
       // A second call while one is in flight used to overwrite these refs, orphaning
       // the first promise — its caller awaited forever with no dialog and no error.
       // One dialog serves one action, so reject the newcomer rather than stack or
-      // silently drop. ReauthCancelledError is the right shape: callers already
-      // treat it as "the user did not proceed", which is exactly what happened.
-      // Reachable since Stage 12.8 put four gated actions on /app/security.
+      // silently drop. ReauthBusyError, NOT ReauthCancelledError: callers stay
+      // silent on cancellation because the user chose it, and staying silent here
+      // would leave a caller with no dialog, no error and no state change — which
+      // is exactly what it did to the enrol-verify step before this distinction
+      // existed. Reachable since Stage 12.8 put four gated actions on /app/security.
       if (resolveRef.current !== null) {
-        reject(new ReauthCancelledError('A reauthentication prompt is already open.'));
+        reject(new ReauthBusyError());
         return;
       }
       resolveRef.current = resolve;

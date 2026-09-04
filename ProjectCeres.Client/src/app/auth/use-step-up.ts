@@ -9,6 +9,20 @@ export class ReauthCancelledError extends Error {
   }
 }
 
+/**
+ * A reauth prompt was already open, so this request could not be served.
+ * Deliberately NOT a ReauthCancelledError: callers treat cancellation as a user
+ * choice and stay silent, which is right for a dismissed dialog and wrong here —
+ * the user did not decline anything and is owed feedback. Conflating the two is
+ * what turned the enrol-verify step into a dead screen.
+ */
+export class ReauthBusyError extends Error {
+  constructor(message = 'A reauthentication prompt is already open.') {
+    super(message);
+    this.name = 'ReauthBusyError';
+  }
+}
+
 export type UseStepUpResult = {
   /**
    * Run an async action; if it throws ReauthRequiredError, the reauth

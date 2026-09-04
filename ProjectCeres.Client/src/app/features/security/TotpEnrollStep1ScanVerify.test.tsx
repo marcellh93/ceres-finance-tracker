@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../../i18n/i18n';
 import { TotpEnrollStep1ScanVerify } from './TotpEnrollStep1ScanVerify';
+import { ReauthBusyError, ReauthCancelledError } from '../../auth/use-step-up';
 
 // Stage 12.9: these surfaces now route reauth through the step-up dialog, so they
 // depend on StepUpProvider's context. Mocked as a pass-through here — the dialog's
@@ -43,6 +44,33 @@ describe('TotpEnrollStep1ScanVerify — reauth wiring', () => {
     await userEvent.type(screen.getByLabelText(/verification code/i), '123456');
 
     await waitFor(() => expect(requireStepUp).toHaveBeenCalled());
+  });
+});
+
+describe('TotpEnrollStep1ScanVerify — busy vs cancelled', () => {
+  it('shows an error when the reauth prompt was BUSY, not silence', async () => {
+    // The 12.8 review caught this: the concurrent-prompt guard originally rejected
+    // with ReauthCancelledError, and every caller correctly stays silent on
+    // cancellation — so a busy prompt left this screen completely dead. Code still
+    // filled in, no error, no dialog, and auto-submit cannot re-fire because
+    // codeValue is unchanged. The user had to clear and retype to get any response.
+    requireStepUp.mockRejectedValueOnce(new ReauthBusyError());
+    mount();
+    await userEvent.type(screen.getByLabelText(/verification code/i), '123456');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('stays silent when the user actually cancelled', async () => {
+    // The other half of the distinction: a dismissed dialog IS a user choice and
+    // must not be scolded. If someone collapses the two error types again, one of
+    // these two tests fails whichever way they collapse it.
+    requireStepUp.mockRejectedValueOnce(new ReauthCancelledError());
+    mount();
+    await userEvent.type(screen.getByLabelText(/verification code/i), '123456');
+
+    await waitFor(() => expect(requireStepUp).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 

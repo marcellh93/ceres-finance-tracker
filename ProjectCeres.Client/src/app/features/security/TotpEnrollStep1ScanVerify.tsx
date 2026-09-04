@@ -51,6 +51,11 @@ async function submitVerify(
     }
     return { kind: 'invalidCode' };
   } catch (err) {
+    // Only a genuine user cancellation is silent. ReauthBusyError (the guard's
+    // rejection when a prompt is already open) is a SEPARATE type, so it falls
+    // through to 'network' and the user gets a message — they declined nothing.
+    // Before that type existed the guard threw ReauthCancelledError and this screen
+    // went dead: code still filled in, no error, and auto-submit unable to re-fire.
     if (err instanceof ReauthCancelledError) return { kind: 'cancelled' };
     return { kind: 'network' };
   }

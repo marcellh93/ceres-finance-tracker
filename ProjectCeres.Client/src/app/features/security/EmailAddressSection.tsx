@@ -110,8 +110,9 @@ export function EmailAddressSection() {
       };
       setFormError(t(byCode[result.code ?? ''] ?? 'security.email.errors.network'));
     } catch (err) {
-      // Cancelling the password prompt is a deliberate choice, not a failure —
-      // showing an error for it would be scolding the user for changing their mind.
+      // Cancelling is a deliberate choice — silence is right. ReauthBusyError is a
+      // SEPARATE type, not a subclass, so it falls through to setFormError below:
+      // the user declined nothing there and is owed a message.
       if (err instanceof ReauthCancelledError) return;
       setFormError(t('security.email.errors.network'));
     }

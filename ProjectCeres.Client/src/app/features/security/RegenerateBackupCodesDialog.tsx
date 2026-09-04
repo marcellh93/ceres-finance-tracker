@@ -56,10 +56,10 @@ export function RegenerateBackupCodesDialog() {
       toast.error(t('security.totp.regenerateFailed'));
       setState({ kind: 'idle' });
     } catch (err) {
-      // Cancelling the password prompt is a choice, not a failure. Either way we
-      // drop back to idle so this dialog closes rather than sitting in 'pending'.
       // Cancelling the password prompt is a choice, not a failure — no toast.
-      // Anything else IS a failure and must say so.
+      // Anything else (including ReauthBusyError, a separate type) IS a failure and
+      // must say so. Either way we drop back to idle so the dialog closes rather
+      // than sitting in 'pending'.
       if (!(err instanceof ReauthCancelledError)) {
         toast.error(t('security.totp.regenerateFailed'));
       }

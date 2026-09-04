@@ -6,7 +6,7 @@ import i18n from '../i18n/i18n';
 import { StepUpProvider } from './StepUpProvider';
 import { AuthProvider } from './auth-context';
 import { MemoryRouter } from 'react-router-dom';
-import { useStepUp, ReauthCancelledError } from './use-step-up';
+import { useStepUp, ReauthCancelledError, ReauthBusyError } from './use-step-up';
 import { ReauthRequiredError } from '../lib/api-client';
 
 declare global {
@@ -27,12 +27,12 @@ function TwoActions() {
         window.outcomes = [];
         const gated = () => Promise.reject(new ReauthRequiredError('reauth'));
         // Deliberately NOT awaited in sequence — both are started before either settles.
-        void requireStepUp(gated).catch((e) =>
-          window.outcomes.push(e instanceof ReauthCancelledError ? 'cancelled-1' : 'other-1'),
-        );
-        void requireStepUp(gated).catch((e) =>
-          window.outcomes.push(e instanceof ReauthCancelledError ? 'cancelled-2' : 'other-2'),
-        );
+        const label = (e: unknown, n: number) =>
+          e instanceof ReauthBusyError ? `busy-${n}`
+          : e instanceof ReauthCancelledError ? `cancelled-${n}`
+          : `other-${n}`;
+        void requireStepUp(gated).catch((e) => window.outcomes.push(label(e, 1)));
+        void requireStepUp(gated).catch((e) => window.outcomes.push(label(e, 2)));
       }}
     >
       go
@@ -64,7 +64,10 @@ describe('StepUpProvider — concurrent step-up guard', () => {
     // The second call must settle — that is the whole point. If the guard is
     // removed this assertion times out rather than failing fast, which is exactly
     // the user-visible symptom it defends against.
-    await waitFor(() => expect(window.outcomes).toContain('cancelled-2'));
+    // The rejection must NOT be a ReauthCancelledError. Callers treat cancellation
+    // as a user choice and stay silent — which left the enrol-verify screen dead
+    // when the guard used that type. 'busy-2' proves the distinction survives.
+    await waitFor(() => expect(window.outcomes).toContain('busy-2'));
 
     // And exactly one dialog is on screen, not two stacked.
     await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
