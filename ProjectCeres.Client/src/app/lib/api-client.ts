@@ -23,6 +23,22 @@ type UnauthenticatedHandler = () => void;
 let unauthenticatedHandler: UnauthenticatedHandler | null = null;
 const AUTH_PROBE_URLS = ['/api/auth/me', '/api/auth/csrf'];
 
+// Token-authenticated pre-auth endpoints. A 401 from these means the TOKEN in the
+// emailed link is invalid or expired — NOT that the caller's session died. They are
+// [AllowAnonymous], so the caller may hold no session at all. Treating their 401 as
+// a session expiry signs a logged-in user out of the SPA for clicking a stale link
+// from their own inbox: status flips to 'anon', the CSRF cache is dropped, and the
+// next navigation redirects to /login. The server session is untouched, so a reload
+// restores it — which makes it a confusing bug rather than a visible one.
+// Found by the Stage 12.8 security review, which also identified the sibling
+// endpoints below as the same shape.
+const TOKEN_AUTH_URLS = [
+  '/api/auth/email-change/confirm',
+  '/api/auth/email-change/revoke',
+  '/api/auth/email/verify',
+  '/api/auth/lockout-unlock',
+];
+
 // Server header set by PersistentCookieRotationMiddleware on the 401 it
 // intentionally returns while issuing a fresh session cookie. Must match
 // SessionConstants.CookieRotatedHeader on the server.
@@ -49,6 +65,8 @@ export function setOnUnauthenticated(handler: UnauthenticatedHandler | null): vo
 export function notifyUnauthenticatedIfApplicable(url: string, response?: Response): void {
   if (unauthenticatedHandler === null) return;
   if (AUTH_PROBE_URLS.some((probe) => url === probe || url.startsWith(`${probe}?`))) return;
+  // A bad link token is not a dead session — see TOKEN_AUTH_URLS.
+  if (TOKEN_AUTH_URLS.some((u) => url === u || url.startsWith(`${u}?`))) return;
   if (response?.headers.get(COOKIE_ROTATED_HEADER) === 'true') return;
   unauthenticatedHandler();
 }

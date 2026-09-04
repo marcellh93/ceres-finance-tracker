@@ -19,7 +19,7 @@ import { DataTransition, type DataTransitionState } from '../../components/DataT
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { apiFetch } from '../../lib/api-client';
-import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
+import { useStepUp, ReauthCancelledError, ReauthBusyError } from '../../auth/use-step-up';
 import { useAuth } from '../../auth/auth-context';
 import { BLOCK_IP_URL, SESSIONS_URL, sessionUrl, type SessionDto } from './sessions-api';
 import { summarizeUserAgent } from './user-agent-summary';
@@ -66,6 +66,14 @@ export function SessionsPage() {
       // show the error state without a toast scolding the user.
       if (err instanceof ReauthCancelledError) {
         setError(new Error('Confirm your identity to view active sessions.'));
+      } else if (err instanceof ReauthBusyError) {
+        // Written copy, not the raw exception message. Busy is not a user choice,
+        // so it must say something — but "A reauthentication prompt is already
+        // open." is an internal string, and every sibling path here uses a sentence
+        // written for the reader. Found by the 12.8 review, which also caught that
+        // this file holds three of the seven requireStepUp call sites — the
+        // "four call sites" framing had left it unaudited.
+        setError(new Error('Finish the identity check already open, then try again.'));
       } else {
         setError(err instanceof Error ? err : new Error(String(err)));
       }

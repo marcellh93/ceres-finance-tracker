@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { I18nextProvider } from 'react-i18next';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import i18n from '../i18n/i18n';
 import { StepUpProvider } from './StepUpProvider';
 import { AuthProvider } from './auth-context';
@@ -41,6 +41,17 @@ function TwoActions() {
 }
 
 describe('StepUpProvider — concurrent step-up guard', () => {
+  // AuthProvider fires GET /api/auth/me on mount. Unstubbed, jsdom cannot resolve
+  // the relative URL and the rejection escapes the test as an unhandled error —
+  // vitest still prints "passed" but exits 1. Caught by build-matrix, not by
+  // reading the summary line.
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(null, { status: 401 }),
+    );
+  });
+  afterEach(() => vi.restoreAllMocks());
+
   it('rejects a second prompt instead of orphaning the first', async () => {
     // Before the guard, the second openStepUp() overwrote the first call's resolve
     // and reject refs. The first promise then never settled: its caller awaited

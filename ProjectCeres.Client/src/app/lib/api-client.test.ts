@@ -199,6 +199,36 @@ describe('apiFetch', () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
+    it.each([
+      '/api/auth/email-change/confirm',
+      '/api/auth/email-change/revoke',
+      '/api/auth/email/verify',
+      '/api/auth/lockout-unlock',
+    ])('does NOT sign the user out when %s rejects a bad token', async (url) => {
+      // These are [AllowAnonymous] token endpoints: a 401 means the token in the
+      // emailed LINK is bad, not that the caller's session died. Before this
+      // exemption, a signed-in user clicking a stale revoke link from their own
+      // inbox was flipped to 'anon' and bounced to /login on the next navigation.
+      // Found by the Stage 12.8 security review.
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+
+      // A POST would burn this mock on the CSRF handshake and the assertion would
+      // pass for the wrong reason — the 401 under test would never be reached.
+      // (That is exactly what the first draft of this test did.) GET goes straight
+      // through, and the 401 branch under test does not depend on the method.
+      fetchSpy.mockResolvedValueOnce(
+        jsonResponse(
+          { error: { code: 'INVALID_EMAIL_CHANGE_TOKEN', message: 'Invalid or expired.' } },
+          { status: 401 },
+        ),
+      );
+
+      await apiFetch(url).catch(() => {});
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
     it('does NOT fire the handler when /api/auth/csrf returns 401', async () => {
       const handler = vi.fn();
       setOnUnauthenticated(handler);
