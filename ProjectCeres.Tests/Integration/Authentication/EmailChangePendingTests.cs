@@ -73,7 +73,7 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         var res = await GetPendingAsync(user);
 
         res.StatusCode.Should().Be(HttpStatusCode.OK);
-        var data = (await BodyAsync(res)).GetProperty("data");
+        var data = (await BodyAsync(res));
         data.GetProperty("pending").GetBoolean().Should().BeFalse();
         // The null-shape is the contract the not-yet-written banner binds against.
         data.GetProperty("maskedEmail").ValueKind.Should().Be(JsonValueKind.Null);
@@ -96,7 +96,7 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         raw.Should().NotContain("target@example.com");
         raw.Should().NotContain("target");
 
-        var data = JsonDocument.Parse(raw).RootElement.GetProperty("data");
+        var data = JsonDocument.Parse(raw).RootElement;
         data.GetProperty("pending").GetBoolean().Should().BeTrue();
         data.GetProperty("maskedEmail").GetString().Should().Be(EmailMask.Mask("target@example.com"));
         data.GetProperty("expired").GetBoolean().Should().BeFalse();
@@ -117,7 +117,7 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
 
         var res = await GetPendingAsync(user);
 
-        var data = (await BodyAsync(res)).GetProperty("data");
+        var data = (await BodyAsync(res));
         data.GetProperty("pending").GetBoolean().Should().BeTrue();
         data.GetProperty("expired").GetBoolean().Should().BeTrue();
     }
@@ -133,7 +133,7 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
 
         var res = await GetPendingAsync(user);
 
-        (await BodyAsync(res)).GetProperty("data").GetProperty("pending").GetBoolean()
+        (await BodyAsync(res)).GetProperty("pending").GetBoolean()
             .Should().BeFalse();
     }
 
@@ -150,14 +150,14 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
         // a Purpose mismatch leaves the negative assertion below green for the wrong
         // reason — the row simply never existed. Same discipline as the AppRole suite.
         var ownerRes = await GetPendingAsync(theirs);
-        (await BodyAsync(ownerRes)).GetProperty("data").GetProperty("pending")
+        (await BodyAsync(ownerRes)).GetProperty("pending")
             .GetBoolean().Should().BeTrue("the owner must see their own pending change");
 
         var res = await GetPendingAsync(mine);
 
         var raw = await res.Content.ReadAsStringAsync();
         raw.Should().NotContain("notyours");
-        JsonDocument.Parse(raw).RootElement.GetProperty("data").GetProperty("pending")
+        JsonDocument.Parse(raw).RootElement.GetProperty("pending")
             .GetBoolean().Should().BeFalse();
     }
 
@@ -174,7 +174,7 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
 
         var res = await GetPendingAsync(user);
 
-        (await BodyAsync(res)).GetProperty("data").GetProperty("pending").GetBoolean()
+        (await BodyAsync(res)).GetProperty("pending").GetBoolean()
             .Should().BeFalse("only the VerifyNew half decides whether a change is in flight");
     }
 
@@ -191,7 +191,7 @@ public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFacto
 
         var res = await GetPendingAsync(user);
 
-        var data = (await BodyAsync(res)).GetProperty("data");
+        var data = (await BodyAsync(res));
         data.GetProperty("maskedEmail").GetString().Should()
             .Be(EmailMask.Mask("newer@example.com"), "a re-request supersedes the earlier one");
     }

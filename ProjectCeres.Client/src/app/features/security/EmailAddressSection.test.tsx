@@ -34,6 +34,10 @@ function mount() {
   );
 }
 
+// apiFetch surfaces the raw response body as `.data`, and the endpoint returns the
+// object BARE (no { data: ... } envelope) — same as SessionsApiController. An earlier
+// version of these mocks nested it one level deeper, which is precisely why the suite
+// stayed green while the banner never rendered against the real server.
 const noPending = { ok: true, data: { pending: false, maskedEmail: null, expiresAt: null, expired: false } };
 
 describe('EmailAddressSection', () => {

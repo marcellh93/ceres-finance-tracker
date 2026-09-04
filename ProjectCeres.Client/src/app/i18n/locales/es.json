@@ -261,7 +261,10 @@
         "dialogConfirm": "Regenerar códigos",
         "successHeading": "Aquí tienes tus nuevos códigos de respaldo",
         "successBody": "Tus códigos anteriores ya no son válidos. Guárdalos en un lugar seguro."
-      }
+      },
+      "enrollFailed": "No se pudo iniciar la configuración de doble factor. Inténtalo de nuevo.",
+      "disableFailed": "No se pudo desactivar el inicio de sesión en dos pasos. Inténtalo de nuevo.",
+      "regenerateFailed": "No se pudieron regenerar tus códigos de respaldo. Los códigos actuales siguen siendo válidos."
     },
     "email": {
       "heading": "Dirección de correo",

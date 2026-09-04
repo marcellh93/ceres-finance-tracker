@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -60,12 +61,13 @@ export function Security() {
         setEnrollment({ kind: 'idle' });
         return;
       }
+      // A non-ALREADY_ENROLLED failure must not look like a no-op button.
+      toast.error(t('security.totp.enrollFailed'));
       setEnrollment({ kind: 'idle' });
     } catch (err) {
       // Cancelling the password prompt is a choice, not an error.
-      if (err instanceof ReauthCancelledError) {
-        setEnrollment({ kind: 'idle' });
-        return;
+      if (!(err instanceof ReauthCancelledError)) {
+        toast.error(t('security.totp.enrollFailed'));
       }
       setEnrollment({ kind: 'idle' });
     }
@@ -83,9 +85,10 @@ export function Security() {
       }
       // 409 MFA_NOT_ENABLED — auth refresh will catch any race; silently drop.
       await refresh();
-    } catch {
-      // Cancel or network failure: the dialog already surfaced its own error, and
-      // MFA state is unchanged. Nothing to add here.
+    } catch (err) {
+      if (!(err instanceof ReauthCancelledError)) {
+        toast.error(t('security.totp.disableFailed'));
+      }
     }
   };
 

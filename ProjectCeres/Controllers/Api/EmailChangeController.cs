@@ -93,12 +93,15 @@ public sealed class EmailChangeController : ControllerBase
 
         var pending = await _service.GetPendingAsync(userId, HttpContext.RequestAborted);
 
-        return Ok(new
-        {
-            data = pending is null
-                ? new { pending = false, maskedEmail = (string?)null, expiresAt = (DateTime?)null, expired = false }
-                : new { pending = true, maskedEmail = (string?)pending.MaskedNewEmail, expiresAt = (DateTime?)pending.ExpiresAt, expired = pending.Expired }
-        });
+        // Bare object, NOT wrapped in { data: ... }. apiFetch already surfaces the
+        // response body as `.data`, so an envelope here would arrive at the client as
+        // result.data.data — which is exactly the bug this shape caused: the banner
+        // read result.data.pending, got undefined, and never rendered even though the
+        // server was answering correctly. SessionsApiController returns bare for the
+        // same reason.
+        return Ok(pending is null
+            ? new { pending = false, maskedEmail = (string?)null, expiresAt = (DateTime?)null, expired = false }
+            : new { pending = true, maskedEmail = (string?)pending.MaskedNewEmail, expiresAt = (DateTime?)pending.ExpiresAt, expired = pending.Expired });
     }
 
     [HttpPost("confirm"), AllowAnonymous, PreAuthCallSite("EmailChange.ConfirmChange")]

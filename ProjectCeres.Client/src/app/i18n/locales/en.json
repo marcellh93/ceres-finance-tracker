@@ -261,7 +261,10 @@
         "dialogConfirm": "Regenerate codes",
         "successHeading": "Here are your new backup codes",
         "successBody": "Your old codes are no longer valid. Save these somewhere safe."
-      }
+      },
+      "enrollFailed": "Couldn't start two-factor setup. Try again.",
+      "disableFailed": "Couldn't turn off two-factor sign-in. Try again.",
+      "regenerateFailed": "Couldn't regenerate your backup codes. Your existing codes still work."
     },
     "email": {
       "heading": "Email address",

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { apiFetch } from '../../lib/api-client';
 import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
+import { toast } from 'sonner';
 import { useAuth } from '../../auth/auth-context';
 import { TotpEnrollStep2BackupCodes } from './TotpEnrollStep2BackupCodes';
 
@@ -49,14 +50,18 @@ export function RegenerateBackupCodesDialog() {
         setState({ kind: 'showCodes', codes: result.data.backupCodes });
         return;
       }
-      // Failure: drop back to idle. Toast surfaces the failure.
+      // Surface it. This screen is the one where guessing wrong means losing account
+      // access — a silent close leaves the user unable to tell "codes regenerated"
+      // from "that failed". Same shape as SessionsPage.
+      toast.error(t('security.totp.regenerateFailed'));
       setState({ kind: 'idle' });
     } catch (err) {
       // Cancelling the password prompt is a choice, not a failure. Either way we
       // drop back to idle so this dialog closes rather than sitting in 'pending'.
-      if (err instanceof ReauthCancelledError) {
-        setState({ kind: 'idle' });
-        return;
+      // Cancelling the password prompt is a choice, not a failure — no toast.
+      // Anything else IS a failure and must say so.
+      if (!(err instanceof ReauthCancelledError)) {
+        toast.error(t('security.totp.regenerateFailed'));
       }
       setState({ kind: 'idle' });
     }

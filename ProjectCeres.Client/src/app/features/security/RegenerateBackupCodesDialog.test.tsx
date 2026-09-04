@@ -9,6 +9,12 @@ import { RegenerateBackupCodesDialog } from './RegenerateBackupCodesDialog';
 import { clearXsrfTokenCacheForTests } from '../../auth/csrf';
 import { ReauthCancelledError } from '../../auth/use-step-up';
 
+// sonner renders into a <Toaster> that this component tree does not mount, so assert
+// the call rather than the rendered toast — the behaviour under test is "the failure
+// is surfaced at all", not sonner's rendering.
+const toastError = vi.fn();
+vi.mock('sonner', () => ({ toast: { error: (...a: unknown[]) => toastError(...a), success: vi.fn() } }));
+
 // Stage 12.9: these surfaces now route reauth through the step-up dialog, so they
 // depend on StepUpProvider's context. Mocked as a pass-through here — the dialog's
 // own behaviour (open, collect password, replay, cancel) has a dedicated suite in
@@ -61,6 +67,52 @@ describe('RegenerateBackupCodesDialog', () => {
   });
 
   afterEach(() => vi.restoreAllMocks());
+
+  it('surfaces a failure instead of closing silently', async () => {
+    // Regression for the 12.8 review block. Removing the old reauth dead-end left
+    // this path rendering NOTHING on failure, behind a comment claiming a toast
+    // that did not exist in the file. On the one screen where guessing wrong means
+    // losing account access, a silent close is the worst possible outcome.
+    fetchSpy.mockImplementation(async (url) => {
+      if (typeof url === 'string' && url === '/api/auth/me') {
+        return new Response(
+          JSON.stringify({
+            userId: '00000000-0000-0000-0000-000000000001', email: 'a@b.test',
+            twoFactorEnabled: true, lastReauthAt: Math.floor(Date.now() / 1000),
+            backupCodesRemaining: 10, usedBackupCodeAtLastLogin: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (typeof url === 'string' && url === '/api/auth/csrf') {
+        return new Response(null, { status: 204, headers: { 'X-XSRF-TOKEN': 'tok' } });
+      }
+      if (typeof url === 'string' && url.includes('backup-codes/regenerate')) {
+        return new Response(JSON.stringify({ error: { code: 'SERVER_ERROR', message: 'boom' } }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(null, { status: 204 });
+    });
+
+    const user = userEvent.setup();
+    mount();
+    await user.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
+    await user.click(await screen.findByRole('button', { name: /^regenerate codes$/i }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(String(toastError.mock.calls[0][0])).toMatch(/couldn't regenerate your backup codes/i);
+  });
+
+  it('routes the regenerate call through requireStepUp', async () => {
+    // The rewiring itself was untested: structurally the call moved, but nothing
+    // asserted it. Without this, reverting to a bare apiFetch stays green.
+    const user = userEvent.setup();
+    mount();
+    await user.click(screen.getByRole('button', { name: /regenerate backup codes/i }));
+    await user.click(await screen.findByRole('button', { name: /^regenerate codes$/i }));
+
+    await waitFor(() => expect(requireStepUp).toHaveBeenCalled());
+  });
 
   it('on a cancelled reauth prompt, the dialog closes (no stacked surfaces)', async () => {
     // Stage 12.9 contract change: REAUTH_REQUIRED no longer bubbles to the parent as
