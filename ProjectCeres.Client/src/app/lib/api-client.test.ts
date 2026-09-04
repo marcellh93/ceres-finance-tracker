@@ -229,6 +229,31 @@ describe('apiFetch', () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['/api/auth/email-change/pending', '[Authorize] — a 401 here IS a dead session'],
+      ['/api/auth/email-change/request', '[RequireRecentAuth] — same'],
+      ['/api/auth/email/verify/resend', 'a different endpoint; must not over-match'],
+    ])('STILL signs the user out on 401 from %s (%s)', async (url) => {
+      // The dangerous half of TOKEN_AUTH_URLS: an exemption that over-matched
+      // would suppress a genuine session expiry and leave the SPA believing the
+      // user is signed in. These three sit next to exempted routes and must keep
+      // the old behaviour. Note the match is `=== u || startsWith(u + '?')`, not a
+      // bare prefix — which is what keeps /verify/resend out of /verify's exemption.
+      const handler = vi.fn();
+      setOnUnauthenticated(handler);
+
+      fetchSpy.mockResolvedValueOnce(
+        jsonResponse(
+          { error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } },
+          { status: 401 },
+        ),
+      );
+
+      await apiFetch(url).catch(() => {});
+
+      expect(handler).toHaveBeenCalled();
+    });
+
     it('does NOT fire the handler when /api/auth/csrf returns 401', async () => {
       const handler = vi.fn();
       setOnUnauthenticated(handler);
