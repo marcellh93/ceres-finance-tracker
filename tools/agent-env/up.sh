@@ -140,10 +140,35 @@ fi
 APP_LOG="$RUNTIME_DIR/$SCHEMA.app.log"
 PID_FILE="$RUNTIME_DIR/$SCHEMA.pid"
 
+# Roadmap § 12.12: ASP.NET loads user secrets ONLY under Development, and the Smoke
+# profile is not Development — so Authentication:TokenLookupSecret:Secret arrives as
+# the "configure-via-user-secrets" placeholder from appsettings.json, and every
+# token-hashing path (register, login, password reset, email change) dies with
+# "FormatException: not a valid Base-64 string" behind a generic 400. Read the
+# developer's secret here and pass it through explicitly.
+SECRETS_FILE="$HOME/.microsoft/usersecrets/fed8e2ba-0214-40f7-9bcf-edbed7627ca1/secrets.json"
+TOKEN_LOOKUP_SECRET=""
+if [[ -f "$SECRETS_FILE" ]]; then
+  TOKEN_LOOKUP_SECRET=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open(sys.argv[1], encoding='utf-8-sig'))
+    print(d.get('Authentication:TokenLookupSecret:Secret',''))
+except Exception:
+    print('')
+" "$SECRETS_FILE" 2>/dev/null || echo "")
+fi
+if [[ -z "$TOKEN_LOOKUP_SECRET" ]]; then
+  err "no Authentication:TokenLookupSecret:Secret in user secrets — auth flows will 400."
+  err "set one with: dotnet user-secrets --project ProjectCeres set 'Authentication:TokenLookupSecret:Secret' \"\$(openssl rand -base64 32)\""
+  exit 2
+fi
+
 (
   cd "$REPO_ROOT"
   ConnectionStrings__ApplicationConnection="$APP_CONN_WITH_SCHEMA" \
   ConnectionStrings__MigrationConnection="$MIGRATION_CONN_WITH_SCHEMA" \
+  Authentication__TokenLookupSecret__Secret="$TOKEN_LOOKUP_SECRET" \
   nohup dotnet run \
     --project "$REPO_ROOT/ProjectCeres" \
     --launch-profile Smoke \

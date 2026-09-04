@@ -1634,6 +1634,12 @@ Consequences:
 - [ ] Add a test that fails loudly and legibly when a required secret is absent, so the symptom names the cause instead of surfacing as a base64 `FormatException` inside an unrelated auth test.
 - *Tripwire: this checklist. The placeholder string in `appsettings.json` is the marker to grep for (`configure-via-user-secrets`).*
 
+**Partially fixed 2026-08-29 for the agent-env Smoke profile.** The gap stopped being theoretical: booting `tools/agent-env/up.sh` and registering through the UI failed with a bare 400, and the app log showed `System.FormatException: not a valid Base-64 string` from `TokenLookupHasher` — the placeholder reaching the hasher, exactly as predicted above. `up.sh` now reads `Authentication:TokenLookupSecret:Secret` from the developer's user-secrets store and passes it through as `Authentication__TokenLookupSecret__Secret`, and fails loudly with the `dotnet user-secrets set` command if it is absent. Verified: the Base-64 exception is gone from the app log. **The test-fixture half of this item is still open** — `TestWebApplicationFactory` still inherits the secret implicitly from Development, so a fresh clone still fails ~307 tests.
+
+**Separate, still-unexplained (found in the same session):** with the secret fixed, `POST /api/auth/register` under the Smoke profile still returns a bare `400` with no error envelope — the shape of an antiforgery rejection rather than model validation, even though `/api/auth/csrf` returns 204 and the cookie policy is `SameAsRequest` in non-Production. Registration works in the integration suite and in normal Development, so this is specific to the Smoke profile. It blocks driving any authenticated surface in the agent environment.
+
+- [ ] Diagnose the Smoke-profile antiforgery rejection on `POST /api/auth/register`. Until it is fixed, `agent-walk` can only reach anonymous routes — any authenticated page it "walks" is really a screenshot of the sign-in redirect (see the `security_route_caveat` note in `stage-12.8/walk-summary.json`).
+
 ---
 
 ## Stage 12.5 — Deferred from Stage 12 (not scheduled)
