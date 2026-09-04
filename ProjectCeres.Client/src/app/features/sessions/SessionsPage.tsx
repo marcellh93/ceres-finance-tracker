@@ -71,7 +71,7 @@ export function SessionsPage() {
         // so it must say something — but "A reauthentication prompt is already
         // open." is an internal string, and every sibling path here uses a sentence
         // written for the reader. Found by the 12.8 review, which also caught that
-        // this file holds three of the seven requireStepUp call sites — the
+        // this file holds three of the eight requireStepUp call sites — the
         // "four call sites" framing had left it unaudited.
         setError(new Error('Finish the identity check already open, then try again.'));
       } else {

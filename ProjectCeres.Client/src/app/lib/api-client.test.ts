@@ -232,7 +232,12 @@ describe('apiFetch', () => {
     it.each([
       ['/api/auth/email-change/pending', '[Authorize] — a 401 here IS a dead session'],
       ['/api/auth/email-change/request', '[RequireRecentAuth] — same'],
-      ['/api/auth/email/verify/resend', 'a different endpoint; must not over-match'],
+      // Note this one cannot actually 401 — EmailVerificationController.cs:42 returns
+      // 204 on every branch (the anti-enumeration property) and 429 when limited. It
+      // is here purely as the MATCH control: it sits under an exempted prefix, so it
+      // proves the match is exact-or-query-string rather than a bare startsWith. If it
+      // ever gains a 401, revisit whether it belongs in TOKEN_AUTH_URLS.
+      ['/api/auth/email/verify/resend', 'sits under an exempted prefix; must not over-match'],
     ])('STILL signs the user out on 401 from %s (%s)', async (url) => {
       // The dangerous half of TOKEN_AUTH_URLS: an exemption that over-matched
       // would suppress a genuine session expiry and leave the SPA believing the
