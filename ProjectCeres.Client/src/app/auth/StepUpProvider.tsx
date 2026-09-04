@@ -23,6 +23,16 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
 
   const openStepUp = useCallback((): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
+      // A second call while one is in flight used to overwrite these refs, orphaning
+      // the first promise — its caller awaited forever with no dialog and no error.
+      // One dialog serves one action, so reject the newcomer rather than stack or
+      // silently drop. ReauthCancelledError is the right shape: callers already
+      // treat it as "the user did not proceed", which is exactly what happened.
+      // Reachable since Stage 12.8 put four gated actions on /app/security.
+      if (resolveRef.current !== null) {
+        reject(new ReauthCancelledError('A reauthentication prompt is already open.'));
+        return;
+      }
       resolveRef.current = resolve;
       rejectRef.current = reject;
       setOpen(true);
