@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MovementRowMenu } from './MovementRowMenu';
+import type { MovementType } from './movements-api';
 import { installCsrfFetchMock, resetCsrfCache, TEST_CSRF_TOKEN } from '../../../test/csrf-fetch-mock';
 
 vi.mock('sonner', () => ({
@@ -23,9 +24,9 @@ afterEach(() => {
 
 function renderMenu({
   movementId = 'tx1',
-  movementType = 'Transaction' as const,
+  movementType = 'Transaction',
   onDeleted = vi.fn(),
-} = {}) {
+}: { movementId?: string; movementType?: MovementType; onDeleted?: () => void } = {}) {
   render(
     <MemoryRouter initialEntries={['/movements']}>
       <Routes>

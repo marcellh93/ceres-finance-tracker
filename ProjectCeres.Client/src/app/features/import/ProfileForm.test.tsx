@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileForm } from './ProfileForm';
@@ -32,12 +33,12 @@ const initialEditExcel: ProfileFormValues = {
 function renderForm(overrides?: {
   mode?: 'create' | 'edit';
   initialValues?: ProfileFormValues;
-  onSubmit?: ReturnType<typeof vi.fn>;
+  onSubmit?: ComponentProps<typeof ProfileForm>['onSubmit'];
 }) {
   const mode = overrides?.mode ?? 'create';
   const initialValues =
     overrides?.initialValues ?? (mode === 'create' ? initialCreate : initialEditCsv);
-  const onSubmit = overrides?.onSubmit ?? vi.fn().mockResolvedValue({ ok: true });
+  const onSubmit = overrides?.onSubmit ?? vi.fn<ComponentProps<typeof ProfileForm>['onSubmit']>().mockResolvedValue({ ok: true });
   const onCancel = vi.fn();
   const utils = render(
     <ProfileForm
@@ -103,7 +104,7 @@ describe('ProfileForm', () => {
   });
 
   it('greys Save back out after onSubmit returns ok:true', async () => {
-    const onSubmit = vi.fn().mockResolvedValue({ ok: true });
+    const onSubmit = vi.fn<ComponentProps<typeof ProfileForm>['onSubmit']>().mockResolvedValue({ ok: true });
     renderForm({ mode: 'edit', onSubmit });
     fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: 'BBVA' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));

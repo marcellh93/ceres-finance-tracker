@@ -9,7 +9,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
-let mockFetch: ReturnType<typeof vi.fn>;
+let mockFetch: ReturnType<typeof installCsrfFetchMock>;
 
 const mappings: ImportColumnMappings = {
   dateColumn:        'Fecha',

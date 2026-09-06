@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { apiFetch, ReauthRequiredError, NetworkError, setOnUnauthenticated } from './api-client';
 import { clearXsrfTokenCacheForTests } from '../auth/csrf';
 
 describe('apiFetch', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: MockInstance<typeof fetch>;
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, 'fetch');
@@ -109,7 +109,11 @@ describe('apiFetch', () => {
     const result = await apiFetch('/api/auth/login', { method: 'POST', body: {} });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
+    // ApiFailure is a discriminated union; fieldErrors lives only on the field-errors
+    // member. Assert the discriminant is present FIRST (so a regressed shape fails here,
+    // not silently skips the check), then the assertion below type-checks.
+    expect(result.ok === false && 'fieldErrors' in result).toBe(true);
+    if (!result.ok && 'fieldErrors' in result) {
       expect(result.fieldErrors).toEqual({ email: 'Required.' });
     }
   });
@@ -133,7 +137,10 @@ describe('apiFetch', () => {
     const result = await apiFetch('/api/auth/login', { method: 'POST', body: {} });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
+    // See the fieldErrors test above: assert the discriminant first so a regressed
+    // shape fails here rather than skipping the narrowed assertion.
+    expect(result.ok === false && 'formError' in result).toBe(true);
+    if (!result.ok && 'formError' in result) {
       expect(result.formError).toBe('Something went wrong.');
     }
   });

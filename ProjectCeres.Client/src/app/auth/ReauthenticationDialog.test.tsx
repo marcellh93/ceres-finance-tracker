@@ -13,7 +13,7 @@ beforeEach(() => {
   global.fetch = vi.fn(async (url: string) =>
     url.includes('/api/auth/csrf')
       ? ({ headers: new Headers({ 'X-XSRF-TOKEN': 't' }) } as unknown as Response)
-      : ({ status: 204 } as Response));
+      : ({ status: 204 } as Response)) as unknown as typeof fetch;
 });
 
 it('renders the password field for a non-MFA user', () => {

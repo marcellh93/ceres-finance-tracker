@@ -30,7 +30,7 @@ vi.mock('./AttachmentDropzone', () => ({
 }));
 
 // ── Mock fetch ──
-let mockFetch: ReturnType<typeof vi.fn>;
+let mockFetch: ReturnType<typeof installCsrfFetchMock>;
 
 const TRANSACTION_DTO = {
   id: 'abc-123',
@@ -223,10 +223,10 @@ describe('MovementEdit', () => {
     });
 
     // Verify PUT was called
-    const putCalls = mockFetch.mock.calls.filter(
-      ([url, init]: [string, RequestInit]) =>
-        url === '/api/transactions/abc-123' && (init?.method ?? 'GET').toUpperCase() === 'PUT',
-    );
+    const putCalls = mockFetch.mock.calls.filter((call) => {
+      const [url, init] = call as [unknown, RequestInit?];
+      return url === '/api/transactions/abc-123' && (init?.method ?? 'GET').toUpperCase() === 'PUT';
+    });
     expect(putCalls.length).toBeGreaterThan(0);
   });
 
@@ -251,10 +251,10 @@ describe('MovementEdit', () => {
     });
 
     // Verify DELETE was called
-    const deleteCalls = mockFetch.mock.calls.filter(
-      ([url, init]: [string, RequestInit]) =>
-        url === '/api/transactions/abc-123' && (init?.method ?? 'GET').toUpperCase() === 'DELETE',
-    );
+    const deleteCalls = mockFetch.mock.calls.filter((call) => {
+      const [url, init] = call as [unknown, RequestInit?];
+      return url === '/api/transactions/abc-123' && (init?.method ?? 'GET').toUpperCase() === 'DELETE';
+    });
     expect(deleteCalls.length).toBeGreaterThan(0);
   });
 

@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsForm } from './SettingsForm';
@@ -15,8 +16,8 @@ const currencies: CurrencyOptionDto[] = [
   { id: 2, code: 'USD', symbol: '$' },
 ];
 
-function renderForm(overrides?: { onSubmit?: ReturnType<typeof vi.fn> }) {
-  const onSubmit = overrides?.onSubmit ?? vi.fn().mockResolvedValue({ ok: true });
+function renderForm(overrides?: { onSubmit?: ComponentProps<typeof SettingsForm>['onSubmit'] }) {
+  const onSubmit = overrides?.onSubmit ?? vi.fn<ComponentProps<typeof SettingsForm>['onSubmit']>().mockResolvedValue({ ok: true });
   const utils = render(
     <SettingsForm
       initialValues={initialValues}
@@ -87,7 +88,7 @@ describe('SettingsForm', () => {
   });
 
   it('Save button greys back out after onSubmit returns ok:true', async () => {
-    const onSubmit = vi.fn().mockResolvedValue({ ok: true });
+    const onSubmit = vi.fn<ComponentProps<typeof SettingsForm>['onSubmit']>().mockResolvedValue({ ok: true });
     renderForm({ onSubmit });
     fireEvent.change(screen.getByLabelText(/period start day/i), {
       target: { value: '15' },

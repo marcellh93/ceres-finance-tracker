@@ -9,19 +9,19 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const items: MovementListItemDto[] = [
   {
     id: 't1', movementType: 'Transaction', date: '2026-04-15', amount: 25.5,
-    currencyCode: 'EUR', currencySymbol: '€', description: 'Rent', isCleared: true,
+    currencyCode: 'EUR', currencySymbol: '€', description: 'Rent', isCleared: true, isOpeningBalance: false,
     accountName: 'Checking', categoryName: 'Housing', categoryTypeName: 'Expense',
     sourceAccountName: null, destAccountName: null, assetAccountName: null, liabilityAccountName: null,
   },
   {
     id: 't2', movementType: 'Transfer', date: '2026-04-14', amount: 100,
-    currencyCode: 'EUR', currencySymbol: '€', description: 'Move savings', isCleared: false,
+    currencyCode: 'EUR', currencySymbol: '€', description: 'Move savings', isCleared: false, isOpeningBalance: false,
     accountName: null, categoryName: null, categoryTypeName: null,
     sourceAccountName: 'Checking', destAccountName: 'Savings', assetAccountName: null, liabilityAccountName: null,
   },
   {
     id: 'lp1', movementType: 'LiabilityPayment', date: '2026-04-13', amount: 50,
-    currencyCode: 'EUR', currencySymbol: '€', description: null, isCleared: false,
+    currencyCode: 'EUR', currencySymbol: '€', description: null, isCleared: false, isOpeningBalance: false,
     accountName: null, categoryName: null, categoryTypeName: null,
     sourceAccountName: null, destAccountName: null, assetAccountName: 'Checking', liabilityAccountName: 'Credit Card',
   },

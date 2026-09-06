@@ -9,7 +9,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-let mockFetch: ReturnType<typeof vi.fn>;
+let mockFetch: ReturnType<typeof installCsrfFetchMock>;
 
 function renderAt(search: string, totalCount = 5, onAfterBulk = vi.fn()) {
   return render(

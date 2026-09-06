@@ -7,7 +7,7 @@ function row(over: Partial<AccountListItemDto>): AccountListItemDto {
   return {
     id: 'x', name: 'X', accountTypeId: 1, accountTypeName: 'Asset',
     currencyId: 1, currencyCode: 'EUR', currencySymbol: '€',
-    description: null, isActive: true, excludeFromSpendable: false,
+    description: null, isActive: true, excludeFromSpendable: false, excludeFromReports: false,
     liabilityRepaymentType: null, interestRate: null,
     balance: 0, hasTransactions: false,
     ...over,

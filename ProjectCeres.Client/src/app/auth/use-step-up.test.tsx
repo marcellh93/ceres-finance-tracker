@@ -30,7 +30,7 @@ it('replays the action after a successful reauth and returns its result', async 
   // Mock the dialog's reauth POST to 204 so onSuccess fires.
   global.fetch = vi.fn(async (url: string) =>
     url.includes('/api/auth/csrf') ? ({ headers: new Headers({ 'X-XSRF-TOKEN': 't' }) } as unknown as Response)
-                                   : ({ status: 204 } as Response));
+                                   : ({ status: 204 } as Response)) as unknown as typeof fetch;
   render(<StepUpProvider><Probe action={action} /></StepUpProvider>);
   await userEvent.click(screen.getByText('go'));
   // dialog opens; submit it

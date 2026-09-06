@@ -10,13 +10,13 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-let mockFetch: ReturnType<typeof vi.fn>;
+let mockFetch: ReturnType<typeof installCsrfFetchMock>;
 
 const activeWithTransactions: AccountListItemDto = {
   id: 'a-1', name: 'Checking Account',
   accountTypeId: 1, accountTypeName: 'Asset',
   currencyId: 1, currencyCode: 'EUR', currencySymbol: '€',
-  description: null, isActive: true, excludeFromSpendable: false,
+  description: null, isActive: true, excludeFromSpendable: false, excludeFromReports: false,
   liabilityRepaymentType: null, interestRate: null,
   balance: 2114.56, hasTransactions: true,
 };

@@ -46,7 +46,7 @@ Before saying "done," "ready," "complete," or "passing," run the tier-scoped pre
 Then:
 
 1. **Build is clean** (no errors, no new warnings) for every command the tier required:
-   - Frontend pair: `pnpm --dir ProjectCeres.Client build`
+   - Frontend pair: `pnpm --dir ProjectCeres.Client build` — this runs `tsc -b`, which **type-checks test files too** (`.test.ts(x)` + `test-setup.ts` via the `tsconfig.test.json` project reference, added Stage 12.8.4). Before then, no command type-checked a test file, so a test asserting against a moved type stayed green. `pnpm --dir ProjectCeres.Client typecheck` runs the same `tsc -b` standalone.
    - Backend pair: `dotnet build ProjectCeres/ProjectCeres.csproj`
 2. **Tests are all green** with zero skipped, unless every skip has an inline comment with a tracked issue link:
    - Frontend pair: `pnpm --dir ProjectCeres.Client test --run` (allow ONE retry on a known-isolation Vitest flake; if it fails twice, root-cause it)

@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountForm } from './AccountForm';
@@ -52,13 +53,14 @@ const initialEditLiability: AccountFormValues = {
 function renderForm(overrides?: {
   mode?: 'create' | 'edit';
   initialValues?: AccountFormValues;
-  onSubmit?: ReturnType<typeof vi.fn>;
+  onSubmit?: ComponentProps<typeof AccountForm>['onSubmit'];
 }) {
   const mode = overrides?.mode ?? 'create';
   const initialValues =
     overrides?.initialValues ??
     (mode === 'create' ? initialCreate : initialEditAsset);
-  const onSubmit = overrides?.onSubmit ?? vi.fn().mockResolvedValue({ ok: true });
+  const onSubmit =
+    overrides?.onSubmit ?? vi.fn<ComponentProps<typeof AccountForm>['onSubmit']>().mockResolvedValue({ ok: true });
   const onCancel = vi.fn();
   const utils = render(
     <AccountForm
