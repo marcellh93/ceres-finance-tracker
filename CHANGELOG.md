@@ -6,6 +6,14 @@
 
 #### Added
 
+**Tests (Stage 12.8 — email-change link-click E2E, 2026-09-06)**
+- New end-to-end coverage (`e2e/auth/email-change.spec.ts`) that clicks a real emailed email-change link, across chromium/firefox/webkit. One flow confirms a change from the security page and verifies the new address signs in while the old one is rejected; the other clicks the cancel link and verifies the change is aborted and the old address still signs in. Closes the gap Stage 9.11 scoped out (no page existed to drive then).
+
+**Authentication (Stage 12.8 — email-change SPA pages, 2026-08-29)**
+- You can now change your email address from the security page: enter a new address (behind an identity re-confirmation prompt), and a confirmation link is sent to the new address while a heads-up notice with a cancel link goes to your current address. The change takes effect only when you click the confirmation link.
+- New `/email-change/confirm` and `/email-change/revoke` pages behind those emailed links. Confirm switches your address; revoke cancels a change still in flight. The revoke page explains, when the link is already spent, that the change may have already gone through, and points to password reset and support.
+- The security page shows a pending-change banner (with the target address masked and a live countdown to the 30-minute expiry), and an expired state offering to resend.
+
 **Support (Stage 12.6 — conversation model, 2026-08-28)**
 - The support surface is now a two-way conversation: a ticket holds an ordered thread of messages between the user and the operator, replacing the single-message ticket. Attachments now hang off a message (upload on the first message or any reply; download links in the thread).
 - New `/support` page — a list of your tickets, each opening its conversation in a slide-in panel whose address is in the URL (so a link opens straight to that thread). Compose a new ticket, reply, attach files, and close your own ticket; a closed ticket offers a follow-up.
