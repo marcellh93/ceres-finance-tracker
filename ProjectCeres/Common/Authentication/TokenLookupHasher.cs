@@ -17,20 +17,47 @@ namespace ProjectCeres.Common.Authentication;
 /// </summary>
 public sealed class TokenLookupHasher
 {
+    /// <summary>The unconfigured value shipped in appsettings.json. Reaching the hasher means
+    /// no real secret was supplied — user-secrets locally, the hosting secret store in Production.</summary>
+    internal const string UnconfiguredPlaceholder = "configure-via-user-secrets";
+
+    private const string HowToConfigure =
+        "Set it in user-secrets locally (dotnet user-secrets --project ProjectCeres set "
+        + "'Authentication:TokenLookupSecret:Secret' \"$(openssl rand -base64 32)\") or in the "
+        + "hosting secret store in Production. Tests supply their own fixed value via the factory.";
+
     private readonly byte[] _key;
 
     public TokenLookupHasher(IOptions<TokenLookupOptions> options)
     {
-        var secret = options.Value.Secret
-            ?? throw new InvalidOperationException(
-                "Authentication:TokenLookupSecret is required.");
+        var secret = options.Value.Secret;
+        if (string.IsNullOrEmpty(secret) || secret == UnconfiguredPlaceholder)
+        {
+            // Name the cause + the fix. Without this the placeholder falls straight into
+            // Convert.FromBase64String and surfaces as a bare FormatException inside whatever
+            // auth path happened to run first — the wrong thing to debug from (Stage 12.12).
+            throw new InvalidOperationException(
+                "Authentication:TokenLookupSecret:Secret is not configured. " + HowToConfigure);
+        }
 
-        _key = Convert.FromBase64String(secret);
-        if (_key.Length < 32)
+        byte[] key;
+        try
+        {
+            key = Convert.FromBase64String(secret);
+        }
+        catch (FormatException ex)
         {
             throw new InvalidOperationException(
-                "Authentication:TokenLookupSecret must decode to >= 32 bytes.");
+                "Authentication:TokenLookupSecret:Secret is not valid base64. " + HowToConfigure, ex);
         }
+
+        if (key.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "Authentication:TokenLookupSecret:Secret must decode to >= 32 bytes. " + HowToConfigure);
+        }
+
+        _key = key;
     }
 
     public byte[] ComputeLookup(string rawToken)

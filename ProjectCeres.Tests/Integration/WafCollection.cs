@@ -44,6 +44,14 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     private const string MigratorConnectionString =
         "Host=localhost;Database=project_ceres_test;Username=ceres_migrator;Password=ceres_migrator_dev_password";
 
+    // Stage 12.12 — a fixed, obviously-test-only token-lookup secret (base64 of 32 bytes).
+    // Supplied by the factory so the suite does not depend on the developer's personal
+    // user-secrets store: a fresh clone / CI runner has none, and the appsettings placeholder
+    // "configure-via-user-secrets" is not valid base64, so TokenLookupHasher's ctor would
+    // fail every register / login / email-token path. NOT a real secret — never used in prod.
+    private const string TestTokenLookupSecret =
+        "dGVzdC1vbmx5LXRva2VuLWxvb2t1cC1zZWNyZXQtMzJieHg=";
+
     // Per-factory upload root keeps WAF-based tests from leaking files into the SUT
     // project root (ProjectCeres/uploads/). Cleaned up in Dispose(bool).
     private readonly string _uploadsRoot =
@@ -86,6 +94,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:AdminConnection",       AdminConnectionString);
         builder.UseSetting("ConnectionStrings:MigrationConnection",   MigratorConnectionString);
         builder.UseSetting("FileAttachments:RootPath", _uploadsRoot);
+
+        // Stage 12.12 — supply the token-lookup secret from the fixture, not the developer's
+        // user-secrets store (which the default host loads only under Development, so the suite
+        // was silently depending on a personal file that a fresh clone / CI runner lacks).
+        builder.UseSetting("Authentication:TokenLookupSecret:Secret", TestTokenLookupSecret);
 
         builder.ConfigureServices(services =>
         {

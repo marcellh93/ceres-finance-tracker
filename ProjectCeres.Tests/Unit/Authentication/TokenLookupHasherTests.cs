@@ -56,4 +56,28 @@ public class TokenLookupHasherTests
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*32*");
     }
+
+    [Fact]
+    public void Ctor_throws_a_named_error_for_the_unconfigured_placeholder()
+    {
+        // Stage 12.12: the appsettings.json placeholder must fail with a message that names
+        // the cause + the fix, NOT a bare FormatException from Convert.FromBase64String deep
+        // in whatever auth path ran first. This is the exact value that reached the hasher on
+        // a fresh clone / CI runner and 500'd ~307 tests.
+        var act = () => Build("configure-via-user-secrets");
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not configured*")
+            .Which.Message.Should().Contain("user-secrets");
+    }
+
+    [Fact]
+    public void Ctor_wraps_a_base64_FormatException_in_a_named_error()
+    {
+        // A non-placeholder but still-invalid value (e.g. a truncated paste) must also name the
+        // cause rather than surface the raw FormatException. The original is kept as InnerException.
+        var act = () => Build("not valid base64 !!!");
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not valid base64*")
+            .And.InnerException.Should().BeOfType<FormatException>();
+    }
 }
