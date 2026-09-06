@@ -1590,7 +1590,7 @@ It was NOT promoted in 12.8: building the component, converting five call sites,
 
 ### Stage 12.8.4 — Test files are never type-checked (not scheduled)
 
-**Status: ❌ Open.** Found 2026-08-29 during the Stage 12.8 screen review, by a dead prop that nothing in the toolchain could see.
+**Status: ✅ Done (2026-09-06).** Test files are now in the type-check graph (`tsconfig.test.json` as a root project reference), so `tsc -b` / `pnpm build` type-check them; all 87 surfaced errors fixed (test-side, no production regression). Found 2026-08-29 during the Stage 12.8 screen review, by a dead prop that nothing in the toolchain could see.
 
 `tsconfig.app.json` ends with `"exclude": ["src/test-setup.ts", "src/**/*.test.ts", "src/**/*.test.tsx"]`, and no other project in the solution includes them — the root `tsconfig.json` has `"files": []` and references only `tsconfig.app.json` (src minus tests), `tsconfig.node.json` (vite config), and `tsconfig.e2e.json` (e2e). Vitest transpiles tests through esbuild, which strips types without checking them. So **no command in this repo type-checks a test file**: not `pnpm build`, not `pnpm test`, and CI would not catch it either.
 
@@ -1598,10 +1598,10 @@ Concretely what slipped through: `TotpEnrollStep1ScanVerify.test.tsx` passed `on
 
 Measured cost of closing it: type-checking `src` with the exclusions removed produces **256 errors** today. The bulk are `TS2304: Cannot find name 'global'` (a missing `@types/node` reference in the test tsconfig, not real bugs), but there is genuine drift too — e.g. `AccountCurrencySubtotals.test.tsx:7` builds an `AccountListItemDto` whose `excludeFromReports` no longer matches the type.
 
-- [ ] Add a `tsconfig.test.json` that includes `src/**/*.test.ts(x)` + `src/test-setup.ts` with `"types": ["node", "vitest/globals", "@testing-library/jest-dom"]`, referenced from the root solution file.
-- [ ] Fix the `global` errors first (one types entry should clear most of the 256), then triage what remains — each surviving error is a test asserting against a type that has moved.
-- [ ] Add the check to the `build` script or a `typecheck` script so it cannot rot again, and note it in `docs/testing.md` § Definition of Done.
-- *Tripwire: this checklist. Re-measure with a temporary tsconfig extending `tsconfig.app.json` with `"exclude": []`.*
+- [x] Added `tsconfig.test.json` (extends `tsconfig.app.json` for the same strictness; `types: [vite/client, vitest/globals, node, @testing-library/jest-dom]`; includes the test files with `exclude: []`), wired as a project reference in the root `tsconfig.json`.
+- [x] The `node` types entry cleared the ~167 `global` errors as predicted; fixed all 87 that remained. All test-side, no production regression: mock-fetch spies typed `MockInstance<typeof fetch>`; `installCsrfFetchMock` consumers typed by its return (`appCalls`); `onSubmit` mocks typed via `ComponentProps<typeof Form>['onSubmit']`; stale DTO fixtures given the now-required `excludeFromReports` / `isOpeningBalance`; `ApiFailure` union narrowed before `fieldErrors`/`formError` **with an added discriminant assertion** so a regressed shape fails loudly; `MovementType` widened in a test helper; `MovementEdit` `.mock.calls` destructure cast.
+- [x] `tsc -b` (build mode) now type-checks the test project via the reference, so `pnpm build` covers it — the check cannot rot. Added a standalone `typecheck` script (`tsc -b`) and noted it in `docs/testing.md` § Definition of Done. Ship-gate: `pnpm build` 0 errors, `pnpm test` 1094/1094.
+- *Tripwire retired: test files are now in the type-check graph; `pnpm build` fails on test type drift.*
 
 ### Stage 12.11 — Dev server serves a stale SPA shell (not scheduled)
 
