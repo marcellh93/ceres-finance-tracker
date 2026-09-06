@@ -101,15 +101,20 @@ public class RlsParityMetaTests
 
         try
         {
+            // Stage 12.8.2: IgnoreQueryFilters strips EF's application-layer UserId filter so the
+            // ONLY thing that can enforce isolation here is the Postgres RLS policy. Without it,
+            // the EF filter (scoped to the acting user) would return 0 for a `UserId == userA`
+            // predicate regardless of RLS — the negative assertion would pass even with RLS off,
+            // proving the filter worked rather than the database. Same fix as AssertRlsVisibility.
             await using (var appB = factory.NewAppContext(actingAs: userB))
             {
-                (await appB.Context.Accounts.CountAsync(a => a.UserId == userA))
-                    .Should().Be(0, "ceres_app acting as userB must not see userA's row");
+                (await appB.Context.Accounts.IgnoreQueryFilters().CountAsync(a => a.UserId == userA))
+                    .Should().Be(0, "ceres_app acting as userB must not see userA's row (RLS, not the EF filter)");
             }
 
             await using (var appA = factory.NewAppContext(actingAs: userA))
             {
-                (await appA.Context.Accounts.CountAsync(a => a.UserId == userA))
+                (await appA.Context.Accounts.IgnoreQueryFilters().CountAsync(a => a.UserId == userA))
                     .Should().Be(1, "ceres_app acting as userA must see its own row (positive control)");
             }
         }
