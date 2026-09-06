@@ -1561,7 +1561,7 @@ Carried to Stage 16 (hosting):
 
 ### Stage 12.8.2 — `AssertRlsVisibility` does not observe RLS for filtered entities (not scheduled)
 
-**Status: ❌ Open.** Found 2026-08-29 by the Stage 12.8 spec-intent review, after a first attempt at closing a related gap fell into the same trap.
+**Status: ✅ Done (2026-09-06).** `IgnoreQueryFilters()` now strips the EF filter in both halves of `AssertRlsVisibility` (refactored to a static core so a meta-test can drive the same shape), so the Postgres RLS policy is the only isolation mechanism left. All nine call sites pass for the right reason — every predicate scopes to `UserId == owner` against a fresh (zero-row) `otherUser`, so the owner count is unchanged and the negative half now genuinely exercises RLS. The same hand-rolled flaw in `RlsParityMetaTests.App_context_cannot_see_a_row_another_user_owns` (line 106) was fixed in the same commit — closing the class, not just the helper instance.
 
 `AppRoleTestBase.AssertRlsVisibility<TEntity>` is the AppRole suite's shared positive+negative control: the owner's `ceres_app` context must see its row, another user's must see zero. It issues `Set<TEntity>().CountAsync(predicate)` **without `IgnoreQueryFilters()`**. For any `IUserOwned` entity — which is every entity the RLS policies protect — EF's global query filter excludes the foreign row *before the query reaches Postgres*, so the negative half returns zero from the EF layer and **RLS is never consulted**. The helper therefore proves the EF filter holds, not the database wall, for exactly the entities whose database wall it exists to prove.
 
@@ -1569,10 +1569,10 @@ Demonstrated, not inferred: `EmailChangePendingUnderRlsTests` was written agains
 
 This is the hazard the Stage 9.5d spec named ("RLS policies are *silently inert*" in the admin-wired suite) partially reintroduced inside the suite built to escape it.
 
-- [ ] Add `IgnoreQueryFilters()` to both halves of `AssertRlsVisibility`, or give it an overload that does, and re-verify each of the **9 call sites across 8 files** still passes for the right reason — several may currently be passing on the EF filter alone. (Entities involved: `Category`, `EmailChangeToken` ×2, `LockoutUnlockToken`, `UserMfaBackupCode`, `AuditLog`, `UserSession`, `PasswordResetToken`, `EmailConfirmationToken` — all `IUserOwned`, so all affected.)
-- [ ] For each caller, confirm the negative assertion fails when its table's RLS policy is disabled. A caller that still passes is not testing RLS.
-- [ ] Consider a guard test that fails if `AssertRlsVisibility` is used on an entity in `UserOwnedModel.RlsTables` without filter-stripping, so the trap cannot be re-entered.
-- *Tripwire: the comment block in `EmailChangePendingUnderRlsTests.cs` pointing here.*
+- [x] Added `IgnoreQueryFilters()` to both halves of `AssertRlsVisibility` and re-verified all 9 call sites pass for the right reason (each predicate is `UserId == owner` against a fresh zero-row `otherUser`, so stripping the filter cannot change the owner count).
+- [x] Confirmed the negative assertion fails when the RLS policy is disabled — pinned once, not per-caller, by `RlsOffMakesOtherUserSeeOwnerRowTests`: it seeds an owner `UserSession`, `DISABLE`s the policy, and asserts the filter-stripped other-user read flips 0→1. Since all 9 callers share the helper, proving the helper observes RLS proves it for every caller (per the 2026-09-06 scope decision — one meta-proof over 9 per-caller toggles).
+- [x] Guard: the meta-proof is self-guarding (remove the strip from the helper and its RLS-disabled `.Should().Be(1)` fails, because the EF filter would return 0). Baking the strip *into* the helper also makes helper-misuse structurally impossible. A lexical source-scan guard was rejected — the project moved away from prose-scanning checks in 9.5a.
+- *Tripwire retired: both the helper and the `RlsParityMetaTests` sibling now strip the filter; the class is closed.*
 
 ### Stage 12.8.3 — Promote the inline warning strip to `<Alert variant="warning">` (not scheduled)
 
