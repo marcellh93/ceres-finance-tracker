@@ -57,7 +57,7 @@ export function AdminTicketThreadSheet({ ticketId, onClose, onChanged }: Props) 
   }, [load]);
 
   async function submit() {
-    if (thread === null || nextStatus === null) return;
+    if (thread === undefined || nextStatus === null) return;
     setSubmitting(true);
     try {
       const result = await apiFetch(adminTicketMessagesUrl(ticketId), {

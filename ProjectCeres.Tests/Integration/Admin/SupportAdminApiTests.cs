@@ -89,7 +89,9 @@ public class SupportAdminApiTests : IAsyncLifetime
     /// filter through the WAF's admin-connected AppDbContext. The opening message is seeded too,
     /// so the ticket looks like a real one. Cleaned up via the owner purge on teardown.
     /// </summary>
-    private async Task<Guid> SeedTicketAsync(SupportTicketStatus status, Guid owner, string marker)
+    private async Task<Guid> SeedTicketAsync(
+        SupportTicketStatus status, Guid owner, string marker,
+        SupportTicketPriority priority = SupportTicketPriority.Normal)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -99,7 +101,7 @@ public class SupportAdminApiTests : IAsyncLifetime
             UserId = owner,
             Subject = $"seeded {marker} {Guid.NewGuid():N}",
             Status = status,
-            Priority = SupportTicketPriority.Normal,
+            Priority = priority,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
@@ -365,6 +367,26 @@ public class SupportAdminApiTests : IAsyncLifetime
             .Where(i => i.GetProperty("subject").GetString()!.Contains(marker)).ToList();
         mine.Should().HaveCount(1, "only the Solved ticket matches the filter");
         mine[0].GetProperty("status").GetInt32().Should().Be((int)SupportTicketStatus.Solved);
+    }
+
+    [Fact]
+    public async Task List_filters_by_priority()
+    {
+        // The priority `.Where` branch is symmetric to status but was untested (test-audit
+        // finding, 2026-09-07). Seed two priorities, filter to one.
+        var (client, session, _) = await SignedInAdminAsync();
+        var owner = await RegisterAsync("prio");
+        var marker = $"prio-{Guid.NewGuid():N}";
+        await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, marker, SupportTicketPriority.Normal);
+        await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, marker, SupportTicketPriority.Urgent);
+
+        var resp = await client.SendAsync(Get(
+            $"/api/admin/support/tickets?pageSize=100&priority={SupportTicketPriority.Urgent}", session));
+        var body = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var mine = body.GetProperty("items").EnumerateArray()
+            .Where(i => i.GetProperty("subject").GetString()!.Contains(marker)).ToList();
+        mine.Should().HaveCount(1, "only the Urgent ticket matches the filter");
+        mine[0].GetProperty("priority").GetInt32().Should().Be((int)SupportTicketPriority.Urgent);
     }
 
     [Fact]
