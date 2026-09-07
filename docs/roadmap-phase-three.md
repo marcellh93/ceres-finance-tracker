@@ -1680,17 +1680,15 @@ Consequences:
 - [ ] Opt-out toggle in Settings notification preferences (the preferences surface itself may not exist yet — confirm)
 - *Tripwire: this checklist + the `planning-future.md` entry; `EmailTemplateKey` has no `NewSessionAlert` member until built.*
 
-### 12.5.4 — Unblock a blocked IP
+### 12.5.4 — Unblock a blocked IP ✅ Done (2026-09-07)
 
-*Deferral reason: tooling gap — no unblock endpoint, service method, or UI exists anywhere in the codebase (verified 2026-08-23: zero matches for "unblock" under `ProjectCeres/`). Stage 12.3 shipped the guard that makes blocking safe; giving blocks an undo is separate work.*
+Stage 12.3 (2026-08-23) added `Block IP` + a `SELF_LOCKOUT` guard but no way to reverse a block on another address — block your office IP and you were locked out of it without database access. This adds the undo, mirroring the block flow. Backend `2ce8e631`; frontend `eddec2e`.
 
-Stage 12.3 (2026-08-23) added `Block IP` to the session row plus a server-side `SELF_LOCKOUT` guard, so a user cannot block the address they are connected from. What it does **not** provide is a way to reverse a block on any *other* address — block your office IP and you cannot get it back without database access. The block confirmation dialog states this explicitly.
-
-- [ ] `ISessionService.TryUnblockIpAsync` + a `DELETE` endpoint under `api/sessions`
-- [ ] Blocked-address list on `/settings/sessions` — a block the user cannot see is a block they cannot reverse
-- [ ] Integration test: block an address, unblock it, confirm a request from it is no longer 403'd by `UserBlockedIpMiddleware`
-- [ ] Update the block confirmation dialog, which currently tells the user the action cannot be undone from the app
-- *Tripwire: the wording in `SessionsPage.tsx`'s block dialog and this checklist.*
+- [x] `ISessionService.TryUnblockIpAsync` + `GetBlockedIpsAsync`; `DELETE` + `GET /api/sessions/blocked-ips` (`[RequireRecentAuth]`, IP in the body). Scoped to `currentUser` and independently RLS-filtered (`UserBlockedIp` is `IUserOwned`); unknown/other-user address → `NOT_FOUND` (404, IDOR-safe).
+- [x] Blocked-addresses section on `/settings/sessions` (rendered only when non-empty), each row with a reauth-gated Unblock action; `load()` fetches sessions + blocked-ips under one step-up.
+- [x] Integration test: block → 403 via `UserBlockedIpMiddleware` → unblock → fresh login no longer 403 (`UserBlockedIpTests`), plus a concrete-IP service round-trip and an IDOR `NOT_FOUND` test. Live endpoint round-trip captured in the stage curl-transcript. **E2E**: `sessions-page.spec.ts` drives block→unblock through the real UI, 3/3 browsers.
+- [x] Block confirmation dialog copy updated — no longer says the action can't be undone; it points at the Blocked addresses section. Unblock dialog is explicit that sessions revoked by the block stay revoked.
+- *Tripwire retired: the "cannot undo" wording is gone, and the checklist is complete.*
 
 ---
 
