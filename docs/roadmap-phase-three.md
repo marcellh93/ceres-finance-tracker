@@ -1650,15 +1650,15 @@ Consequences:
 
 **Reason each qualifies as a deferral (no-unjustified-deferrals gate):** user-authorized AND a tooling/infra gap — the capability each needs does not exist in the codebase today (see per-item notes).
 
-### 12.5.1 — Per-session IP-anchor toggle
+### 12.5.1 — Per-session IP-anchor toggle ✅ Done (2026-09-08)
 
-*Deferral reason: tooling gap — `UserSession.IsIpAnchored` column + enforcement does not exist (the roadmap's Stage 6 carry-forward wrongly assumed it did). Needs a column migration + self-lockout design first.*
+*Deferral reason (original): tooling gap — `UserSession.IsIpAnchored` column + enforcement did not exist. **Built 2026-09-08** (`c57d0a84`), forks 1a (exact-IP) + 2a (reject→sign-out→re-login), 3-agent reviewer pipeline all pass (security-found rotation-hop gap fixed in the same commit).*
 
-- [ ] Add `IsIpAnchored` (or chosen-granularity) column to `UserSession` + RLS-table migration
-- [ ] Server-side enforcement: reject a request whose session is anchored and whose IP differs from the anchor (resolve granularity: exact-IP vs subnet vs ASN — exact-IP self-locks-out roaming mobile users)
-- [ ] Per-row toggle on `/settings/sessions` + a self-lockout UX warning + recovery path
-- [ ] Integration test: toggle on → request from a different IP → 401
-- *Tripwire: this checklist + the `planning-future.md` entry; no code stub exists to FIXME (the feature is greenfield).*
+- [x] Add `IsIpAnchored` column to `UserSession` + migration — `AddUserSessionIpAnchor` (bool, default false). Existing IUserOwned entity, so migration-only; rides the existing `UserSessions` RLS `user_isolation` policy (rls-audit confirms).
+- [x] Server-side enforcement — exact-IP (fork 1a). `SessionRevocationValidator` signs out an anchored session whose request IP ≠ `IpCreatedAt`, riding the per-request revocation SELECT. **Also enforced on the `__Host-Persist` rotation hop** (`PersistentCookieRotationMiddleware` runs before the validator): a mismatched-IP rotation is refused and `IsIpAnchored` is carried onto the rotated row. Subnet/ASN rejected — subnet lets a same-network thief through, ASN needs a dataset; opt-in makes the roaming-lockout self-selected away.
+- [x] Per-row toggle on `/settings/sessions` + self-lockout UX warning + recovery path — reauth-gated `POST /api/sessions/{id}/anchor` (IDOR-404); confirm dialog states the honest scope (defends a replayed cookie, NOT a password sign-in) and warns the current-session case signs you out. Recovery (fork 2a) is a fresh login — no separate unlock.
+- [x] Integration test: toggle on → request from a different IP → 401 — `SessionIpAnchorTests` (mismatch→401 + two negative controls: same-IP→OK, unanchored→OK), plus `SessionsApiTests` (endpoint flag-flip + cross-user 404), `PersistentCookieRotationTests` (rotation anchor-refuse + carry-forward), `SessionsPage.test.tsx` 19/19, `sessions-page.spec.ts` E2E 15/15.
+- *Tripwire retired: the feature shipped; the `planning-future.md` entry is now historical.*
 
 ### 12.5.2 — Admin ticket-list UI ✅ Done (2026-09-07)
 
