@@ -119,3 +119,45 @@ test('Sessions: no Block IP action is offered on the current device', async ({
   await expect(page.getByText('This device')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Block IP' })).toHaveCount(0)
 })
+
+test('Sessions: a blocked address can be unblocked from the Blocked addresses section', async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  // Stage 12.5.4 — the real block→unblock round trip through the UI. Seed a block on a
+  // concrete address via the API (login first stamps the 5-minute reauth window that
+  // /api/sessions/block-ip requires), then unblock it in the browser.
+  const url = baseURL!
+  const user = await createVerifiedUser(request, url)
+  const loginRes = await postJson(request, url, '/api/auth/login', {
+    email: user.email,
+    password: DEFAULT_PASSWORD,
+    rememberMe: false,
+  })
+  if (loginRes.status() !== 204) throw new Error(`login failed: ${loginRes.status()}`)
+
+  const blockedIp = '203.0.113.77'
+  const blockRes = await postJson(request, url, '/api/sessions/block-ip', { ipAddress: blockedIp })
+  if (blockRes.status() !== 204) throw new Error(`block failed: ${blockRes.status()} ${await blockRes.text()}`)
+
+  const state = await request.storageState()
+  await page.context().addCookies(state.cookies)
+  await page.goto('/settings/sessions')
+
+  // The Blocked addresses section appears with the seeded address.
+  await expect(page.getByRole('heading', { level: 1, name: 'Active sessions', exact: true })).toBeVisible()
+  await expect(page.getByText('Blocked addresses')).toBeVisible()
+  await expect(page.getByText(blockedIp)).toBeVisible()
+
+  // Unblock it: confirm in the dialog.
+  await page.getByRole('button', { name: 'Unblock' }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText(new RegExp(`Unblock ${blockedIp.replace(/\./g, '\\.')}\\?`))).toBeVisible()
+  await dialog.getByRole('button', { name: 'Unblock' }).click()
+
+  // The section disappears once the only block is gone (it renders only when non-empty).
+  await expect(page.getByText('Blocked addresses')).toHaveCount(0)
+  await expect(page.getByText(blockedIp)).toHaveCount(0)
+})

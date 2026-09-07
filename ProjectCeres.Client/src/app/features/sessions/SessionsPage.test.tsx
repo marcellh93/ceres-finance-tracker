@@ -3,7 +3,7 @@ import { userEvent } from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionsPage } from './SessionsPage';
-import type { SessionDto } from './sessions-api';
+import { BLOCKED_IPS_URL, SESSIONS_URL, type BlockedIpDto, type SessionDto } from './sessions-api';
 
 // vi.mock is hoisted above const declarations, so the spies must be created
 // inside vi.hoisted for the factory to see them.
@@ -113,10 +113,14 @@ describe('SessionsPage', () => {
 
   it('revokes another session after confirmation and refetches the list', async () => {
     const user = userEvent.setup();
-    apiFetch
-      .mockResolvedValueOnce({ ok: true, status: 200, data: [session()] })
-      .mockResolvedValueOnce({ ok: true, status: 204, data: null })
-      .mockResolvedValueOnce({ ok: true, status: 200, data: [] });
+    // URL-aware: load() now fetches sessions AND blocked-ips, so positional
+    // once-chains are brittle. Route by endpoint instead. The DELETE resolves 204.
+    apiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === SESSIONS_URL) return Promise.resolve({ ok: true, status: 200, data: [session()] });
+      if (url === BLOCKED_IPS_URL) return Promise.resolve({ ok: true, status: 200, data: [] });
+      if (init?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204, data: null });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
 
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Revoke' }));
@@ -133,9 +137,13 @@ describe('SessionsPage', () => {
         expect.objectContaining({ method: 'DELETE' }),
       );
     });
-    // Third call is the refetch — the list on screen may be minutes stale
-    // after a mid-action reauth, so splicing locally would be wrong.
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
+    // A refetch follows the revoke — the list on screen may be minutes stale after
+    // a mid-action reauth, so splicing locally would be wrong. Assert the refetch
+    // re-hit the sessions endpoint rather than a raw call count (which now also
+    // includes the blocked-ips reads).
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.filter(([u]) => u === SESSIONS_URL).length).toBeGreaterThanOrEqual(2),
+    );
     expect(logout).not.toHaveBeenCalled();
   });
 
@@ -184,20 +192,25 @@ describe('SessionsPage', () => {
 
   it('blocks an address after confirmation and refetches', async () => {
     const user = userEvent.setup();
-    apiFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        data: [session({ id: 'other', isCurrent: false, ipCreatedAt: '198.51.100.7' })],
-      })
-      .mockResolvedValueOnce({ ok: true, status: 204, data: null })
-      .mockResolvedValueOnce({ ok: true, status: 200, data: [] });
+    apiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === SESSIONS_URL)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: [session({ id: 'other', isCurrent: false, ipCreatedAt: '198.51.100.7' })],
+        });
+      if (url === BLOCKED_IPS_URL) return Promise.resolve({ ok: true, status: 200, data: [] });
+      if (init?.method === 'POST') return Promise.resolve({ ok: true, status: 204, data: null });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
 
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Block IP' }));
 
     const dialog = await screen.findByRole('alertdialog');
-    expect(within(dialog).getByText(/cannot undo this from the app/i)).toBeInTheDocument();
+    // Copy changed in 12.5.4: the block is now reversible, so the dialog points at
+    // the Blocked addresses section instead of saying it cannot be undone.
+    expect(within(dialog).getByText(/lift the block later/i)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Block address' }));
 
     await waitFor(() => {
@@ -206,23 +219,31 @@ describe('SessionsPage', () => {
         expect.objectContaining({ method: 'POST', body: { ipAddress: '198.51.100.7' } }),
       );
     });
-    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(3));
+    // Refetch after block re-hits the sessions endpoint (≥2 times overall).
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.filter(([u]) => u === SESSIONS_URL).length).toBeGreaterThanOrEqual(2),
+    );
   });
 
   it('surfaces the server refusal if a block is rejected', async () => {
     const user = userEvent.setup();
-    apiFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        data: [session({ id: 'other', isCurrent: false })],
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 409,
-        code: 'SELF_LOCKOUT',
-        message: 'You cannot block the address you are currently connected from.',
-      });
+    apiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === SESSIONS_URL)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: [session({ id: 'other', isCurrent: false })],
+        });
+      if (url === BLOCKED_IPS_URL) return Promise.resolve({ ok: true, status: 200, data: [] });
+      if (init?.method === 'POST')
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          code: 'SELF_LOCKOUT',
+          message: 'You cannot block the address you are currently connected from.',
+        });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
 
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Block IP' }));
@@ -257,5 +278,86 @@ describe('SessionsPage', () => {
       await screen.findByText('Confirm your identity to view active sessions.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  // ---- Stage 12.5.4: blocked addresses + unblock ----
+
+  function blockedIp(over: Partial<BlockedIpDto> = {}): BlockedIpDto {
+    return { ipAddress: '198.51.100.7', blockedAt: '2026-08-25T10:00:00Z', ...over };
+  }
+
+  // Route sessions/blocked-ips by URL; `blocked` seeds the blocked list, `onDelete`
+  // answers the unblock DELETE.
+  function mockLoad(opts: {
+    sessions?: SessionDto[];
+    blocked?: BlockedIpDto[];
+    onDelete?: () => unknown;
+  }) {
+    apiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === SESSIONS_URL)
+        return Promise.resolve({ ok: true, status: 200, data: opts.sessions ?? [] });
+      if (url === BLOCKED_IPS_URL && init?.method === 'DELETE')
+        return Promise.resolve(opts.onDelete ? opts.onDelete() : { ok: true, status: 204, data: null });
+      if (url === BLOCKED_IPS_URL)
+        return Promise.resolve({ ok: true, status: 200, data: opts.blocked ?? [] });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
+  }
+
+  it('lists blocked addresses when the user has any', async () => {
+    mockLoad({ blocked: [blockedIp({ ipAddress: '203.0.113.42' })] });
+    renderPage();
+
+    expect(await screen.findByText('Blocked addresses')).toBeInTheDocument();
+    expect(screen.getByText('203.0.113.42')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unblock' })).toBeInTheDocument();
+  });
+
+  it('hides the blocked-addresses section entirely when there are none', async () => {
+    mockLoad({ blocked: [] });
+    renderPage();
+
+    // Wait for the page to settle (the sessions card renders), then assert the
+    // section is absent rather than empty-with-a-header.
+    await screen.findByText('Active sessions');
+    expect(screen.queryByText('Blocked addresses')).not.toBeInTheDocument();
+  });
+
+  it('unblocks an address after confirmation and refetches', async () => {
+    const user = userEvent.setup();
+    mockLoad({ blocked: [blockedIp({ ipAddress: '203.0.113.42' })] });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Unblock' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/Unblock 203\.0\.113\.42\?/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Unblock' }));
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        BLOCKED_IPS_URL,
+        expect.objectContaining({ method: 'DELETE', body: { ipAddress: '203.0.113.42' } }),
+      ),
+    );
+    expect(toastSuccess).toHaveBeenCalledWith('Unblocked 203.0.113.42.');
+    // Refetch after unblock re-hits the sessions endpoint.
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.filter(([u]) => u === SESSIONS_URL).length).toBeGreaterThanOrEqual(2),
+    );
+  });
+
+  it('surfaces the server error if an unblock is rejected', async () => {
+    const user = userEvent.setup();
+    mockLoad({
+      blocked: [blockedIp({ ipAddress: '203.0.113.42' })],
+      onDelete: () => ({ ok: false, status: 404, code: 'NOT_FOUND', message: 'No block found for that address.' }),
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Unblock' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Unblock' }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('No block found for that address.'));
   });
 });

@@ -21,7 +21,14 @@ import { useDelayedLoading } from '../../lib/use-delayed-loading';
 import { apiFetch } from '../../lib/api-client';
 import { useStepUp, ReauthCancelledError, ReauthBusyError } from '../../auth/use-step-up';
 import { useAuth } from '../../auth/auth-context';
-import { BLOCK_IP_URL, SESSIONS_URL, sessionUrl, type SessionDto } from './sessions-api';
+import {
+  BLOCK_IP_URL,
+  BLOCKED_IPS_URL,
+  SESSIONS_URL,
+  sessionUrl,
+  type BlockedIpDto,
+  type SessionDto,
+} from './sessions-api';
 import { summarizeUserAgent } from './user-agent-summary';
 
 /**
@@ -50,16 +57,28 @@ export function SessionsPage() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [pendingBlock, setPendingBlock] = useState<SessionDto | null>(null);
   const [blockingIp, setBlockingIp] = useState<string | null>(null);
+  const [blockedIps, setBlockedIps] = useState<BlockedIpDto[]>([]);
+  const [pendingUnblock, setPendingUnblock] = useState<BlockedIpDto | null>(null);
+  const [unblockingIp, setUnblockingIp] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(undefined);
     try {
-      const result = await requireStepUp(() => apiFetch<SessionDto[]>(SESSIONS_URL));
-      if (result.ok) {
-        setSessions(result.data ?? []);
+      // Both reads are reauth-gated; wrapping the pair in one requireStepUp means a
+      // single identity check covers the whole page load, not one prompt per request.
+      const result = await requireStepUp(async () => {
+        const sessionsResult = await apiFetch<SessionDto[]>(SESSIONS_URL);
+        const blockedResult = await apiFetch<BlockedIpDto[]>(BLOCKED_IPS_URL);
+        return { sessionsResult, blockedResult };
+      });
+      if (result.sessionsResult.ok) {
+        setSessions(result.sessionsResult.data ?? []);
+        // The blocked list is secondary; if only it fails, keep the page usable and
+        // leave the section empty rather than blocking the whole load on it.
+        setBlockedIps(result.blockedResult.ok ? (result.blockedResult.data ?? []) : []);
       } else {
-        setError(new Error(result.message));
+        setError(new Error(result.sessionsResult.message));
       }
     } catch (err) {
       // Cancelling the reauth dialog is a deliberate choice, not a failure —
@@ -152,6 +171,33 @@ export function SessionsPage() {
       }
     } finally {
       setBlockingIp(null);
+    }
+  }
+
+  async function confirmUnblock() {
+    const target = pendingUnblock;
+    if (target === null) return;
+    setPendingUnblock(null);
+    setUnblockingIp(target.ipAddress);
+
+    try {
+      const result = await requireStepUp(() =>
+        apiFetch(BLOCKED_IPS_URL, { method: 'DELETE', body: { ipAddress: target.ipAddress } }),
+      );
+
+      if (!result.ok) {
+        toast.error(result.message || 'Could not unblock that address.');
+        return;
+      }
+
+      toast.success(`Unblocked ${target.ipAddress}.`);
+      await load();
+    } catch (err) {
+      if (!(err instanceof ReauthCancelledError)) {
+        toast.error('Could not unblock that address.');
+      }
+    } finally {
+      setUnblockingIp(null);
     }
   }
 
@@ -268,6 +314,43 @@ export function SessionsPage() {
         </Card>
       </DataTransition>
 
+      {/* Blocked addresses. Rendered only when the user has blocks — an empty
+          section is noise. A block you cannot see is a block you cannot reverse. */}
+      {blockedIps.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Blocked addresses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-border divide-y">
+              {blockedIps.map((blocked) => (
+                <li
+                  key={blocked.ipAddress}
+                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <span className="font-medium">{blocked.ipAddress}</span>
+                    <p className="text-muted-foreground text-sm">
+                      Blocked {new Date(blocked.blockedAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={unblockingIp === blocked.ipAddress}
+                      onClick={() => setPendingUnblock(blocked)}
+                    >
+                      Unblock
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       <AlertDialog
         open={pendingRevoke !== null}
         onOpenChange={(open) => !open && setPendingRevoke(null)}
@@ -301,8 +384,7 @@ export function SessionsPage() {
             <AlertDialogTitle>Block {pendingBlock?.ipCreatedAt}?</AlertDialogTitle>
             <AlertDialogDescription>
               Every session from this address is signed out, and future sign-ins from it are
-              refused. You cannot undo this from the app yet, so only block an address you are
-              sure you will not need.
+              refused. You can lift the block later under Blocked addresses below.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -310,6 +392,25 @@ export function SessionsPage() {
             <AlertDialogAction variant="destructive" onClick={() => void confirmBlock()}>
               Block address
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingUnblock !== null}
+        onOpenChange={(open) => !open && setPendingUnblock(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unblock {pendingUnblock?.ipAddress}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sign-ins from this address will be allowed again. Sessions that were signed out
+              when you blocked it stay signed out — this only restores future access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmUnblock()}>Unblock</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

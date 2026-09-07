@@ -3,6 +3,7 @@
 export const SESSIONS_URL = '/api/sessions';
 export const sessionUrl = (id: string) => `/api/sessions/${id}`;
 export const BLOCK_IP_URL = '/api/sessions/block-ip';
+export const BLOCKED_IPS_URL = '/api/sessions/blocked-ips';
 
 // ---------- DTOs ----------
 
@@ -20,4 +21,10 @@ export type SessionDto = {
   ipCreatedAt: string;
   userAgent: string;
   isCurrent: boolean;
+};
+
+/** Mirrors `ProjectCeres/ViewModels/Sessions/BlockedIpDto.cs`. */
+export type BlockedIpDto = {
+  ipAddress: string;
+  blockedAt: string;
 };
