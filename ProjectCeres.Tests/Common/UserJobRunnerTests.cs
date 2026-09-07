@@ -96,8 +96,15 @@ public class UserJobRunnerTests : IAsyncLifetime
     public async Task ForEachUserAsync_exits_loop_early_when_token_cancels_between_users()
     {
         // Pins the pre-iteration cancellation check (`if (ct.IsCancellationRequested) break;`).
-        // Two users, A and B. Work on A cancels the token. The runner must NOT invoke
-        // work on B — even though both passed the filter and would otherwise iterate.
+        // Two users pass the filter. The FIRST user's work cancels the token; the runner must
+        // NOT invoke work on the second — even though both would otherwise iterate.
+        //
+        // ForEachUserAsync does not ORDER BY (the enumeration order is Postgres's choice), so the
+        // test must not assume which user comes first: it cancels on whichever the runner hits
+        // first and asserts the other is skipped. The earlier version pinned a specific user and
+        // passed only when Postgres happened to return that row first — a latent order-flake that
+        // failed once the row order flipped (2026-09-07). The contract under test is order-
+        // independent, so the test now is too.
         var userA = await AuthTestFixture.RegisterUserAsync(_factory, $"cancel-a-{Guid.NewGuid():N}{TestEmailSuffix}");
         var userB = await AuthTestFixture.RegisterUserAsync(_factory, $"cancel-b-{Guid.NewGuid():N}{TestEmailSuffix}");
 
@@ -113,14 +120,17 @@ public class UserJobRunnerTests : IAsyncLifetime
             id =>
             {
                 invoked.Add(id);
-                if (id == userA.Id) cts.Cancel();
+                // Cancel on the first user the runner reaches, regardless of DB order.
+                if (invoked.Count == 1) cts.Cancel();
                 return Task.CompletedTask;
             },
             cts.Token);
 
-        invoked.Should().ContainSingle()
-            .Which.Should().Be(userA.Id,
-                "the pre-iteration cancellation check must skip user B's invocation once A's work cancelled the token");
+        // Exactly one user was invoked (the second was skipped by the cancellation check), and it
+        // was one of the two that passed the filter — without assuming which the DB returned first.
+        invoked.Should().HaveCount(1, "the pre-iteration cancellation check must skip the second "
+            + "user's invocation once the first user's work cancelled the token");
+        invoked.Should().BeSubsetOf(new[] { userA.Id, userB.Id });
     }
 
     [Fact]
