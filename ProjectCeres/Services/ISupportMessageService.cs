@@ -21,7 +21,13 @@ public interface ISupportMessageService
     /// not owned by the caller), or <see cref="InvalidOperationException"/> if the transition is
     /// refused (e.g. the ticket is Closed).
     /// </summary>
-    Task<SupportMessage> PostUserReplyAsync(Guid ticketId, string body, CancellationToken ct = default);
+    /// <summary>
+    /// Appends a user reply and advances status. Returns the new message and the ticket
+    /// it was loaded against — the caller reuses the ticket's header (subject/priority) for
+    /// the operator notification instead of re-fetching the whole thread.
+    /// </summary>
+    Task<(SupportMessage Message, SupportTicket Ticket)> PostUserReplyAsync(
+        Guid ticketId, string body, CancellationToken ct = default);
 
     /// <summary>One of the caller's own tickets with its full message thread, oldest first. Null if not theirs.</summary>
     Task<SupportTicket?> GetThreadAsync(Guid ticketId, CancellationToken ct = default);

@@ -137,9 +137,10 @@ public class SupportApiController(
     public async Task<IActionResult> Reply(Guid ticketId, [FromBody] ReplyRequest request, CancellationToken ct)
     {
         SupportMessage message;
+        SupportTicket ticket;
         try
         {
-            message = await messages.PostUserReplyAsync(ticketId, request.Body, ct);
+            (message, ticket) = await messages.PostUserReplyAsync(ticketId, request.Body, ct);
         }
         catch (SupportTicketNotFoundException)
         {
@@ -154,12 +155,10 @@ public class SupportApiController(
             return Validation(ex);
         }
 
-        // Notify the operator of the new user reply. The ticket carries the subject/priority
-        // the notification quotes; GetThreadAsync scopes to the caller, so a foreign or
-        // absent ticket would have already thrown out of PostUserReplyAsync above.
-        var ticket = await messages.GetThreadAsync(ticketId, ct);
-        if (ticket is not null)
-            await notify.NotifyOperatorOfUserReplyAsync(ticket, FromDisplay(), message.Body, ct);
+        // Notify the operator of the new user reply. PostUserReplyAsync already loaded the
+        // ticket (owner-scoped) to run the state machine and returns it, so the notification
+        // reuses its subject/priority — no second full-thread fetch.
+        await notify.NotifyOperatorOfUserReplyAsync(ticket, FromDisplay(), message.Body, ct);
 
         return Ok(new MessageDto(
             message.Id, message.AuthorRole, message.Body, message.CreatedAt, []));

@@ -105,12 +105,18 @@ public class SupportMessageServiceTests : IAsyncLifetime
         var marker = $"reply-open-{Guid.NewGuid():N}";
         var ticket = await SeedTicketAsync(SupportTicketStatus.Pending, Sentinel, marker);
 
-        var message = await _service.PostUserReplyAsync(ticket.Id, "Still broken, here's more detail.");
+        var (message, returnedTicket) = await _service.PostUserReplyAsync(ticket.Id, "Still broken, here's more detail.");
 
         message.AuthorRole.Should().Be(SupportMessageAuthor.User);
         message.SupportTicketId.Should().Be(ticket.Id);
         message.UserId.Should().Be(Sentinel);
         message.Body.Should().Be("Still broken, here's more detail.");
+
+        // The returned ticket is the one the reply loaded — the controller reuses its
+        // header for the operator notification instead of re-fetching the whole thread.
+        returnedTicket.Id.Should().Be(ticket.Id);
+        returnedTicket.Status.Should().Be(SupportTicketStatus.Open,
+            "the returned ticket reflects the post-reply status the notification quotes");
 
         var persistedMessage = await _fixture.Db.SupportMessages.AsNoTracking()
             .SingleAsync(m => m.Id == message.Id);

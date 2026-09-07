@@ -23,7 +23,8 @@ public sealed class SupportMessageService : ISupportMessageService
         _timeProvider = timeProvider;
     }
 
-    public async Task<SupportMessage> PostUserReplyAsync(Guid ticketId, string body, CancellationToken ct = default)
+    public async Task<(SupportMessage Message, SupportTicket Ticket)> PostUserReplyAsync(
+        Guid ticketId, string body, CancellationToken ct = default)
     {
         var ticket = await _db.SupportTickets.Owned(_user)
             .FirstOrDefaultAsync(t => t.Id == ticketId, ct)
@@ -48,7 +49,7 @@ public sealed class SupportMessageService : ISupportMessageService
         ticket.Status = result.NewStatus;
         ticket.UpdatedAt = now;
         await _db.SaveChangesAsync(ct);
-        return message;
+        return (message, ticket);
     }
 
     public async Task<SupportTicket?> GetThreadAsync(Guid ticketId, CancellationToken ct = default) =>
