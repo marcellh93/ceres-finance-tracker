@@ -1467,10 +1467,10 @@ Server side:
 Tests:
 
 - [x] Revoke own session, verify cookie no longer authenticates — `SessionsApiTests` + the e2e revoke spec
-- [ ] Block own IP, verify subsequent requests from same IP rejected
+- [x] Block own IP, verify subsequent requests from same IP rejected — `UserBlockedIpTests.Authenticated_request_from_blocked_ip_returns_403_and_revokes_matching_sessions` (seeds the block on the session's recorded IP, then a subsequent authenticated request 403s and the session is revoked)
 - [x] Submit ticket, verify admin receives email — `SupportNotificationTests`
 - [x] User A cannot view User B's ticket (IDOR) — `SupportApiTests` (404-not-403), `SupportConversationApiTests`
-- [ ] Reauthentication required to access `/settings/sessions`
+- [x] Reauthentication required to access `/settings/sessions` — `SessionsApiTests.Get_without_recent_auth_returns_401_REAUTH_REQUIRED` ([RequireRecentAuth] on all five `SessionsApiController` endpoints; a stale-reauth cookie gets 401 REAUTH_REQUIRED)
 
 ### Stage 12.6 — Support conversation model ✅ Done (2026-08-28)
 
@@ -1550,7 +1550,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 Carried to Stage 16 (hosting):
 
-- [ ] **Register the `SweepSessions` daily cron.** Add a daily cron entry running `dotnet run --project ProjectCeres -- --sweep-sessions` (or the deployed equivalent) so revoked/expired `UserSession` rows are purged at the 90-day horizon per `security-model.md` § Retention. Same cron-command mechanism the Stage 13.6 audit-log purge can reuse.
+- [x] **Register the `SweepSessions` daily cron — moved to Stage 16 § Scheduled jobs (cron) on 2026-09-07.** The sweep tool + `SessionRetentionSweepTests` shipped here; registering the host-side daily cron needs a deployment target, so it lives as a receiving `[ ]` under Stage 16 (alongside the parallel 13.6 audit-purge cron). No code owed now.
 
 ### Stage 12.8.1 — Email-change follow-ups (not scheduled)
 
@@ -2162,6 +2162,10 @@ CI/CD:
 - [ ] **Playwright E2E suite (shipped in Stage 9.11) wired into CI** per Stage 16.16 — `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates.*
 - [ ] CD pipeline runs: build artifact, deploy to staging, run integration smoke tests, deploy to prod (manual approval gate)
 - [ ] Rollback plan documented: how to revert the last deploy in under 10 minutes
+
+Scheduled jobs (cron):
+
+- [ ] **Register the `SweepSessions` daily cron.** A daily host cron (or provider scheduler) runs `dotnet run --project ProjectCeres -- --sweep-sessions` (or the deployed equivalent) so revoked/expired `UserSession` rows are purged at the 90-day horizon per `security-model.md` § Retention. The sweep tool + its `SessionRetentionSweepTests` coverage shipped in Stage 12.10; only the host-side cron entry remains, which needs a deployment target to exist. Carried in from Stage 12.10 on 2026-09-07. The Stage 13.6 audit-log auto-purge cron reuses this same cron-command mechanism.
 
 Container / runtime hardening (per `security-model.md` § Container / Runtime Hardening):
 
