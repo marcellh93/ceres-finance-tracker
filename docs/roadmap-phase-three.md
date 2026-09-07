@@ -1605,7 +1605,7 @@ Measured cost of closing it: type-checking `src` with the exclusions removed pro
 
 ### Stage 12.11 — Dev server serves a stale SPA shell (not scheduled)
 
-**Status: ❌ Open.** Raised 2026-08-29. An attempted fix shipped as `dafee78c` and was **reverted in `19ff467a`** — it broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` (404 instead of 200), and the cause is structural, not a small oversight. It reached `main` because a `Program.cs`-only turn classified TIER 1 (unit tests only) and never ran the integration suite; that gate hole is closed in `a0261dcd`.
+**Status: ✅ Done (2026-09-07, Option B).** The integration-test host now runs as `Testing`, not the default `Development` (`TestWebApplicationFactory.ConfigureWebHost` → `UseEnvironment("Testing")`), so `IsDevelopment()` means exactly one thing: a real `dotnet run` / `dotnet watch` session that actually has Vite listening. The Vite branch at `Program.cs:680` now applies to real developers only; the test host, which never runs Vite, cleanly takes the static-fallback path (`MapFallbackToFile("dist/app.html")`, registered in all environments). Option B was unblocked by §12.12 — moving off Development stops loading user secrets, and the factory now supplies the token-lookup secret itself. `Testing` was already a first-class environment (`Program.cs:60` enables import/review for it), so the only behaviour the flip changes for tests is skipping the Vite branch (the fix) and entering the prod exception-handler + HSTS block at line 653 (verified harmless: the 500-expecting and cookie/CSRF/startup tests pass on `Testing`). TIER M full-suite gate. Raised 2026-08-29; the earlier attempt (`dafee78c`, reverted `19ff467a`) tried to exclude the fallback path in Development instead and broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` because the test host was *also* Development — the two-meanings problem Option B removes.
 
 The problem: in Development the SPA shell is served from `wwwroot/dist/app.html` by `UseStaticFiles`, so a developer with Vite running still gets the last `pnpm build` output — no HMR client, and no `Cache-Control`, so the browser pins it until a hard reload. This is the `CLAUDE.md` § Stale-artifact trip-up, at its source.
 
@@ -1613,11 +1613,11 @@ The attempted fix excluded that path from static files in Development so Vite wo
 
 Three ways to fix it properly, each its own piece of work:
 
-- [ ] **Option A — boot-time reachability probe.** Try Vite's port at startup; fall back to static files if nothing answers. Honest, but adds a network call to boot and races a Vite server that starts slightly later.
-- [ ] **Option B — give the test host its own environment.** Set an environment other than Development on the shared `WebApplicationFactory` so `IsDevelopment()` stops carrying two meanings. **Attempted 2026-08-29 and reverted: it fails 307 tests as written, and § 12.12 is the reason.** ASP.NET loads user secrets *only* under Development, and `Authentication:TokenLookupSecret:Secret` exists nowhere else — so moving off Development hands `TokenLookupHasher` the literal `"configure-via-user-secrets"` placeholder, which throws `FormatException` at `Convert.FromBase64String` (`TokenLookupHasher.cs:28`) on every register / login / confirmation path. **§ 12.12 is a hard prerequisite:** the factory must supply its own secrets before this option is viable at all.
-- [ ] **Option C — per-request fallback.** Attempt Vite, serve the built shell when the proxy fails. Most robust, most complexity.
+- [ ] ~~**Option A — boot-time reachability probe.**~~ Not chosen — adds a boot network call and races a slightly-later Vite start.
+- [x] **Option B — give the test host its own environment.** Shipped 2026-09-07: `UseEnvironment("Testing")` on the shared factory, so `IsDevelopment()` no longer carries two meanings. The 307-test failure the first attempt hit was §12.12 (user secrets load only under Development); §12.12 shipped first and the factory now supplies the token-lookup secret, so the blocker is gone. Verified: env-sensitive slice (SPA-shell, 500-expecting, cookie/CSRF/startup) 23/23 green on `Testing`; full suite is the TIER M gate.
+- [ ] ~~**Option C — per-request fallback.**~~ Not chosen — most robust but most complexity; Option B fixes the root cause instead.
 
-Until one ships, the workaround stands: `tools/stage-spa.sh` before verifying a frontend change against a non-Vite app, per `CLAUDE.md`.
+The `tools/stage-spa.sh` workaround still applies to the *deliberate* non-Vite profiles (plain `dotnet run`, the agent-env Smoke profile) per `CLAUDE.md` — those legitimately serve the built bundle. What Option B fixed is the test host wrongly sharing the `Development` identity, not those profiles.
 
 ### Stage 12.12 — The test suite depends on a developer's local user-secrets store (not scheduled)
 
