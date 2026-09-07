@@ -114,4 +114,36 @@ public class SessionService(
         await tx.CommitAsync();
         return Result.Ok();
     }
+
+    public async Task<IReadOnlyList<BlockedIpDto>> GetBlockedIpsAsync()
+    {
+        var userId = currentUser.UserId;
+        return await db.UserBlockedIps
+            .Where(b => b.UserId == userId)
+            .OrderByDescending(b => b.BlockedAt)
+            .Select(b => new BlockedIpDto(b.IpAddress, b.BlockedAt))
+            .ToArrayAsync();
+    }
+
+    public async Task<Result> TryUnblockIpAsync(string? ipAddress)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            return Result.Fail("VALIDATION_ERROR", "IpAddress is required.");
+        }
+
+        var userId = currentUser.UserId;
+
+        // Scoped to the caller: an unknown IP or another user's block matches nothing
+        // and returns NOT_FOUND (the same IDOR-safe shape as TryRevokeAsync). We do not
+        // touch UserSessions — unblocking restores future access; it does not resurrect
+        // the sessions the block revoked (those stay revoked, as a revoke should).
+        var deleted = await db.UserBlockedIps
+            .Where(b => b.UserId == userId && b.IpAddress == ipAddress)
+            .ExecuteDeleteAsync();
+
+        return deleted > 0
+            ? Result.Ok()
+            : Result.Fail("NOT_FOUND", "No block found for that address.");
+    }
 }

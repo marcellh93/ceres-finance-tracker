@@ -38,6 +38,22 @@ public class SessionsApiController(ISessionService sessions) : ControllerBase
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
+    [HttpGet("blocked-ips")]
+    [RequireRecentAuth]
+    public async Task<ActionResult<BlockedIpDto[]>> BlockedIps()
+    {
+        var result = await sessions.GetBlockedIpsAsync();
+        return Ok(result.ToArray());
+    }
+
+    [HttpDelete("blocked-ips")]
+    [RequireRecentAuth]
+    public async Task<IActionResult> UnblockIp([FromBody] UnblockIpRequest request)
+    {
+        var result = await sessions.TryUnblockIpAsync(request.IpAddress);
+        return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
+    }
+
     private IActionResult ToErrorResponse(ResultError error) => error.Code switch
     {
         "NOT_FOUND" => NotFound(),
