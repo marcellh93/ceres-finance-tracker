@@ -518,6 +518,77 @@ public sealed class EmailChangeService
         }
     }
 
+    /// <summary>
+    /// Stage 12.8.1 — in-app cancel of the caller's OWN pending change. Unlike
+    /// <see cref="RevokeAsync"/> this is authenticated, not token-based: the user is
+    /// signed in, so we scope by <paramref name="userId"/> against the RLS-bound _db
+    /// (no pre-auth scope, no emailed token). It consumes both sibling tokens of the
+    /// newest in-flight change — the same end state the emailed revoke link produces.
+    ///
+    /// Deliberately NOT reauth-gated (the endpoint is [Authorize], not
+    /// [RequireRecentAuth]): cancelling returns the account to its status quo (the
+    /// current, unchanged address), so it is strictly less sensitive than the
+    /// reauth-gated /request that started the change. Requiring a fresh password to
+    /// UNDO a security action — often done precisely because the user is worried —
+    /// would be user-hostile. `/confirm` is the state-changing direction that stays
+    /// protected (token + 30-min window); cancel only removes an unconsumed intent.
+    /// </summary>
+    public async Task<EmailChangeCancelOutcome> CancelPendingAsync(Guid userId, CancellationToken ct)
+    {
+        var sem = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync(ct);
+        try
+        {
+            // "In flight" is an unconsumed VerifyNew (mirrors GetPendingAsync). Newest wins.
+            var pending = await _db.EmailChangeTokens
+                .Where(t => t.UserId == userId
+                         && t.Purpose == EmailChangeTokenPurpose.VerifyNew
+                         && t.ConsumedAt == null)
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (pending is null)
+            {
+                return new EmailChangeCancelOutcome.NothingPending();
+            }
+
+            // Consume both siblings (VerifyNew + RevokeOld) of this change together, keyed on
+            // NewEmail — exactly as RevokeAsync does. Scoped to the caller; no IgnoreQueryFilters
+            // needed because _db is already RLS-bound to this authenticated user.
+            await _db.EmailChangeTokens
+                .Where(t => t.UserId == userId
+                         && t.NewEmail == pending.NewEmail
+                         && t.ConsumedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, _timeProvider.GetUtcNow().UtcDateTime), ct);
+
+            // Notify the old (current, unchanged) address — the same "a pending change was
+            // cancelled" notice the emailed revoke path sends, so the loop is closed identically.
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is not null)
+            {
+                try
+                {
+                    var recipient = await _recipients.ResolveAsync(user.Id, ct);
+                    var culture = await _languages.ResolveForUserAsync(user.Id, ct);
+                    var msg = _composer.Compose(EmailTemplateKey.EmailChangeRevokeNotificationToOld, culture)
+                        with { To = recipient };
+                    await _email.SendAsync(msg, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send email-change cancel notification.");
+                }
+            }
+
+            await _auditLog.RecordAsync(userId, AuditLogAction.EmailChangeRevoked, ct: ct);
+            return new EmailChangeCancelOutcome.Cancelled();
+        }
+        finally
+        {
+            sem.Release();
+        }
+    }
+
     private void EnforceEmailRateLimit(string normalizedNewEmail)
     {
         // Sliding-window-ish: copy of PasswordResetService.EnforceEmailRateLimit with cache-key prefix swap.

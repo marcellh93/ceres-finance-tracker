@@ -87,3 +87,33 @@ test('change email → revoke link → change is cancelled, old address still si
   // The change was aborted: the old address still signs in.
   await login(page, user.email, user.password)
 })
+
+test('change email → cancel in-app → the pending banner clears', async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  // Stage 12.8.1 E1 — in-app cancel. Request a change, reload /app/security so the
+  // pending banner renders, click Cancel, and confirm the banner goes away without
+  // touching the emailed revoke link.
+  const user = await createVerifiedUser(request, baseURL!, {
+    email: uniqueEmail('emailcancel'),
+    password: DEFAULT_PASSWORD,
+  })
+  const newEmail = uniqueEmail('emailcancel-new')
+
+  await login(page, user.email, user.password)
+  await requestEmailChange(page, newEmail)
+
+  // Reload so the section reads /pending fresh and shows the "Waiting for confirmation"
+  // banner (with a Cancel action) rather than the just-submitted "sent" state.
+  await page.goto('/app/security')
+  await expect(page.getByText('Waiting for confirmation')).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: 'Cancel this change' }).click()
+
+  // The banner clears once the cancel completes and the section refetches /pending.
+  await expect(page.getByText('Waiting for confirmation')).toHaveCount(0, { timeout: 10_000 })
+  // And the primary "Change email address" affordance is back (no change in flight).
+  await expect(page.getByRole('button', { name: 'Change email address' })).toBeVisible()
+})

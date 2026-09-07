@@ -60,6 +60,7 @@ export function EmailAddressSection() {
   const [mode, setMode] = useState<Mode>({ kind: 'idle' });
   const [pending, setPending] = useState<PendingDto | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -79,6 +80,28 @@ export function EmailAddressSection() {
   useEffect(() => {
     void loadPending();
   }, [loadPending]);
+
+  // Stage 12.8.1 — in-app cancel of the pending change. Authenticated but not reauth-gated
+  // on the server (cancelling returns the account to its unchanged state). Refetch after so
+  // the banner redraws whether the cancel consumed a change or there was nothing left.
+  const cancelPending = async () => {
+    setCancelling(true);
+    setFormError(null);
+    try {
+      const result = await apiFetch('/api/auth/email-change/cancel', { method: 'POST' });
+      if (!result.ok) {
+        setFormError(t('security.email.errors.network'));
+        return;
+      }
+      setPending(null);
+      setMode({ kind: 'idle' });
+      await loadPending();
+    } catch {
+      setFormError(t('security.email.errors.network'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const minutes = useMinutesRemaining(
     pending?.pending && !pending.expired ? pending.expiresAt : null,
@@ -153,9 +176,24 @@ export function EmailAddressSection() {
               </>
             )}
             {mode.kind === 'idle' && (
-              <Button type="button" variant="outline" size="sm" onClick={() => setMode({ kind: 'form' })}>
-                {t(pending.expired ? 'security.email.resend' : 'security.email.changeButton')}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setMode({ kind: 'form' })}>
+                  {t(pending.expired ? 'security.email.resend' : 'security.email.changeButton')}
+                </Button>
+                {/* Cancel is offered only for a change still in flight — an expired one has
+                    nothing to cancel, so "Send a new link" is the right affordance there. */}
+                {!pending.expired && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={cancelling}
+                    onClick={() => void cancelPending()}
+                  >
+                    {t(cancelling ? 'security.email.cancelling' : 'security.email.cancelPending')}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>

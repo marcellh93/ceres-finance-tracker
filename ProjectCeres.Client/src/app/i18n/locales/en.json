@@ -285,6 +285,8 @@
       "expiredHeading": "That link expired",
       "expiredBody": "The confirmation link for {{email}} is no longer valid. Send a new one to try again.",
       "resend": "Send a new link",
+      "cancelPending": "Cancel this change",
+      "cancelling": "Cancelling…",
       "errors": {
         "unchanged": "That's already your address.",
         "alreadyInUse": "That address is already registered to another account.",

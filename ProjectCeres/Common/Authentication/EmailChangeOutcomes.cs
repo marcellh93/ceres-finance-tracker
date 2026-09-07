@@ -21,6 +21,18 @@ public abstract record EmailChangeRevokeOutcome
 }
 
 /// <summary>
+/// Outcome of an authenticated in-app cancel of the caller's own pending change
+/// (Stage 12.8.1). NothingPending is not an error to the user — the end state
+/// ("no change in flight") is what they wanted — but the endpoint distinguishes it
+/// so the UI can refresh rather than claim a cancel that did nothing.
+/// </summary>
+public abstract record EmailChangeCancelOutcome
+{
+    public sealed record Cancelled : EmailChangeCancelOutcome;
+    public sealed record NothingPending : EmailChangeCancelOutcome;
+}
+
+/// <summary>
 /// An email change awaiting confirmation. <paramref name="MaskedNewEmail"/> is already
 /// masked — the full address never leaves the server, so devtools cannot defeat the
 /// masking the settings banner relies on.

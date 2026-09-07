@@ -285,6 +285,8 @@
       "expiredHeading": "El enlace ha caducado",
       "expiredBody": "El enlace de confirmación para {{email}} ya no es válido. Envía uno nuevo para volver a intentarlo.",
       "resend": "Enviar un enlace nuevo",
+      "cancelPending": "Cancelar este cambio",
+      "cancelling": "Cancelando…",
       "errors": {
         "unchanged": "Esa ya es tu dirección.",
         "alreadyInUse": "Esa dirección ya pertenece a otra cuenta.",

@@ -219,4 +219,66 @@ describe('EmailAddressSection', () => {
       await screen.findByRole('button', { name: /change email address/i }),
     ).toBeInTheDocument();
   });
+
+  // ---- Stage 12.8.1: in-app cancel of a pending change ----
+
+  const pendingResponse = {
+    ok: true,
+    data: {
+      pending: true,
+      maskedEmail: 'n•••••@e•••••',
+      expiresAt: new Date(Date.now() + 20 * 60_000).toISOString(),
+      expired: false,
+    },
+  };
+
+  it('cancels a pending change in-app and clears the banner', async () => {
+    const user = userEvent.setup();
+    // URL-aware: first /pending shows a change; /cancel 204s; the re-fetch shows none.
+    let pendingCalls = 0;
+    apiFetch.mockImplementation((url: string) => {
+      if (url === '/api/auth/email-change/pending') {
+        pendingCalls += 1;
+        return Promise.resolve(pendingCalls === 1 ? pendingResponse : noPending);
+      }
+      if (url === '/api/auth/email-change/cancel') return Promise.resolve({ ok: true, data: null });
+      return Promise.resolve(noPending);
+    });
+
+    mount();
+
+    // The pending banner + a Cancel action appear.
+    await screen.findByText(/n•••••@e•••••/);
+    const cancelBtn = screen.getByRole('button', { name: /cancel this change/i });
+    await user.click(cancelBtn);
+
+    // The cancel endpoint is hit, NOT reauth-gated (no requireStepUp wrapper — the
+    // cancel handler calls apiFetch directly, unlike the reauth-gated request form).
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/auth/email-change/cancel',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    // Banner clears after the refetch returns no pending change.
+    await waitFor(() => expect(screen.queryByText(/n•••••@e•••••/)).toBeNull());
+  });
+
+  it('does not offer Cancel on an expired pending change', async () => {
+    // An expired change has nothing in flight to cancel — the affordance there is resend.
+    apiFetch.mockResolvedValue({
+      ok: true,
+      data: {
+        pending: true,
+        maskedEmail: 'n•••••@e•••••',
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        expired: true,
+      },
+    });
+    mount();
+
+    await screen.findByText(/n•••••@e•••••/);
+    expect(screen.queryByRole('button', { name: /cancel this change/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /send a new link/i })).toBeInTheDocument();
+  });
 });

@@ -104,6 +104,31 @@ public sealed class EmailChangeController : ControllerBase
             : new { pending = true, maskedEmail = (string?)pending.MaskedNewEmail, expiresAt = (DateTime?)pending.ExpiresAt, expired = pending.Expired });
     }
 
+    // Stage 12.8.1 — in-app cancel of the caller's own pending change. Authenticated but
+    // NOT [RequireRecentAuth]: cancelling returns the account to its unchanged status quo,
+    // strictly less sensitive than the reauth-gated /request that started the change (and
+    // requiring a password to UNDO a security action is user-hostile). The state-changing
+    // direction that stays reauth/token-protected is /confirm, not this.
+    [HttpPost("cancel"), Authorize]
+    public async Task<IActionResult> CancelChange()
+    {
+        var sid = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (sid is null || !Guid.TryParse(sid, out var userId))
+        {
+            return Unauthorized(new { error = new { code = "UNAUTHORIZED", message = "Authentication required." } });
+        }
+
+        var outcome = await _service.CancelPendingAsync(userId, HttpContext.RequestAborted);
+        // Both outcomes are 204: the end state the caller wanted ("no change in flight")
+        // holds either way. The UI refetches /pending to redraw regardless.
+        return outcome switch
+        {
+            EmailChangeCancelOutcome.Cancelled => NoContent(),
+            EmailChangeCancelOutcome.NothingPending => NoContent(),
+            _ => NoContent(),
+        };
+    }
+
     [HttpPost("confirm"), AllowAnonymous, PreAuthCallSite("EmailChange.ConfirmChange")]
     [EnableRateLimiting(AuthRateLimitPolicies.AuthLoginByIp)]
     public async Task<IActionResult> ConfirmChange([FromBody] EmailChangeConfirmRequest body)
