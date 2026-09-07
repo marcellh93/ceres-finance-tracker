@@ -86,6 +86,86 @@ public class Group3_AdminAndBackgroundTests
         }
     }
 
+    // Stage 12.5.2: pin the SupportTicket list read path specifically. The admin ticket-list
+    // endpoint reads adminDb.SupportTickets.IgnoreQueryFilters() across all users; these two
+    // prove that read relies on ceres_admin BYPASSRLS — the admin sees every owner's ticket,
+    // and a ceres_app context (a non-owner) sees zero even with the EF filter stripped. Without
+    // this, the cross-tenant list could regress to leaking-or-hiding and only the generic Account
+    // case above would notice.
+    [Fact]
+    public async Task Admin_list_read_path_sees_SupportTickets_from_all_users()
+    {
+        var ticketA = NewTicket(_fixture.UserA);
+        var ticketB = NewTicket(_fixture.UserB);
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            admin.SupportTickets.AddRange(ticketA, ticketB);
+            await admin.SaveChangesAsync();
+        }
+
+        try
+        {
+            await using var admin = _fixture.CreateAdminContext();
+            var rows = await admin.SupportTickets
+                .IgnoreQueryFilters()
+                .Where(t => t.Id == ticketA.Id || t.Id == ticketB.Id)
+                .ToListAsync();
+            rows.Should().HaveCount(2)
+                .And.Contain(t => t.UserId == _fixture.UserA)
+                .And.Contain(t => t.UserId == _fixture.UserB);
+        }
+        finally
+        {
+            await CleanupTickets(ticketA.Id, ticketB.Id);
+        }
+    }
+
+    [Fact]
+    public async Task App_context_does_NOT_see_another_users_SupportTicket_even_with_IgnoreQueryFilters()
+    {
+        var ticketA = NewTicket(_fixture.UserA);
+        var ticketB = NewTicket(_fixture.UserB);
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            admin.SupportTickets.AddRange(ticketA, ticketB);
+            await admin.SaveChangesAsync();
+        }
+
+        try
+        {
+            await using var appA = _fixture.CreateAppContext(_fixture.UserA);
+            var rows = await appA.SupportTickets
+                .IgnoreQueryFilters()
+                .Where(t => t.Id == ticketA.Id || t.Id == ticketB.Id)
+                .ToListAsync();
+            rows.Should().ContainSingle()
+                .Which.UserId.Should().Be(_fixture.UserA,
+                    "RLS filters B's ticket out of A's view regardless of IgnoreQueryFilters()");
+        }
+        finally
+        {
+            await CleanupTickets(ticketA.Id, ticketB.Id);
+        }
+    }
+
+    private static SupportTicket NewTicket(Guid userId) => new()
+    {
+        Id        = Guid.NewGuid(),
+        UserId    = userId,
+        Subject   = $"Group3 RLS ticket {Guid.NewGuid():N}",
+        Status    = SupportTicketStatus.Open,
+        Priority  = SupportTicketPriority.Normal,
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow,
+    };
+
+    private async Task CleanupTickets(Guid a, Guid b)
+    {
+        await using var admin = _fixture.CreateAdminContext();
+        await admin.SupportTickets.IgnoreQueryFilters()
+            .Where(x => x.Id == a || x.Id == b).ExecuteDeleteAsync();
+    }
+
     private static Account NewAccount(Guid userId) => new()
     {
         Id            = Guid.NewGuid(),

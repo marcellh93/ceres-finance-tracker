@@ -294,4 +294,127 @@ public class SupportAdminApiTests : IAsyncLifetime
         agentMessages.Should().HaveCount(1, "the owner reads the operator's reply in their own thread");
         agentMessages[0].GetProperty("authorRole").GetInt32().Should().Be((int)SupportMessageAuthor.Agent);
     }
+
+    // -------------------------------------------------------------------------
+    // Stage 12.5.2 — admin list + thread read surface
+    // -------------------------------------------------------------------------
+
+    private static HttpRequestMessage Get(string url, string session)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Add("Cookie", $"{SessionConstants.SessionCookieName}={session}");
+        return req;
+    }
+
+    [Fact]
+    public async Task List_returns_tickets_across_all_users_with_owner_email()
+    {
+        var (client, session, _) = await SignedInAdminAsync();
+        var userA = await RegisterAsync("owner-a");
+        var userB = await RegisterAsync("owner-b");
+        var marker = $"list-{Guid.NewGuid():N}";
+        var tA = await SeedTicketAsync(SupportTicketStatus.Open, userA.Id, marker);
+        var tB = await SeedTicketAsync(SupportTicketStatus.Pending, userB.Id, marker);
+
+        var resp = await client.SendAsync(Get("/api/admin/support/tickets?pageSize=100", session));
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+        var items = body.GetProperty("items").EnumerateArray()
+            .Where(i => i.GetProperty("subject").GetString()!.Contains(marker)).ToList();
+        items.Should().HaveCount(2, "the admin list spans all users, not just the admin's own");
+        var byId = items.ToDictionary(i => Guid.Parse(i.GetProperty("id").GetString()!));
+        byId[tA].GetProperty("ownerEmail").GetString().Should().Be(userA.Email);
+        byId[tA].GetProperty("ownerUserId").GetString().Should().Be(userA.Id.ToString());
+        byId[tB].GetProperty("ownerEmail").GetString().Should().Be(userB.Email);
+        byId[tA].GetProperty("messageCount").GetInt32().Should().Be(1, "the seeded opening message is counted");
+    }
+
+    [Fact]
+    public async Task List_paginates_with_a_total_count()
+    {
+        var (client, session, _) = await SignedInAdminAsync();
+        var owner = await RegisterAsync("pager");
+        var marker = $"page-{Guid.NewGuid():N}";
+        await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, marker);
+        await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, marker);
+
+        // pageSize=1 filtered to this run's two tickets: assert the envelope shape. `total` is the
+        // unfiltered global count, so assert it is >= 2 rather than == 2 (the DB is shared).
+        var resp = await client.SendAsync(Get("/api/admin/support/tickets?page=1&pageSize=1", session));
+        var body = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        body.GetProperty("items").GetArrayLength().Should().Be(1);
+        body.GetProperty("page").GetInt32().Should().Be(1);
+        body.GetProperty("pageSize").GetInt32().Should().Be(1);
+        body.GetProperty("total").GetInt32().Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task List_filters_by_status()
+    {
+        var (client, session, _) = await SignedInAdminAsync();
+        var owner = await RegisterAsync("filter");
+        var marker = $"filter-{Guid.NewGuid():N}";
+        await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, marker);
+        await SeedTicketAsync(SupportTicketStatus.Solved, owner.Id, marker);
+
+        var resp = await client.SendAsync(Get(
+            $"/api/admin/support/tickets?pageSize=100&status={SupportTicketStatus.Solved}", session));
+        var body = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var mine = body.GetProperty("items").EnumerateArray()
+            .Where(i => i.GetProperty("subject").GetString()!.Contains(marker)).ToList();
+        mine.Should().HaveCount(1, "only the Solved ticket matches the filter");
+        mine[0].GetProperty("status").GetInt32().Should().Be((int)SupportTicketStatus.Solved);
+    }
+
+    [Fact]
+    public async Task List_is_403_for_a_non_admin()
+    {
+        var caller = await RegisterAsync("plain-list");
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var session = await AuthTestFixture.LoginViaHttpAsync(_factory, client, caller.Email!);
+
+        var resp = await client.SendAsync(Get("/api/admin/support/tickets", session));
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Thread_returns_owner_and_ordered_messages()
+    {
+        var (client, session, _) = await SignedInAdminAsync();
+        var owner = await RegisterAsync("thread-owner");
+        var marker = $"thread-{Guid.NewGuid():N}";
+        var ticketId = await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, marker);
+
+        var resp = await client.SendAsync(Get($"/api/admin/support/tickets/{ticketId}", session));
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+        body.GetProperty("ownerUserId").GetString().Should().Be(owner.Id.ToString());
+        body.GetProperty("ownerEmail").GetString().Should().Be(owner.Email);
+        body.GetProperty("messages").GetArrayLength().Should().Be(1);
+        body.GetProperty("messages")[0].GetProperty("body").GetString().Should().Contain("opening");
+    }
+
+    [Fact]
+    public async Task Thread_is_404_for_an_unknown_id()
+    {
+        var (client, session, _) = await SignedInAdminAsync();
+        var resp = await client.SendAsync(Get($"/api/admin/support/tickets/{Guid.NewGuid()}", session));
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "an unresolved ticket id is 404, matching the IDOR 404-not-403 rule");
+    }
+
+    [Fact]
+    public async Task Thread_is_403_for_a_non_admin()
+    {
+        var owner = await RegisterAsync("thread-owner2");
+        var ticketId = await SeedTicketAsync(SupportTicketStatus.Open, owner.Id, $"t-{Guid.NewGuid():N}");
+        var caller = await RegisterAsync("plain-thread");
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var session = await AuthTestFixture.LoginViaHttpAsync(_factory, client, caller.Email!);
+
+        var resp = await client.SendAsync(Get($"/api/admin/support/tickets/{ticketId}", session));
+        resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
 }

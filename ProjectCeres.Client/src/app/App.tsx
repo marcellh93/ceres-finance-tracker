@@ -27,6 +27,8 @@ const Security = lazy(() => import('./pages/Security').then((m) => ({ default: m
 import { Settings } from './pages/Settings';
 import { Sessions } from './pages/Sessions';
 import { Support } from './pages/Support';
+import { AdminSupport } from './pages/AdminSupport';
+import { RequireAdmin } from './admin/RequireAdmin';
 import { AccountCreate } from './features/accounts/AccountCreate';
 import { AccountEdit } from './features/accounts/AccountEdit';
 import { AccountLedger } from './features/accounts/AccountLedger';
@@ -133,6 +135,11 @@ export function App() {
         <Route path="support" element={<Support />} />
         <Route path="support/new" element={<Support />} />
         <Route path="support/:ticketId" element={<Support />} />
+        {/* Stage 12.5.2 — first admin surface. RequireAdmin is UX-only (fork 2a): the
+            page's [RequireAdmin] API call is the server-side authority; a non-admin sees
+            the page's not-authorized state. */}
+        <Route path="admin/support" element={<RequireAdmin><AdminSupport /></RequireAdmin>} />
+        <Route path="admin/support/:ticketId" element={<RequireAdmin><AdminSupport /></RequireAdmin>} />
         <Route path="profile" element={<Profile />} />
         <Route
           path="security"

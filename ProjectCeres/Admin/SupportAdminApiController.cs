@@ -54,6 +54,122 @@ public sealed class SupportAdminApiController(
         [StringLength(5000)] string? Body,
         SupportTicketStatus Status);
 
+    /// <summary>One ticket in the admin triage list. Mirrors the user-facing rollup
+    /// (bodies never materialised) plus the OWNER identity the operator needs to know
+    /// who filed it. Stage 12.5.2.</summary>
+    public sealed record AdminTicketListItemDto(
+        Guid Id,
+        string Subject,
+        SupportTicketStatus Status,
+        SupportTicketPriority Priority,
+        Guid? PrecedingTicketId,
+        DateTime CreatedAt,
+        DateTime UpdatedAt,
+        int MessageCount,
+        DateTime LastMessageAt,
+        Guid OwnerUserId,
+        string OwnerEmail);
+
+    /// <summary>Offset-paginated envelope. First paginated list in the API — offset over
+    /// cursor because triage wants jump-to-page + a total; see api-contract.md.</summary>
+    public sealed record AdminTicketListResponse(
+        IReadOnlyList<AdminTicketListItemDto> Items,
+        int Page,
+        int PageSize,
+        int Total);
+
+    /// <summary>
+    /// The triage list: every user's tickets, newest activity first, paginated. Cross-tenant by
+    /// design — the IDOR-404 rule applies to a single-id fetch, not the list. Reads the BYPASSRLS
+    /// adminDb with IgnoreQueryFilters() (legal under Admin/, ADR-0065) and joins AspNetUsers for
+    /// the owner email. Bodies are never loaded — MessageCount/LastMessageAt are a SQL rollup.
+    /// </summary>
+    [HttpGet("tickets")]
+    public async Task<ActionResult<AdminTicketListResponse>> ListTickets(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] SupportTicketStatus? status = null,
+        [FromQuery] SupportTicketPriority? priority = null,
+        CancellationToken ct = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = adminDb.SupportTickets.IgnoreQueryFilters().AsNoTracking();
+        if (status is { } s) query = query.Where(t => t.Status == s);
+        if (priority is { } p) query = query.Where(t => t.Priority == p);
+
+        var total = await query.CountAsync(ct);
+
+        // Join to AspNetUsers for the owner email. adminDb is an IdentityDbContext subclass, so
+        // Users is available; project Email only, never other Identity fields.
+        var items = await query
+            .OrderByDescending(t => t.UpdatedAt).ThenByDescending(t => t.CreatedAt)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(t => new AdminTicketListItemDto(
+                t.Id, t.Subject, t.Status, t.Priority, t.PrecedingTicketId,
+                t.CreatedAt, t.UpdatedAt,
+                t.Messages.Count,
+                t.Messages.Max(m => (DateTime?)m.CreatedAt) ?? t.CreatedAt,
+                t.UserId,
+                adminDb.Users.Where(u => u.Id == t.UserId).Select(u => u.Email!).FirstOrDefault() ?? ""))
+            .ToListAsync(ct);
+
+        return Ok(new AdminTicketListResponse(items, page, pageSize, total));
+    }
+
+    public sealed record AdminAttachmentDto(
+        Guid Id, string FileName, string ContentType, long FileSizeBytes, DateTime UploadedAt);
+
+    public sealed record AdminMessageDto(
+        Guid Id,
+        SupportMessageAuthor AuthorRole,
+        string Body,
+        DateTime CreatedAt,
+        IReadOnlyList<AdminAttachmentDto> Attachments);
+
+    /// <summary>The full thread for one ticket, plus the owner identity. Stage 12.5.2.</summary>
+    public sealed record AdminTicketThreadDto(
+        Guid Id,
+        string Subject,
+        SupportTicketStatus Status,
+        SupportTicketPriority Priority,
+        Guid OwnerUserId,
+        string OwnerEmail,
+        IReadOnlyList<AdminMessageDto> Messages);
+
+    /// <summary>
+    /// One ticket's full thread. 404-not-403 on a miss (matches PostMessage + the user surface
+    /// IDOR rule). Cross-tenant read via the BYPASSRLS adminDb + IgnoreQueryFilters().
+    /// </summary>
+    [HttpGet("tickets/{id:guid}")]
+    public async Task<ActionResult<AdminTicketThreadDto>> GetTicket(Guid id, CancellationToken ct)
+    {
+        var ticket = await adminDb.SupportTickets
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Include(t => t.Messages).ThenInclude(m => m.Attachments)
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        if (ticket is null) return NotFound();
+
+        var ownerEmail = await adminDb.Users
+            .Where(u => u.Id == ticket.UserId).Select(u => u.Email!).FirstOrDefaultAsync(ct) ?? "";
+
+        var messages = ticket.Messages
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new AdminMessageDto(
+                m.Id, m.AuthorRole, m.Body, m.CreatedAt,
+                m.Attachments
+                    .OrderBy(a => a.UploadedAt)
+                    .Select(a => new AdminAttachmentDto(a.Id, a.FileName, a.ContentType, a.FileSizeBytes, a.UploadedAt))
+                    .ToList()))
+            .ToList();
+
+        return Ok(new AdminTicketThreadDto(
+            ticket.Id, ticket.Subject, ticket.Status, ticket.Priority,
+            ticket.UserId, ownerEmail, messages));
+    }
+
     // Sends the agent-reply / Solved email to the user, so it is a mail-sending action and
     // carries the same rate limit as the user endpoints — the invariant the spec (§ Notifications
     // carry-forward) and both reviews (security H3) pinned in ArchitectureTests' mailSendingActions.
