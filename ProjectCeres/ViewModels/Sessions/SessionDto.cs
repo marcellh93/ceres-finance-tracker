@@ -6,4 +6,5 @@ public sealed record SessionDto(
     DateTime LastUsedAt,
     string IpCreatedAt,
     string UserAgent,
-    bool IsCurrent);
+    bool IsCurrent,
+    bool IsIpAnchored);

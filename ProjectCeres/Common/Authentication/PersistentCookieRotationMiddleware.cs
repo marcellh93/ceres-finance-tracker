@@ -79,6 +79,19 @@ public sealed class PersistentCookieRotationMiddleware
             return;
         }
 
+        // Stage 12.5.1: honour the IP anchor on the rotation hop too. Rotation runs BEFORE
+        // UseAuthentication, so it never reaches SessionRevocationValidator's anchor check —
+        // without this, a stolen __Host-Persist cookie replayed from another IP could rotate
+        // an anchored session into a fresh valid one, bypassing the anchor entirely. Reject
+        // by leaving the request unauthenticated (no rotation, no new cookie), exactly as a
+        // bad token does. Exact-IP match, mirroring the validator.
+        if (match.IsIpAnchored
+            && match.IpCreatedAt != (context.Connection.RemoteIpAddress?.ToString() ?? ""))
+        {
+            await _next(context);
+            return;
+        }
+
         // Serialize rotation per matched session row. The other parallel request that
         // matched the same row will block here, then re-check after acquiring and find
         // the row already revoked — short-circuiting to next() without re-rotating.
@@ -111,6 +124,11 @@ public sealed class PersistentCookieRotationMiddleware
                 CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
                 LastUsedAt = timeProvider.GetUtcNow().UtcDateTime,
                 IsPersistent = true,
+                // Carry the anchor forward — otherwise a "remember me" session silently loses
+                // the protection the user opted into on its next rotation. The rotation only
+                // reaches here when the IP matched (anchored case above), so the new row's
+                // IpCreatedAt (= current IP) stays consistent with the original anchor.
+                IsIpAnchored = match.IsIpAnchored,
             };
             db.UserSessions.Add(newSession);
             await db.SaveChangesAsync();

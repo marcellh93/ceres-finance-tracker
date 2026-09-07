@@ -29,6 +29,14 @@ public class SessionsApiController(ISessionService sessions) : ControllerBase
         return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
     }
 
+    [HttpPost("{id:guid}/anchor")]
+    [RequireRecentAuth]
+    public async Task<IActionResult> SetIpAnchor(Guid id, [FromBody] SetIpAnchorRequest request)
+    {
+        var result = await sessions.TrySetIpAnchorAsync(id, request.Anchored);
+        return result.IsSuccess ? NoContent() : ToErrorResponse(result.Error!.Value);
+    }
+
     [HttpPost("block-ip")]
     [RequireRecentAuth]
     public async Task<IActionResult> BlockIp([FromBody] BlockIpRequest request)

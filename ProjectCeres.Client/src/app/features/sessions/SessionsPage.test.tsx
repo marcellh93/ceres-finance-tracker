@@ -50,6 +50,7 @@ function session(over: Partial<SessionDto> = {}): SessionDto {
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
     isCurrent: false,
+    isIpAnchored: false,
     ...over,
   };
 }
@@ -223,6 +224,93 @@ describe('SessionsPage', () => {
     await waitFor(() =>
       expect(apiFetch.mock.calls.filter(([u]) => u === SESSIONS_URL).length).toBeGreaterThanOrEqual(2),
     );
+  });
+
+  it('anchors a session after confirmation and refetches', async () => {
+    const user = userEvent.setup();
+    apiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === SESSIONS_URL)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: [session({ id: 'anchor-me', isCurrent: false, ipCreatedAt: '198.51.100.7' })],
+        });
+      if (url === BLOCKED_IPS_URL) return Promise.resolve({ ok: true, status: 200, data: [] });
+      if (init?.method === 'POST') return Promise.resolve({ ok: true, status: 204, data: null });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Anchor IP' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    // The warning is the point: anchoring locks the session to its IP and is a stopgap,
+    // not device-blocking. It must say so honestly.
+    expect(within(dialog).getByText(/stop working the moment its IP changes/i)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/does not block someone who signs in with your password/i),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Anchor session' }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/sessions/anchor-me/anchor',
+        expect.objectContaining({ method: 'POST', body: { anchored: true } }),
+      );
+    });
+    await waitFor(() =>
+      expect(apiFetch.mock.calls.filter(([u]) => u === SESSIONS_URL).length).toBeGreaterThanOrEqual(2),
+    );
+  });
+
+  it('warns about being signed out when anchoring the current session', async () => {
+    const user = userEvent.setup();
+    apiFetch.mockImplementation((url: string) => {
+      if (url === SESSIONS_URL)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: [session({ id: 'me', isCurrent: true })],
+        });
+      if (url === BLOCKED_IPS_URL) return Promise.resolve({ ok: true, status: 200, data: [] });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Anchor IP' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(
+      within(dialog).getByText(/signed out on this device and have to sign in again/i),
+    ).toBeInTheDocument();
+  });
+
+  it('removes the anchor from an already-anchored session', async () => {
+    const user = userEvent.setup();
+    apiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === SESSIONS_URL)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: [session({ id: 'anchored-row', isCurrent: false, isIpAnchored: true })],
+        });
+      if (url === BLOCKED_IPS_URL) return Promise.resolve({ ok: true, status: 200, data: [] });
+      if (init?.method === 'POST') return Promise.resolve({ ok: true, status: 204, data: null });
+      return Promise.resolve({ ok: true, status: 200, data: [] });
+    });
+
+    renderPage();
+    // An anchored row's button reads "Anchored", and the confirm removes the anchor.
+    await user.click(await screen.findByRole('button', { name: 'Anchored' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove anchor' }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/sessions/anchored-row/anchor',
+        expect.objectContaining({ method: 'POST', body: { anchored: false } }),
+      );
+    });
   });
 
   it('surfaces the server refusal if a block is rejected', async () => {

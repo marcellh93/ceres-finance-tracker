@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Ban } from 'lucide-react';
+import { Ban, Shield, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { apiFetch } from '../../lib/api-client';
 import { useStepUp, ReauthCancelledError, ReauthBusyError } from '../../auth/use-step-up';
 import { useAuth } from '../../auth/auth-context';
 import {
+  anchorUrl,
   BLOCK_IP_URL,
   BLOCKED_IPS_URL,
   SESSIONS_URL,
@@ -60,6 +61,8 @@ export function SessionsPage() {
   const [blockedIps, setBlockedIps] = useState<BlockedIpDto[]>([]);
   const [pendingUnblock, setPendingUnblock] = useState<BlockedIpDto | null>(null);
   const [unblockingIp, setUnblockingIp] = useState<string | null>(null);
+  const [pendingAnchor, setPendingAnchor] = useState<SessionDto | null>(null);
+  const [anchoringId, setAnchoringId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -201,6 +204,34 @@ export function SessionsPage() {
     }
   }
 
+  async function confirmAnchor() {
+    const target = pendingAnchor;
+    if (target === null) return;
+    const next = !target.isIpAnchored;
+    setPendingAnchor(null);
+    setAnchoringId(target.id);
+
+    try {
+      const result = await requireStepUp(() =>
+        apiFetch(anchorUrl(target.id), { method: 'POST', body: { anchored: next } }),
+      );
+
+      if (!result.ok) {
+        toast.error(result.message || 'Could not update this session.');
+        return;
+      }
+
+      toast.success(next ? 'Session anchored to its IP.' : 'IP anchor removed.');
+      await load();
+    } catch (err) {
+      if (!(err instanceof ReauthCancelledError)) {
+        toast.error('Could not update this session.');
+      }
+    } finally {
+      setAnchoringId(null);
+    }
+  }
+
   const hasData = sessions !== undefined;
   const showSkeleton = useDelayedLoading(loading && !hasData);
 
@@ -274,6 +305,14 @@ export function SessionsPage() {
                           </span>
                         )}
                       </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {session.isIpAnchored && (
+                          <span className="text-primary inline-flex items-center gap-1 text-xs font-medium">
+                            <ShieldCheck aria-hidden="true" className="size-3.5" />
+                            Anchored to IP
+                          </span>
+                        )}
+                      </div>
                       <p className="text-muted-foreground text-sm">
                         IP {session.ipCreatedAt} · Last used{' '}
                         {new Date(session.lastUsedAt).toLocaleString()}
@@ -282,7 +321,25 @@ export function SessionsPage() {
                         Signed in {new Date(session.createdAt).toLocaleString()}
                       </p>
                     </div>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={anchoringId === session.id}
+                        onClick={() => setPendingAnchor(session)}
+                      >
+                        {session.isIpAnchored ? (
+                          <>
+                            <ShieldCheck aria-hidden="true" />
+                            Anchored
+                          </>
+                        ) : (
+                          <>
+                            <Shield aria-hidden="true" />
+                            Anchor IP
+                          </>
+                        )}
+                      </Button>
                       {/* No block action on the current row: blocking the address
                           you are connected from locks you out, and there is no
                           unblock path. The server refuses it too (409). */}
@@ -411,6 +468,34 @@ export function SessionsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => void confirmUnblock()}>Unblock</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingAnchor !== null}
+        onOpenChange={(open) => !open && setPendingAnchor(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAnchor?.isIpAnchored
+                ? 'Remove the IP anchor?'
+                : `Anchor this session to ${pendingAnchor?.ipCreatedAt}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAnchor?.isIpAnchored
+                ? 'This session will work from any network again. A stolen session cookie replayed from another address would no longer be rejected.'
+                : pendingAnchor?.isCurrent
+                  ? `This session will stop working the moment your IP changes — and you will be signed out on this device and have to sign in again. Only anchor if this network is stable (e.g. an office desktop). It protects against a stolen session cookie replayed from another network; it does not block someone who signs in with your password.`
+                  : `This session will stop working the moment its IP changes, and it will be signed out. It protects against a stolen session cookie replayed from another network; it does not block someone who signs in with your password.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmAnchor()}>
+              {pendingAnchor?.isIpAnchored ? 'Remove anchor' : 'Anchor session'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

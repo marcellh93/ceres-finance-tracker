@@ -394,6 +394,60 @@ public class SessionsApiTests : IAsyncLifetime
             .Should().BeTrue();
     }
 
+    // ── IP anchor (Stage 12.5.1) ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Post_anchor_sets_IsIpAnchored_on_the_callers_own_session()
+    {
+        var (sessionCookie, user) = await LoginWithFreshReauthAsync("anchor");
+        var (client, _, _) = BuildClient(sessionCookie, user.Id);
+
+        // The current session's id, from the list.
+        var listResp = await client.GetAsync("/api/sessions");
+        var sessionId = (await listResp.Content.ReadFromJsonAsync<JsonElement>())
+            .EnumerateArray().First(s => s.GetProperty("isCurrent").GetBoolean())
+            .GetProperty("id").GetGuid();
+
+        var resp = await client.PostAsJsonAsync($"/api/sessions/{sessionId}/anchor", new { anchored = true });
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // AsNoTracking on both reads: a tracking query would return the SAME identity-map
+        // instance on the second read, masking the toggle-off DB write behind the stale
+        // first-read value.
+        var row = await db.UserSessions.IgnoreQueryFilters().AsNoTracking().SingleAsync(s => s.Id == sessionId);
+        row.IsIpAnchored.Should().BeTrue("anchoring the caller's own session must set the flag");
+
+        // And toggling it back off is honoured.
+        var off = await client.PostAsJsonAsync($"/api/sessions/{sessionId}/anchor", new { anchored = false });
+        off.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var reread = await db.UserSessions.IgnoreQueryFilters().AsNoTracking().SingleAsync(s => s.Id == sessionId);
+        reread.IsIpAnchored.Should().BeFalse("toggling the anchor back off must clear the flag");
+    }
+
+    [Fact]
+    public async Task Post_anchor_on_another_users_session_returns_404_idor_guard()
+    {
+        var (sessionCookieA, userA) = await LoginWithFreshReauthAsync("anchor-idor-a");
+        var (clientA, _, _) = BuildClient(sessionCookieA, userA.Id);
+
+        var (sessionCookieB, userB) = await LoginWithFreshReauthAsync("anchor-idor-b");
+        var (clientBForList, _, _) = BuildClient(sessionCookieB, userB.Id);
+        var bListResp = await clientBForList.GetAsync("/api/sessions");
+        var bSessionId = (await bListResp.Content.ReadFromJsonAsync<JsonElement>())
+            .EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var resp = await clientA.PostAsJsonAsync($"/api/sessions/{bSessionId}/anchor", new { anchored = true });
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            "anchoring another user's session must be indistinguishable from an unknown id (IDOR guard)");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = await db.UserSessions.IgnoreQueryFilters().SingleAsync(s => s.Id == bSessionId);
+        row.IsIpAnchored.Should().BeFalse("the refused cross-user anchor must not have flipped the flag");
+    }
+
     // ── Test 5 ───────────────────────────────────────────────────────────────────
 
     [Fact]

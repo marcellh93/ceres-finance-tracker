@@ -270,6 +270,97 @@ public class PersistentCookieRotationTests : IAsyncLifetime
             "rotation must issue the new __Host-Persist cookie");
     }
 
+    // Stage 12.5.1 — the anchor must survive the persistent-rotation hop, which runs BEFORE
+    // SessionRevocationValidator and so must enforce the anchor itself.
+
+    [Fact]
+    public async Task Anchored_persistent_session_is_not_rotated_from_a_different_ip()
+    {
+        // Seed a rememberMe login, then anchor its persistent row to an IP the TestServer is
+        // not on (RemoteIpAddress is null → ""). A rotation request therefore arrives from a
+        // MISMATCHED IP and must be refused: no new __Host-Persist cookie, no fresh session —
+        // otherwise a stolen persistent cookie replayed elsewhere would rotate past the anchor.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "anchor-rotate@persist-test.local");
+        var loginClient = _factory.CreateClient();
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, loginClient, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = true });
+        loginResp.EnsureSuccessStatusCode();
+        var oldPersist = ExtractCookie(loginResp.Headers.GetValues("Set-Cookie"), SessionConstants.PersistentCookieName);
+        oldPersist.Should().NotBeNull();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.UserSessions.IgnoreQueryFilters()
+                .Where(s => s.UserId == user.Id && s.IsPersistent && s.RevokedAt == null)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(s => s.IsIpAnchored, true)
+                    .SetProperty(s => s.IpCreatedAt, "203.0.113.50"));
+        }
+
+        var rotateClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var rotateReq = new HttpRequestMessage(HttpMethod.Get, "/api/transactions");
+        rotateReq.Headers.Add("Cookie", $"{SessionConstants.PersistentCookieName}={oldPersist}");
+        var rotateResp = await rotateClient.SendAsync(rotateReq);
+
+        rotateResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var setCookies = rotateResp.Headers.TryGetValues("Set-Cookie", out var v) ? v.ToList() : new List<string>();
+        setCookies.Should().NotContain(s => s.StartsWith($"{SessionConstants.PersistentCookieName}="),
+            "an anchored persistent session must NOT rotate from a mismatched IP");
+
+        // The original row is untouched (not revoked): the rotation was refused, not consumed.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var rows = await db.UserSessions.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.UserId == user.Id && s.IsPersistent).ToListAsync();
+            rows.Should().ContainSingle().Which.RevokedAt.Should().BeNull(
+                "a refused rotation must not revoke the anchored row");
+        }
+    }
+
+    [Fact]
+    public async Task Rotation_carries_the_ip_anchor_forward_to_the_new_session()
+    {
+        // Anchor the persistent row but leave IpCreatedAt at the TestServer value ("") so the
+        // rotation IP matches and rotation proceeds. The NEW row must inherit IsIpAnchored —
+        // otherwise the anchor silently evaporates on the first return visit.
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "anchor-carry@persist-test.local");
+        var loginClient = _factory.CreateClient();
+        var loginResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, loginClient, "/api/auth/login",
+            new { email = user.Email, password = AuthTestFixture.ValidPassword, rememberMe = true });
+        loginResp.EnsureSuccessStatusCode();
+        var oldPersist = ExtractCookie(loginResp.Headers.GetValues("Set-Cookie"), SessionConstants.PersistentCookieName);
+        oldPersist.Should().NotBeNull();
+
+        Guid oldSessionId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = await db.UserSessions.IgnoreQueryFilters()
+                .SingleAsync(s => s.UserId == user.Id && s.IsPersistent && s.RevokedAt == null);
+            oldSessionId = row.Id;
+            row.IsIpAnchored = true;
+            await db.SaveChangesAsync();
+        }
+
+        var rotateClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var rotateReq = new HttpRequestMessage(HttpMethod.Get, "/api/transactions");
+        rotateReq.Headers.Add("Cookie", $"{SessionConstants.PersistentCookieName}={oldPersist}");
+        var rotateResp = await rotateClient.SendAsync(rotateReq);
+        var setCookies = rotateResp.Headers.TryGetValues("Set-Cookie", out var v) ? v.ToList() : new List<string>();
+        setCookies.Should().Contain(s => s.StartsWith($"{SessionConstants.PersistentCookieName}="),
+            "a same-IP anchored session still rotates");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var newRow = await db.UserSessions.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(s => s.UserId == user.Id && s.IsPersistent && s.RevokedAt == null && s.Id != oldSessionId);
+            newRow.IsIpAnchored.Should().BeTrue("the rotated session must inherit the anchor");
+        }
+    }
+
     private static string? ExtractCookie(IEnumerable<string> setCookies, string name)
     {
         foreach (var c in setCookies)

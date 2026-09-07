@@ -48,6 +48,23 @@ public static class SessionRevocationValidator
             return;
         }
 
+        // Stage 12.5.1: IP-anchored sessions are rejected when the request's source IP
+        // differs from the address the session was created on (exact match). This defends
+        // a stolen session cookie replayed from another network — the replayed cookie
+        // arrives from a different IP and is signed out. Opt-in per session, so a roaming
+        // user simply does not anchor. RejectAsync signs out, so recovery is a fresh login
+        // (which re-anchors to the new IP if re-enabled). The comparison mirrors
+        // UserBlockedIpMiddleware's `RemoteIpAddress?.ToString() ?? ""`.
+        if (session.IsIpAnchored)
+        {
+            var currentIp = ctx.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+            if (session.IpCreatedAt != currentIp)
+            {
+                await RejectAsync(ctx);
+                return;
+            }
+        }
+
         // Stage 6b.3 Gap 9: debounce LastUsedAt writes to avoid hot-row contention under
         // authenticated load. 60-second resolution is sufficient for "last used" telemetry;
         // without the gate, every authenticated request issued an UPDATE, causing PostgreSQL

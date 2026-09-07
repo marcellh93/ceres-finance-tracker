@@ -57,7 +57,15 @@ test('Sessions: revoking another device removes its row', async ({
 
   // Two logins for the same account = two sessions. The first belongs to a
   // throwaway context so the browser can revoke it as "another device".
-  const other = await playwright.request.newContext()
+  //
+  // Stage 12.10 login-dedup revokes a same-device duplicate — keyed on
+  // (UserId, UserAgent, IpCreatedAt). Both contexts share the Playwright host IP,
+  // so without a DISTINCT User-Agent the second login would dedup the first away
+  // and only one session would exist. A different UA makes them genuinely two
+  // devices, which is what "another device" means here.
+  const other = await playwright.request.newContext({
+    extraHTTPHeaders: { 'User-Agent': 'CeresE2E-OtherDevice/1.0 (Linux; test)' },
+  })
   const otherLogin = await postJson(other, url, '/api/auth/login', {
     email: user.email,
     password: DEFAULT_PASSWORD,
@@ -118,6 +126,67 @@ test('Sessions: no Block IP action is offered on the current device', async ({
   // undone from the app.
   await expect(page.getByText('This device')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Block IP' })).toHaveCount(0)
+})
+
+test('Sessions: anchoring another device to its IP flips the row and shows the honest warning', async ({
+  page,
+  request,
+  baseURL,
+  playwright,
+}) => {
+  // Stage 12.5.1 — the real anchor toggle through the UI, driven against the server.
+  // Anchor a SECOND (non-current) device: anchoring the current session would sign this
+  // test out on its next request (the intended self-lockout), which we cover at the unit
+  // and integration layer instead. Here we prove the toggle + warning + row state.
+  const url = baseURL!
+  const user = await createVerifiedUser(request, url)
+
+  // A distinct User-Agent makes this a genuinely separate device, so Stage 12.10
+  // login-dedup (keyed on UserId + UserAgent + IP) does not collapse it into the
+  // current session — see the revoke test above for the same reasoning.
+  const other = await playwright.request.newContext({
+    extraHTTPHeaders: { 'User-Agent': 'CeresE2E-OtherDevice/1.0 (Linux; test)' },
+  })
+  const otherLogin = await postJson(other, url, '/api/auth/login', {
+    email: user.email,
+    password: DEFAULT_PASSWORD,
+    rememberMe: false,
+  })
+  if (otherLogin.status() !== 204) throw new Error(`other login failed: ${otherLogin.status()}`)
+
+  const loginRes = await postJson(request, url, '/api/auth/login', {
+    email: user.email,
+    password: DEFAULT_PASSWORD,
+    rememberMe: false,
+  })
+  if (loginRes.status() !== 204) throw new Error(`login failed: ${loginRes.status()}`)
+
+  const state = await request.storageState()
+  await page.context().addCookies(state.cookies)
+  await page.goto('/settings/sessions')
+  await expect(page.getByRole('heading', { level: 1, name: 'Active sessions', exact: true })).toBeVisible()
+
+  // Both devices show an "Anchor IP" button; act on the OTHER one so the test's
+  // own session survives the round-trip. Target it by the distinct User-Agent it
+  // logged in with ("Unknown browser on Linux" — the summary of our custom UA),
+  // which is unambiguous and does not depend on excluding the current row.
+  const otherRow = page.getByRole('listitem').filter({ hasText: 'Unknown browser on Linux' })
+  await expect(otherRow).toBeVisible()
+
+  // Its confirm dialog must state the stopgap honestly — it protects against a
+  // replayed cookie, not a password sign-in.
+  await otherRow.getByRole('button', { name: 'Anchor IP' }).click()
+
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText(/does not block someone who signs in with your password/i)).toBeVisible()
+  await dialog.getByRole('button', { name: 'Anchor session' }).click()
+
+  // The row flips to the anchored state: the badge appears and the button now reads "Anchored".
+  await expect(page.getByText('Anchored to IP')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Anchored' })).toHaveCount(1)
+
+  await other.dispose()
 })
 
 test('Sessions: a blocked address can be unblocked from the Blocked addresses section', async ({

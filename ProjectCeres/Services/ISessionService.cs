@@ -13,6 +13,16 @@ public interface ISessionService
     Task<Result> TryRevokeAsync(Guid sessionId);
 
     /// <summary>
+    /// Toggles IP-anchoring on one of the caller's own live sessions. An anchored session
+    /// is rejected by <c>SessionRevocationValidator</c> on any request whose source IP
+    /// differs from the session's origin IP (exact match) — defending a stolen cookie
+    /// replayed from another network. Fails NOT_FOUND for an unknown id, another user's
+    /// session, or an already-revoked one (IDOR-safe, scoped to the caller like every
+    /// other method here).
+    /// </summary>
+    Task<Result> TrySetIpAnchorAsync(Guid sessionId, bool anchored);
+
+    /// <summary>
     /// Blocks an IP and revokes the caller's sessions created from it. Idempotent —
     /// re-blocking an already-blocked IP succeeds. Refuses SELF_LOCKOUT when the
     /// target matches <paramref name="callerIpAddress"/>: UserBlockedIpMiddleware

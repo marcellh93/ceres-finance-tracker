@@ -33,7 +33,8 @@ public class SessionService(
                 s.LastUsedAt,
                 s.IpCreatedAt,
                 s.UserAgent,
-                s.Id == currentSessionId))
+                s.Id == currentSessionId,
+                s.IsIpAnchored))
             .ToArrayAsync();
     }
 
@@ -48,6 +49,24 @@ public class SessionService(
         if (session is null) return Result.Fail("NOT_FOUND", "Session not found.");
 
         session.RevokedAt = timeProvider.GetUtcNow().UtcDateTime;
+        await db.SaveChangesAsync();
+        return Result.Ok();
+    }
+
+    public async Task<Result> TrySetIpAnchorAsync(Guid sessionId, bool anchored)
+    {
+        var userId = currentUser.UserId;
+
+        // Scoped to the caller, like TryRevokeAsync: another user's (or unknown) session
+        // is NOT_FOUND, never a leak. A revoked session cannot be anchored — the toggle
+        // only appears on live rows, and re-anchoring a dead session is meaningless.
+        var session = await db.UserSessions
+            .Where(s => s.UserId == userId && s.Id == sessionId && s.RevokedAt == null)
+            .SingleOrDefaultAsync();
+
+        if (session is null) return Result.Fail("NOT_FOUND", "Session not found.");
+
+        session.IsIpAnchored = anchored;
         await db.SaveChangesAsync();
         return Result.Ok();
     }
