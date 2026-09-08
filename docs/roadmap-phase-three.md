@@ -11,6 +11,17 @@
 > **Security gate rule:** Stages that introduce or modify security-sensitive code (auth, multi-tenancy, sessions, email, headers) cannot be marked done without their verification checklist green. The verification list for each stage is drawn from `security-model.md`, `multi-tenancy-strategy.md`, and the ADRs — items there are not optional.
 >
 > **Responsive rule:** every SPA surface is built mobile-first as it ships. No surface is marked done without verifying its layout at three tiers: `mobile` (< 640px), `tablet` (640–1023px), and `desktop` (≥ 1024px). Touch targets ≥ 44×44px on mobile. No horizontal overflow at or above 320px. The strategy doc — [`planning-phase3-responsive.md`](planning-phase3-responsive.md) — defines the tier behaviour for navigation, tables (table → card collapse on mobile), forms (full-page on mobile, modal on desktop), and charts. Per-stage verification items below.
+>
+> **Checklist-marker & deferral rule (binding on every checklist and stage heading in this doc):**
+> - **`[x]` means DONE** — the work shipped and is verified. An `[x]` item's text must read in the past/shipped tense. It is a contradiction to mark an item `[x]` while its text says "deferred", "not built", "not scheduled", "still open", or "owed" — if any of those is true, the item is **not** `[x]`.
+> - **`[ ]` means genuinely open** — not yet done, and living in the stage where the work will actually happen.
+> - **`[~]` means partial / deliberately-not-shipped** — code shipped but a documented residual remains, or a deliberate scope call (must say which, in the item text).
+> - **`[→]` means DEFERRED — and a deferral MUST name both the why AND the where, in the item text itself:**
+>   1. **Why** — the reason (a tooling/subsystem gap with evidence, or user-authorised, per the `no-unjustified-deferrals` rule); and
+>   2. **Where** — the *exact receiving location*: the `§<stage>` (or ADR / planning-doc section) that now carries a `[ ]` for this work. A deferral with a reason but no destination is incomplete. The receiving location must actually contain the matching `[ ]`.
+>   A deferred item is **never `[x]`** — `[x]` is reserved for work that shipped here. Use `[→]` (or `[ ]` when the item stays in its own stage as the receiving home).
+> - **A receiving stage** (one that exists only to hold deferred-in work, e.g. §12.5.5) states, in its own reason line, **where each of its items was deferred FROM** (a back-link to the source `§<stage>`), so the deferral is traceable in both directions.
+> - **Stage-heading suffixes track state:** a heading marked `✅ Done` must not also carry a `(not scheduled)` / `(Open)` suffix — flip the suffix when the status flips.
 
 ---
 
@@ -1552,7 +1563,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 Carried to Stage 16 (hosting):
 
-- [x] **Register the `SweepSessions` daily cron — moved to Stage 16 § Scheduled jobs (cron) on 2026-09-07.** The sweep tool + `SessionRetentionSweepTests` shipped here; registering the host-side daily cron needs a deployment target, so it lives as a receiving `[ ]` under Stage 16 (alongside the parallel 13.6 audit-purge cron). No code owed now.
+- [→] **Register the `SweepSessions` daily cron — DEFERRED (2026-09-07). Why:** registering the host-side daily cron needs a deployment target that does not exist until hosting (the sweep tool + `SessionRetentionSweepTests` shipped here; only the ops cron entry remains). **Where:** the receiving `[ ]` lives at **Stage 16 § Scheduled jobs (cron)** (this doc), alongside the parallel 13.6 audit-purge cron.
 
 ### Stage 12.8.1 — Email-change follow-ups (not scheduled)
 
@@ -1561,7 +1572,7 @@ Carried to Stage 16 (hosting):
 - [x] **In-app cancel of a pending change (2026-09-07, `4c96c7da`).** `EmailChangeService.CancelPendingAsync(userId)` — authenticated, consumes both sibling tokens (VerifyNew + RevokeOld) of the newest in-flight change, notifies the old address, audits `EmailChangeRevoked` — behind `POST /api/auth/email-change/cancel` (`[Authorize]`). A Cancel button on the pending banner in `EmailAddressSection`, offered only for a non-expired change. **Resolved the open reauth question by NOT reauth-gating** (the roadmap's "probably needs a fresh password" was tentative): cancel returns the account to its unchanged status quo, strictly less sensitive than the reauth-gated `/request`; the state-changing direction (`/confirm`) stays token+window protected; requiring a password to undo a security action is user-hostile (cf. `feedback_archive_requires_reactivate`). 3-agent reviewer pipeline all pass (security/writer/test-audit); integration 5/5, Vitest 15/15, E2E 3/3 browsers.
 - [x] **No recovery path for an already-completed hostile change — ACCEPTED for beta (option C, 2026-09-07).** `RevokeAsync` cancels only a change still in flight; if an attacker with a live session confirms a change inside the 30-minute window, the legitimate user's revoke link is already consumed and recovery is out-of-band (support) only. **Resolved as accept-and-document:** the damage is bounded by controls that ship (`/confirm` revokes all sessions + regenerates `SecurityStamp`, logging the attacker out on confirm; the old address is notified on completion), so "recovery requires a support request" is a tolerable beta stopgap. Documented with a support runbook in `security-model.md` § Email Address Change → "Accepted risk: no in-app recovery from an already-completed hostile change". The real fix (option B, grace-period reclaim / option A, admin rollback) is scheduled as a `[ ]` under **Stage 15.8 → Carried in from Stage 12.8.1 E2**; ticking it retires the accepted-risk block.
 
-### Stage 12.8.2 — `AssertRlsVisibility` does not observe RLS for filtered entities (not scheduled)
+### Stage 12.8.2 — `AssertRlsVisibility` does not observe RLS for filtered entities ✅ Done (2026-09-06)
 
 **Status: ✅ Done (2026-09-06).** `IgnoreQueryFilters()` now strips the EF filter in both halves of `AssertRlsVisibility` (refactored to a static core so a meta-test can drive the same shape), so the Postgres RLS policy is the only isolation mechanism left. All nine call sites pass for the right reason — every predicate scopes to `UserId == owner` against a fresh (zero-row) `otherUser`, so the owner count is unchanged and the negative half now genuinely exercises RLS. The same hand-rolled flaw in `RlsParityMetaTests.App_context_cannot_see_a_row_another_user_owns` (line 106) was fixed in the same commit — closing the class, not just the helper instance.
 
@@ -1590,7 +1601,7 @@ It was NOT promoted in 12.8: building the component, converting five call sites,
 - [x] Update `docs/design-system.md` — the § Inline warning strip note now records the promotion + the `<Alert>` recipe; the § Known limitations `--warning` note records the paired-token resolution.
 - *Tripwire retired: the recipe now points at the `<Alert>` primitive; `border-warning/30 bg-warning/10` no longer appears in any non-test caller (`components/ui/alert.tsx` is the sole home).*
 
-### Stage 12.8.4 — Test files are never type-checked (not scheduled)
+### Stage 12.8.4 — Test files are never type-checked ✅ Done (2026-09-06)
 
 **Status: ✅ Done (2026-09-06).** Test files are now in the type-check graph (`tsconfig.test.json` as a root project reference), so `tsc -b` / `pnpm build` type-check them; all 87 surfaced errors fixed (test-side, no production regression). Found 2026-08-29 during the Stage 12.8 screen review, by a dead prop that nothing in the toolchain could see.
 
@@ -1605,7 +1616,7 @@ Measured cost of closing it: type-checking `src` with the exclusions removed pro
 - [x] `tsc -b` (build mode) now type-checks the test project via the reference, so `pnpm build` covers it — the check cannot rot. Added a standalone `typecheck` script (`tsc -b`) and noted it in `docs/testing.md` § Definition of Done. Ship-gate: `pnpm build` 0 errors, `pnpm test` 1094/1094.
 - *Tripwire retired: test files are now in the type-check graph; `pnpm build` fails on test type drift.*
 
-### Stage 12.11 — Dev server serves a stale SPA shell (not scheduled)
+### Stage 12.11 — Dev server serves a stale SPA shell ✅ Done (2026-09-07)
 
 **Status: ✅ Done (2026-09-07, Option B).** The integration-test host now runs as `Testing`, not the default `Development` (`TestWebApplicationFactory.ConfigureWebHost` → `UseEnvironment("Testing")`), so `IsDevelopment()` means exactly one thing: a real `dotnet run` / `dotnet watch` session that actually has Vite listening. The Vite branch at `Program.cs:680` now applies to real developers only; the test host, which never runs Vite, cleanly takes the static-fallback path (`MapFallbackToFile("dist/app.html")`, registered in all environments). Option B was unblocked by §12.12 — moving off Development stops loading user secrets, and the factory now supplies the token-lookup secret itself. `Testing` was already a first-class environment (`Program.cs:60` enables import/review for it), so the only behaviour the flip changes for tests is skipping the Vite branch (the fix) and entering the prod exception-handler + HSTS block at line 653 (verified harmless: the 500-expecting and cookie/CSRF/startup tests pass on `Testing`). TIER M full-suite gate. Raised 2026-08-29; the earlier attempt (`dafee78c`, reverted `19ff467a`) tried to exclude the fallback path in Development instead and broke `DashboardApiTests.GetDashboardRoot_ServesSpaShell` because the test host was *also* Development — the two-meanings problem Option B removes.
 
@@ -1668,7 +1679,7 @@ Consequences:
 
 - [x] Decide + build the admin-identity mechanism — **no-op, shipped in Stage 15.6** (`Admin` role, `AdminRoleService`, `[RequireAdmin]` live check, ADR-0080). Reused, not rebuilt.
 - [x] `Admin/` endpoints to list all tickets via the `ceres_admin` BYPASSRLS context per ADR-0065 — `GET /api/admin/support/tickets` (offset-paginated, all users, owner email joined) + `GET .../{id}` thread (404-not-403), extending `SupportAdminApiController` (already `[RequireAdmin]` + `[RequiresAdminContext]`). Integration 14/14; a new `Group3_AdminAndBackgroundTests` case pins the list read path (admin sees all owners; `ceres_app` non-owner sees zero even filter-stripped).
-- [x] Admin list/triage SPA surface — first admin SPA area (`features/admin/`): paginated list + thread sheet, server-gated (fork 2a: no cached `isAdmin` flag; the 403 renders a not-authorized state). Vitest 5/5, E2E 6/6. **Admin nav link deferred to Stage 15.8** (see plan — over-engineering shared chrome for one link; admins reach `/admin/support` directly).
+- [x] Admin list/triage SPA surface — first admin SPA area (`features/admin/`): paginated list + thread sheet, server-gated (fork 2a: no cached `isAdmin` flag; the 403 renders a not-authorized state). Vitest 5/5, E2E 6/6. **Admin nav link deferred → Stage 15.8 § Carried in from Stage 12.5.2** (this doc; over-engineering shared chrome for one link, admins reach `/admin/support` directly — the receiving `[ ]` now lives there).
 - [x] **Retires the Stage 12.5 accepted risk** — done; the § 12.5 accepted-risk A2 line below is now ticked (an operator can read all tickets without the notification email).
 - *Tripwire retired: the surface ships; both the accepted-risk line and the Stage 16 alert framing are updated.*
 
@@ -1679,16 +1690,16 @@ Consequences:
 - [x] Resolve novelty granularity + first-ever-login suppression — **exact-IP** (fork 1a, mirroring the anchor; subnet/ASN rejected for the same reasons). First-ever login (no prior session) is suppressed — there is no "new" to alert on, and every first sign-in would otherwise fire it.
 - [x] Session-novelty detection at the `UserSession` creation path (login) — `AuthController.IssueSessionAndCookiesAsync` queries the user's prior session IPs before the dedup revoke; novel = has prior sessions AND none from the current IP. Owner-scoped (login runs in the user's scope). `NewSessionAlertTests` pins first-login→no-alert, new-IP→alert, known-IP→no-alert.
 - [x] `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx — 3 keys × 2 langs (args: IP, device, sign-in time). Sent by a new non-blocking `INewSessionNotificationService` (log-and-swallow; a mail outage never fails the login). Composer round-trip + key-count (48→51) pinned.
-- [x] Opt-out toggle in Settings notification preferences — **homed under §12.5.5** (the notification-preferences surface does not exist; a new-sign-in security alert conventionally has no off-switch, so shipping the alert without one is not a gap). The receiving `[ ]` lives under §12.5.5 below; the WHAT is in `planning-future.md` § New-session alert. Nothing owed here — the decision and its home are the deliverable.
+- [→] Opt-out toggle in Settings notification preferences — **DEFERRED. Why:** the notification-preferences surface does not exist (user-authorised 2026-09-08, §12.5.3 option A; a new-sign-in security alert conventionally has no off-switch, so shipping without one is not a gap). **Where:** the receiving `[ ]` lives at **§12.5.5** (this doc, below) — "Opt-out toggle for the §12.5.3 new-session alert"; the WHAT detail is in `planning-future.md` § New-session alert.
 - *Tripwire retired: `EmailTemplateKey.NewSessionAlert` now exists; the alert ships. The opt-out is homed under §12.5.5.*
 
-### 12.5.5 — Notification-preferences surface (deferred — receiving stage, not scheduled)
+### 12.5.5 — Notification-preferences surface (RECEIVING STAGE — holds deferred-in work; itself not yet scheduled)
 
-*Deferral reason: user-authorized (2026-09-08, §12.5.3 option A) AND a real missing subsystem — there is no per-user notification-preference model, endpoint, or settings page today (`Settings` holds only format/currency/period/language). Building the whole surface to add one off-switch would invert the effort; it is a stage of its own, and it has more than one waiting consumer.*
+*This is a **receiving stage**: it exists to hold work deferred here from elsewhere, and is not itself scheduled to a batch yet. **Deferred IN from:** §12.5.3 (the new-session-alert opt-out toggle, deferred 2026-09-08 via option A). **Also anticipated from:** `planning-future.md` / `planning-phase3.md` § Safe to Spend alert (weekly-digest + Safe-to-Spend toggles) once those ship. **Reason it's its own stage:** there is no per-user notification-preference model, endpoint, or settings page today (`Settings` holds only format/currency/period/language); building the whole surface to add one off-switch would invert the effort, and it has more than one waiting consumer.*
 
 - [ ] Notification-preferences surface: a per-user preference store (column set or table), a GET/PATCH endpoint, and a Settings → Notifications SPA page. The api-contract already anticipates this row (`Notifications | GET/PATCH`).
-- [ ] Opt-out toggle for the §12.5.3 new-session alert wired into that surface (default on). Carried in from §12.5.3.
-- [ ] Toggles for the other anticipated notifications once they ship: weekly digest opt-in and the Safe to Spend alert (both `planning-future.md` / `planning-phase3.md` § Safe to Spend alert).
+- [ ] Opt-out toggle for the §12.5.3 new-session alert wired into that surface (default on). **Deferred in from §12.5.3.**
+- [ ] Toggles for the other anticipated notifications once they ship: weekly digest opt-in and the Safe to Spend alert. **Anticipated in from** `planning-future.md` / `planning-phase3.md` § Safe to Spend alert.
 - *Tripwire: this checklist + the `planning-future.md` § New-session alert opt-out note; no preference model/field exists until built.*
 
 ### 12.5.4 — Unblock a blocked IP ✅ Done (2026-09-07)
@@ -2081,6 +2092,10 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 ### Carried in from Stage 12.8.1 E2 (accepted risk, 2026-09-07)
 
 - [ ] **Recovery from an already-completed hostile email change (option B: grace-period reclaim).** Deferred from Stage 12.8.1 with the residual risk accepted for the beta and documented in `security-model.md` § Email Address Change → "Accepted risk: no in-app recovery from an already-completed hostile change" (with a support runbook). The real fix: the change-completed notice to the *old* address carries a time-boxed "undo this" reclaim link (a new reclaim token + endpoint + page) that reverses the address swap in-app; it needs its own abuse design (the reclaim link is itself a takeover vector if mis-scoped). Option A (admin-assisted address rollback UI) folds into this admin stage's surface. Ticking either retires the § Email Address Change accepted-risk block.
+
+### Carried in from Stage 12.5.2 (admin ticket-list, 2026-09-07)
+
+- [ ] **Admin navigation link to `/admin/support`.** §12.5.2 shipped the admin ticket-list/triage surface but not a nav entry to reach it (admins navigate to `/admin/support` directly for now); building shared admin chrome for a single link was out of that stage's scope. This admin stage owns the admin nav surface, so the link lands here. Deferred in from §12.5.2.
 
 ### Verification checklist
 
