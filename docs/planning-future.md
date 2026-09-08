@@ -440,6 +440,8 @@ Three items were scoped out of Stage 12 core during the 2026-06-30 brainstorm (u
 
 **Note vs. the original spec:** the shipped email does NOT include a one-click revoke *link* (the original "wasn't you? revoke it" idea) — it points the user to Settings → Security to review/revoke sessions instead. A signed revoke-link is a future enhancement, not owed now.
 
+**Cross-cutting follow-up — detach notification sends at scale (not scheduled):** every notification email in the app (`NewSessionNotificationService`, `SupportNotificationService`, `PasswordResetService` completion mail) is `await`ed inline in its request path and swallows failures. A send *failure* never fails the operation (the guarantee holds), but a *slow* provider adds its latency to the response up to the HttpClient timeout. This is consistent across all notification call sites by design, not a §12.5.3 regression. If login/request latency becomes a budget concern, the fix is one place: a shared detached-send wrapper (`Task.Run` with an observed-exception logger + a send timeout), applied to all notification sites at once — not a per-site divergence. Raised by the §12.5.3 security review (non-blocking note).
+
 ---
 
 ## Phase 5 — Business Model
