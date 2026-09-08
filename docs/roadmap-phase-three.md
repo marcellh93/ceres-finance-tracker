@@ -1491,7 +1491,7 @@ Frontend (`/support`, supersedes the form-only checklist above):
 - [x] List with status badges (Open=info, Pending=warning, OnHold=secondary, Solved=success, Closed=outline), `messageCount`/`lastMessageAt`, empty/error/loading via `DataTransition`
 - [x] Thread in a URL-reflected slide-in sheet (`/support/<id>`), composer, attachments (upload on create + reply, download links in thread), user close-ticket action, Closed → follow-up affordance
 - [x] Vitest (15 support tests) + Playwright E2E (`e2e/auth/support-page.spec.ts`, 6 flows × 3 browsers incl. the API-seeded agent-reply leg)
-- [ ] `/support` touch targets: Send / reply / close / ticket-row tap targets ≥ 44×44px on mobile — **not met**; `sm` buttons are `h-7` like every shipped page (mirrors the open `/settings/sessions` touch-target item above). Design-system-wide mobile size bump, out of 12.6 scope
+- [x] `/support` touch targets: Send / reply / close / ticket-row tap targets ≥ 44×44px on mobile — **met by the Bucket D app-wide `Button` bump (Stage 12.8.3, 2026-09-08)**; the `sm` size now carries `max-sm:h-11`, so these clear 44px on mobile with no per-page change.
 - [ ] Manual browser pass: golden path, 375px mobile, all nav links — the E2E covers the flows headlessly; a human visual pass is still owed
 
 Whole-branch review follow-ups (2026-08-28, all addressed except the perf note):
@@ -1528,13 +1528,13 @@ Stage 9.8 moved-in item (relocated 2026-06-14 — see Stage 9 § Reauthenticatio
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md) § Surface Inventory):
 
-- [ ] `/settings/sessions` mobile: session rows render as cards (not table); per-row revoke + IP-block actions reachable
-- [ ] `/settings/sessions` tablet: cards remain (per the responsive doc — Active sessions list is card-view through tablet, table only on desktop)
-- [ ] `/settings/sessions` desktop: standard table layout
-- [ ] `/settings/sessions` touch targets: per-row revoke and IP-block buttons each ≥ 44×44px on mobile; session-row card meets the same minimum across its tappable region
+- [x] `/settings/sessions` mobile: session rows render as stacked cards (`flex-col`), per-row anchor / revoke / IP-block actions reachable — Bucket D breakpoint fix (`sm:`→`lg:`) keeps the card layout below desktop.
+- [x] `/settings/sessions` tablet: cards remain (the row only goes horizontal at `lg:` = ≥1024px, so card-view persists through tablet per the responsive doc).
+- [~] `/settings/sessions` desktop: at `lg:` the card becomes a single aligned horizontal row (label/meta left, actions right) rather than a literal `<table>`. **Deliberately not a `<table>`:** the session list is a short (≤~5-row), action-rich list (per-row anchor/revoke/block buttons + badges + confirm dialogs); a real table element would duplicate all that wiring for no readability gain. The horizontal row is the table-equivalent desktop layout. If a future need arises for sortable columns, revisit.
+- [x] `/settings/sessions` touch targets: per-row anchor/revoke/IP-block buttons are ≥44px tall on mobile via the app-wide `Button` `max-sm:h-11` bump (Bucket D). Asserted by `sessions-page.spec.ts` mobile E2E (button height ≥44px + no 375px overflow, all browsers).
 - [x] `/support` mobile: thread + compose in a full-width slide-in sheet (scoped width override), list rows wrap, no horizontal overflow at 375px — E2E-asserted (`support-page.spec.ts`)
 - [x] `/support` desktop: list in a card; thread/compose in a right-side sheet (`sm:max-w-lg`) — the sheet replaced the form-modal/table split (12.6 conversation model)
-- [ ] `/support` touch targets ≥ 44×44px on mobile — **not met** (see the Stage 12.6 checklist); `sm` buttons are `h-7`, a design-system-wide bump tracked alongside the `/settings/sessions` touch-target item
+- [x] `/support` touch targets ≥ 44×44px on mobile — **met by the Bucket D app-wide `Button` bump (Stage 12.8.3, 2026-09-08)**: the standard sizes now carry `max-sm:h-11`/`max-sm:size-11`, so the support send/reply/close/row buttons clear 44px on mobile with no per-page change.
 
 ### Stage 12.10 — Session lifecycle (expiry filter, login dedup, retention sweep) ✅ Done (2026-08-29)
 
@@ -1574,7 +1574,7 @@ This is the hazard the Stage 9.5d spec named ("RLS policies are *silently inert*
 - [x] Guard: the meta-proof is self-guarding (remove the strip from the helper and its RLS-disabled `.Should().Be(1)` fails, because the EF filter would return 0). Baking the strip *into* the helper also makes helper-misuse structurally impossible. A lexical source-scan guard was rejected — the project moved away from prose-scanning checks in 9.5a.
 - *Tripwire retired: both the helper and the `RlsParityMetaTests` sibling now strip the filter; the class is closed.*
 
-### Stage 12.8.3 — Promote the inline warning strip to `<Alert variant="warning">` (not scheduled)
+### Stage 12.8.3 — Promote the inline warning strip to `<Alert variant="warning">` ✅ Done (2026-09-08)
 
 **Status: ❌ Open.** Surfaced 2026-08-29 while building the 12.8 pending banner.
 
@@ -1582,11 +1582,11 @@ This is the hazard the Stage 9.5d spec named ("RLS policies are *silently inert*
 
 It was NOT promoted in 12.8: building the component, converting five call sites, adding the paired `--warning-foreground` token, and updating the docs is materially more than the stage was scoped for, and doing it inside a stage about email change would bury it. The banner uses the documented inline pattern, so it is consistent with the other four rather than inventing a sixth shape.
 
-- [ ] Build `<Alert variant="warning">` in `src/components/ui/alert.tsx` per the recipe's anatomy.
-- [ ] Add the `--warning-foreground` token (§ Known limitations: `warning` is AA-Large only, so body copy currently inherits default foreground).
-- [ ] Convert all five callers in the same commit: `TotpEnrollStep2BackupCodes`, `BackupCodeLoginBanner`, `SupportThreadSheet`, `BudgetCreate`, `EmailAddressSection`.
-- [ ] Update `docs/design-system.md` — the caller list is stale, and the promotion rule should record that it fired.
-- *Tripwire: the caller list in § Inline warning strip, which is now wrong in the other direction (it will list five where it says three).*
+- [x] Build `<Alert variant="warning">` in `src/components/ui/alert.tsx` per the recipe's anatomy — composable `AlertTitle`/`AlertDescription`, optional `icon` override + `icon={null}`, optional 44px `onDismiss` button, `role="status"` + `aria-live="polite"` built in. Pinned by `alert.test.tsx` (5/5).
+- [x] Add the `--warning-foreground` token — light (darkened amber, AA for body) + dark (lightened), in all three token blocks; `<Alert>` applies `text-warning-foreground` to body while `--warning` stays reserved for the icon stroke.
+- [x] Convert all five callers in the same commit: `TotpEnrollStep2BackupCodes`, `BackupCodeLoginBanner` (`onDismiss`), `SupportThreadSheet`, `BudgetCreate` (`icon={null}`), `EmailAddressSection`. Existing caller Vitest green (role=status preserved, 22/22); full client suite 1113 green.
+- [x] Update `docs/design-system.md` — the § Inline warning strip note now records the promotion + the `<Alert>` recipe; the § Known limitations `--warning` note records the paired-token resolution.
+- *Tripwire retired: the recipe now points at the `<Alert>` primitive; `border-warning/30 bg-warning/10` no longer appears in any non-test caller (`components/ui/alert.tsx` is the sole home).*
 
 ### Stage 12.8.4 — Test files are never type-checked (not scheduled)
 
