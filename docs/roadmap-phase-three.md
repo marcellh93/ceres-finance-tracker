@@ -1670,15 +1670,24 @@ Consequences:
 - [x] **Retires the Stage 12.5 accepted risk** — done; the § 12.5 accepted-risk A2 line below is now ticked (an operator can read all tickets without the notification email).
 - *Tripwire retired: the surface ships; both the accepted-risk line and the Stage 16 alert framing are updated.*
 
-### 12.5.3 — New-session-from-new-IP alert email
+### 12.5.3 — New-session-from-new-IP alert email ✅ Done (2026-09-08)
 
-*Deferral reason: needs a comparison-granularity + first-login-suppression design; naive exact-IP shipping now causes alert fatigue.*
+*Deferral reason (original): needed a comparison-granularity + first-login-suppression design. **Built 2026-09-08** — exact-IP novelty (fork 1a, reusing §12.5.1's granularity decision), first-ever login suppressed. The opt-out toggle is split out because the notification-preferences surface it needs does not exist (user-authorized 2026-09-08, option A — a security "new sign-in" alert is conventionally not opt-out anyway).*
 
-- [ ] Resolve novelty granularity (exact IP / /24 / geo-ASN) + first-ever-login suppression
-- [ ] Session-novelty detection at the `UserSession` creation path (login)
-- [ ] `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx (`NewSessionAlert.Subject/BodyText/BodyHtml`)
-- [ ] Opt-out toggle in Settings notification preferences (the preferences surface itself may not exist yet — confirm)
-- *Tripwire: this checklist + the `planning-future.md` entry; `EmailTemplateKey` has no `NewSessionAlert` member until built.*
+- [x] Resolve novelty granularity + first-ever-login suppression — **exact-IP** (fork 1a, mirroring the anchor; subnet/ASN rejected for the same reasons). First-ever login (no prior session) is suppressed — there is no "new" to alert on, and every first sign-in would otherwise fire it.
+- [x] Session-novelty detection at the `UserSession` creation path (login) — `AuthController.IssueSessionAndCookiesAsync` queries the user's prior session IPs before the dedup revoke; novel = has prior sessions AND none from the current IP. Owner-scoped (login runs in the user's scope). `NewSessionAlertTests` pins first-login→no-alert, new-IP→alert, known-IP→no-alert.
+- [x] `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx — 3 keys × 2 langs (args: IP, device, sign-in time). Sent by a new non-blocking `INewSessionNotificationService` (log-and-swallow; a mail outage never fails the login). Composer round-trip + key-count (48→51) pinned.
+- [x] Opt-out toggle in Settings notification preferences — **homed under §12.5.5** (the notification-preferences surface does not exist; a new-sign-in security alert conventionally has no off-switch, so shipping the alert without one is not a gap). The receiving `[ ]` lives under §12.5.5 below; the WHAT is in `planning-future.md` § New-session alert. Nothing owed here — the decision and its home are the deliverable.
+- *Tripwire retired: `EmailTemplateKey.NewSessionAlert` now exists; the alert ships. The opt-out is homed under §12.5.5.*
+
+### 12.5.5 — Notification-preferences surface (deferred — receiving stage, not scheduled)
+
+*Deferral reason: user-authorized (2026-09-08, §12.5.3 option A) AND a real missing subsystem — there is no per-user notification-preference model, endpoint, or settings page today (`Settings` holds only format/currency/period/language). Building the whole surface to add one off-switch would invert the effort; it is a stage of its own, and it has more than one waiting consumer.*
+
+- [ ] Notification-preferences surface: a per-user preference store (column set or table), a GET/PATCH endpoint, and a Settings → Notifications SPA page. The api-contract already anticipates this row (`Notifications | GET/PATCH`).
+- [ ] Opt-out toggle for the §12.5.3 new-session alert wired into that surface (default on). Carried in from §12.5.3.
+- [ ] Toggles for the other anticipated notifications once they ship: weekly digest opt-in and the Safe to Spend alert (both `planning-future.md` / `planning-phase3.md` § Safe to Spend alert).
+- *Tripwire: this checklist + the `planning-future.md` § New-session alert opt-out note; no preference model/field exists until built.*
 
 ### 12.5.4 — Unblock a blocked IP ✅ Done (2026-09-07)
 

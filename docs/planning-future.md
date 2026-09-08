@@ -427,19 +427,18 @@ Three items were scoped out of Stage 12 core during the 2026-06-30 brainstorm (u
 - Endpoint scope + isolation: admin endpoints read across users (bypass the per-user query filter / RLS) — they must use the `ceres_admin` BYPASSRLS context deliberately and be access-controlled, mirroring the `IUserJobRunner` admin-context discipline.
 - Whether the beta needs this at all, or admin triage via the notification email + direct DB access suffices until there's a second operator.
 
-#### New-session-from-new-IP alert email (Stage 8 carry-forward)
+#### New-session-from-new-IP alert email — ✅ SHIPPED 2026-09-08 (Stage 12.5.3)
 
-**What:** when a `UserSession` is created from an IP not previously seen for that user, email a "new sign-in — wasn't you? revoke it" notification with IP + UA summary + a revoke link. Opt-out, default-enabled, toggle in Settings notification preferences.
+**What shipped:** when a `UserSession` is created from an IP the user has never signed in from before, an email alert is sent ("new sign-in from a network we haven't seen; if it wasn't you, change your password and review your sessions"), carrying the IP, device summary, and sign-in time.
 
-**Why deferred:** novelty = "IP not previously seen" naively compared against `UserSession.IpCreatedAt` history fires on nearly every login for mobile/CGNAT/VPN users → alert fatigue that trains users to ignore security mail. Doing it well needs a comparison-granularity + suppression design.
+**Design resolved:**
+- Comparison granularity: **exact IP** (fork 1a — mirrors the §12.5.1 IP-anchor decision; subnet/ASN rejected for the same reasons).
+- First-ever-login suppression: **yes** — no prior session means no "new" to alert on; every first sign-in would otherwise fire it.
+- Template: `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx. Sent by a non-blocking `INewSessionNotificationService` (log-and-swallow — a mail outage never fails the login).
 
-**Open design questions:**
-- Comparison granularity: exact IP vs /24 subnet vs geo/ASN.
-- First-ever-login suppression (don't alert on the account's very first session).
-- Opt-out wiring: the Settings notification-preferences surface this toggles from doesn't exist yet either.
-- Template: add `NewSessionAlert` to `EmailTemplateKey` + EN/ES resx (`NewSessionAlert.Subject/BodyText/BodyHtml`) when built.
+**Still deferred — the opt-out toggle (→ roadmap §12.5.5):** the alert ships WITHOUT an off-switch, because (a) the notification-preferences surface it would live in does not exist yet and (b) a new-sign-in security alert is conventionally not opt-out (Google/GitHub don't offer one). The toggle is homed as a `[ ]` under roadmap §12.5.5 (Notification-preferences surface), alongside the weekly-digest and Safe-to-Spend toggles that also wait on that surface.
 
-**Gate (all three):** resume when scheduled by the user; restore an executing stage in the then-active roadmap from § Stage 12.5's checklist.
+**Note vs. the original spec:** the shipped email does NOT include a one-click revoke *link* (the original "wasn't you? revoke it" idea) — it points the user to Settings → Security to review/revoke sessions instead. A signed revoke-link is a future enhancement, not owed now.
 
 ---
 

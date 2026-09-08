@@ -24,4 +24,11 @@ public enum EmailTemplateKey
 
     /// <summary>Notifies the user that the operator marked their ticket Solved. Stage 12.6.</summary>
     SupportTicketSolved,
+
+    /// <summary>
+    /// Security alert: a sign-in arrived from an IP the user has never signed in from before
+    /// (exact-IP novelty; first-ever login suppressed). Stage 12.5.3. Args: {0} new IP,
+    /// {1} device summary, {2} sign-in time.
+    /// </summary>
+    NewSessionAlert,
 }

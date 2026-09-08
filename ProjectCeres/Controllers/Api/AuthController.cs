@@ -43,6 +43,7 @@ public sealed class AuthController : ControllerBase
     private readonly LockoutCache _lockoutCache;
     private readonly EmailConfirmationService _emailConfirmation;
     private readonly TimeProvider _timeProvider;
+    private readonly Common.Email.INewSessionNotificationService _newSessionNotifier;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -58,7 +59,8 @@ public sealed class AuthController : ControllerBase
         Services.CategorySeedService categorySeedService,
         LockoutCache lockoutCache,
         EmailConfirmationService emailConfirmation,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        Common.Email.INewSessionNotificationService newSessionNotifier)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -74,6 +76,7 @@ public sealed class AuthController : ControllerBase
         _lockoutCache = lockoutCache;
         _emailConfirmation = emailConfirmation;
         _timeProvider = timeProvider;
+        _newSessionNotifier = newSessionNotifier;
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -431,6 +434,18 @@ public sealed class AuthController : ControllerBase
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
         var ua = Request.Headers.UserAgent.ToString();
 
+        // Stage 12.5.3: decide new-session-alert novelty BEFORE the dedup revoke below mutates
+        // the row set. Exact-IP novelty (fork 1a, mirroring the anchor). First-ever login is
+        // suppressed — with no prior session there is no "new" to alert on, and every first
+        // sign-in would otherwise fire it. Alert only when the user HAS prior sessions and NONE
+        // of them was created from this IP. Query is naturally owner-scoped (login runs in the
+        // user's scope); IgnoreQueryFilters is not needed and not used.
+        var priorSessions = await _db.UserSessions
+            .Where(s => s.UserId == user.Id && s.Id != sessionId)
+            .Select(s => s.IpCreatedAt)
+            .ToListAsync();
+        var isNovelSession = priorSessions.Count > 0 && !priorSessions.Contains(ip);
+
         // Dedup: one live session per device, persistent or not. Revoke any existing
         // live session from the same UA + IP before adding the new row, so the list
         // shows one row per device instead of one per login. Guarded by
@@ -487,6 +502,15 @@ public sealed class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         _antiforgery.GetAndStoreTokens(HttpContext);
+
+        // Stage 12.5.3: fire the new-session security alert after the session is committed.
+        // Non-blocking — the service swallows + logs any send failure so a mail outage never
+        // fails the login. No opt-out is consulted (security alert; prefs surface deferred).
+        if (isNovelSession)
+        {
+            await _newSessionNotifier.NotifyNewSessionAsync(
+                user.Id, ip, ua, session.CreatedAt, HttpContext.RequestAborted);
+        }
     }
 
     private bool ReadRememberMeCookie() =>

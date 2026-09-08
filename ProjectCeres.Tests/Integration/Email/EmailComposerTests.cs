@@ -41,14 +41,17 @@ public sealed class EmailComposerTests
     [InlineData(EmailTemplateKey.TotpDisabled, "es")]
     [InlineData(EmailTemplateKey.BackupCodesRegenerated, "en")]
     [InlineData(EmailTemplateKey.BackupCodesRegenerated, "es")]
+    [InlineData(EmailTemplateKey.NewSessionAlert, "en")]
+    [InlineData(EmailTemplateKey.NewSessionAlert, "es")]
     public void Renders_all_templates_en_and_es(EmailTemplateKey key, string culture)
     {
         using var scope = _factory.Services.CreateScope();
         var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
 
-        // Two placeholders is enough for any template (LockoutUnlock and EmailChangeRevokeOld
-        // are the only ones with {1}); extras are ignored by String.Format.
-        var msg = composer.Compose(key, new CultureInfo(culture), "https://example.invalid/x", "203.0.113.5");
+        // Three placeholders covers every template (NewSessionAlert uses {0}{1}{2}); extras
+        // are ignored by String.Format, but a MISSING arg would throw — so pass the max.
+        var msg = composer.Compose(key, new CultureInfo(culture),
+            "https://example.invalid/x", "203.0.113.5", "2026-09-08 00:00:00Z");
 
         msg.Subject.Should().NotBeNullOrWhiteSpace();
         msg.BodyText.Should().NotBeNullOrWhiteSpace();
@@ -220,6 +223,6 @@ public sealed class EmailComposerTests
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(48, "16 templates × 3 keys each (SupportReplyToUser + SupportTicketSolved added Stage 12.6)");
+        enKeys.Should().HaveCount(51, "17 templates × 3 keys each (NewSessionAlert added Stage 12.5.3)");
     }
 }

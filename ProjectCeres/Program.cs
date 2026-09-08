@@ -540,6 +540,7 @@ builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
 builder.Services.AddScoped<ISupportMessageService, SupportMessageService>();
 builder.Services.AddScoped<ISupportRecipientResolver, SupportRecipientResolver>();
 builder.Services.AddScoped<ISupportNotificationService, SupportNotificationService>();
+builder.Services.AddScoped<INewSessionNotificationService, NewSessionNotificationService>();
 
 // Stage 12.5 — support-ticket notifications have nowhere to go without this.
 // Production fails to boot rather than accept tickets nobody will read; other

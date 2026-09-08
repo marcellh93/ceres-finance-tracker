@@ -126,4 +126,13 @@ View the full conversation: {2}</value></data>
 
 If your issue isn't resolved, reply to the ticket to reopen it: {1}</value></data>
   <data name="SupportTicketSolved.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Ceres support marked your ticket &lt;strong&gt;{0}&lt;/strong&gt; as &lt;strong&gt;solved&lt;/strong&gt;.&lt;/p&gt;&lt;p&gt;If your issue isn't resolved, &lt;a href="{1}"&gt;reply to the ticket&lt;/a&gt; to reopen it.&lt;/p&gt;</value></data>
+  <data name="NewSessionAlert.Subject" xml:space="preserve"><value>New sign-in to your Ceres account</value></data>
+  <data name="NewSessionAlert.BodyText" xml:space="preserve"><value>Your Ceres account was signed in to from a network we haven't seen before.
+
+IP address: {0}
+Device:     {1}
+When:       {2}
+
+If this was you, no action is needed. If it wasn't, change your password right away and review your active sessions under Settings — Security.</value></data>
+  <data name="NewSessionAlert.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your Ceres account was signed in to from a network we haven't seen before.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;IP address:&lt;/strong&gt; {0}&lt;br /&gt;&lt;strong&gt;Device:&lt;/strong&gt; {1}&lt;br /&gt;&lt;strong&gt;When:&lt;/strong&gt; {2}&lt;/p&gt;&lt;p&gt;If this was you, no action is needed. If it wasn't, change your password right away and review your active sessions under Settings — Security.&lt;/p&gt;</value></data>
 </root>

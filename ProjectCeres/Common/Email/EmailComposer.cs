@@ -85,6 +85,8 @@ public sealed class EmailComposer : IEmailComposer
             (EmailKeys.SupportReplyToUser.Subject, EmailKeys.SupportReplyToUser.BodyText, EmailKeys.SupportReplyToUser.BodyHtml),
         EmailTemplateKey.SupportTicketSolved =>
             (EmailKeys.SupportTicketSolved.Subject, EmailKeys.SupportTicketSolved.BodyText, EmailKeys.SupportTicketSolved.BodyHtml),
+        EmailTemplateKey.NewSessionAlert =>
+            (EmailKeys.NewSessionAlert.Subject, EmailKeys.NewSessionAlert.BodyText, EmailKeys.NewSessionAlert.BodyHtml),
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
     };
 }

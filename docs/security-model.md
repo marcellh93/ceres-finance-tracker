@@ -340,6 +340,17 @@ Decision record: `docs/decisions/ADR-0077-roslyn-analyzers-for-invariant-enforce
 - **Recovery on a legitimate IP change (Fork 2a):** the mismatch signs the session out, and the user simply logs in again (a fresh session, re-anchorable). No separate unlock mechanism — the normal login is the recovery path.
 - **Toggle:** `POST /api/sessions/{id}/anchor` (`[RequireRecentAuth]`, IDOR-scoped to the caller like revoke/block-ip; a foreign or unknown session is 404). Default off for existing and new sessions.
 
+### New-Session Alert
+
+**Status: ✅ Shipped (Stage 12.5.3).** The companion to IP-anchoring: anchoring rejects a *replayed cookie* from another IP; this alert covers the case anchoring by design cannot — someone who **signs in with the password** from a new network.
+
+- **Trigger:** at the `UserSession` creation path (`AuthController.IssueSessionAndCookiesAsync`), if the user has prior sessions and none was created from the current IP (exact-IP novelty, mirroring the anchor), an email is sent. First-ever login is suppressed (no prior session = nothing to be "new" against).
+- **Delivery:** non-blocking via `INewSessionNotificationService` — the send is logged-and-swallowed so a mail outage never fails the sign-in. Recipient resolves server-side from the account's own email (`IEmailRecipientResolver`), never a request payload.
+- **No opt-out (by design, for now):** a new-sign-in security alert is conventionally not opt-out. An opt-out toggle is homed under roadmap §12.5.5 (the notification-preferences surface), which does not exist yet.
+- **Content:** IP, device summary, sign-in time, and guidance to change the password + review sessions under Settings → Security. It does not carry a one-click revoke link (future enhancement).
+
+This alert is part of the compensating-control stack for non-MFA accounts named under § Login → MFA.
+
 ### Password Reset
 
 **Status: ✅ Shipped (Stage 6c.1, 2026-05-10).** Endpoints `POST /api/auth/password-reset/request` and `POST /api/auth/password-reset/confirm` ship the rules below. Email delivery uses the dev-only `LogOnlyEmailService` until Stage 8 wires the real provider. See `docs/superpowers/specs/2026-05-10-password-reset-design.md` and `docs/superpowers/plans/2026-05-10-stage-6c-1-password-reset-plan.md` for the full design and implementation; ship-gate covered by 46 integration tests under `ProjectCeres.Tests/Integration/Authentication/PasswordReset*`.
