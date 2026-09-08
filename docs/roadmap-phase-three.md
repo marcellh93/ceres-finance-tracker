@@ -1499,7 +1499,7 @@ Whole-branch review follow-ups (2026-08-28, all addressed except the perf note):
 - [x] **`Email:PublicBaseUrl` now fails fast at Production boot** (mirrors the `SupportAddress` guard), so the `Request.Host` fallback in `SupportAdminApiController.SupportUrlBase()` can only run in dev/test. Pinned by `ResendEmailServiceTests.Production_without_public_base_url_throws_at_startup`
 - [x] **User-reply IDOR now returns 404, not 422** — `PostUserReplyAsync` throws `SupportTicketNotFoundException` (404) for a foreign/absent ticket and the generic `InvalidOperationException` (422) only for the Closed-ticket transition refusal, so the IDOR-as-404 shape is uniform across the surface
 - [x] Operator `Body` capped at 5000 (`[StringLength]`), matching the user surface
-- [ ] **Minor perf: `SupportApiController.Reply` re-fetches the full thread just to notify the operator.** After `PostUserReplyAsync` it calls `GetThreadAsync` again (loading all messages + attachments) only to pass the subject/priority to the notification. A header-only fetch — or returning the ticket from the reply service — would avoid the second query. Low-frequency endpoint; not worth the signature change now. Raised by the 12.6 whole-branch review
+- [x] **Minor perf: `SupportApiController.Reply` re-fetch eliminated (2026-09-08, `8ea9559c`).** `PostUserReplyAsync` now returns `(message, ticket)` — the ticket it already loaded to run the state machine — so `Reply` reuses it for the operator notification instead of a second `GetThreadAsync` (which had loaded the whole message + attachment graph for four header scalars). One fewer query + no graph load per user reply. `SupportMessageServiceTests` asserts the returned ticket carries the post-reply status. Raised by the 12.6 whole-branch review.
 
 Carried to Stage 16 (hosting):
 
@@ -1613,15 +1613,15 @@ The attempted fix excluded that path from static files in Development so Vite wo
 
 Three ways to fix it properly, each its own piece of work:
 
-- [ ] ~~**Option A — boot-time reachability probe.**~~ Not chosen — adds a boot network call and races a slightly-later Vite start.
+- ~~**Option A — boot-time reachability probe.**~~ Not chosen — adds a boot network call and races a slightly-later Vite start. (Decision record, not an open task.)
 - [x] **Option B — give the test host its own environment.** Shipped 2026-09-07: `UseEnvironment("Testing")` on the shared factory, so `IsDevelopment()` no longer carries two meanings. The 307-test failure the first attempt hit was §12.12 (user secrets load only under Development); §12.12 shipped first and the factory now supplies the token-lookup secret, so the blocker is gone. Verified: env-sensitive slice (SPA-shell, 500-expecting, cookie/CSRF/startup) 23/23 green on `Testing`; full suite is the TIER M gate.
-- [ ] ~~**Option C — per-request fallback.**~~ Not chosen — most robust but most complexity; Option B fixes the root cause instead.
+- ~~**Option C — per-request fallback.**~~ Not chosen — most robust but most complexity; Option B fixes the root cause instead. (Decision record, not an open task.)
 
 The `tools/stage-spa.sh` workaround still applies to the *deliberate* non-Vite profiles (plain `dotnet run`, the agent-env Smoke profile) per `CLAUDE.md` — those legitimately serve the built bundle. What Option B fixed is the test host wrongly sharing the `Development` identity, not those profiles.
 
-### Stage 12.12 — The test suite depends on a developer's local user-secrets store (not scheduled)
+### Stage 12.12 — The test suite depends on a developer's local user-secrets store ✅ Done (2026-09-08)
 
-**Status: ❌ Open.** Found 2026-08-29 while diagnosing the § 12.11 Option B failure. Not caused by that work — it has been latent since the Stage 6.15 token-lookup secret landed.
+**Status: ✅ Fixed (`ad125c8f`, Batch 1).** Found 2026-08-29 while diagnosing the § 12.11 Option B failure. Not caused by that work — it had been latent since the Stage 6.15 token-lookup secret landed.
 
 `ProjectCeres.csproj` declares a `UserSecretsId`, and ASP.NET's default host builder loads the user-secrets provider **only when the environment is Development**. `TestWebApplicationFactory` sets no environment, so it inherits Development and silently picks up whatever is in the developer's `~/.microsoft/usersecrets/<id>/secrets.json`. It overrides the three connection strings itself, but **not** `Authentication:TokenLookupSecret:Secret` — that value comes from the personal secret store alone. `appsettings.json` ships it as the placeholder string `"configure-via-user-secrets"`, which is not valid base64.
 
@@ -1631,10 +1631,10 @@ Consequences:
 - **CI has the same shape.** Any runner without that file provisioned fails identically, which is the wrong failure to debug from a red pipeline.
 - **It blocks § 12.11 Option B**, and any other change that moves the test host off Development.
 
-- [ ] Have `TestWebApplicationFactory` supply `Authentication:TokenLookupSecret:Secret` itself (a fixed, obviously-test-only base64 value via `UseSetting`, alongside the connection strings it already overrides). Test-only secrets belong in the fixture, not in a developer's home directory.
-- [ ] Audit for other settings resolved from user secrets that the factory does not override — `Email:Resend:ApiKey` is present in the store; confirm whether any test path reaches it.
-- [ ] Add a test that fails loudly and legibly when a required secret is absent, so the symptom names the cause instead of surfacing as a base64 `FormatException` inside an unrelated auth test.
-- *Tripwire: this checklist. The placeholder string in `appsettings.json` is the marker to grep for (`configure-via-user-secrets`).*
+- [x] `TestWebApplicationFactory` now supplies `Authentication:TokenLookupSecret:Secret` itself (`WafCollection.cs:111`, a fixed test-only base64 value via `UseSetting`, alongside the connection strings). A fresh clone / CI runner no longer depends on a developer's home-directory secret.
+- [x] Audit for other user-secret-only settings the factory misses — done: `Email:Resend:ApiKey` is Production-only (Dev/Test falls back to `LogOnlyEmailService`), so no other test path reaches the store (`ad125c8f` commit note).
+- [x] Loud, legible failure when the secret is absent — `TokenLookupHasher`'s ctor now detects the `configure-via-user-secrets` placeholder / bad base64 and throws an `InvalidOperationException` naming the cause + the fix (keeping the original as InnerException) instead of a bare `FormatException` deep in an auth path. Pinned by `TokenLookupHasherTests`.
+- *Tripwire retired: the fixture supplies the secret; the placeholder no longer reaches the hasher in tests.*
 
 **Partially fixed 2026-08-29 for the agent-env Smoke profile.** The gap stopped being theoretical: booting `tools/agent-env/up.sh` and registering through the UI failed with a bare 400, and the app log showed `System.FormatException: not a valid Base-64 string` from `TokenLookupHasher` — the placeholder reaching the hasher, exactly as predicted above. `up.sh` now reads `Authentication:TokenLookupSecret:Secret` from the developer's user-secrets store and passes it through as `Authentication__TokenLookupSecret__Secret`, and fails loudly with the `dotnet user-secrets set` command if it is absent. Verified: the Base-64 exception is gone from the app log. **The test-fixture half of this item is still open** — `TestWebApplicationFactory` still inherits the secret implicitly from Development, so a fresh clone still fails ~307 tests.
 
