@@ -6,6 +6,12 @@
 
 #### Added
 
+**Authentication (Stage 12.5.1 — per-session IP anchor, 2026-09-08)**
+- You can now "anchor" an active session to the network it started from, on `/settings/sessions`. An anchored session is signed out if it's used from a different IP — defending against a stolen session cookie replayed from another network. It's opt-in per session, with a confirm dialog that's clear it protects against a replayed cookie, not someone signing in with your password. Recovery from a legitimate IP change is simply signing in again (and the anchor carries across a "remember me" cookie rotation).
+
+**Authentication (Stage 12.5.3 — new-sign-in alert, 2026-09-08)**
+- You now get a security email when your account is signed in to from a network you have never signed in from before, with the IP, device, and time, and guidance to change your password and review your sessions if it wasn't you. Your first-ever sign-in is suppressed. A per-user opt-out is planned once a notification-preferences screen exists.
+
 **Tests (Stage 12.8 — email-change link-click E2E, 2026-09-06)**
 - New end-to-end coverage (`e2e/auth/email-change.spec.ts`) that clicks a real emailed email-change link, across chromium/firefox/webkit. One flow confirms a change from the security page and verifies the new address signs in while the old one is rejected; the other clicks the cancel link and verifies the change is aborted and the old address still signs in. Closes the gap Stage 9.11 scoped out (no page existed to drive then).
 
@@ -250,6 +256,21 @@
 
 #### Fixed
 
+**Security (Stage 12.5 A1 — follow-up ticket isolation, 2026-09-08)**
+- A support follow-up ticket can no longer reference another user's ticket at the database level (previously only the service refused it) — closed with a composite owner-scoped foreign key.
+
+**Support (Stage 12.6 — reply performance, 2026-09-08)**
+- Replying to a support ticket no longer re-loads the entire conversation just to send the operator notification (one fewer query per reply).
+
+**Tests (Stage 12.12 — fresh-clone / CI test isolation, 2026-09-08)**
+- The integration test suite no longer depends on a developer's personal user-secrets file: the test fixture supplies its own token-lookup secret, so a fresh clone and any CI runner can run the suite. A missing secret now fails with a named error that points at the fix instead of a bare base64 error deep inside an unrelated auth test.
+
+**Tooling (Stage 12.11 — dev server stale SPA shell, 2026-09-07)**
+- The integration-test host runs as its own `Testing` environment rather than sharing `Development` with real developers, so `dotnet run` / `dotnet watch` with Vite listening no longer risks serving a stale built bundle to a developer while the test host takes the correct static-fallback path.
+
+**Tests (Stage 12.6 / 12.10 — manual passes converted to E2E, 2026-09-08)**
+- Two owed "manual browser pass" checklist items became real Playwright assertions: repeated sign-ins from one browser show a single session row (dedup), and the support Send control meets the 44px mobile touch target.
+
 **Sessions (Stage 12.10 — session lifecycle, 2026-08-29)**
 - The active-sessions list showed sessions whose login had long since expired, offering Revoke / Block-IP buttons on sessions that were already dead. The list now hides a session once its cookie has expired (30 minutes of inactivity for a normal session, 30 days for a "remember me" one).
 
@@ -286,6 +307,11 @@
 - `docs/api-contract.md` + the `AuthController.Register` code comment claimed Identity password-policy failures (too-short, breached) return `422` — they return `400` (the controller calls `ValidationProblem(ModelState)`, which bypasses the 422 factory). Documentation corrected to match the pinned behavior (`RegisterEndpointTests`); model-binding/DataAnnotations failures still return the `422` envelope
 
 #### Changed
+
+**Design system (Stage 12.8.3 — Alert primitive + mobile touch targets, 2026-09-08)**
+- The repeated inline "warning strip" is now a proper `<Alert>` component, used across the backup-codes, TOTP-enrolment, email-change, support, and budget-conflict surfaces; warning body text now meets AA contrast.
+- Buttons now meet the 44px touch-target minimum on mobile (staying compact on desktop) — improving reachability on the sessions, support, and every other button-bearing screen.
+- `/settings/sessions` keeps its card layout through tablet, switching to an aligned row on desktop.
 
 **Sessions (Stage 12.10 — session lifecycle, 2026-08-29)**
 - Signing in again from the same browser no longer stacks up a new session row each time — the previous session from that same device is superseded, so the active-sessions list shows one entry per device. Signing in from a different browser or network still appears as its own session.
