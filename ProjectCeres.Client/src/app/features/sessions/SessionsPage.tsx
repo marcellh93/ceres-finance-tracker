@@ -294,7 +294,7 @@ export function SessionsPage() {
                 {sessions?.map((session) => (
                   <li
                     key={session.id}
-                    className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center lg:justify-between"
                   >
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">

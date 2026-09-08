@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Copy, Download, AlertTriangle } from 'lucide-react';
+import { Copy, Download } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -72,10 +73,9 @@ export function TotpEnrollStep2BackupCodes({ codes, userEmail, onDone, onCancelW
         </Button>
       </div>
 
-      <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm">
-        <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" aria-hidden />
-        <span>{t('security.totp.wizard.step2.warning')}</span>
-      </div>
+      <Alert>
+        <AlertDescription>{t('security.totp.wizard.step2.warning')}</AlertDescription>
+      </Alert>
 
       <label className="flex items-center gap-2 text-sm">
         <input

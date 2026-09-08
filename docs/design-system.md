@@ -238,6 +238,7 @@ Always use the tokens via `var(--chart-N)`. Chart components should never hard-c
 | `--motion-*` | Added | Not in shadcn |
 | All other shadcn tokens | Left at defaults (zinc baseline) | Works with the brand |
 | `Button` cursor | Yes | Default shadcn Button has no cursor override; we apply `cursor-pointer` so all interactive buttons get the hand cursor on hover |
+| `Button` touch targets | Yes (Stage 12.8) | The standard sizes (`default`, `sm`, `lg`, `icon`, `icon-sm`, `icon-lg`) carry `max-sm:h-11` / `max-sm:size-11` — compact on desktop, ≥44px tall on mobile (<640px) per the WCAG touch minimum and the roadmap's responsive rule. The `xs` / `icon-xs` sizes are the deliberate dense-context affordances (button groups, inline chips — WCAG inline exception) and stay compact at all widths. New buttons inherit this automatically; don't hand-add mobile heights. |
 | `Badge` variants | Extended | Added `success`, `warning`, `info` semantic variants (soft-tinted, matching the existing `destructive` recipe), plus `ghost` and `link` for low-emphasis use |
 | `Switch` styling | Tuned | Custom CSS in `index.css` adapts the base-ui data attributes to the project palette |
 
@@ -351,7 +352,27 @@ For surface-level nudges that need more presence than a `<Badge>` but less than 
 
 Anatomy: `border-warning/30 bg-warning/10` for the surround; `text-warning` only for the icon stroke (per § Known limitations — warning is AA-Large only, body text must inherit default foreground); `AlertTriangle` from `lucide-react` at `h-5 w-5`; `role="status"` + `aria-live="polite"` for the screen-reader announcement. Body and CTA stack vertically inside the middle column.
 
-Current callers: `TotpEnrollStep2BackupCodes.tsx`, `BudgetCreate.tsx`, `BackupCodeLoginBanner.tsx`. **At the fourth caller, promote to `<Alert variant="warning">` in `src/components/ui/alert.tsx`** and back-port all callers in the same commit. Add a paired `--warning-foreground` token (see § Known limitations) so body copy can stay inside the warning palette without inheriting default foreground.
+**Promoted to `<Alert variant="warning">` (Stage 12.5.3 — the fifth caller crossed the threshold).** The inline pattern above is retained for reference, but **new warning surfaces use the `<Alert>` primitive** in `src/components/ui/alert.tsx`, not the hand-rolled div. All five callers were back-ported in the same commit: `TotpEnrollStep2BackupCodes`, `BudgetCreate` (`icon={null}`), `BackupCodeLoginBanner` (`onDismiss`), `SupportThreadSheet`, `EmailAddressSection`.
+
+### `<Alert>` — surface-level nudge (named recipe → primitive)
+
+```tsx
+<Alert>                                   {/* variant="warning" is the default (only variant today) */}
+  <AlertTitle>Optional emphasised line</AlertTitle>
+  <AlertDescription>Body copy.</AlertDescription>
+  <Button size="sm" variant="outline">Optional CTA</Button>
+</Alert>
+
+<Alert icon={null}>…</Alert>              {/* suppress the icon (inline-text warnings) */}
+<Alert onDismiss={fn} dismissLabel="…">…</Alert>  {/* render a 44px dismiss (X) button */}
+```
+
+- **`role="status"` + `aria-live="polite"`** are built in — do not add them at the call site.
+- **Icon:** defaults to `AlertTriangle` at `h-5 w-5` in `text-warning` (AA-Large, icon-only). Pass `icon={SomeLucideIcon}` to override or `icon={null}` to omit.
+- **Body colour:** the primitive sets `text-warning-foreground` (the paired AA token — see § Known limitations, now resolved for `warning`), so body copy stays in the warning palette and still meets AA for normal text. `--warning` itself remains reserved for the icon stroke.
+- **Dismiss:** `onDismiss` renders a `size-11` (44px) ghost X button; `dismissLabel` is required for a11y.
+- **CTA / extra content:** pass as children after the description — they stack vertically in the middle column.
+- Only `variant="warning"` exists today; the cva is the seam for `info` / `success` / `destructive` when a caller needs them.
 
 ---
 
@@ -1147,7 +1168,7 @@ These are accepted trade-offs in the current foundation. Track here so future wo
 
 - **IBM Plex Mono is the static (400) package** (`@fontsource/ibm-plex-mono`), not the variable family. fontsource does not publish a variable build of IBM Plex Mono. Bold weights (`font-bold`, `font-semibold`) on `<Numeric>` will trigger browser-synthesized bold rather than a true drawn glyph. If a future feature needs real bold numerics, add `@fontsource/ibm-plex-mono/600.css` (or 700.css) to `index.css` alongside the existing import.
 
-- **`--warning` (amber) is at L=0.770 in light mode**, ~3:1 contrast against white. Sufficient for borders, background fills, and icons (WCAG AA Large), but **insufficient for body text** (AA requires 4.5:1). Don't use `text-warning` for inline warning labels in 16px copy. Use it for icon strokes, badge fills, alert backgrounds.
+- **`--warning` (amber) is at L=0.770 in light mode**, ~3:1 contrast against white. Sufficient for borders, background fills, and icons (WCAG AA Large), but **insufficient for body text** (AA requires 4.5:1). Don't use `text-warning` for inline warning labels in 16px copy. Use it for icon strokes, badge fills, alert backgrounds. **Resolved for body copy (Stage 12.5.3):** the paired `--warning-foreground` token now exists (darkened amber in light, lightened in dark) and is what `<Alert>` applies to its body — use `text-warning-foreground` for warning-palette body text; keep `text-warning` for icon strokes only.
 
 - **No paired foreground tokens for semantic colors yet.** `--success`, `--warning`, `--info` exist but `--success-foreground`, `--warning-foreground`, `--info-foreground` don't. Add them in the plan that introduces alerts, toasts, or semantic badges (likely the App Shell or Movements/Transactions plan) — they're not needed by the current design-system foundation alone.
 

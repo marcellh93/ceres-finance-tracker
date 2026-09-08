@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { AlertTriangle } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '../../components/Field';
@@ -152,51 +152,44 @@ export function EmailAddressSection() {
       </p>
 
       {showBanner && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 p-4 text-sm"
-        >
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
-          <div className="flex-1 space-y-2">
-            {pending.expired ? (
-              <>
-                <p className="font-medium">{t('security.email.expiredHeading')}</p>
-                <p>{t('security.email.expiredBody', { email: pending.maskedEmail })}</p>
-              </>
-            ) : (
-              <>
-                <p className="font-medium">{t('security.email.pendingHeading')}</p>
-                <p>{t('security.email.pendingBody', { email: pending.maskedEmail })}</p>
-                <p className="text-muted-foreground">
-                  {minutes !== null && minutes > 0
-                    ? t('security.email.pendingExpiresIn', { count: minutes })
-                    : t('security.email.pendingExpiresSoon')}
-                </p>
-              </>
-            )}
-            {mode.kind === 'idle' && (
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setMode({ kind: 'form' })}>
-                  {t(pending.expired ? 'security.email.resend' : 'security.email.changeButton')}
+        <Alert>
+          {pending.expired ? (
+            <>
+              <AlertTitle>{t('security.email.expiredHeading')}</AlertTitle>
+              <AlertDescription>{t('security.email.expiredBody', { email: pending.maskedEmail })}</AlertDescription>
+            </>
+          ) : (
+            <>
+              <AlertTitle>{t('security.email.pendingHeading')}</AlertTitle>
+              <AlertDescription>{t('security.email.pendingBody', { email: pending.maskedEmail })}</AlertDescription>
+              <AlertDescription className="text-muted-foreground">
+                {minutes !== null && minutes > 0
+                  ? t('security.email.pendingExpiresIn', { count: minutes })
+                  : t('security.email.pendingExpiresSoon')}
+              </AlertDescription>
+            </>
+          )}
+          {mode.kind === 'idle' && (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setMode({ kind: 'form' })}>
+                {t(pending.expired ? 'security.email.resend' : 'security.email.changeButton')}
+              </Button>
+              {/* Cancel is offered only for a change still in flight — an expired one has
+                  nothing to cancel, so "Send a new link" is the right affordance there. */}
+              {!pending.expired && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={cancelling}
+                  onClick={() => void cancelPending()}
+                >
+                  {t(cancelling ? 'security.email.cancelling' : 'security.email.cancelPending')}
                 </Button>
-                {/* Cancel is offered only for a change still in flight — an expired one has
-                    nothing to cancel, so "Send a new link" is the right affordance there. */}
-                {!pending.expired && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={cancelling}
-                    onClick={() => void cancelPending()}
-                  >
-                    {t(cancelling ? 'security.email.cancelling' : 'security.email.cancelPending')}
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
+          )}
+        </Alert>
       )}
 
       {mode.kind === 'sent' && (

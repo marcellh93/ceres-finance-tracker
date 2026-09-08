@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CategoryBudgetForm, type CategoryBudgetFormValues } from './CategoryBudgetForm';
 import { GoalBudgetForm, type GoalBudgetFormValues } from './GoalBudgetForm';
 import {
@@ -116,29 +117,31 @@ export function BudgetCreate() {
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold">New category budget</h1>
         {conflict && (
-          <div className="rounded-md border border-warning/30 bg-warning/10 p-4 text-sm">
-            {conflict.existingIsActive ? (
-              <>
-                This combination already has an active budget.{' '}
-                <Link to={`/budgets/${conflict.existingBudgetId}/edit`} className="underline">
-                  Edit it instead
-                </Link>
-                .
-              </>
-            ) : (
-              <>
-                An archived budget for this category and currency exists.{' '}
-                <button
-                  type="button"
-                  className="underline"
-                  onClick={() => reactivateAndRedirect(conflict.existingBudgetId)}
-                >
-                  Reactivate it
-                </button>
-                .
-              </>
-            )}
-          </div>
+          <Alert icon={null}>
+            <AlertDescription>
+              {conflict.existingIsActive ? (
+                <>
+                  This combination already has an active budget.{' '}
+                  <Link to={`/budgets/${conflict.existingBudgetId}/edit`} className="underline">
+                    Edit it instead
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  An archived budget for this category and currency exists.{' '}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => reactivateAndRedirect(conflict.existingBudgetId)}
+                  >
+                    Reactivate it
+                  </button>
+                  .
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
         )}
         <CategoryBudgetForm
           mode="create"

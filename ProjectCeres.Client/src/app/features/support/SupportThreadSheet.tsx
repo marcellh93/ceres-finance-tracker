@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AlertTriangle, Paperclip } from 'lucide-react';
+import { Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -188,20 +189,14 @@ function ThreadBody({
 
       <div className="border-border border-t p-4">
         {isClosed ? (
-          <div
-            role="status"
-            className="border-warning/30 bg-warning/10 flex items-start gap-3 rounded-md border px-4 py-3"
-          >
-            <AlertTriangle aria-hidden="true" className="text-warning h-5 w-5 shrink-0" />
-            <div className="space-y-2">
-              <p className="text-sm">
-                This ticket is closed. Start a follow-up if the issue continues.
-              </p>
-              <Button size="sm" variant="outline" onClick={() => onFollowUp(data)}>
-                Start a follow-up
-              </Button>
-            </div>
-          </div>
+          <Alert>
+            <AlertDescription>
+              This ticket is closed. Start a follow-up if the issue continues.
+            </AlertDescription>
+            <Button size="sm" variant="outline" onClick={() => onFollowUp(data)}>
+              Start a follow-up
+            </Button>
+          </Alert>
         ) : (
           <div className="space-y-3">
             <ReplyComposer onSubmit={onReply} onComplete={onReplyComplete} />

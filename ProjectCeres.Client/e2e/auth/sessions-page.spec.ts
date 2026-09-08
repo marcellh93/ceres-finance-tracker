@@ -230,3 +230,42 @@ test('Sessions: a blocked address can be unblocked from the Blocked addresses se
   await expect(page.getByText('Blocked addresses')).toHaveCount(0)
   await expect(page.getByText(blockedIp)).toHaveCount(0)
 })
+
+test('Sessions: mobile — action buttons meet the 44px touch target and no horizontal overflow', async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  // Stage 12.8 Bucket D: at mobile width the per-row action buttons (sm size) must be
+  // ≥44px tall via the responsive Button bump, and the page must not overflow horizontally.
+  const url = baseURL!
+  await page.setViewportSize({ width: 375, height: 720 })
+  const user = await createVerifiedUser(request, url)
+  const loginRes = await postJson(request, url, '/api/auth/login', {
+    email: user.email,
+    password: DEFAULT_PASSWORD,
+    rememberMe: false,
+  })
+  if (loginRes.status() !== 204) throw new Error(`login failed: ${loginRes.status()}`)
+  const state = await request.storageState()
+  await page.context().addCookies(state.cookies)
+
+  await page.goto('/settings/sessions')
+  await expect(page.getByRole('heading', { level: 1, name: 'Active sessions', exact: true })).toBeVisible()
+
+  // The current session's action buttons (Sign out, Anchor IP) are sm-size; on mobile
+  // they must be ≥44px tall. A 1px tolerance for sub-pixel rounding.
+  for (const name of ['Sign out', 'Anchor IP']) {
+    const btn = page.getByRole('button', { name })
+    await expect(btn).toBeVisible()
+    const box = await btn.boundingBox()
+    expect(box, `${name} button has a box`).not.toBeNull()
+    expect(box!.height, `${name} button ≥44px tall on mobile`).toBeGreaterThanOrEqual(43.5)
+  }
+
+  // No horizontal overflow of the page body at 375px (roadmap: no overflow ≥320px).
+  const noOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  )
+  expect(noOverflow).toBe(true)
+})
