@@ -194,15 +194,16 @@ test('Support: the thread sheet is full-width and usable at 375px', async ({ pag
   expect(box).not.toBeNull()
   expect(box!.width).toBeGreaterThan(340)
 
-  // The composer and its Send control are present and reachable at this width
-  // (no clipping / overflow). NB: the ≥44px touch-target floor (roadmap
-  // responsive rule) is NOT asserted here — the sm Button is h-7 like every
-  // other shipped page, and the mobile touch-target bump is a design-system-
-  // wide item tracked as an open [ ] for /support (mirrors the open /settings/
-  // sessions item). Asserting 44px here would be asserting a state that does
-  // not exist yet.
+  // The composer and its Send control are present and reachable at this width.
   await expect(thread.getByRole('textbox')).toBeVisible()
-  await expect(thread.getByRole('button', { name: 'Send reply' })).toBeVisible()
+  const send = thread.getByRole('button', { name: 'Send reply' })
+  await expect(send).toBeVisible()
+
+  // ≥44px touch target on mobile — now met by the Bucket D app-wide Button bump
+  // (Stage 12.8.3: sm size carries max-sm:h-11). This was an open [ ] until then.
+  const sendBox = await send.boundingBox()
+  expect(sendBox).not.toBeNull()
+  expect(sendBox!.height, 'Send reply ≥44px tall on mobile').toBeGreaterThanOrEqual(43.5)
 
   // No horizontal overflow of the page body at 375px (roadmap: no overflow ≥320px).
   const overflow = await page.evaluate(

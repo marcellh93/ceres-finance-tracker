@@ -269,3 +269,40 @@ test('Sessions: mobile — action buttons meet the 44px touch target and no hori
   )
   expect(noOverflow).toBe(true)
 })
+
+test('Sessions: repeated logins from one browser show a single row (dedup)', async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  // Stage 12.10 dedup, through the browser (converts the owed manual pass): two logins from
+  // the SAME context (same UA + IP) collapse to one live session per device, so the list shows
+  // exactly one row. The integration layer pins the DB behaviour (SessionLoginDedupTests); this
+  // proves it surfaces as a single row in the real UI.
+  const url = baseURL!
+  const user = await createVerifiedUser(request, url)
+
+  // Log in twice through the same request context — same device from the server's view.
+  for (const attempt of [1, 2]) {
+    const res = await postJson(request, url, '/api/auth/login', {
+      email: user.email,
+      password: DEFAULT_PASSWORD,
+      rememberMe: false,
+    })
+    if (res.status() !== 204) throw new Error(`login ${attempt} failed: ${res.status()}`)
+  }
+
+  const state = await request.storageState()
+  await page.context().addCookies(state.cookies)
+  await page.goto('/settings/sessions')
+  await expect(page.getByRole('heading', { level: 1, name: 'Active sessions', exact: true })).toBeVisible()
+
+  // Exactly one session row: the second login deduped the first (same device).
+  // The card title counts rows, and the current-device markers appear exactly once
+  // (a second live row would title "2 active sessions" and add another "This device").
+  await expect(page.getByText('1 active session')).toBeVisible()
+  await expect(page.getByText('2 active sessions')).toHaveCount(0)
+  await expect(page.getByText('This device')).toHaveCount(1)
+  // Exactly one row-level action set (the current session shows Sign out + Anchor IP).
+  await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(1)
+})
