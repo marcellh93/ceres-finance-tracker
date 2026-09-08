@@ -13,11 +13,12 @@ namespace ProjectCeres.Tests.Integration;
 /// <summary>
 /// SupportTicketService against the real project_ceres_test database.
 ///
-/// Two rules here cannot be expressed by the schema and so are only ever as strong as
-/// these tests: close is final (no path back out of Closed), and a follow-up must
-/// reference a Closed ticket belonging to the same user. PostgreSQL's referential
-/// integrity trigger is not subject to RLS, so the database will happily accept a
-/// cross-user PrecedingTicketId — the service is the only thing that refuses it.
+/// The follow-up rule has two halves. "Same owner" is now ALSO enforced structurally —
+/// Stage 12.5 A1 made the self-FK composite (PrecedingTicketId, UserId) → (Id, UserId), so
+/// the database rejects a cross-user PrecedingTicketId (pinned by `ParityTests`). The other
+/// half — a follow-up must reference a *Closed* ticket, and close is final (no path back out
+/// of Closed) — is a state-machine rule the schema cannot express, so it is only ever as
+/// strong as these tests.
 /// </summary>
 [Collection("IntegrationTests")]
 public class SupportTicketServiceTests : IAsyncLifetime

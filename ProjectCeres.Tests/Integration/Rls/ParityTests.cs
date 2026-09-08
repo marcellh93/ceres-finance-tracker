@@ -206,6 +206,52 @@ public class ParityTests
         fk.OnDelete.Should().Be('c', "cascade — an attachment cannot outlive its ticket");
     }
 
+    /// <summary>
+    /// Stage 12.5 A1 — the SupportTicket follow-up self-FK is composite
+    /// (PrecedingTicketId, UserId) → (Id, UserId), so the database cannot accept a follow-up
+    /// pointing at another user's ticket. Before this, only SupportTicketService.CreateAsync
+    /// refused it; the RLS-bypassing FK trigger would otherwise let the row through as an
+    /// existence oracle. Restrict (not cascade): deleting an earlier ticket must never silently
+    /// take its follow-ups. Reads pg_constraint for the same reason the attachment test does.
+    /// </summary>
+    [Fact]
+    public async Task Preceding_ticket_fk_is_scoped_to_the_owner_in_the_database()
+    {
+        await using var admin = _fixture.CreateAdminContext();
+        var conn = admin.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT c.conname,
+                   (SELECT string_agg(a.attname, ',' ORDER BY x.ord)
+                      FROM unnest(c.conkey) WITH ORDINALITY AS x(attnum, ord)
+                      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = x.attnum),
+                   (SELECT string_agg(a.attname, ',' ORDER BY x.ord)
+                      FROM unnest(c.confkey) WITH ORDINALITY AS x(attnum, ord)
+                      JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = x.attnum),
+                   c.confdeltype
+              FROM pg_constraint c
+             WHERE c.conrelid = '""SupportTickets""'::regclass
+               AND c.contype = 'f'
+               AND c.confrelid = '""SupportTickets""'::regclass";
+
+        var found = new List<(string Name, string Cols, string RefCols, char OnDelete)>();
+        await using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+                found.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetChar(3)));
+        }
+
+        found.Should().ContainSingle("SupportTickets has exactly one self-referencing FK (the follow-up chain)");
+        var fk = found[0];
+        fk.Cols.Should().Be("PrecedingTicketId,UserId",
+            "a single-column self-FK lets a follow-up reference another user's ticket, an "
+            + "existence oracle the RLS-bypassing FK trigger would accept");
+        fk.RefCols.Should().Be("Id,UserId");
+        fk.OnDelete.Should().Be('r', "restrict — deleting an earlier ticket must not take its follow-ups");
+    }
+
     [Fact]
     public async Task Every_user_owned_table_has_FORCE_RLS_enabled()
     {

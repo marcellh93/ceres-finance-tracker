@@ -174,19 +174,26 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.Property(t => t.Status).HasConversion<int>();
             b.Property(t => t.Priority).HasConversion<int>();
 
-            // Self-reference for the follow-up chain. Restrict, not Cascade: a
-            // follow-up is its own record of what was reported, so deleting an
-            // earlier ticket must never silently take the later ones with it.
-            // Tickets are not user-deletable anyway — this guards an admin path
-            // that does not exist yet.
+            // Alternate key so a child can reference (Id, UserId) rather than Id alone.
+            // See the SupportMessage config below for why that matters. Declared before the
+            // self-FK so the composite HasPrincipalKey below resolves to it.
+            b.HasAlternateKey(t => new { t.Id, t.UserId });
+
+            // Self-reference for the follow-up chain, COMPOSITE (PrecedingTicketId, UserId) →
+            // (Id, UserId) — a follow-up can only ever point at a PRECEDING ticket with the
+            // SAME owner. Stage 12.5 A1: Postgres runs FK checks through an RI trigger RLS does
+            // not touch, so a single-column FK would let the DB accept a follow-up referencing
+            // another user's ticket (an existence oracle over the unguessable GUID). The service
+            // (SupportTicketService.CreateAsync) already refuses it; this makes it structurally
+            // unrepresentable, mirroring the SupportMessage→ticket FK. Restrict, not Cascade: a
+            // follow-up is its own record, so deleting an earlier ticket must never silently take
+            // the later ones. PrecedingTicketId is nullable — under MATCH SIMPLE a null leading
+            // column skips FK enforcement, so a ticket with no predecessor carries no obligation.
             b.HasOne(t => t.PrecedingTicket)
                 .WithMany()
-                .HasForeignKey(t => t.PrecedingTicketId)
+                .HasForeignKey(t => new { t.PrecedingTicketId, t.UserId })
+                .HasPrincipalKey(t => new { t.Id, t.UserId })
                 .OnDelete(DeleteBehavior.Restrict);
-
-            // Alternate key so a child can reference (Id, UserId) rather than Id alone.
-            // See the SupportMessage config below for why that matters.
-            b.HasAlternateKey(t => new { t.Id, t.UserId });
         });
 
         modelBuilder.Entity<SupportMessage>(b =>
