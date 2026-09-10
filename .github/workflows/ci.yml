@@ -43,14 +43,32 @@ jobs:
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Restore ProjectCeres (so dotnet ef can build it)
         run: dotnet restore ProjectCeres/ProjectCeres.csproj
-      - name: Provision + migrate project_ceres_test
+      - name: Provision + migrate the test databases
+        # Both DBs: project_ceres_test for the integration suite, project_ceres_e2e
+        # for E2eDatabaseGuardStartupCheckTests (which connects to it to prove the
+        # guard passes against the correct DB). A clean runner has neither.
         run: |
           which dotnet-ef && dotnet-ef --version
           tools/ci/setup-test-db.sh project_ceres_test
+          tools/ci/setup-test-db.sh project_ceres_e2e
         env:
           PGHOST: localhost
           PGUSER: postgres
           PGPASSWORD: postgres
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.33.2"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install client deps (for the SPA stage below)
+        run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
+      - name: Stage the SPA bundle into wwwroot/dist
+        # DashboardApiTests.GetDashboardRoot_ServesSpaShell asserts the SPA fallback
+        # serves the built shell (200 text/html). wwwroot/dist is gitignored and
+        # only produced by a Release build or this script, so a clean runner 404s
+        # without it. SkipTailwind is fine — this stages the Vite SPA, not site.css.
+        run: tools/stage-spa.sh
       - name: Build
         run: dotnet build ProjectCeres.Tests/ProjectCeres.Tests.csproj
       - name: Full test suite

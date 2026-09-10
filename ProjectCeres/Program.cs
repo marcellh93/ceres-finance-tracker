@@ -211,6 +211,18 @@ else
 
 builder.Services.AddScoped<IEmailRecipientResolver, EmailRecipientResolver>();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+
+// Default the app-wide culture to en so resource lookups resolve even off the
+// request path — background email sends (support + new-session alerts) compose
+// under CultureInfo.CurrentUICulture, which is the invariant culture on a host
+// running invariant globalization (e.g. CI). Under invariant culture the .en/.es
+// satellite resx do not match and IStringLocalizer returns the raw key as the
+// subject. Pinning the default to en makes those sends deterministic; a request's
+// LanguagePreferenceMiddleware still overrides per-user (es).
+var defaultCulture = CultureInfo.GetCultureInfo("en");
+CultureInfo.DefaultThreadCurrentCulture = defaultCulture;
+CultureInfo.DefaultThreadCurrentUICulture = defaultCulture;
+
 builder.Services.AddScoped<IEmailComposer, EmailComposer>();
 builder.Services.AddScoped<ILanguageResolver, LanguageResolver>();
 
