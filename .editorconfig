@@ -50,3 +50,20 @@ dotnet_diagnostic.IDE0001.severity = warning
 [ProjectCeres/Migrations/*.cs]
 dotnet_diagnostic.CA1861.severity = none
 dotnet_diagnostic.CA1825.severity = none
+
+# ─────────────────────────────────────────────────────────────────────────
+# Test projects — three CA naming rules fire on deliberate test conventions
+# (surfaced as CI annotations 2026-09-10). Scoped to test code only; the
+# production analyzer rules stay at latest-recommended.
+#   CA1707 (no underscores in type name): the CERnnn_ prefix maps a test class
+#     to its analyzer rule id, and GroupN_ groups RLS scenarios — the
+#     underscore is the convention, not an accident.
+#   CA1711 (type must not end in 'Collection'): xUnit REQUIRES the suffix on
+#     [CollectionDefinition] classes; renaming breaks the collection fixture.
+#   CA1051 (no visible instance fields): shared test-base fixtures expose fields
+#     to subclasses by design; encapsulation adds nothing in test-only code.
+# ─────────────────────────────────────────────────────────────────────────
+[{ProjectCeres.Tests,ProjectCeres.Analyzers.Tests}/**.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1051.severity = none

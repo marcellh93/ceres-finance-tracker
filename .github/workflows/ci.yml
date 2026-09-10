@@ -33,8 +33,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
       - name: Install dotnet-ef (global, pinned to EF Core version) + on PATH
@@ -55,10 +55,10 @@ jobs:
           PGHOST: localhost
           PGUSER: postgres
           PGPASSWORD: postgres
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: "10.33.2"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
       - name: Install client deps (for the SPA stage below)
@@ -80,8 +80,8 @@ jobs:
   analyzer-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
       - name: Restore (populates the CodeAnalysis.Testing ref-pack cache)
@@ -92,11 +92,11 @@ jobs:
   client-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           # Explicit version — NOT package_json_file. Our packageManager pin
           # carries a full "+sha512.…/…" hash that action-setup@v4 misparses as
@@ -136,8 +136,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
       - name: Install dotnet-ef (global, pinned to EF Core version) + on PATH
@@ -146,10 +146,10 @@ jobs:
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Restore ProjectCeres (so dotnet ef can build it)
         run: dotnet restore ProjectCeres/ProjectCeres.csproj
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           # Explicit version — NOT package_json_file. Our packageManager pin
           # carries a full "+sha512.…/…" hash that action-setup@v4 misparses as
@@ -169,7 +169,7 @@ jobs:
           V="$(node -p "require('./ProjectCeres.Client/package.json').devDependencies['@playwright/test'].replace(/[^0-9.]/g,'')")"
           echo "version=${V:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
@@ -183,7 +183,7 @@ jobs:
           PGPASSWORD: postgres
       - name: Upload traces + report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-artifacts-${{ matrix.project }}
           path: ProjectCeres.Client/e2e/.artifacts/
@@ -192,16 +192,16 @@ jobs:
   repo-hygiene:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0          # gitleaks scans history
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           # Explicit version — NOT package_json_file. Our packageManager pin
           # carries a full "+sha512.…/…" hash that action-setup@v4 misparses as
@@ -222,7 +222,7 @@ jobs:
             echo "::error::Vulnerable package(s) reported by dotnet list --vulnerable"; exit 1
           fi
       - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
       - name: Node hook self-tests
         run: bash scripts/test-hooks.sh
       - name: Roadmap marker/status consistency
