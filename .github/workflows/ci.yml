@@ -65,14 +65,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: ProjectCeres.Client/package.json   # packageManager pin lives here, not at repo root
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: ProjectCeres.Client/pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ProjectCeres.Client/package.json
       - name: Install
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Build (tsc + vite + check-size)
@@ -105,14 +103,12 @@ jobs:
       - name: Restore dotnet tools (dotnet-ef)
         run: dotnet tool restore || dotnet tool install --global dotnet-ef
       - run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: ProjectCeres.Client/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: ProjectCeres.Client/pnpm-lock.yaml
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ProjectCeres.Client/package.json
       - name: Install client deps
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Resolve Playwright version (for the cache key)
@@ -148,12 +144,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: ProjectCeres.Client/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ProjectCeres.Client/package.json
       - name: Vulnerable-package scan (fail on any finding)
         run: |
           dotnet restore ProjectCeres.sln 2>/dev/null || dotnet restore
