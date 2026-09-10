@@ -1,5 +1,17 @@
 # CI / GitHub Actions troubleshooting
 
+## Standing posture: handle CI yourself with `gh` — don't wait to be told
+
+`gh` is authenticated in this environment, so a failing CI run is **yours to
+diagnose and fix without waiting for the user to paste logs or screenshots.**
+After any push, watch the run, read a failing job's real log, fix, and re-push —
+the same way you would iterate on a local test failure. Asking the user "did CI
+pass?" or "can you send me the log?" is the anti-pattern this runbook exists to
+end: every screenshot round-trip is a turn the `gh` commands below would have
+saved. The only step that ever needs the user is a one-time `! gh auth login` if
+`gh` reports it is not authenticated. CLAUDE.md § *Handling CI failures* is the
+short version of this; the commands and gotchas below are the detail.
+
 ## The one rule that governs all of this: read the actual failure output FIRST
 
 When a build, a test run, or a CI job fails, the **first action is to read the

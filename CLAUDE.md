@@ -60,6 +60,20 @@ The Stop hook (`.claude/hooks/run-tests.sh`) is the project's `dotnet test` gate
 
 Live log at `.claude/state/run-tests/last.log`; the tier decision is printed to stderr at start.
 
+## Handling CI failures — use `gh`, don't wait to be told
+
+**When a push triggers CI, drive the result yourself with the `gh` CLI — do not wait for the user to paste logs or screenshots.** After pushing, watch the run to completion, and when a job fails, read its actual failing-step log and act on it. This is the standing posture, not a per-request permission.
+
+The loop (full command reference + the Stage 12.13 gotchas: `docs/runbooks/ci-actions-troubleshooting.md`):
+
+1. `gh run list` → find the run for the pushed commit.
+2. `gh run watch <id>` → watch to completion (don't ask the user "did it pass?").
+3. On failure: `gh run view <id> --log-failed`, or `gh run view <id> --job <job-id> --log` when the error is swallowed (a script's `>/dev/null`, a subprocess, an implicit build). **Read the real error before hypothesizing a cause** — that is the `read-failure-first` rule the runbook and its Stop-hook nudge enforce.
+4. Reproduce the failing command locally where possible, fix, re-push, watch again.
+5. A single-shard flake (e.g. one webkit e2e timeout while the others pass): `gh run rerun <id> --failed` to confirm it's flaky before treating it as real — but a reproducible failure gets root-caused, never re-run away.
+
+`gh` is authenticated in this environment. If a `gh` call reports it is not, ask the user to run `! gh auth login` once — that is the only step that needs them. Everything after is yours to handle.
+
 ## Architecture Rules (Non-Obvious)
 
 **Data model:**
@@ -130,7 +144,7 @@ killing the watcher alone re-orphans the app. Start watchers with `tools/dev-wat
 - `docs/design-system.md` — React client design system: tokens, primitives, recipes. Source of truth for UI look-and-feel.
 - `docs/legal.md` — GDPR checklist, data retention policy (required before Phase 3)
 - `docs/business-model.md` — freemium tiers (Phase 5, not yet active)
-- `docs/runbooks/` — operational procedures and troubleshooting. `local-dev-troubleshooting.md` (stale binary / stale SPA bundle), `email-dns-setup.md` (Stage 16 SPF/DKIM/DMARC), `ci-actions-troubleshooting.md` (**read the actual failure output FIRST**; `gh` log-reading commands; the Stage 12.13 CI gotchas). Enforced by the `read-failure-first` PostToolUse hook, which nudges once per session when command output shows a build/test/CI failure.
+- `docs/runbooks/` — operational procedures and troubleshooting. `local-dev-troubleshooting.md` (stale binary / stale SPA bundle), `email-dns-setup.md` (Stage 16 SPF/DKIM/DMARC), `ci-actions-troubleshooting.md` (**handle CI failures yourself with `gh` — don't wait for the user**; **read the actual failure output FIRST**; `gh` log-reading commands; the Stage 12.13 CI gotchas). Enforced by the `read-failure-first` PostToolUse hook, which nudges once per session when command output shows a build/test/CI failure.
 - `.claude/skills/playbook/references/constitution.md` — the eight-phase routing matrix the session is gated by. Source of truth for HARD/advisory phases and their required chains.
 - `~/.claude/projects/<project-slug>/memory/MEMORY.md` — index of pinned `feedback_*` / `project_*` / `reference_*` memory entries. Auto-loaded on session start, but truncated past ~200 lines; the topic files it points to are not.
 - When an open question in any planning doc (`docs/planning.md`, `docs/planning-phase2.md`, `docs/planning-phase3.md`, `docs/planning-future.md`) is resolved, remove it from Open Questions, mark it `[x]`, and append it to `docs/planning-resolved.md`. If the decision is architectural, execute the sync-docs skill.
