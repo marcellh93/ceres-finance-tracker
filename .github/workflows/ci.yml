@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:            # dormant — no PR workflow today; armed for the future
+  workflow_dispatch:       # manual "Run workflow" button
+
+# Supersede in-flight runs on rapid pushes to the same ref (saves minutes;
+# does not hide failures within a run).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore dotnet tools (dotnet-ef)
+        run: dotnet tool restore || dotnet tool install --global dotnet-ef
+      - name: Ensure dotnet-ef on PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Provision + migrate project_ceres_test
+        run: tools/ci/setup-test-db.sh project_ceres_test
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+      - name: Build
+        run: dotnet build ProjectCeres.Tests/ProjectCeres.Tests.csproj
+      - name: Full test suite
+        # No secret env var needed: WafCollection.cs supplies Authentication:TokenLookupSecret:Secret
+        # itself via UseSetting (the Stage 12.12 fix), so the integration suite is self-sufficient
+        # on secrets — it needs only a reachable Postgres. E2E generates its own in run-server.sh.
+        run: dotnet test ProjectCeres.Tests/ProjectCeres.Tests.csproj --no-build
+
+  analyzer-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore (populates the CodeAnalysis.Testing ref-pack cache)
+        run: dotnet restore ProjectCeres.Analyzers.Tests/ProjectCeres.Analyzers.Tests.csproj
+      - name: Analyzer tests
+        run: dotnet test ProjectCeres.Analyzers.Tests/ProjectCeres.Analyzers.Tests.csproj
+
+  client-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4          # reads version from packageManager
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: ProjectCeres.Client/pnpm-lock.yaml
+      - name: Install
+        run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
+      - name: Build (tsc + vite + check-size)
+        run: pnpm --dir ProjectCeres.Client build
+      - name: Vitest
+        run: pnpm --dir ProjectCeres.Client test
