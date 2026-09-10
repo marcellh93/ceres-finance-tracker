@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { __resetSettingsForTests, __seedSettingsForTests } from './app/lib/use-settings'
 
 // ── Global fetch isolation ────────────────────────────────────────────────────
 // Many test files assign `global.fetch = vi.fn()` in a `beforeEach` without
@@ -24,12 +25,22 @@ let _originalFetch: typeof fetch
 
 beforeEach(() => {
   _originalFetch = global.fetch
+  // Seed the use-settings singleton with resolved fallback data so any component
+  // that transitively calls useSettings() renders with valid settings
+  // synchronously — no /api/settings fetch fires, so nothing can leak past this
+  // test's teardown. This global beforeEach runs BEFORE a test file's own
+  // beforeEach, so use-settings.test.ts still resets to the un-seeded lifecycle it
+  // asserts (its local beforeEach calls __resetSettingsForTests after this one).
+  __seedSettingsForTests()
 })
 
 afterEach(() => {
   global.fetch = _originalFetch
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  // Drop the singleton so no settings fetch or subscriber survives into the next
+  // test — the source of the intermittent post-teardown unhandled rejection.
+  __resetSettingsForTests()
 })
 
 // @testing-library/react's fake-timer detection checks `typeof jest !== 'undefined'`

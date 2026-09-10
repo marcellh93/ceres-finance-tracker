@@ -113,3 +113,19 @@ export function __resetSettingsForTests(): void {
     subscribers: new Set(),
   };
 }
+
+/**
+ * Test-only helper. Seeds the singleton with resolved data (FALLBACK by default)
+ * so a component that calls useSettings() renders with valid settings
+ * synchronously — no fetch, no cross-test leak. The global test setup calls this
+ * in beforeEach; a test that needs the un-seeded fetch lifecycle (use-settings's
+ * own tests) calls __resetSettingsForTests() in its later-running local beforeEach.
+ */
+export function __seedSettingsForTests(data: AppSettings = FALLBACK): void {
+  cache = {
+    data,
+    loading: false,
+    promise: Promise.resolve(),
+    subscribers: new Set(),
+  };
+}
