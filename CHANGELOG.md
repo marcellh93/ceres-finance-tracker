@@ -6,6 +6,10 @@
 
 #### Added
 
+**Tooling / CI (Stage 12.13 — GitHub Actions, 2026-09-10)**
+- New CI pipeline (`.github/workflows/ci.yml`) running on every push to `main`: full server test suite, Roslyn analyzers, client build + Vitest, Playwright E2E across chromium/firefox/webkit, and a hygiene job (vulnerable-package scan, gitleaks secret scan, hook self-tests, roadmap consistency). Runs on a fresh, stateless environment — the un-tiered superset of the local per-turn test gate, which is unchanged.
+- New `tools/ci/setup-test-db.sh` — one script that creates + role-provisions + migrates a Ceres database, consumed by both CI and the E2E `run-server.sh` so the two never drift.
+
 **Authentication (Stage 12.5.1 — per-session IP anchor, 2026-09-08)**
 - You can now "anchor" an active session to the network it started from, on `/settings/sessions`. An anchored session is signed out if it's used from a different IP — defending against a stolen session cookie replayed from another network. It's opt-in per session, with a confirm dialog that's clear it protects against a replayed cookie, not someone signing in with your password. Recovery from a legitimate IP change is simply signing in again (and the anchor carries across a "remember me" cookie rotation).
 
