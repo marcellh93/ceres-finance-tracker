@@ -153,8 +153,11 @@ jobs:
           dotnet restore ProjectCeres.sln 2>/dev/null || dotnet restore
           OUT="$(dotnet list package --vulnerable --include-transitive 2>&1 || true)"
           echo "$OUT"
-          if echo "$OUT" | grep -qiE '>\s*[0-9].*(Critical|High|Moderate|Low)'; then
-            echo "::error::Vulnerable package(s) reported"; exit 1
+          # dotnet list --vulnerable always exits 0; it prints "has no vulnerable packages"
+          # for a clean project. Fail if that success sentinel is missing OR a severity is reported.
+          if echo "$OUT" | grep -qiE '\b(Critical|High|Moderate|Low)\b' \
+             || ! echo "$OUT" | grep -q 'has no vulnerable packages'; then
+            echo "::error::Vulnerable package(s) reported by dotnet list --vulnerable"; exit 1
           fi
       - name: Client dependency audit (pnpm)
         run: |

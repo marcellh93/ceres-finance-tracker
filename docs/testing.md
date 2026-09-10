@@ -333,6 +333,8 @@ Add `[Collection("IntegrationTests")]` to most new integration test classes. The
 
 ## CI/CD — Phase 3 Scope
 
+> **Superseded 2026-09-10 for the CI shape:** the actual pipeline is documented in § Continuous Integration (Stage 12.13) below. The Testcontainers / single-job / PR-gating description here predates it and is retained only for its CD / future-hosting notes.
+
 CI and CD are not active in Phase 1 or 2. This is an intentional deferral — the app runs locally for a single user, so automated pipelines add overhead with no benefit at this stage.
 
 **Phase 3 state:**
