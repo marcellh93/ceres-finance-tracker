@@ -16,20 +16,8 @@ MIGRATOR_URI="postgresql://ceres_migrator:ceres_migrator_dev_password@localhost/
 
 err() { echo "[e2e/run-server] $*" >&2; }
 
-# 1. Create DB if missing.
-if ! psql -lqt | cut -d '|' -f1 | grep -qw "$DB"; then
-  err "creating database $DB"
-  createdb "$DB"
-fi
-
-# 2. Provision roles/grants for THIS database (grants are per-database).
-err "applying setup-postgres-roles.sql to $DB"
-psql -d "$DB" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/scripts/setup-postgres-roles.sql" >/dev/null
-
-# 3. Migrate as ceres_migrator (the --connection flag is mandatory — no design-time factory).
-err "migrating $DB"
-dotnet ef database update --project "$REPO_ROOT/ProjectCeres" \
-  --context AppDbContext --connection "$MIGRATE_CONN" >/dev/null
+# 1-3. Create DB (if absent) + provision roles + migrate — shared with CI.
+"$REPO_ROOT/tools/ci/setup-test-db.sh" "$DB"
 
 # 4. Guarded wipe — assert the target DB before any TRUNCATE. Connect as ceres_migrator
 # (the table owner — TRUNCATE needs ownership). Spare lookup + migrations-history tables.
