@@ -341,3 +341,38 @@ CI and CD are not active in Phase 1 or 2. This is an intentional deferral — th
 - **CD strategy** — **GitHub Actions environments** + **OIDC** per [ADR-0070](decisions/ADR-0070-ci-cd-on-github-actions.md). Migration runs `dotnet ef database update` gated on green CI for the same commit. Pre-migration DB snapshot taken on every run, retained ≥7 days. Deploy target itself scoped to the still-open hosting-platform decision.
 - **Production migration strategy** — deferred to **Stage 15** (pre-launch hardening); choice depends on hosting platform.
 - **Testcontainers** — replaces the local `project_ceres_test` database in CI where a real PostgreSQL instance is not available. The `services.postgres` Postgres 16 image is the GitHub-Actions-native equivalent and is the default.
+
+---
+
+## Continuous Integration (Stage 12.13)
+
+CI runs on GitHub Actions (`.github/workflows/ci.yml`) on every push to `main`
+(plus a manual `workflow_dispatch` button; the `pull_request` trigger is dormant
+because the project commits straight to `main`).
+
+**CI is additive to the local Stop-hook gate, not a replacement.** The Stop hook
+(`.claude/hooks/run-tests.sh`) is the fast, *tiered* inner-loop gate — it skips
+(tier 0), runs unit-only (tier 1), or the full suite (tier 2) based on what a turn
+changed, on the author's machine. CI is the *un-tiered, fresh-environment superset*:
+it always runs everything, against a clean checkout with zero local state, and it
+runs the things the Stop hook never does (E2E across three browsers, dependency +
+secret scanning). The two cover each other's blind spots — the Stop hook keeps the
+inner loop fast; CI proves it works somewhere other than the author's Mac (exactly
+the class of bug Stage 12.12 was: a suite silently depending on a personal secrets file).
+
+**No drift:** each CI job runs the same command the Stop hook / evidence build-matrix
+already run. DB provisioning is shared via `tools/ci/setup-test-db.sh` (also used by
+`tools/e2e/run-server.sh`), so "CI passes" ≡ "the suite passes on a clean machine."
+
+**Jobs** (five, parallel, fail-fast off — one push surfaces all failures):
+| Job | Runs |
+|---|---|
+| `dotnet-test` | full `dotnet test` (no filter) against a Postgres 16 service |
+| `analyzer-test` | the Roslyn analyzer suite |
+| `client-test` | `pnpm build` (tsc + vite + size budget) + Vitest |
+| `e2e` | Playwright sharded over chromium/firefox/webkit; traces on failure |
+| `repo-hygiene` | `dotnet list package --vulnerable` + client `pnpm audit` + gitleaks + Node hook tests (`scripts/test-hooks.sh`) + roadmap consistency |
+
+**Secrets:** none real — fixed test-only values (the `*_dev_password` role passwords
+in `scripts/setup-postgres-roles.sql` and a fixed test token-lookup secret). Real
+production secrets arrive at actual Stage 16 hosting.

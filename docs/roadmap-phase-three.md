@@ -1669,7 +1669,7 @@ Stage 16 on the user's direction. Governed by ADR-0070 (CI/CD on GitHub Actions)
 
 - [x] `.github/workflows/ci.yml` — five parallel jobs, push-to-main + manual dispatch, fail-fast off.
 - [x] `tools/ci/setup-test-db.sh` — single DB-provisioning source; `run-server.sh` refactored to consume it (E2E still green locally).
-- [ ] `docs/testing.md` § Continuous Integration documents the additive-not-replacement model.
+- [x] `docs/testing.md` § Continuous Integration documents the additive-not-replacement model.
 - [ ] **First green Actions run on GitHub.** Only a real push to `main` can verify this; the workflow file + shell are correct and command-parity-checked locally, but a live runner surfaces path-casing / service-timing / cache-key issues no local check can. Owed at the user's next push; iterate on the Actions log.
 
 ---
