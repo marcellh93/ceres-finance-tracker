@@ -20,7 +20,7 @@
 >   1. **Why** — the reason (a tooling/subsystem gap with evidence, or user-authorised, per the `no-unjustified-deferrals` rule); and
 >   2. **Where** — the *exact receiving location*: the `§<stage>` (or ADR / planning-doc section) that now carries a `[ ]` for this work. A deferral with a reason but no destination is incomplete. The receiving location must actually contain the matching `[ ]`.
 >   A deferred item is **never `[x]`** — `[x]` is reserved for work that shipped here. Use `[→]` (or `[ ]` when the item stays in its own stage as the receiving home).
-> - **A receiving stage** (one that exists only to hold deferred-in work, e.g. §12.5.5) states, in its own reason line, **where each of its items was deferred FROM** (a back-link to the source `§<stage>`), so the deferral is traceable in both directions.
+> - **A receiving stage** (one that exists only to hold deferred-in work, e.g. Stage 17 — Notification preferences) states, in its own reason line, **where each of its items was deferred FROM** (a back-link to the source `§<stage>`), so the deferral is traceable in both directions. A receiving stage must be numbered **outside** the closing family's namespace — a `12.x` stage is 12-family and cannot be used to exempt work from the 12-family close (learned 2026-09-10: "§12.5.5" was renumbered to Stage 17 for exactly this reason).
 > - **Stage-heading suffixes track state:** a heading marked `✅ Done` must not also carry a `(not scheduled)` / `(Open)` suffix — flip the suffix when the status flips.
 
 ---
@@ -1417,7 +1417,7 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 **Status: ✅ CLOSED (2026-09-08).** The whole 12-family is complete. All four SPA surfaces shipped — `/settings/sessions` (12.1–12.3), `/support` (12.4–12.7, conversation model by 12.6), the email-change surfaces (12.8), and the reauth dialog (12.9). The 12.5 family closed this session: **12.5.1** per-session IP anchor (exact-IP, enforced in the validator + the persistent-rotation hop), **12.5.2** admin ticket-list/triage surface, **12.5.3** new-sign-in alert email, **12.5.4** unblock-a-blocked-IP, plus the **A1** composite owner-scoped FK on the follow-up chain. The test-infra sub-stages closed too — **12.8.4** (test type-checking), **12.11** (dev-server stale-shell → `Testing` environment), **12.12** (fresh-clone/CI test-secret self-supply). The 12.8.2 `AssertRlsVisibility` and 12.8.3 `<Alert>` promotion shipped; the manual browser passes were converted to E2E.
 
-**The only remaining non-`[x]` items under a 12.* number are authorized deferrals homed in receiving stages, not open 12-family work** (confirmed with the user 2026-09-08 as counting toward the close): **§12.5.5** (the notification-preferences surface — receiving stage for the §12.5.3 opt-out toggle, deferred via Option A) and the **§12.8.1-E2 → Stage 15.8** hostile-email-change recovery (accepted-risk deferral). The `/settings/sessions` desktop `[~]` (aligned row rather than a literal `<table>`) is a deliberate, documented layout call.
+**No item under a 12.* number is open.** Every deferral was homed OUT of the 12.x namespace so the close is honest (2026-09-10): the notification-preferences surface + the §12.5.3 opt-out toggle moved to **Stage 17 — Notification preferences** (was briefly mis-numbered "§12.5.5"; a 12-numbered stage is 12-family, so it was renumbered rather than exempted); the §12.8.1-E2 hostile-email-change recovery is at **Stage 15.8**; the SweepSessions cron is at **Stage 16 § Scheduled jobs**. The `/settings/sessions` desktop `[~]` (aligned row rather than a literal `<table>`) is a deliberate, documented layout call. All confirmed with the user as counting toward the close.
 
 > **Goal:** users can review and revoke their active sessions, block IPs, and submit support tickets. The pages exist in the SPA at `/settings/sessions` and `/support`.
 
@@ -1690,17 +1690,9 @@ Consequences:
 - [x] Resolve novelty granularity + first-ever-login suppression — **exact-IP** (fork 1a, mirroring the anchor; subnet/ASN rejected for the same reasons). First-ever login (no prior session) is suppressed — there is no "new" to alert on, and every first sign-in would otherwise fire it.
 - [x] Session-novelty detection at the `UserSession` creation path (login) — `AuthController.IssueSessionAndCookiesAsync` queries the user's prior session IPs before the dedup revoke; novel = has prior sessions AND none from the current IP. Owner-scoped (login runs in the user's scope). `NewSessionAlertTests` pins first-login→no-alert, new-IP→alert, known-IP→no-alert.
 - [x] `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx — 3 keys × 2 langs (args: IP, device, sign-in time). Sent by a new non-blocking `INewSessionNotificationService` (log-and-swallow; a mail outage never fails the login). Composer round-trip + key-count (48→51) pinned.
-- [→] Opt-out toggle in Settings notification preferences — **DEFERRED. Why:** the notification-preferences surface does not exist (user-authorised 2026-09-08, §12.5.3 option A; a new-sign-in security alert conventionally has no off-switch, so shipping without one is not a gap). **Where:** the receiving `[ ]` lives at **§12.5.5** (this doc, below) — "Opt-out toggle for the §12.5.3 new-session alert"; the WHAT detail is in `planning-future.md` § New-session alert.
-- *Tripwire retired: `EmailTemplateKey.NewSessionAlert` now exists; the alert ships. The opt-out is homed under §12.5.5.*
+- [→] Opt-out toggle in Settings notification preferences — **DEFERRED. Why:** the notification-preferences surface does not exist (user-authorised 2026-09-08, §12.5.3 option A; a new-sign-in security alert conventionally has no off-switch, so shipping without one is not a gap). **Where:** the receiving `[ ]` lives at **Stage 17 — Notification preferences** (this doc) — "Opt-out toggle for the §12.5.3 new-session alert"; the WHAT detail is in `planning-future.md` § New-session alert.
+- *Tripwire retired: `EmailTemplateKey.NewSessionAlert` now exists; the alert ships. The opt-out is homed at Stage 17.*
 
-### 12.5.5 — Notification-preferences surface (RECEIVING STAGE — holds deferred-in work; itself not yet scheduled)
-
-*This is a **receiving stage**: it exists to hold work deferred here from elsewhere, and is not itself scheduled to a batch yet. **Deferred IN from:** §12.5.3 (the new-session-alert opt-out toggle, deferred 2026-09-08 via option A). **Also anticipated from:** `planning-future.md` / `planning-phase3.md` § Safe to Spend alert (weekly-digest + Safe-to-Spend toggles) once those ship. **Reason it's its own stage:** there is no per-user notification-preference model, endpoint, or settings page today (`Settings` holds only format/currency/period/language); building the whole surface to add one off-switch would invert the effort, and it has more than one waiting consumer.*
-
-- [ ] Notification-preferences surface: a per-user preference store (column set or table), a GET/PATCH endpoint, and a Settings → Notifications SPA page. The api-contract already anticipates this row (`Notifications | GET/PATCH`).
-- [ ] Opt-out toggle for the §12.5.3 new-session alert wired into that surface (default on). **Deferred in from §12.5.3.**
-- [ ] Toggles for the other anticipated notifications once they ship: weekly digest opt-in and the Safe to Spend alert. **Anticipated in from** `planning-future.md` / `planning-phase3.md` § Safe to Spend alert.
-- *Tripwire: this checklist + the `planning-future.md` § New-session alert opt-out note; no preference model/field exists until built.*
 
 ### 12.5.4 — Unblock a blocked IP ✅ Done (2026-09-07)
 
@@ -2089,11 +2081,11 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 - [ ] **Decide whether promote/demote require step-up auth.** Role promotion is not on `security-model.md`'s documented `[RequireRecentAuth]` list, so adding it is a policy extension, not a bug fix. A stolen admin session currently mints permanent admins with no re-proof of identity.
 - [ ] **Open question (nothing owed): should role claims refresh mid-session?** `SessionRevocationValidator` never re-issues the principal, which is why [ADR-0080](decisions/ADR-0080-admin-gating-via-live-role-policy.md) gates on a per-request database read instead of `[Authorize(Roles = ...)]`. The reauth flow's `RefreshSignInAsync` already rebuilds the principal and could do the same here. [ADR-0080](decisions/ADR-0080-admin-gating-via-live-role-policy.md) already decided the live check is strictly stronger for revocation and would not be reversed if claims refresh landed, so this is a question to close, not a gap to fill.
 
-### Carried in from Stage 12.8.1 E2 (accepted risk, 2026-09-07)
+### Deferred-in work — hostile email-change recovery (source: Stage 12.8.1 E2, accepted risk 2026-09-07)
 
 - [ ] **Recovery from an already-completed hostile email change (option B: grace-period reclaim).** Deferred from Stage 12.8.1 with the residual risk accepted for the beta and documented in `security-model.md` § Email Address Change → "Accepted risk: no in-app recovery from an already-completed hostile change" (with a support runbook). The real fix: the change-completed notice to the *old* address carries a time-boxed "undo this" reclaim link (a new reclaim token + endpoint + page) that reverses the address swap in-app; it needs its own abuse design (the reclaim link is itself a takeover vector if mis-scoped). Option A (admin-assisted address rollback UI) folds into this admin stage's surface. Ticking either retires the § Email Address Change accepted-risk block.
 
-### Carried in from Stage 12.5.2 (admin ticket-list, 2026-09-07)
+### Deferred-in work — admin navigation link (source: Stage 12.5.2 admin ticket-list, 2026-09-07)
 
 - [ ] **Admin navigation link to `/admin/support`.** §12.5.2 shipped the admin ticket-list/triage surface but not a nav entry to reach it (admins navigate to `/admin/support` directly for now); building shared admin chrome for a single link was out of that stage's scope. This admin stage owns the admin nav surface, so the link lands here. Deferred in from §12.5.2.
 
@@ -2223,6 +2215,19 @@ Data Protection key storage (Stage 6 carry-forward):
 - [ ] **ASP.NET Core Data Protection keys persisted to a durable location**, not the default ephemeral filesystem. Without this, every container restart rotates the keys silently and every encrypted-at-rest payload tied to those keys (`TotpReplayEntry`-style ephemeral payloads, anything signed by the antiforgery system, anything wrapped by `IDataProtector`) becomes unreadable after a deploy. Options on a single-VPS deployment: bind-mounted host directory (`PersistKeysToFileSystem`) with restricted permissions; or PostgreSQL-backed key ring via `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`. Confirm choice in `planning.md` § Open Questions if not yet locked.
 - [ ] **Key ring rotation procedure documented in `security-model.md` § Secrets Rotation Procedures** — Data Protection auto-rotates the active key every 90 days by default; the rotation procedure documents what to verify after a rotation lands (no decryption failures in logs for 24 h; antiforgery still working across all sessions).
 - [ ] **TOTP seed encryption verified end-to-end**: enrol a user, restart the application, log in with the same TOTP — must still verify. Pins the "Data Protection wiring works AND keys persisted across restart" invariant the Stage 6 verification deferred here.
+
+---
+
+## Stage 17 — Notification preferences (Batch 5 — not yet scheduled)
+
+**Status: ❌ Open (deferred, not scheduled to a batch yet).** A per-user notification-preferences surface. Renumbered out of the 12-family on 2026-09-10: it was briefly tracked as "§12.5.5", but a 12-numbered stage is 12-family by the project's number-is-the-contract rule, and this work is deliberately deferred rather than part of the Stage 12 close — so it lives here as its own stage instead. The Stage 12 work it relates to shipped; only this surface (and the opt-out it would host) remains, by decision.
+
+**Deferred IN from:** §12.5.3 (the new-session-alert opt-out toggle, deferred 2026-09-08 via option A — a new-sign-in security alert conventionally ships without an off-switch). **Also the eventual home for:** the weekly-digest opt-in and the Safe-to-Spend alert toggles (`planning-phase3.md` § Safe to Spend alert / § Weekly financial digest; `planning-future.md`) once those features ship — they share this surface and the `FinancialNotificationJob` infrastructure. **Reason it's its own stage:** there is no per-user notification-preference model, endpoint, or Settings page today (`Settings` holds only format / currency / period / language); building the whole surface to add one off-switch would invert the effort, and it has more than one waiting consumer.
+
+- [ ] Notification-preferences surface: a per-user preference store (column set or table), a GET/PATCH endpoint, and a Settings → Notifications SPA page. The api-contract already anticipates this row (`Notifications | GET/PATCH`).
+- [ ] Opt-out toggle for the §12.5.3 new-session alert wired into that surface (default on). **Deferred in from §12.5.3.**
+- [ ] Toggles for the other anticipated notifications once they ship: weekly-digest opt-in and the Safe-to-Spend alert. **Anticipated in from** `planning-phase3.md` / `planning-future.md`.
+- *Tripwire: this checklist + the `planning-future.md` § New-session alert opt-out note; no preference model/field exists until built.*
 
 ---
 

@@ -436,7 +436,7 @@ Three items were scoped out of Stage 12 core during the 2026-06-30 brainstorm (u
 - First-ever-login suppression: **yes** — no prior session means no "new" to alert on; every first sign-in would otherwise fire it.
 - Template: `NewSessionAlert` added to `EmailTemplateKey` + EN/ES resx. Sent by a non-blocking `INewSessionNotificationService` (log-and-swallow — a mail outage never fails the login).
 
-**Still deferred — the opt-out toggle (→ roadmap §12.5.5):** the alert ships WITHOUT an off-switch, because (a) the notification-preferences surface it would live in does not exist yet and (b) a new-sign-in security alert is conventionally not opt-out (Google/GitHub don't offer one). The toggle is homed as a `[ ]` under roadmap §12.5.5 (Notification-preferences surface), alongside the weekly-digest and Safe-to-Spend toggles that also wait on that surface.
+**Still deferred — the opt-out toggle (→ roadmap Stage 17 — Notification preferences):** the alert ships WITHOUT an off-switch, because (a) the notification-preferences surface it would live in does not exist yet and (b) a new-sign-in security alert is conventionally not opt-out (Google/GitHub don't offer one). The toggle is homed as a `[ ]` under roadmap **Stage 17 — Notification preferences**, alongside the weekly-digest and Safe-to-Spend toggles that also wait on that surface. (Was briefly tracked as "§12.5.5"; renumbered out of the 12-family on 2026-09-10 since a 12-numbered stage is 12-family.)
 
 **Note vs. the original spec:** the shipped email does NOT include a one-click revoke *link* (the original "wasn't you? revoke it" idea) — it points the user to Settings → Security to review/revoke sessions instead. A signed revoke-link is a future enhancement, not owed now.
 

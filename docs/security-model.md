@@ -346,7 +346,7 @@ Decision record: `docs/decisions/ADR-0077-roslyn-analyzers-for-invariant-enforce
 
 - **Trigger:** at the `UserSession` creation path (`AuthController.IssueSessionAndCookiesAsync`), if the user has prior sessions and none was created from the current IP (exact-IP novelty, mirroring the anchor), an email is sent. First-ever login is suppressed (no prior session = nothing to be "new" against).
 - **Delivery:** non-blocking via `INewSessionNotificationService` — the send is logged-and-swallowed so a mail outage never fails the sign-in. Recipient resolves server-side from the account's own email (`IEmailRecipientResolver`), never a request payload.
-- **No opt-out (by design, for now):** a new-sign-in security alert is conventionally not opt-out. An opt-out toggle is homed under roadmap §12.5.5 (the notification-preferences surface), which does not exist yet.
+- **No opt-out (by design, for now):** a new-sign-in security alert is conventionally not opt-out. An opt-out toggle is homed under roadmap **Stage 17 — Notification preferences** (the notification-preferences surface), which does not exist yet.
 - **Content:** IP, device summary, sign-in time, and guidance to change the password + review sessions under Settings → Security. It does not carry a one-click revoke link (future enhancement).
 
 This alert is part of the compensating-control stack for non-MFA accounts named under § Login → MFA.
