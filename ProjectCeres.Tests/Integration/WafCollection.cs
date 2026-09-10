@@ -31,18 +31,27 @@ namespace ProjectCeres.Tests.Integration;
 /// </summary>
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    // Stage 7.5 / ADR-0068 — three role-scoped connection strings into project_ceres_test.
-    // The hosted app resolves ApplicationConnection (ceres_app) at request time; admin
-    // services + IUserJobRunner resolve AdminConnection (ceres_admin / BYPASSRLS); the
-    // fixture itself uses MigratorConnection for schema setup.
-    private const string AppConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=ceres_app;Password=ceres_app_dev_password";
+    // Stage 12.18 — the database this factory targets. A bucket collection fixture
+    // overrides InitDbName (e.g. TestDatabaseRouter.DatabaseForCollection("IntegrationParallel1"));
+    // default = legacy single DB, so factories built outside a bucket (ad-hoc, or under
+    // the N=1 fallback) keep today's behaviour. DatabaseName is computed (not ctor-assigned)
+    // so a field-backed subclass override resolves correctly even though InitDbName is
+    // read before any subclass field would be set.
+    protected virtual string InitDbName => TestDatabaseRouter.LegacyDatabase;
 
-    private const string AdminConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=ceres_admin;Password=ceres_admin_dev_password";
+    public string DatabaseName => InitDbName;
 
-    private const string MigratorConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=ceres_migrator;Password=ceres_migrator_dev_password";
+    // Stage 7.5 / ADR-0068 — three role-scoped connection strings, routed through
+    // TestDatabaseRouter so each bucket can target its own database. The hosted app
+    // resolves ApplicationConnection (ceres_app) at request time; admin services +
+    // IUserJobRunner resolve AdminConnection (ceres_admin / BYPASSRLS); the fixture
+    // itself uses MigratorConnection for schema setup.
+    private (string app, string admin, string migrator) Conns
+        => TestDatabaseRouter.ConnectionsFor(DatabaseName);
+
+    // For test assertions only — the app connection string actually wired below.
+    internal string ResolvedAppConnectionString =>
+        UseAppRoleConnection ? Conns.app : Conns.admin;
 
     // Stage 12.12 — a fixed, obviously-test-only token-lookup secret (base64 of 32 bytes).
     // Supplied by the factory so the suite does not depend on the developer's personal
@@ -100,9 +109,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         // RlsTestFixture (under Integration/Rls/) connects as the real ceres_app to
         // exercise the wall directly — that's where Stage 7.5 test coverage lives.
         builder.UseSetting("ConnectionStrings:ApplicationConnection",
-            UseAppRoleConnection ? AppConnectionString : AdminConnectionString);
-        builder.UseSetting("ConnectionStrings:AdminConnection",       AdminConnectionString);
-        builder.UseSetting("ConnectionStrings:MigrationConnection",   MigratorConnectionString);
+            UseAppRoleConnection ? Conns.app : Conns.admin);
+        builder.UseSetting("ConnectionStrings:AdminConnection",       Conns.admin);
+        builder.UseSetting("ConnectionStrings:MigrationConnection",   Conns.migrator);
         builder.UseSetting("FileAttachments:RootPath", _uploadsRoot);
 
         // Stage 12.12 — supply the token-lookup secret from the fixture, not the developer's

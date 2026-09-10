@@ -30,14 +30,16 @@ namespace ProjectCeres.Tests.Integration;
 /// </summary>
 public class TestDbFixture : IAsyncDisposable
 {
-    internal const string AppConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=ceres_app;Password=ceres_app_dev_password";
+    // Stage 12.18 — routed through TestDatabaseRouter so this fixture targets the
+    // AppRoleTests collection's own database (falls back to the legacy shared DB
+    // when CERES_TEST_DB_CLONES is unset).
+    internal static string DatabaseName => TestDatabaseRouter.DatabaseForCollection("AppRoleTests");
 
-    internal const string AdminConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=ceres_admin;Password=ceres_admin_dev_password";
+    internal static string AppConnectionString => TestDatabaseRouter.ConnectionsFor(DatabaseName).app;
 
-    internal const string MigratorConnectionString =
-        "Host=localhost;Database=project_ceres_test;Username=ceres_migrator;Password=ceres_migrator_dev_password";
+    internal static string AdminConnectionString => TestDatabaseRouter.ConnectionsFor(DatabaseName).admin;
+
+    internal static string MigratorConnectionString => TestDatabaseRouter.ConnectionsFor(DatabaseName).migrator;
 
     internal static readonly Guid SentinelUserId = new("00000000-0000-0000-0000-000000000001");
 

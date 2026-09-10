@@ -45,6 +45,26 @@ public class TestDatabaseRouterTests
         using var _ = new EnvVarScope("CERES_TEST_DB_CLONES", null);
         TestDatabaseRouter.DatabaseForCollection("RateLimitTests").Should().Be("project_ceres_test");
     }
+
+    [Fact]
+    public void Waf_uses_the_database_name_it_is_given_for_its_app_connection()
+    {
+        using var factory = new FixedDbFactory("project_ceres_test_3");
+        // The factory exposes its resolved app connection string for assertion.
+        factory.ResolvedAppConnectionString
+            .Should().Contain("Database=project_ceres_test_3")
+            .And.Contain("Username=ceres_admin"); // default UseAppRoleConnection=false → admin
+    }
+
+    // TestWebApplicationFactory.DatabaseName is a computed property (=> InitDbName), not a
+    // settable one, so a bucket collection (and this test) targets a database by overriding
+    // InitDbName in a subclass rather than via an object initializer.
+    private sealed class FixedDbFactory : TestWebApplicationFactory
+    {
+        private readonly string _db;
+        public FixedDbFactory(string db) { _db = db; }
+        protected override string InitDbName => _db;
+    }
 }
 
 // Test helper: restore an env var on dispose.
