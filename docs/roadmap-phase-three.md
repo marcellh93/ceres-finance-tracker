@@ -1678,11 +1678,11 @@ troubleshooting captured in `docs/runbooks/ci-actions-troubleshooting.md`.
 
 ---
 
-## Stage 12.16 — Dependency-advisory triage
+## Stage 12.16 — Dependency-advisory triage ✅ Done (2026-09-10)
 
-**Status: ❌ Open.** Surfaced 2026-09-10 when Stage 12.13's `repo-hygiene` job put `pnpm audit --audit-level high` on the critical path and it went red on the existing advisory backlog. GitHub Dependabot reports 17 (7 high, 8 moderate, 2 low) on `main`. The `dotnet list package --vulnerable` half of the same job is green — this is a JS-only backlog.
+**Status: ✅ Done (2026-09-10).** Surfaced when Stage 12.13's `repo-hygiene` job put `pnpm audit --audit-level high` on the critical path and it went red on the existing advisory backlog (16 `pnpm audit` alerts: 7 high, 8 moderate, 1 low; the `dotnet list package --vulnerable` half was already green — a JS-only backlog). Resolved per [ADR-0079](decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md): re-pinned four stale transitive overrides to their newest in-range patched floor, added three new overrides (`@hono/node-server`, `browserslist`, `postcss-selector-parser`), and bumped the direct devDependency `vitest`. See the ADR's 2026-09-10 update note for the per-package rationale and condition-3 verification.
 
-- [ ] Triage the 17 open JS advisories: for each, either bump the direct parent, add/adjust a transitive pin in `pnpm overrides` per [ADR-0079](decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md) (running its four required post-change commands), or record an accepted-risk exception with rationale. Gate is green when `pnpm --dir ProjectCeres.Client audit --audit-level high` exits 0 in `repo-hygiene`.
+- [x] Triaged all 16 JS advisories; `pnpm --dir ProjectCeres.Client audit` is fully clean at every severity (was: 7 high / 8 moderate / 1 low). The `repo-hygiene` `pnpm audit --audit-level high` gate now exits 0. All four ADR-0079 post-change commands pass (build, test, dotnet build; the 5 pre-existing `setState-in-effect` lint errors are unrelated to this change and tracked separately — CI does not gate on `pnpm lint`).
 
 ---
 
