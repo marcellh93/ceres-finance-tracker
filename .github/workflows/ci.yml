@@ -15,6 +15,12 @@ concurrency:
 jobs:
   dotnet-test:
     runs-on: ubuntu-latest
+    # This job has no pnpm/Node. ProjectCeres's BuildTailwind target shells out
+    # to `pnpm run build:css` on every build (provision's ef build, the test
+    # build, and dotnet test). CSS is irrelevant to the server test suite, so
+    # skip Tailwind job-wide.
+    env:
+      SkipTailwind: "true"
     services:
       postgres:
         image: postgres:16
@@ -45,10 +51,6 @@ jobs:
           PGHOST: localhost
           PGUSER: postgres
           PGPASSWORD: postgres
-          # dotnet ef implicitly builds ProjectCeres, whose BuildTailwind target
-          # shells out to pnpm — absent in this job. Skip it; migration only needs
-          # the assembly to compile.
-          SkipTailwind: "true"
       - name: Build
         run: dotnet build ProjectCeres.Tests/ProjectCeres.Tests.csproj
       - name: Full test suite
@@ -94,6 +96,12 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    # E2E asserts the Vite-built SPA stylesheet (wwwroot/dist, built by pnpm in
+    # run-server.sh), not the Razor site.css. The server's `dotnet run` build
+    # would otherwise fire BuildTailwind → pnpm from an MSBuild subprocess whose
+    # PATH drops the pnpm shim. Skip Tailwind; the SPA CSS is unaffected.
+    env:
+      SkipTailwind: "true"
     strategy:
       fail-fast: false
       matrix:
