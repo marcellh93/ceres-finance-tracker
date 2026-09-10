@@ -31,12 +31,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - name: Restore dotnet tools (dotnet-ef)
-        run: dotnet tool restore || dotnet tool install --global dotnet-ef
-      - name: Ensure dotnet-ef on PATH
-        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Install dotnet-ef (global, pinned to EF Core version) + on PATH
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.5
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Provision + migrate project_ceres_test
-        run: tools/ci/setup-test-db.sh project_ceres_test
+        run: |
+          which dotnet-ef && dotnet-ef --version
+          tools/ci/setup-test-db.sh project_ceres_test
         env:
           PGHOST: localhost
           PGUSER: postgres
@@ -65,12 +67,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: ProjectCeres.Client/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: pnpm on PATH?
+        run: which pnpm && pnpm --version
       - name: Install
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Build (tsc + vite + check-size)
@@ -100,15 +104,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - name: Restore dotnet tools (dotnet-ef)
-        run: dotnet tool restore || dotnet tool install --global dotnet-ef
-      - run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+      - name: Install dotnet-ef (global, pinned to EF Core version) + on PATH
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.5
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: ProjectCeres.Client/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install client deps
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Resolve Playwright version (for the cache key)
@@ -144,12 +149,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: ProjectCeres.Client/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Vulnerable-package scan (fail on any finding)
         run: |
           dotnet restore ProjectCeres.sln 2>/dev/null || dotnet restore
