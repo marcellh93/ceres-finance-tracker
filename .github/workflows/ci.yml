@@ -45,6 +45,10 @@ jobs:
           PGHOST: localhost
           PGUSER: postgres
           PGPASSWORD: postgres
+          # dotnet ef implicitly builds ProjectCeres, whose BuildTailwind target
+          # shells out to pnpm — absent in this job. Skip it; migration only needs
+          # the assembly to compile.
+          SkipTailwind: "true"
       - name: Build
         run: dotnet build ProjectCeres.Tests/ProjectCeres.Tests.csproj
       - name: Full test suite
@@ -132,7 +136,12 @@ jobs:
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Resolve Playwright version (for the cache key)
         id: pw
-        run: echo "version=$(pnpm --dir ProjectCeres.Client ls @playwright/test --depth 0 --parseable 2>/dev/null | sed 's/.*@//' || echo unknown)" >> "$GITHUB_OUTPUT"
+        # Read the declared version straight from package.json — a single clean
+        # value. The earlier `pnpm ls --parseable | sed` emitted two path lines,
+        # corrupting the $GITHUB_OUTPUT single-line protocol.
+        run: |
+          V="$(node -p "require('./ProjectCeres.Client/package.json').devDependencies['@playwright/test'].replace(/[^0-9.]/g,'')")"
+          echo "version=${V:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

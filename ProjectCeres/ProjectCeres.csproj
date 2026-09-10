@@ -34,7 +34,10 @@
     </ProjectReference>
   </ItemGroup>
 
-  <Target Name="BuildTailwind" BeforeTargets="Build">
+  <!-- SkipTailwind opt-out: lets a pnpm-less context (e.g. CI's `dotnet ef
+       database update`, which only needs the assembly to compile) build
+       without the Tailwind CLI. Normal builds still produce site.css. -->
+  <Target Name="BuildTailwind" BeforeTargets="Build" Condition="'$(SkipTailwind)' != 'true'">
     <Exec Command="pnpm run build:css" WorkingDirectory="$(ProjectDir)" />
   </Target>
 
