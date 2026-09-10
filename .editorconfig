@@ -67,3 +67,11 @@ dotnet_diagnostic.CA1825.severity = none
 dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1711.severity = none
 dotnet_diagnostic.CA1051.severity = none
+# CA1000 fires on the Microsoft.CodeAnalysis.Testing verifier idiom (static
+# helpers on a generic CSharpAnalyzerVerifier<T> / CodeFixVerifier<T>) — the
+# canonical pattern that harness ships. CA1859/CA1861 are perf micro-opts
+# (concrete-over-interface, static-readonly-over-inline-array) with no value in
+# test code, where using the interface type or an inline literal is the point.
+dotnet_diagnostic.CA1000.severity = none
+dotnet_diagnostic.CA1859.severity = none
+dotnet_diagnostic.CA1861.severity = none
