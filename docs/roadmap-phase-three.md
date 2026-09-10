@@ -1657,6 +1657,23 @@ Consequences:
 
 ---
 
+## Stage 12.13 — CI pipeline (accelerated from 16.8 / 16.9 / 16.16)
+
+**Status: ✅ Done (2026-09-10) — pending first green Actions run on push.** GitHub Actions
+CI (`.github/workflows/ci.yml`) on push to `main`: five parallel jobs (dotnet full suite,
+analyzers, client build+Vitest, sharded 3-browser Playwright E2E, repo-hygiene = vuln +
+gitleaks + hook tests + roadmap consistency). Fixed test-only secrets; DB provisioning shared
+with `run-server.sh` via `tools/ci/setup-test-db.sh` (no drift). Additive to the local Stop
+hook, not a replacement — see `docs/testing.md` § Continuous Integration. Pulled forward from
+Stage 16 on the user's direction. Governed by ADR-0070 (CI/CD on GitHub Actions) + ADR-0071 (E2E).
+
+- [x] `.github/workflows/ci.yml` — five parallel jobs, push-to-main + manual dispatch, fail-fast off.
+- [x] `tools/ci/setup-test-db.sh` — single DB-provisioning source; `run-server.sh` refactored to consume it (E2E still green locally).
+- [x] `docs/testing.md` § Continuous Integration documents the additive-not-replacement model.
+- [ ] **First green Actions run on GitHub.** Only a real push to `main` can verify this; the workflow file + shell are correct and command-parity-checked locally, but a live runner surfaces path-casing / service-timing / cache-key issues no local check can. Owed at the user's next push; iterate on the Actions log.
+
+---
+
 ## Stage 12.5 — Deferred from Stage 12 ✅ Done (2026-09-08)
 
 **Status: ✅ Done (2026-09-08).** Originally deferred 2026-06-30 (three items scoped out of Stage 12 core, user-authorized), all now built this session: **12.5.1** per-session IP anchor, **12.5.2** admin ticket-list/triage, **12.5.3** new-session alert, plus **12.5.4** unblock-IP and the **A1** composite follow-up FK. The one piece not built — the new-session-alert opt-out toggle — was deferred by decision (option A) and homed OUT of the 12.x namespace at **Stage 17 — Notification preferences**. The WHAT + original design questions live in [`planning-future.md` § Deferred from Stage 12](planning-future.md#deferred-from-stage-12-2026-06-30).
@@ -2115,15 +2132,15 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 | 16.5 | Automated database backups + encryption + retention | `security-model.md` § Backup Security |
 | 16.6 | Backup restoration testing (quarterly) | `security-model.md` § Restoration Testing |
 | 16.7 | Backup encryption-key rotation procedure | `security-model.md` § Backup Encryption Key Rotation |
-| 16.8 | CI dependency vulnerability scanning | `security-model.md` § Dependency Scanning |
-| 16.9 | CI secrets scanning | `security-model.md` § Secrets Scanning |
+| 16.8 | **[→] DELIVERED EARLY at §12.13.** CI dependency vulnerability scanning. Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml` `repo-hygiene` job (`dotnet list package --vulnerable` + `pnpm audit`), shipped under Stage 12.13. | `security-model.md` § Dependency Scanning |
+| 16.9 | **[→] DELIVERED EARLY at §12.13.** CI secrets scanning. Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml` `repo-hygiene` job (gitleaks), shipped under Stage 12.13. | `security-model.md` § Secrets Scanning |
 | 16.10 | Production migration strategy (`dotnet ef database update` vs. CI step vs. reviewed SQL) | `planning.md` § Open Questions |
 | 16.11 | CD pipeline (trigger, staging, migration step, rollback plan) | `planning.md` § Open Questions: CD strategy |
 | 16.12 | Monitoring + alerting (uptime, error rate, certificate expiry) | (operational) |
 | 16.13 | Container / runtime hardening | `security-model.md` § Container / Runtime Hardening |
 | 16.14 | Data Protection key persistence + rotation | `security-model.md` § TOTP Secrets + § Secrets Rotation Procedures + Stage 6 carry-forward |
 | 16.15 | **Stage 7.5 follow-up.** Production database setup creates `ceres_app`, `ceres_admin`, `ceres_migrator` per `scripts/setup-postgres-roles.sql`. Only `ceres_app` (NOBYPASSRLS) and `ceres_admin` (BYPASSRLS) credentials are deployed with the application; `ceres_migrator` (DDL + BYPASSRLS) credentials are held by the deploy operator and used only when applying migrations. The privilege-leak startup check in `Program.cs` refuses to start if the runtime `ApplicationConnection` is wired to a privileged role — confirm it fires correctly under the production deployment configuration. | Stage 7.5 / ADR-0068 |
-| 16.16 | **Stage 9.11 follow-up.** Playwright E2E suite (shipped in Stage 9.11) wired into `.github/workflows/ci.yml`: `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. Suite runs on every PR + on `main`. | [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates / Stage 9.11 |
+| 16.16 | **Stage 9.11 follow-up — delivered early, see §12.13.** Playwright E2E suite (shipped in Stage 9.11) wired into `.github/workflows/ci.yml`: `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. Suite runs on every PR + on `main`. | [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates / Stage 9.11 |
 
 ### Verification checklist
 
@@ -2174,10 +2191,10 @@ Migrations:
 
 CI/CD:
 
-- [ ] CI provider chosen (likely GitHub Actions per `planning.md`)
-- [ ] CI runs: build, all server tests, all client tests, vulnerability scan (`dotnet list package --vulnerable`), secret scan
-- [ ] CI fails the build on any test failure or security finding
-- [ ] **Playwright E2E suite (shipped in Stage 9.11) wired into CI** per Stage 16.16 — `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates.*
+- [→] **CI provider chosen — DELIVERED EARLY at §12.13 (2026-09-10).** Why: user accelerated CI out of Stage 16. Where: GitHub Actions, `.github/workflows/ci.yml`, shipped under Stage 12.13.
+- [→] **CI runs: build/tests/vuln scan/secret scan — DELIVERED EARLY at §12.13 (2026-09-10).** Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml` five parallel jobs (dotnet full suite, analyzers, client build+Vitest, sharded E2E, `repo-hygiene` = vuln + gitleaks + hook tests + roadmap consistency), shipped under Stage 12.13.
+- [→] **CI fails the build on any test failure or security finding — DELIVERED EARLY at §12.13 (2026-09-10).** Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml`, all five jobs required, shipped under Stage 12.13.
+- [→] **Playwright E2E suite wired into CI — DELIVERED EARLY at §12.13 (2026-09-10).** Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml` `e2e` job (sharded chromium/firefox/webkit), shipped under Stage 12.13. *Anchor: [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md).*
 - [ ] CD pipeline runs: build artifact, deploy to staging, run integration smoke tests, deploy to prod (manual approval gate)
 - [ ] Rollback plan documented: how to revert the last deploy in under 10 minutes
 
