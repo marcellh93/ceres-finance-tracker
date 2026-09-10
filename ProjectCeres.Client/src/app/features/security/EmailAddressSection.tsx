@@ -42,6 +42,11 @@ function useMinutesRemaining(expiresAt: string | null): number | null {
   const [minutes, setMinutes] = useState<number | null>(compute);
 
   useEffect(() => {
+    // Re-sync on target change: compute() is time-dependent, so recomputing here
+    // (not just on mount) keeps the label correct when expiresAt changes. This is
+    // a deliberate re-sync of time-derived state, not the cascading-render hazard
+    // the rule targets — a render-time reset changed the computed value in tests.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMinutes(compute());
     if (!expiresAt) return;
     // 30s rather than 60s: a minute-granular label drifts by up to a full minute
@@ -78,6 +83,10 @@ export function EmailAddressSection() {
   }, []);
 
   useEffect(() => {
+    // loadPending sets state only AFTER an await (post-fetch), so this is not the
+    // synchronous cascading render the rule guards against — the canonical
+    // fetch-on-mount pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPending();
   }, [loadPending]);
 

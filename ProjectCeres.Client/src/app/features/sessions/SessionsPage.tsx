@@ -105,6 +105,10 @@ export function SessionsPage() {
   }, [requireStepUp]);
 
   useEffect(() => {
+    // load sets state only AFTER an await (post-fetch), so this is not the
+    // synchronous cascading render the rule guards against — the canonical
+    // fetch-on-mount pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
