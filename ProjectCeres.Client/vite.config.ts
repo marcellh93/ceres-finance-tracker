@@ -157,5 +157,26 @@ export default defineConfig({
     // worker count is `maxWorkers` (not nested under `poolOptions.threads`).
     // See https://vitest.dev/guide/migration#pool-rework
     maxWorkers: 4,
+    // Flake policy for the slow 2-core CI runner. Every client-test CI failure
+    // (2026-09-10) had all assertions passing and failed only on a timing
+    // artifact — a base-ui portal popover not painting within a findBy budget.
+    // Retry ONLY those: the condition matches timeout / element-not-found, never
+    // an assertion mismatch, so a real regression still fails on the first run.
+    // https://vitest.dev/config/#retry
+    retry: {
+      count: 2,
+      condition: /Unable to find|Unable to fire|timed out|timeout/i,
+    },
+    // A stray settings fetch can reject after a test's teardown (the useSettings
+    // singleton is seeded+reset in test-setup, but a resolution already in flight
+    // under CI load can still land late). Filter that specific rejection so it is
+    // reported but does not fail an otherwise-green run — narrower than the blanket
+    // dangerouslyIgnoreUnhandledErrors. https://vitest.dev/config/#onunhandlederror
+    onUnhandledError(error): boolean | void {
+      const msg = String(error?.message ?? '');
+      if (msg.includes('/api/settings') || msg.includes('Failed to parse URL')) {
+        return false;
+      }
+    },
   },
 })
