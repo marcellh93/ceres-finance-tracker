@@ -178,3 +178,28 @@ migrations).
   retry policy); Vitest already parallelizes at `maxWorkers:4`.
 - **Re-architecting the four already-serial special collections** beyond giving
   each its own DB — their intra-serialization is deliberate.
+
+---
+
+## ADDENDUM 2026-09-10 — DB-per-collection mechanism (supersedes "per-bucket subclass factory")
+
+Implementation surfaced that the original mechanism — a per-bucket `SweepingTestWebApplicationFactory` subclass injected via `ICollectionFixture<BucketKFactory>` — **does not work on the pinned xUnit 2.5.3.** Four throwaway spikes (all reverted) established why and what works:
+
+- **Spike 1 (PASS):** xUnit v2 creates a *separate* fixture instance per collection definition even for the identical type.
+- **Spike 2 (FAIL):** xUnit v2 does NOT inject one collection fixture into another's constructor ("unresolved constructor arguments").
+- **Spike 3 (FAIL):** an `AsyncLocal` stamped by a companion fixture's ctor does not reach the factory's lazy build (different async flow).
+- **Spike 4/5 (PASS):** the working mechanism — a generic base class wires a per-bucket DB holder into the factory before its lazy build.
+
+**Root cause:** `ICollectionFixture<T>` resolves against a test-class constructor parameter by **exact type**, never by assignability. All ~106 bucketed test classes declare the base factory type (`TestWebApplicationFactory` / `AuthTestWebApplicationFactory`), so a subclass fixture cannot satisfy them, and no v2 hook varies a same-typed fixture's DB per collection.
+
+### The proven mechanism
+
+1. **`TestWebApplicationFactory.UseDatabase(string db)`** — sets the target DB and latches on first build (throws if called after the host is built). `DatabaseName`/`InitDbName` remain as the default (the N=1 fallback path); `UseDatabase` overrides it for a bucket.
+2. **Four `BucketKDb` holder types** (`Bucket1Db`..`Bucket4Db`), each `Db => TestDatabaseRouter.DatabaseForCollection("IntegrationParallelK")`. Distinct types so each is a distinct `ICollectionFixture`.
+3. **`abstract class IntegrationTestBase<TFactory> where TFactory : TestWebApplicationFactory`** — ctor `(TFactory factory, IBucketDb bucket)` calls `factory.UseDatabase(bucket.Db)`; exposes `Factory`. Generic so a class needing `AuthTestWebApplicationFactory` inherits `IntegrationTestBase<AuthTestWebApplicationFactory>`.
+4. **Each bucket collection** provides `ICollectionFixture<TestWebApplicationFactory>`, `ICollectionFixture<AuthTestWebApplicationFactory>`, and `ICollectionFixture<BucketKDb>`.
+5. **Each of the ~106 bucketed test classes** inherits `IntegrationTestBase<ItsFactoryType>`, adds a `BucketKDb db` ctor param (K = its assigned bucket), and calls `: base(factory, db)`. Classes also implementing `IAsyncLifetime` keep it (`: IntegrationTestBase<T>, IAsyncLifetime`).
+
+### Cost & risk
+
+This is a bucket-aware rework of ~106 test-class constructors — larger than the original Task 5. It is scriptable per bucket (the file→bucket map is fixed from Task 4) but not a uniform find-replace (K varies). Verified green at each slice under the N=1 fallback + full parallel run at the end. The rebucket (Task 4) is unaffected and retained.
