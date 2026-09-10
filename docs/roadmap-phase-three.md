@@ -1565,9 +1565,9 @@ Carried to Stage 16 (hosting):
 
 - [→] **Register the `SweepSessions` daily cron — DEFERRED (2026-09-07). Why:** registering the host-side daily cron needs a deployment target that does not exist until hosting (the sweep tool + `SessionRetentionSweepTests` shipped here; only the ops cron entry remains). **Where:** the receiving `[ ]` lives at **Stage 16 § Scheduled jobs (cron)** (this doc), alongside the parallel 13.6 audit-purge cron.
 
-### Stage 12.8.1 — Email-change follow-ups (not scheduled)
+### Stage 12.8.1 — Email-change follow-ups ✅ Done (2026-09-07)
 
-**Status: ❌ Open.** Two items scoped out of 12.8 during the 2026-08-29 brainstorm, both user-authorized. Neither blocks 12.8: the first is a convenience the revoke email already covers, the second is a real gap with no cheap fix.
+**Status: ✅ Done (2026-09-07).** Two items scoped out of 12.8 during the 2026-08-29 brainstorm, both user-authorized, both now resolved: the in-app cancel of a pending change **shipped** (`4c96c7da`), and the "no recovery from an already-completed hostile change" gap was **accepted for beta** (option C) with the real fix (option B/A) homed at **Stage 15.8**. Nothing open here.
 
 - [x] **In-app cancel of a pending change (2026-09-07, `4c96c7da`).** `EmailChangeService.CancelPendingAsync(userId)` — authenticated, consumes both sibling tokens (VerifyNew + RevokeOld) of the newest in-flight change, notifies the old address, audits `EmailChangeRevoked` — behind `POST /api/auth/email-change/cancel` (`[Authorize]`). A Cancel button on the pending banner in `EmailAddressSection`, offered only for a non-expired change. **Resolved the open reauth question by NOT reauth-gating** (the roadmap's "probably needs a fresh password" was tentative): cancel returns the account to its unchanged status quo, strictly less sensitive than the reauth-gated `/request`; the state-changing direction (`/confirm`) stays token+window protected; requiring a password to undo a security action is user-hostile (cf. `feedback_archive_requires_reactivate`). 3-agent reviewer pipeline all pass (security/writer/test-audit); integration 5/5, Vitest 15/15, E2E 3/3 browsers.
 - [x] **No recovery path for an already-completed hostile change — ACCEPTED for beta (option C, 2026-09-07).** `RevokeAsync` cancels only a change still in flight; if an attacker with a live session confirms a change inside the 30-minute window, the legitimate user's revoke link is already consumed and recovery is out-of-band (support) only. **Resolved as accept-and-document:** the damage is bounded by controls that ship (`/confirm` revokes all sessions + regenerates `SecurityStamp`, logging the attacker out on confirm; the old address is notified on completion), so "recovery requires a support request" is a tolerable beta stopgap. Documented with a support runbook in `security-model.md` § Email Address Change → "Accepted risk: no in-app recovery from an already-completed hostile change". The real fix (option B, grace-period reclaim / option A, admin rollback) is scheduled as a `[ ]` under **Stage 15.8 → Carried in from Stage 12.8.1 E2**; ticking it retires the accepted-risk block.
@@ -1589,7 +1589,7 @@ This is the hazard the Stage 9.5d spec named ("RLS policies are *silently inert*
 
 ### Stage 12.8.3 — Promote the inline warning strip to `<Alert variant="warning">` ✅ Done (2026-09-08)
 
-**Status: ❌ Open.** Surfaced 2026-08-29 while building the 12.8 pending banner.
+**Status: ✅ Done (2026-09-08, `4d3c6e8f`).** Surfaced 2026-08-29 while building the 12.8 pending banner; built when the fifth caller crossed the promotion threshold. The `<Alert>` primitive shipped with all five callers back-ported + the `--warning-foreground` token (see the checklist below).
 
 `docs/design-system.md` § Inline warning strip says: *"At the fourth caller, promote to `<Alert variant="warning">` in `src/components/ui/alert.tsx` and back-port all callers in the same commit."* The doc lists three callers. There are already **four** on disk — `SupportThreadSheet.tsx` was added since and never recorded — so the threshold was crossed before 12.8 began. The 12.8 banner is the fifth.
 
@@ -1657,9 +1657,9 @@ Consequences:
 
 ---
 
-## Stage 12.5 — Deferred from Stage 12 (not scheduled)
+## Stage 12.5 — Deferred from Stage 12 ✅ Done (2026-09-08)
 
-**Status: ❌ Deferred (2026-06-30, user-authorized).** Three items were scoped out of Stage 12 core during the 2026-06-30 brainstorm because each needs design work the core stage deliberately did not carry. This is the receiving checklist (the `[ ]` execution gate); the WHAT + open design questions live in [`planning-future.md` § Deferred from Stage 12](planning-future.md#deferred-from-stage-12-2026-06-30). Not on the active schedule — resumes only when the user schedules it. Listed here, separate from Stage 12, so Stage 12 closes with zero unchecked items under its own heading (Phase E).
+**Status: ✅ Done (2026-09-08).** Originally deferred 2026-06-30 (three items scoped out of Stage 12 core, user-authorized), all now built this session: **12.5.1** per-session IP anchor, **12.5.2** admin ticket-list/triage, **12.5.3** new-session alert, plus **12.5.4** unblock-IP and the **A1** composite follow-up FK. The one piece not built — the new-session-alert opt-out toggle — was deferred by decision (option A) and homed OUT of the 12.x namespace at **Stage 17 — Notification preferences**. The WHAT + original design questions live in [`planning-future.md` § Deferred from Stage 12](planning-future.md#deferred-from-stage-12-2026-06-30).
 
 **Reason each qualifies as a deferral (no-unjustified-deferrals gate):** user-authorized AND a tooling/infra gap — the capability each needs does not exist in the codebase today (see per-item notes).
 
