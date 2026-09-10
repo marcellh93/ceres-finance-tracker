@@ -65,7 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4          # reads version from packageManager
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ProjectCeres.Client/package.json   # packageManager pin lives here, not at repo root
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -104,6 +106,8 @@ jobs:
         run: dotnet tool restore || dotnet tool install --global dotnet-ef
       - run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ProjectCeres.Client/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -145,6 +149,8 @@ jobs:
         with:
           dotnet-version: "10.0.x"
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ProjectCeres.Client/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
