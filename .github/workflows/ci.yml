@@ -144,6 +144,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -155,6 +156,10 @@ jobs:
           if echo "$OUT" | grep -qiE '>\s*[0-9].*(Critical|High|Moderate|Low)'; then
             echo "::error::Vulnerable package(s) reported"; exit 1
           fi
+      - name: Client dependency audit (pnpm)
+        run: |
+          pnpm --dir ProjectCeres.Client install --frozen-lockfile
+          pnpm --dir ProjectCeres.Client audit --audit-level high
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
       - name: Node hook self-tests
