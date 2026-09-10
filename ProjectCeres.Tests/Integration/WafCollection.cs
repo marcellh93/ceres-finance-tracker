@@ -31,15 +31,32 @@ namespace ProjectCeres.Tests.Integration;
 /// </summary>
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
-    // Stage 12.18 — the database this factory targets. A bucket collection fixture
-    // overrides InitDbName (e.g. TestDatabaseRouter.DatabaseForCollection("IntegrationParallel1"));
-    // default = legacy single DB, so factories built outside a bucket (ad-hoc, or under
-    // the N=1 fallback) keep today's behaviour. DatabaseName is computed (not ctor-assigned)
-    // so a field-backed subclass override resolves correctly even though InitDbName is
-    // read before any subclass field would be set.
+    // Stage 12.18 — the database this factory targets. Default = legacy single DB, so
+    // factories built outside a bucket (ad-hoc, or under the N=1 fallback) keep today's
+    // behaviour. A bucket collection's IntegrationTestBase<TFactory> calls UseDatabase
+    // before the host builds, pinning this factory to its bucket's database instead.
     protected virtual string InitDbName => TestDatabaseRouter.LegacyDatabase;
 
-    public string DatabaseName => InitDbName;
+    private string? _overrideDb;
+    private bool _built;
+
+    public string DatabaseName => _overrideDb ?? InitDbName;
+
+    /// <summary>
+    /// Overrides <see cref="DatabaseName"/> for this factory instance. Must be called
+    /// before the host is built (i.e. before the first <c>Services</c>/<c>CreateClient()</c>
+    /// access) — <see cref="ConfigureWebHost"/> latches <see cref="_built"/> as soon as the
+    /// lazy build starts, and a call after that point throws rather than silently no-op.
+    /// </summary>
+    public void UseDatabase(string db)
+    {
+        if (_built)
+            throw new InvalidOperationException(
+                $"UseDatabase(\"{db}\") called after {nameof(TestWebApplicationFactory)} " +
+                "already built its host. Call UseDatabase before the first Services/CreateClient() access.");
+
+        _overrideDb = db;
+    }
 
     // Stage 7.5 / ADR-0068 — three role-scoped connection strings, routed through
     // TestDatabaseRouter so each bucket can target its own database. The hosted app
@@ -86,6 +103,11 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Latch build-started so UseDatabase throws instead of silently no-op'ing once
+        // the host is under construction (WebApplicationFactory builds lazily on first
+        // Services/CreateClient() access; ConfigureWebHost is the earliest hook of that build).
+        _built = true;
+
         // Stage 12.11 — run the integration-test host as "Testing", not the default
         // Development. The dev SPA-shell bug was unfixable while IsDevelopment() meant
         // two things (a real dev machine AND this in-memory host): the Vite branch at
