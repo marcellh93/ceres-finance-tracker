@@ -438,11 +438,13 @@ describe('MovementForm', () => {
     // Wait for the budget combobox trigger to appear (aria-label="No budget" when unselected)
     const trigger = await screen.findByRole('combobox', { name: /^No budget$/i });
     expect(trigger).toBeInTheDocument();
-    // Open the popover and verify 'Trip' is listed
+    // Open the popover and verify 'Trip' is listed. No explicit timeout: this
+    // portal-rendered base-ui popover is exactly the flake class vite.config.ts
+    // set testTimeout: 15_000 for. A local `{ timeout: 3000 }` override CAPS the
+    // budget BELOW that global default — the opposite of the intent — and is what
+    // failed this on a loaded CI runner. Let it inherit the 15s budget.
     fireEvent.click(trigger);
-    // Explicit 3000ms timeout: portal-rendered popover under full-suite CPU
-    // contention can exceed RTL's default 1000ms findBy (see App.test.tsx 802e937).
-    expect(await screen.findByText('Trip', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText('Trip')).toBeInTheDocument();
   });
 
   it('Test 15: Selecting a goal updates values.budgetId on submit', async () => {
@@ -462,8 +464,8 @@ describe('MovementForm', () => {
     // Open the budget combobox and pick 'Trip'
     const trigger = await screen.findByRole('combobox', { name: /^No budget$/i });
     fireEvent.click(trigger);
-    // Explicit 3000ms timeout: same portal-popover contention path as Test 14.
-    fireEvent.click(await screen.findByText('Trip', {}, { timeout: 3000 }));
+    // No explicit timeout — inherits the global 15s budget (see Test 14).
+    fireEvent.click(await screen.findByText('Trip'));
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
@@ -490,12 +492,11 @@ describe('MovementForm', () => {
     // The trigger should exist once goals load (aria-label="Old Trip" when archived goal selected)
     const trigger = await screen.findByRole('combobox', { name: /^Old Trip$/i });
     expect(trigger).toBeInTheDocument();
-    // Open the popover and verify the archived suffix is shown.
-    // Explicit timeout: this reads a base-ui popover rendered into a portal, and the
-    // default 1000ms is too tight under full-suite CPU contention. Same fix as Tests 14/15.
+    // Open the popover and verify the archived suffix is shown. No explicit
+    // timeout — inherits the global 15s budget (see Test 14).
     fireEvent.click(trigger);
     expect(
-      await screen.findByText('Old Trip (archived)', {}, { timeout: 3000 }),
+      await screen.findByText('Old Trip (archived)'),
     ).toBeInTheDocument();
   });
 });
