@@ -20,7 +20,7 @@ namespace ProjectCeres.Tests.Integration;
 /// of Closed) — is a state-machine rule the schema cannot express, so it is only ever as
 /// strong as these tests.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class SupportTicketServiceTests : IAsyncLifetime
 {
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");

@@ -17,7 +17,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// shows the old address unchanged and the user cannot tell whether their request
 /// worked, so they submit again and trigger two more emails.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;

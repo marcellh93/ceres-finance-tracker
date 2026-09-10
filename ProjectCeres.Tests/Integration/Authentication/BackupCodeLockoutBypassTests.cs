@@ -10,7 +10,7 @@ using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class BackupCodeLockoutBypassTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

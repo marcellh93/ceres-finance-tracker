@@ -22,7 +22,7 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// MfaEnrollmentTests + MfaDisableTests. EnrollUserMfaAsync runs against the base
 /// _factory (only that overload exists) — both factories share the same DB.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class MfaSecurityEmailTests : IAsyncLifetime
 {
     private const string EmailDomain = "@mfa-secemail-test.local";

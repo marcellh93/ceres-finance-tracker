@@ -21,7 +21,7 @@ namespace ProjectCeres.Tests.Integration.Admin;
 ///
 /// Every DB read is keyed on this run's own ids; users and their owned rows are purged on teardown.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class SupportAdminApiTests : IAsyncLifetime
 {
     private const string EmailSuffix = "@support-admin-test.local";

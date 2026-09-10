@@ -14,7 +14,7 @@ using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class LockoutUnlockIssuanceTests : IAsyncLifetime
 {
     private const string EmailDomain = "@lockout-issue.local";

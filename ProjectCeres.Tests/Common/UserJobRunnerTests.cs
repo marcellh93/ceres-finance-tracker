@@ -10,7 +10,7 @@ using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Common;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class UserJobRunnerTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

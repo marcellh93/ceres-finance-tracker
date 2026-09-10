@@ -17,7 +17,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   20000000-0000-0000-0000-000000000025 = Uncategorized Income  (CategoryTypeId = 1)
 ///   20000000-0000-0000-0000-000000000026 = Uncategorized Expense (CategoryTypeId = 2)
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class ImportServiceIntegrationTests : IAsyncLifetime
 {
     private static readonly Guid UncategorizedIncomeId  = new("20000000-0000-0000-0000-000000000025");

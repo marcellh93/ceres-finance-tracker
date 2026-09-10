@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class ComboboxApiTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {

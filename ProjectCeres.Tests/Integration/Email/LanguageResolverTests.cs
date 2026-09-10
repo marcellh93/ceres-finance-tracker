@@ -10,7 +10,7 @@ using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Email;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public sealed class LanguageResolverTests
 {
     private readonly AuthTestWebApplicationFactory _factory;

@@ -13,7 +13,7 @@ using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Integration.Api;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class SessionsApiTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

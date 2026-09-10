@@ -18,7 +18,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// sustained request rate. Two methods because confirm and revoke filter by different
 /// Purpose values and we want independent regression coverage for both.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class EmailChangeVerifyDosAmplificationTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private const int DummyRowCount = 200;

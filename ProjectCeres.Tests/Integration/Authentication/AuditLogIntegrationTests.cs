@@ -16,7 +16,7 @@ using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class AuditLogIntegrationTests : IAsyncLifetime
 {
     private const string EmailDomain = "@audit-test.local";

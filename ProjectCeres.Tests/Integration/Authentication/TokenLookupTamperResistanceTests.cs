@@ -24,7 +24,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// returns 401. Without these tests, a future refactor that deletes the Argon2id
 /// check would still pass the existing happy-path/expiry/consumed suite.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class TokenLookupTamperResistanceTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;

@@ -26,7 +26,7 @@ namespace ProjectCeres.Tests.Integration;
 /// in shape: AuthTestWebApplicationFactory, strict-mock IEmailService, per-test
 /// GUID-suffixed emails, IgnoreQueryFilters on the user-owned token table.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

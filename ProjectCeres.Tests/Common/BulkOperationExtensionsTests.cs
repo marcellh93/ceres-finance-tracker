@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Common;
 /// per-test GUID-suffixed account name to avoid order-dependent reads in the shared
 /// IntegrationTests xUnit collection.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class BulkOperationExtensionsTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

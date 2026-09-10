@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class ApiInfrastructureTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {

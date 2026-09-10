@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class PasswordResetSessionRevocationTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;

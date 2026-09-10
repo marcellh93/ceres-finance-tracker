@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// the indexed TokenLookup lookup makes the verify cost independent of N. The test
 /// seeds 200 dummy rows and asserts the confirm call still returns in under one second.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class PasswordResetVerifyDosAmplificationTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private const int DummyRowCount = 200;

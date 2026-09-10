@@ -25,7 +25,7 @@ namespace ProjectCeres.Tests.Integration.MultiTenancy;
 /// alone catches a cross-tenant leak even when the service-layer .Owned(user) chain
 /// is bypassed entirely.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class IdorIsolationTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

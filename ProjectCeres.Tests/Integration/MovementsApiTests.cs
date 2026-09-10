@@ -19,7 +19,7 @@ namespace ProjectCeres.Tests.Integration;
 /// The factory overrides the connection string to project_ceres_test so these tests
 /// never touch the dev database. Seeded rows are deleted in DisposeAsync.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class MovementsApiTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId = new("20000000-0000-0000-0000-000000000002");

@@ -17,7 +17,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   AccountTypeId 1 = Asset
 ///   CategoryId 20000000-0000-0000-0000-000000000026 = Uncategorized Expense
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class ImportStagedTransactionServiceTests : IAsyncLifetime
 {
     private static readonly Guid UncategorizedExpenseId = new("20000000-0000-0000-0000-000000000026");

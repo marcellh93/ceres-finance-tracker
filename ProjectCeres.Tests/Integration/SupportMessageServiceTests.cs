@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration;
 /// fixture cannot forge these rows is the wall working — the tests below need the rows to
 /// exist anyway, to prove the SERVICE (not just RLS) enforces the state machine and ownership.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class SupportMessageServiceTests : IAsyncLifetime
 {
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");

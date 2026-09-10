@@ -8,7 +8,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.MultiTenancy;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class GlobalQueryFilterTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

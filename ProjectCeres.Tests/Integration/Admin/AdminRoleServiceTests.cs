@@ -20,7 +20,7 @@ public class AppRolesTests
     }
 }
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class AdminRoleServiceTests : IAsyncLifetime
 {
     private const string EmailSuffix = "@admin-role-test.local";

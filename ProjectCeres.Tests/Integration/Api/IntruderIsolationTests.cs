@@ -25,7 +25,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// When real auth lands these tests continue to work — replace the seed
 /// "intruder UserId" with another authenticated user and the same shape holds.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class IntruderIsolationTests : IAsyncLifetime
 {
     private static readonly Guid Sentinel              = new("00000000-0000-0000-0000-000000000001");

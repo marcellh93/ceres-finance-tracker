@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// The IDOR cases matter most here: a ticket or attachment belonging to someone else must
 /// answer 404, never 403, so the response cannot be used to probe which ids exist.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class SupportApiTests : IAsyncLifetime
 {
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");

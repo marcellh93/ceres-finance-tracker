@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class DashboardApiTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {

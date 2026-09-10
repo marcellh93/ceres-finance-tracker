@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration;
 /// IntegrationTests fixture has the migration already applied by the time tests
 /// run, so the test just exercises the SQL contract against rows we control.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class BackfillIdentityNormalizedToLowercaseTests
 {
     private readonly TestWebApplicationFactory _factory;

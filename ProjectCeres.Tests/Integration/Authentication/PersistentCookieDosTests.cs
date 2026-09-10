@@ -10,7 +10,7 @@ using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class PersistentCookieDosTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

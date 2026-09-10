@@ -7,7 +7,7 @@ using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Email;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public sealed class EmailComposerTests
 {
     private readonly AuthTestWebApplicationFactory _factory;

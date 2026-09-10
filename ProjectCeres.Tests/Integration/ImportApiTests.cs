@@ -10,7 +10,7 @@ namespace ProjectCeres.Tests.Integration;
 /// WAF integration test for POST /api/import.
 /// Uses the test DB via TestWebApplicationFactory.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class ImportApiTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {

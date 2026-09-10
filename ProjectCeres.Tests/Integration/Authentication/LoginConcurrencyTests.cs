@@ -9,7 +9,7 @@ using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class LoginConcurrencyTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

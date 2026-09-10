@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   AccountTypeId 1 = Asset
 ///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing (Expense, non-system)
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class GoalBudgetServiceTests : IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");

@@ -11,7 +11,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// shelved from the beta (Production). They must be unreachable (404) in Production
 /// and remain live in Development / E2E / Testing environments.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class ShelvedEndpointFencingTests
 {
     // A bare Production-environment factory. All settings required by Program.cs under

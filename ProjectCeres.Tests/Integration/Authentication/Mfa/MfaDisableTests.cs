@@ -17,7 +17,7 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// Mirrors the MfaRegenerateTests harness exactly (same xUnit collection,
 /// same login → TOTP step → session-cookie flow, same per-test cleanup).
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class MfaDisableTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

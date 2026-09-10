@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Api;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class ReconciliationReviewApiTests : IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");

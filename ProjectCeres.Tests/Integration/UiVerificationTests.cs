@@ -27,7 +27,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   AccountTypeId 1 = Asset, 2 = Liability
 ///   CurrencyId    1 = EUR
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class UiVerificationTests : IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;

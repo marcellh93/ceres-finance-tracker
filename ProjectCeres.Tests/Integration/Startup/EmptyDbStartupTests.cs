@@ -8,7 +8,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Startup;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class EmptyDbStartupTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

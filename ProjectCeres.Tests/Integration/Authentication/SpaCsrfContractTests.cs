@@ -18,7 +18,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// suites cannot observe a missing X-XSRF-TOKEN header; these run the real pipeline
 /// with a genuine authenticated session, which is where the SPA's 400 came from.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class SpaCsrfContractTests : IAsyncLifetime
 {
     private const string EmailSuffix = "@spa-csrf-test.local";

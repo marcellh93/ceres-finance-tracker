@@ -9,7 +9,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Api;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class CategoriesCrudApiTests : IAsyncLifetime
 {
     private static readonly Guid OpeningBalanceCategoryId = new("20000000-0000-0000-0000-000000000001"); // IsSystem

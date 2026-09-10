@@ -9,7 +9,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class TransfersApiTests : IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;

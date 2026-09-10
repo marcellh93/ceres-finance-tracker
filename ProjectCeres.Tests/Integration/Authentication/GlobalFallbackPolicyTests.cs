@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class GlobalFallbackPolicyTests
 {
     private readonly AuthTestWebApplicationFactory _factory;

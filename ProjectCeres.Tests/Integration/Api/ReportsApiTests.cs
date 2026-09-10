@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Api;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class ReportsApiTests : IAsyncLifetime
 {
     private static readonly Guid CheckingAccountId = new("10000000-0000-0000-0000-000000000002");

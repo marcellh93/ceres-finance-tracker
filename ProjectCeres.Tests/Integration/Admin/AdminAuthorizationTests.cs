@@ -14,7 +14,7 @@ using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Integration.Admin;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class AdminAuthorizationTests : IAsyncLifetime
 {
     private const string EmailSuffix = "@admin-authz-test.local";

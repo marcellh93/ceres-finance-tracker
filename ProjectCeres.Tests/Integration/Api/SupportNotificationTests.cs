@@ -18,7 +18,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// way an operator learns a ticket exists — so what it carries, and that it is addressed to
 /// the configured mailbox rather than to anything user-supplied, are both load-bearing.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class SupportNotificationTests : IAsyncLifetime
 {
     private const string SupportAddress = "support-desk@ceres-test.local";

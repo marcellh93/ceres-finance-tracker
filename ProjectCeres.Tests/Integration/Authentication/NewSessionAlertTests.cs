@@ -22,7 +22,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// session rows with controlled IPs: a concrete IP makes "" novel (alert), an "" prior makes
 /// "" known (no alert), and no prior at all is the first-login suppression case (no alert).
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class NewSessionAlertTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

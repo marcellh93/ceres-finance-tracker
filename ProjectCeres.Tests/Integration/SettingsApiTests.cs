@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class SettingsApiTests(TestWebApplicationFactory factory)
     : IClassFixture<TestWebApplicationFactory>
 {

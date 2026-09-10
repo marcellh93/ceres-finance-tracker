@@ -7,7 +7,7 @@ using Moq;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class TransferReviewServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

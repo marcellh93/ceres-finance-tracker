@@ -15,7 +15,7 @@ namespace ProjectCeres.Tests.Integration;
 /// no foreign key to AspNetUsers — so registration's 26 seeded categories survived
 /// every test run. 57,267 orphaned rows had accumulated in the shared test database.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class UserOwnedCleanupTests
 {
     private const string EmailSuffix = "@cleanup-test.local";

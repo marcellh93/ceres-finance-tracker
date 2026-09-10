@@ -424,18 +424,6 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
 }
 
 /// <summary>
-/// All integration tests — both TestDbFixture-based and WebApplicationFactory-based —
-/// share a single xUnit collection. xUnit runs all classes in a collection sequentially
-/// on one thread, eliminating races between concurrent writes to project_ceres_test.
-/// </summary>
-[CollectionDefinition("IntegrationTests")]
-public class IntegrationCollection
-    : ICollectionFixture<SweepingTestWebApplicationFactory>,
-      ICollectionFixture<TestWebApplicationFactory>,
-      ICollectionFixture<AuthTestWebApplicationFactory>
-{ }
-
-/// <summary>
 /// The one factory that sweeps abandoned test users on teardown.
 ///
 /// xUnit disposes collection fixtures after every test in the collection has run, so

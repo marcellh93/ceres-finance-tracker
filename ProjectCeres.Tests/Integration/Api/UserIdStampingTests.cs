@@ -20,7 +20,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// When real auth lands, these continue to work — the sentinel just becomes
 /// the authenticated user's id, returned by ICurrentUserAccessor.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class UserIdStampingTests : IAsyncLifetime
 {
     private static readonly Guid Sentinel              = new("00000000-0000-0000-0000-000000000001");

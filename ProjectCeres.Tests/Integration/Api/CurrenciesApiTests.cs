@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace ProjectCeres.Tests.Integration.Api;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class CurrenciesApiTests
 {
     private readonly HttpClient _client;

@@ -48,7 +48,7 @@ public class LoginCrossFeatureTests : IAsyncLifetime
     }
 }
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class LoginCrossFeatureRegressionTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

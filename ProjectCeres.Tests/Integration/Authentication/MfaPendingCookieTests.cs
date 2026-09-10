@@ -11,7 +11,7 @@ using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class MfaPendingCookieTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

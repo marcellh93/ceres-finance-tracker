@@ -9,7 +9,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel4")]
 public class LiabilityPaymentsApiTests : IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;

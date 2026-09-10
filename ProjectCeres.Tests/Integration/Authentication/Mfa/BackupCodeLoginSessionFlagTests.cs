@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// matching UsedBackupCodeAtLastLogin field on the MeResponse DTO. The flag
 /// drives the dashboard backup-code banner.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class BackupCodeLoginSessionFlagTests : IAsyncLifetime
 {
     private const string EmailSuffix = "@backup-flag-test.local";

@@ -12,7 +12,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class LoginWithTotpTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

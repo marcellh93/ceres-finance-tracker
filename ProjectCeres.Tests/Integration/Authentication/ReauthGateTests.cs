@@ -8,7 +8,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class ReauthGateTests : IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;

@@ -11,7 +11,7 @@ using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class LoginWithoutMfaTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

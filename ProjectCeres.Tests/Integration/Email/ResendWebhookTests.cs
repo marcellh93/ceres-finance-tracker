@@ -12,7 +12,7 @@ using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Email;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public sealed class ResendWebhookTests
 {
     private readonly AuthTestWebApplicationFactory _factory;

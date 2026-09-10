@@ -18,7 +18,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   AccountTypeId 1 = Asset
 ///   CurrencyId    1 = EUR
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class TransferAttachmentServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

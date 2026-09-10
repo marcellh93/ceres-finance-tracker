@@ -21,7 +21,7 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// IpCreatedAt at the recorded value so it matches, proving anchoring does not reject a
 /// same-IP request.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel1")]
 public class SessionIpAnchorTests : IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;

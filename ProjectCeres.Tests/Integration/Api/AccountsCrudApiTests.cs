@@ -8,7 +8,7 @@ using ProjectCeres.Data;
 
 namespace ProjectCeres.Tests.Integration.Api;
 
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel2")]
 public class AccountsCrudApiTests : IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;

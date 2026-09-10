@@ -13,7 +13,7 @@ namespace ProjectCeres.Tests.Integration;
 /// split. These are architecture-style assertions about the service registrations,
 /// not behaviour tests of EF or the interceptor itself.
 /// </summary>
-[Collection("IntegrationTests")]
+[Collection("IntegrationParallel3")]
 public class DbContextRegistrationTests
 {
     private readonly TestWebApplicationFactory _factory;
