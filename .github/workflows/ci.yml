@@ -221,10 +221,6 @@ jobs:
              || ! echo "$OUT" | grep -q 'has no vulnerable packages'; then
             echo "::error::Vulnerable package(s) reported by dotnet list --vulnerable"; exit 1
           fi
-      - name: Client dependency audit (pnpm)
-        run: |
-          pnpm --dir ProjectCeres.Client install --frozen-lockfile
-          pnpm --dir ProjectCeres.Client audit --audit-level high
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
       - name: Node hook self-tests
@@ -235,3 +231,11 @@ jobs:
             node -e "const fs=require('fs');const {scan}=require('./.claude/hooks/roadmap-consistency-check.js');const g=scan(fs.readFileSync(process.argv[1],'utf8'));if(g.length){console.error(process.argv[1]+':');g.forEach(x=>console.error('  '+x));process.exit(1)}" "$f"
           done
           echo "roadmaps consistent"
+      # Runs LAST: the JS advisory set (17 open, tracked for a dedicated triage
+      # pass — pnpm overrides per ADR-0079 + bumps) is a known red today. Keeping
+      # it last means gitleaks, the hook self-tests, and the roadmap check all run
+      # and report even while this gate is failing. It still fails the job.
+      - name: Client dependency audit (pnpm)
+        run: |
+          pnpm --dir ProjectCeres.Client install --frozen-lockfile
+          pnpm --dir ProjectCeres.Client audit --audit-level high

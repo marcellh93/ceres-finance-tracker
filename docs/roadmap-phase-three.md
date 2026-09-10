@@ -1670,7 +1670,16 @@ Stage 16 on the user's direction. Governed by ADR-0070 (CI/CD on GitHub Actions)
 - [x] `.github/workflows/ci.yml` — five parallel jobs, push-to-main + manual dispatch, fail-fast off.
 - [x] `tools/ci/setup-test-db.sh` — single DB-provisioning source; `run-server.sh` refactored to consume it (E2E still green locally).
 - [x] `docs/testing.md` § Continuous Integration documents the additive-not-replacement model.
-- [ ] **First green Actions run on GitHub.** Only a real push to `main` can verify this; the workflow file + shell are correct and command-parity-checked locally, but a live runner surfaces path-casing / service-timing / cache-key issues no local check can. Owed at the user's next push; iterate on the Actions log.
+- [x] **First green Actions run on GitHub** (2026-09-10, run on `ae419780`). Six of seven jobs green: `dotnet-test` (1381/1381), `analyzer-test`, `client-test` (1113/1113), and all three E2E shards (chromium/firefox/webkit). The live runner surfaced — and we fixed — a chain of real issues no local check could: the `packageManager` sha512 hash misparsed by `pnpm/action-setup` (→ pinned `version:`), the unconditional `BuildTailwind` target failing in pnpm-less jobs (→ `SkipTailwind` opt-out), and four latent test bugs that only a clean runner exposes — an invariant-culture email-resource regression (→ `en` default culture in `Program.cs`), a missing `project_ceres_e2e` DB, and an unstaged `wwwroot/dist`.
+- [→] **`repo-hygiene` pnpm-audit gate is red on 17 open JS advisories (7 high, 8 moderate, 2 low) — DEFERRED. Why:** dependency-advisory triage is a distinct body of work (pnpm `overrides` per [ADR-0079](decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md) for the transitive pins + parent bumps where reachable), not CI plumbing; user-authorized to defer (2026-09-10). **Where:** homed at **Stage 12.16 — Dependency-advisory triage** below; the `pnpm audit --audit-level high` step already exists and runs last in `repo-hygiene` so the other hygiene checks still report.
+
+---
+
+## Stage 12.16 — Dependency-advisory triage
+
+**Status: ❌ Open.** Surfaced 2026-09-10 when Stage 12.13's `repo-hygiene` job put `pnpm audit --audit-level high` on the critical path and it went red on the existing advisory backlog. GitHub Dependabot reports 17 (7 high, 8 moderate, 2 low) on `main`. The `dotnet list package --vulnerable` half of the same job is green — this is a JS-only backlog.
+
+- [ ] Triage the 17 open JS advisories: for each, either bump the direct parent, add/adjust a transitive pin in `pnpm overrides` per [ADR-0079](decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md) (running its four required post-change commands), or record an accepted-risk exception with rationale. Gate is green when `pnpm --dir ProjectCeres.Client audit --audit-level high` exits 0 in `repo-hygiene`.
 
 ---
 
