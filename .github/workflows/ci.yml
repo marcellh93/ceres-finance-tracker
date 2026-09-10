@@ -77,3 +77,88 @@ jobs:
         run: pnpm --dir ProjectCeres.Client build
       - name: Vitest
         run: pnpm --dir ProjectCeres.Client test
+
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore dotnet tools (dotnet-ef)
+        run: dotnet tool restore || dotnet tool install --global dotnet-ef
+      - run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: ProjectCeres.Client/pnpm-lock.yaml
+      - name: Install client deps
+        run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
+      - name: Resolve Playwright version (for the cache key)
+        id: pw
+        run: echo "version=$(pnpm --dir ProjectCeres.Client ls @playwright/test --depth 0 --parseable 2>/dev/null | sed 's/.*@//' || echo unknown)" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Playwright browsers
+        run: pnpm --dir ProjectCeres.Client exec playwright install --with-deps ${{ matrix.project }}
+      - name: E2E (${{ matrix.project }})
+        run: pnpm --dir ProjectCeres.Client exec playwright test --config e2e/playwright.golden.config.ts --project=${{ matrix.project }}
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+      - name: Upload traces + report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-${{ matrix.project }}
+          path: ProjectCeres.Client/e2e/.artifacts/
+          retention-days: 7
+
+  repo-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # gitleaks scans history
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Vulnerable-package scan (fail on any finding)
+        run: |
+          dotnet restore ProjectCeres.sln 2>/dev/null || dotnet restore
+          OUT="$(dotnet list package --vulnerable --include-transitive 2>&1 || true)"
+          echo "$OUT"
+          if echo "$OUT" | grep -qiE '>\s*[0-9].*(Critical|High|Moderate|Low)'; then
+            echo "::error::Vulnerable package(s) reported"; exit 1
+          fi
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+      - name: Node hook self-tests
+        run: node --test .claude/hooks/__tests__/
+      - name: Roadmap marker/status consistency
+        run: |
+          for f in docs/roadmap-phase-*.md; do
+            node -e "const fs=require('fs');const {scan}=require('./.claude/hooks/roadmap-consistency-check.js');const g=scan(fs.readFileSync(process.argv[1],'utf8'));if(g.length){console.error(process.argv[1]+':');g.forEach(x=>console.error('  '+x));process.exit(1)}" "$f"
+          done
+          echo "roadmaps consistent"
