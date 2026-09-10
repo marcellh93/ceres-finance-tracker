@@ -26,8 +26,10 @@ log "applying setup-postgres-roles.sql to $DB"
 psql -d "$DB" -v ON_ERROR_STOP=1 -f "$REPO_ROOT/scripts/setup-postgres-roles.sql" >/dev/null
 
 # 3. Migrate as ceres_migrator (the --connection flag is mandatory — no design-time factory).
+# Do NOT silence stdout: dotnet ef writes its build + migration errors there, and a
+# swallowed error turns a failed migration into an undiagnosable "exit code 1" in CI.
 log "migrating $DB"
 dotnet ef database update --project "$REPO_ROOT/ProjectCeres" \
-  --context AppDbContext --connection "$MIGRATE_CONN" >/dev/null
+  --context AppDbContext --connection "$MIGRATE_CONN"
 
 log "done: $DB provisioned + migrated"

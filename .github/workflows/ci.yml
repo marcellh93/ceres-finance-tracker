@@ -73,13 +73,14 @@ jobs:
         with:
           node-version: "22"
       - uses: pnpm/action-setup@v4
-        id: pnpm
         with:
-          package_json_file: ProjectCeres.Client/package.json
-      - name: Put pnpm on PATH  # action-setup's PATH export is unreliable across setup-node; force it
-        run: |
-          echo "${{ steps.pnpm.outputs.bin_dest }}" >> "$GITHUB_PATH"
-          "${{ steps.pnpm.outputs.bin_dest }}/pnpm" --version
+          # Explicit version — NOT package_json_file. Our packageManager pin
+          # carries a full "+sha512.…/…" hash that action-setup@v4 misparses as
+          # a local directory path, "installing" a bogus pnpm@0.0.0 with no
+          # binary. An exact version string sidesteps that entirely.
+          version: "10.33.2"
+      - name: pnpm on PATH?
+        run: which pnpm && pnpm --version
       - name: Install
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Build (tsc + vite + check-size)
@@ -119,13 +120,14 @@ jobs:
         with:
           node-version: "22"
       - uses: pnpm/action-setup@v4
-        id: pnpm
         with:
-          package_json_file: ProjectCeres.Client/package.json
-      - name: Put pnpm on PATH  # action-setup's PATH export is unreliable across setup-node; force it
-        run: |
-          echo "${{ steps.pnpm.outputs.bin_dest }}" >> "$GITHUB_PATH"
-          "${{ steps.pnpm.outputs.bin_dest }}/pnpm" --version
+          # Explicit version — NOT package_json_file. Our packageManager pin
+          # carries a full "+sha512.…/…" hash that action-setup@v4 misparses as
+          # a local directory path, "installing" a bogus pnpm@0.0.0 with no
+          # binary. An exact version string sidesteps that entirely.
+          version: "10.33.2"
+      - name: pnpm on PATH?
+        run: which pnpm && pnpm --version
       - name: Install client deps
         run: pnpm --dir ProjectCeres.Client install --frozen-lockfile
       - name: Resolve Playwright version (for the cache key)
@@ -165,13 +167,14 @@ jobs:
         with:
           node-version: "22"
       - uses: pnpm/action-setup@v4
-        id: pnpm
         with:
-          package_json_file: ProjectCeres.Client/package.json
-      - name: Put pnpm on PATH  # action-setup's PATH export is unreliable across setup-node; force it
-        run: |
-          echo "${{ steps.pnpm.outputs.bin_dest }}" >> "$GITHUB_PATH"
-          "${{ steps.pnpm.outputs.bin_dest }}/pnpm" --version
+          # Explicit version — NOT package_json_file. Our packageManager pin
+          # carries a full "+sha512.…/…" hash that action-setup@v4 misparses as
+          # a local directory path, "installing" a bogus pnpm@0.0.0 with no
+          # binary. An exact version string sidesteps that entirely.
+          version: "10.33.2"
+      - name: pnpm on PATH?
+        run: which pnpm && pnpm --version
       - name: Vulnerable-package scan (fail on any finding)
         run: |
           dotnet restore ProjectCeres.sln 2>/dev/null || dotnet restore
