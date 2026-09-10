@@ -1686,7 +1686,13 @@ troubleshooting captured in `docs/runbooks/ci-actions-troubleshooting.md`.
 
 ---
 
-## Stage 12.5 — Deferred from Stage 12 ✅ Done (2026-09-08)
+## Stage 12.17 — E2E webkit flake policy on CI
+
+**Status: ❌ Open.** Surfaced 2026-09-10: a `support-page … keeps-the-ticket-Open` test timed out on `locator.click` (60s) on the **webkit** shard only; chromium + firefox passed the same test, and a re-run of the webkit shard passed. A CI-load timing flake on the flakiest browser, unrelated to the change that surfaced it (an `.editorconfig` edit).
+
+`e2e/playwright.golden.config.ts` sets `retries: 0` with a deliberate comment — "A flake is a failure until root-caused (docs/testing.md § Flaky tests)." That policy is right for local runs, but a clean CI runner is CPU-starved relative to a dev machine, and a single sub-timeout slip should not fail a 25-test shard. This mirrors the client-test flake already fixed at the Vitest runner level (§12.13, `retry` with a timeout-only condition).
+
+- [ ] Decide the CI-only retry policy for Playwright (e.g. `retries: process.env.CI ? 1 : 0` in the golden config, keeping local `retries: 0`), reconciled with `docs/testing.md § Flaky tests`. If a retry is adopted, keep it CI-scoped and note it in the testing doc so a retried pass is still visible as a flake, not silently green. Before shipping a blanket retry, confirm this specific `support-page` test has no real root cause (a genuine race in the ticket-Open flow) — a retry must not paper over a real bug.
 
 **Status: ✅ Done (2026-09-08).** Originally deferred 2026-06-30 (three items scoped out of Stage 12 core, user-authorized), all now built this session: **12.5.1** per-session IP anchor, **12.5.2** admin ticket-list/triage, **12.5.3** new-session alert, plus **12.5.4** unblock-IP and the **A1** composite follow-up FK. The one piece not built — the new-session-alert opt-out toggle — was deferred by decision (option A) and homed OUT of the 12.x namespace at **Stage 17 — Notification preferences**. The WHAT + original design questions live in [`planning-future.md` § Deferred from Stage 12](planning-future.md#deferred-from-stage-12-2026-06-30).
 
