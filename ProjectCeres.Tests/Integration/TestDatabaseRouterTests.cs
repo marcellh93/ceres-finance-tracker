@@ -57,6 +57,38 @@ public class TestDatabaseRouterTests
             .And.Contain("Username=ceres_admin"); // default UseAppRoleConnection=false → admin
     }
 
+    [Fact]
+    public void UseDatabase_before_build_sets_the_database()
+    {
+        using var factory = new FixedDbFactory("project_ceres_test");
+        factory.UseDatabase("project_ceres_test_3");
+        factory.DatabaseName.Should().Be("project_ceres_test_3");
+    }
+
+    [Fact]
+    public void UseDatabase_with_same_db_after_build_is_a_no_op()
+    {
+        using var factory = new FixedDbFactory("project_ceres_test_3");
+        _ = factory.Services; // force the lazy build, latching _built
+
+        var act = () => factory.UseDatabase("project_ceres_test_3");
+
+        act.Should().NotThrow();
+        factory.DatabaseName.Should().Be("project_ceres_test_3");
+    }
+
+    [Fact]
+    public void UseDatabase_with_different_db_after_build_throws()
+    {
+        using var factory = new FixedDbFactory("project_ceres_test_3");
+        _ = factory.Services; // force the lazy build, latching _built
+
+        var act = () => factory.UseDatabase("project_ceres_test_DIFFERENT");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*conflicts*");
+    }
+
     // TestWebApplicationFactory.DatabaseName is a computed property (=> InitDbName), not a
     // settable one, so a bucket collection (and this test) targets a database by overriding
     // InitDbName in a subclass rather than via an object initializer.
