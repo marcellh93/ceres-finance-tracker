@@ -1,0 +1,24 @@
+# Build outputs (rebuilt inside the image; never shadow the fresh build)
+**/bin
+**/obj
+**/node_modules
+ProjectCeres.Client/dist
+ProjectCeres/wwwroot/dist
+ProjectCeres/wwwroot/css
+
+# VCS + tooling + docs (not needed at build/runtime)
+.git
+.github
+.claude
+.superpowers
+docs
+tools
+**/*.user
+**/TestResults
+ProjectCeres.Client/e2e/.artifacts
+**/*.md
+
+# Config overlays + local secrets — only the placeholder base appsettings.json enters the image
+**/appsettings.*.json
+**/.env*
+scripts/Untitled-1.json
