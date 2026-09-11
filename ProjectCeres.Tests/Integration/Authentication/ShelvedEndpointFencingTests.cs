@@ -17,6 +17,12 @@ public class ShelvedEndpointFencingTests
     // A bare Production-environment factory. All settings required by Program.cs under
     // Production are supplied explicitly so the host builds without throwing.
     // Pattern mirrors E2eEnvironmentRegistrationTests.NonE2eFactory (Production path).
+    //
+    // Stage 12.18 — deliberately NOT a Bucket4Factory: these are GET-only 404-fencing
+    // assertions against Program.cs environment routing; they read/write no app data, so
+    // targeting the legacy DB rather than the bucket-4 clone carries no isolation risk.
+    // The legacy DB is provisioned as a backstop by setup-test-db.sh for exactly such
+    // uncollected/self-contained factories.
     private static WebApplicationFactory<Program> BuildProductionFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
