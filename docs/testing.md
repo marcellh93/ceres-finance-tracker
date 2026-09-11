@@ -30,6 +30,8 @@ If the answer is none of (1), (2), or (3), the test is not legitimately failing 
 
 A test that fails intermittently is treated as a failing test until proven otherwise. Do not add retries, do not mark `[Fact(Skip="flaky")]` silently, do not rerun until green. State that it is flaky, propose a root cause, and wait for direction.
 
+**Two narrow, CI-scoped exceptions exist, each earned by a root-cause first** — neither is a licence to retry away a red test: the Vitest one-retry for a known isolation flake (§ Definition of Done), and the Playwright CI-only single retry (§ E2E, Stage 12.17). Both keep local runs at zero retries, cap the retry at one, and surface a retried pass as a flake rather than silent-green. Adding a new retry carve-out requires the same: a documented root cause proving the failure is environmental (not a real bug), CI-only scope, and a one-retry cap.
+
 ### IMPORTANT — prohibited shortcuts
 
 Do not delete tests, do not add `[Fact(Skip="…")]`, do not comment out assertions, do not wrap failing calls in `try/catch` to silence them, and do not call `DbContext`, repositories, or services directly to set state that the feature under test was supposed to set. If a test cannot be made to pass without one of these, stop and tell the user.
@@ -155,7 +157,7 @@ Focus on critical user-facing flows that cross the full stack and are not covere
 
 **Artifacts:** traces + screenshots (retain-on-failure) + HTML report under `ProjectCeres.Client/e2e/.artifacts/`; captured emails (verify / reset / unlock links) as JSON under repo-root `.e2e/emails/`.
 
-**`retries: 0`** — a flake is a failure until root-caused (per § Flaky tests).
+**`retries: process.env.CI ? 1 : 0`** (Stage 12.17) — local runs keep zero retries (a flake is a failure until root-caused, per § Flaky tests); CI gets exactly one. The `ubuntu-latest` runner is CPU-starved relative to a dev machine, and the slowest browser (webkit) can slip a single sub-timeout on an otherwise-correct test — a 60s webkit `locator.click` timeout on the support-page reply test was root-caused to CI load, not a race (the Send button mounts only after the thread load resolves and takes no async disable gate, so the click has no node-swap to lose). Playwright reports a retried pass as `flaky`, not silent-green, so a degrading test stays visible and a genuinely broken one still fails both attempts.
 
 **When it runs:** on demand + at auth-touching stage close-outs. Nothing runs it automatically yet — the Stop hook is tier-0 for `.ts`-only writes and the DoD tiers don't invoke Playwright; CI wiring lands in Stage 16.16.
 

@@ -5,8 +5,16 @@ const APP_URL = process.env.E2E_APP_URL ?? 'https://localhost:7299'
 export default defineConfig({
   testDir: './auth',
   testMatch: /.*\.spec\.ts$/,
-  // A flake is a failure until root-caused (docs/testing.md § Flaky tests).
-  retries: 0,
+  // Locally a flake is a failure until root-caused (docs/testing.md § Flaky tests).
+  // On CI ONLY, allow exactly one retry (Stage 12.17): the ubuntu-latest runner is
+  // CPU-starved relative to a dev machine, and the slowest browser (webkit) can slip a
+  // single sub-timeout on an otherwise-correct test — a 60s webkit `locator.click`
+  // timeout on the support-page reply test was root-caused to CI load, not a race
+  // (the Send button mounts only after the thread load and takes no async disable gate).
+  // Playwright reports a retried pass as `flaky`, NOT silent-green, so a degrading test
+  // stays visible; a genuinely broken test still fails both attempts → red. Mirrors the
+  // Vitest one-retry carve-out in docs/testing.md § Definition of Done.
+  retries: process.env.CI ? 1 : 0,
   // Deterministic email-sink polling + a single shared loopback rate-limit partition.
   // Parallelism / sharding is Stage 16.16's job.
   workers: 1,

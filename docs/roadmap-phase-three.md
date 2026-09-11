@@ -1686,13 +1686,15 @@ troubleshooting captured in `docs/runbooks/ci-actions-troubleshooting.md`.
 
 ---
 
-## Stage 12.17 — E2E webkit flake policy on CI
+## Stage 12.17 — E2E webkit flake policy on CI ✅ Done (2026-09-11)
 
-**Status: ❌ Open.** Surfaced 2026-09-10: a `support-page … keeps-the-ticket-Open` test timed out on `locator.click` (60s) on the **webkit** shard only; chromium + firefox passed the same test, and a re-run of the webkit shard passed. A CI-load timing flake on the flakiest browser, unrelated to the change that surfaced it (an `.editorconfig` edit).
+**Status: ✅ Done (2026-09-11).** Surfaced 2026-09-10: a `support-page … keeps-the-ticket-Open` test timed out on `locator.click` (60s) on the **webkit** shard only; chromium + firefox passed the same test, and a re-run of the webkit shard passed. A CI-load timing flake on the flakiest browser, unrelated to the change that surfaced it (an `.editorconfig` edit).
 
-`e2e/playwright.golden.config.ts` sets `retries: 0` with a deliberate comment — "A flake is a failure until root-caused (docs/testing.md § Flaky tests)." That policy is right for local runs, but a clean CI runner is CPU-starved relative to a dev machine, and a single sub-timeout slip should not fail a 25-test shard. This mirrors the client-test flake already fixed at the Vitest runner level (§12.13, `retry` with a timeout-only condition).
+**Root cause confirmed before adopting a retry (the prerequisite).** Traced the reply flow: `ReplyComposer`'s "Send reply" button mounts only after the thread `GET` resolves (a skeleton shows before that), takes no async `disabled` gate from `SupportThreadSheet`, and its `canSend` flips synchronously on the textarea `fill()`. There is no post-mount async gate on the click target and no node-swap race. So the webkit 60s timeout is genuine CI CPU-contention on the slowest browser, **not** a race in the ticket-Open flow — a retry here absorbs a timing slip without papering over a bug.
 
-- [ ] Decide the CI-only retry policy for Playwright (e.g. `retries: process.env.CI ? 1 : 0` in the golden config, keeping local `retries: 0`), reconciled with `docs/testing.md § Flaky tests`. If a retry is adopted, keep it CI-scoped and note it in the testing doc so a retried pass is still visible as a flake, not silently green. Before shipping a blanket retry, confirm this specific `support-page` test has no real root cause (a genuine race in the ticket-Open flow) — a retry must not paper over a real bug.
+**Decision:** `e2e/playwright.golden.config.ts` now sets `retries: process.env.CI ? 1 : 0` — CI gets exactly one retry, local stays `0` (a flake is still a failure until root-caused). Playwright reports a retried pass as `flaky`, not silent-green, so a degrading test stays visible and a genuinely broken one still fails both attempts. Reconciled with `docs/testing.md § Flaky tests` (a new CI-only carve-out, capped at one retry, mirroring the Vitest precedent) and the § E2E note.
+
+- [x] Decided + shipped the CI-only Playwright retry (`retries: process.env.CI ? 1 : 0`), root-caused the specific `support-page` flake as environmental (no ticket-Open race), and documented the carve-out in `docs/testing.md` so a retried pass is surfaced as a flake, not silently green. Config verified to parse in both branches (`CI` set → 1, unset → 0).
 
 ## Stage 12.18 — Parallelize the integration test suite (DB-per-bucket) ✅ Done (2026-09-11)
 

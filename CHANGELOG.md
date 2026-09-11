@@ -273,6 +273,9 @@
 **Tests (Stage 12.12 — fresh-clone / CI test isolation, 2026-09-08)**
 - The integration test suite no longer depends on a developer's personal user-secrets file: the test fixture supplies its own token-lookup secret, so a fresh clone and any CI runner can run the suite. A missing secret now fails with a named error that points at the fix instead of a bare base64 error deep inside an unrelated auth test.
 
+**Tests (Stage 12.17 — E2E webkit CI flake, 2026-09-11)**
+- Playwright E2E now retries once on CI only (`retries: process.env.CI ? 1 : 0`); local runs stay at zero. A CPU-starved CI runner can slip a single sub-timeout on the slowest browser (webkit) — root-caused to CI load, not a race — and one retry absorbs that without hiding a real failure (a retried pass is reported as `flaky`, a genuinely broken test still fails both attempts).
+
 **Tooling (Stage 12.11 — dev server stale SPA shell, 2026-09-07)**
 - The integration-test host runs as its own `Testing` environment rather than sharing `Development` with real developers, so `dotnet run` / `dotnet watch` with Vite listening no longer risks serving a stale built bundle to a developer while the test host takes the correct static-fallback path.
 
