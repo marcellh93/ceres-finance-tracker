@@ -11,11 +11,11 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class BackupCodeLockoutBypassTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class BackupCodeLockoutBypassTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
 
-    public BackupCodeLockoutBypassTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public BackupCodeLockoutBypassTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

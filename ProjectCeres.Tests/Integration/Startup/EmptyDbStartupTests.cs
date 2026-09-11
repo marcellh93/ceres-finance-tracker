@@ -9,16 +9,16 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Startup;
 
 [Collection("IntegrationParallel1")]
-public class EmptyDbStartupTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmptyDbStartupTests : IntegrationTestBase<Bucket1AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket1AuthFactory _factory;
 
     // Backed-up state we restore after the test so we don't break other tests in the
     // collection that rely on the seeded reference rows being present.
     private readonly List<Account>  _backedUpAccounts  = new();
     private readonly List<Settings> _backedUpSettings  = new();
 
-    public EmptyDbStartupTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public EmptyDbStartupTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public async Task InitializeAsync()
     {
@@ -77,7 +77,7 @@ public class EmptyDbStartupTests : IntegrationTestBase<AuthTestWebApplicationFac
         //
         // What this test does NOT catch: a true boot-time IHostedService that
         // queries user-owned tables and crashes at StartAsync. The
-        // AuthTestWebApplicationFactory is registered as a collection fixture in
+        // Bucket1AuthFactory is registered as a collection fixture in
         // WafCollection.cs — the host boots ONCE when the first test in the
         // collection resolves the factory, with whatever seed data was present at
         // that moment. By the time InitializeAsync wipes the tables, StartAsync

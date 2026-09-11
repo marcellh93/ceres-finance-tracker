@@ -17,11 +17,11 @@ namespace ProjectCeres.Tests.Integration;
 /// run, so the test just exercises the SQL contract against rows we control.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class BackfillIdentityNormalizedToLowercaseTests : IntegrationTestBase<TestWebApplicationFactory>
+public class BackfillIdentityNormalizedToLowercaseTests : IntegrationTestBase<Bucket4Factory>
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket4Factory _factory;
 
-    public BackfillIdentityNormalizedToLowercaseTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
+    public BackfillIdentityNormalizedToLowercaseTests(Bucket4Factory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
     }

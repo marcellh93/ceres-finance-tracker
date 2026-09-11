@@ -12,11 +12,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class UserBlockedIpTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class UserBlockedIpTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
 
-    public UserBlockedIpTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public UserBlockedIpTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

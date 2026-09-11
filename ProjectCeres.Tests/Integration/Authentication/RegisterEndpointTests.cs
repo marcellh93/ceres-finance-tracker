@@ -9,12 +9,12 @@ using ProjectCeres.Tests.Common;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class RegisterEndpointTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class RegisterEndpointTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
     private readonly HttpClient _client;
 
-    public RegisterEndpointTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
+    public RegisterEndpointTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

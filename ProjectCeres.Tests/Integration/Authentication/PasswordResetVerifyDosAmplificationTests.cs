@@ -17,14 +17,14 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// seeds 200 dummy rows and asserts the confirm call still returns in under one second.
 /// </summary>
 [Collection("IntegrationParallel2")]
-public class PasswordResetVerifyDosAmplificationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
+public class PasswordResetVerifyDosAmplificationTests : IntegrationTestBase<Bucket2AuthFactory>
 {
     private const int DummyRowCount = 200;
     private const string MarkerEmail = "dos-amp-pwreset@example.com";
 
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
 
-    public PasswordResetVerifyDosAmplificationTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => 
+    public PasswordResetVerifyDosAmplificationTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => 
         _factory = factory;
 
     [Fact]
@@ -53,7 +53,7 @@ public class PasswordResetVerifyDosAmplificationTests : IntegrationTestBase<Auth
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // Marker user so the dummy rows are scoped to one identifiable user; cleanup
-        // happens at the AuthTestWebApplicationFactory level via test-DB lifecycle.
+        // happens at the Bucket2AuthFactory level via test-DB lifecycle.
         var user = db.Users.FirstOrDefault(u => u.Email == MarkerEmail);
         if (user is null)
         {

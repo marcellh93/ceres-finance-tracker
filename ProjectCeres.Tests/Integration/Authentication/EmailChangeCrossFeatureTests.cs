@@ -14,11 +14,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel4")]
-public class EmailChangeCrossFeatureTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
+public class EmailChangeCrossFeatureTests : IntegrationTestBase<Bucket4AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public EmailChangeCrossFeatureTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public EmailChangeCrossFeatureTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -83,7 +83,7 @@ public class EmailChangeCrossFeatureTests : IntegrationTestBase<AuthTestWebAppli
     }
 
     private static async Task<HttpResponseMessage> PostConfirmAsync(
-        WebApplicationFactory<Program> factory, AuthTestWebApplicationFactory baseFactory, string token)
+        WebApplicationFactory<Program> factory, Bucket4AuthFactory baseFactory, string token)
     {
         var (csrf, header) = AuthTestFixture.MintCsrf(baseFactory);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
@@ -97,7 +97,7 @@ public class EmailChangeCrossFeatureTests : IntegrationTestBase<AuthTestWebAppli
     }
 
     private static async Task<HttpResponseMessage> PostRevokeAsync(
-        WebApplicationFactory<Program> factory, AuthTestWebApplicationFactory baseFactory, string token)
+        WebApplicationFactory<Program> factory, Bucket4AuthFactory baseFactory, string token)
     {
         var (csrf, header) = AuthTestFixture.MintCsrf(baseFactory);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });

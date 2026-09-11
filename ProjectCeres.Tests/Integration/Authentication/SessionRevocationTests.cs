@@ -12,11 +12,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel4")]
-public class SessionRevocationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class SessionRevocationTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public SessionRevocationTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public SessionRevocationTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

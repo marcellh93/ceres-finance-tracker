@@ -13,15 +13,15 @@ using Xunit;
 namespace ProjectCeres.Tests.Integration.Email;
 
 [Collection("IntegrationParallel2")]
-public sealed class ResendWebhookTests : IntegrationTestBase<AuthTestWebApplicationFactory>
+public sealed class ResendWebhookTests : IntegrationTestBase<Bucket2AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
     // Svix signing secrets are "whsec_" + base64(32-byte key). This is a deterministic
     // base64-encoded test key — DO NOT introduce non-base64 characters here; both the
     // verifier and this test's helper base64-decode the suffix.
     private const string TestWebhookSecret = "whsec_MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
-    public ResendWebhookTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public ResendWebhookTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     [Fact]
     public async Task Rejects_bad_signature_with_401()

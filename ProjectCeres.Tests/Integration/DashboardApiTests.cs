@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace ProjectCeres.Tests.Integration;
 
 [Collection("IntegrationParallel4")]
-public class DashboardApiTests(TestWebApplicationFactory factory)
-    : IClassFixture<TestWebApplicationFactory>
+public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
+    : IntegrationTestBase<Bucket4Factory>(factory, bucketDb)
 {
     private readonly HttpClient _client = factory.CreateClient();
 

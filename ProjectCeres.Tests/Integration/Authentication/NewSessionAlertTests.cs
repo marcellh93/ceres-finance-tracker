@@ -23,11 +23,11 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// "" known (no alert), and no prior at all is the first-login suppression case (no alert).
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class NewSessionAlertTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class NewSessionAlertTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public NewSessionAlertTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public NewSessionAlertTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

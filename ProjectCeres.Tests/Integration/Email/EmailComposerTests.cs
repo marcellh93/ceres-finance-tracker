@@ -8,11 +8,11 @@ using Xunit;
 namespace ProjectCeres.Tests.Integration.Email;
 
 [Collection("IntegrationParallel3")]
-public sealed class EmailComposerTests : IntegrationTestBase<AuthTestWebApplicationFactory>
+public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
 
-    public EmailComposerTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public EmailComposerTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     [Theory]
     [InlineData(EmailTemplateKey.PasswordResetRequest, "en")]

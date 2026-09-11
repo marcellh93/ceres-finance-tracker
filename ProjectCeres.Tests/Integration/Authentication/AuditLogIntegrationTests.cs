@@ -17,13 +17,13 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel4")]
-public class AuditLogIntegrationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class AuditLogIntegrationTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
     private const string EmailDomain = "@audit-test.local";
 
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public AuditLogIntegrationTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public AuditLogIntegrationTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -600,6 +600,12 @@ public class AuditLogIntegrationTests : IntegrationTestBase<AuthTestWebApplicati
 /// </summary>
 public sealed class ThrowingAuditLogWriterFactory : AuthTestWebApplicationFactory
 {
+    // Ad-hoc factory (constructed directly by the test, not a bucket collection fixture),
+    // so it pins its own database to the IntegrationParallel4 bucket rather than going
+    // through IntegrationTestBase. Matches the collection this test class lives in.
+    protected override string InitDbName =>
+        TestDatabaseRouter.DatabaseForCollection("IntegrationParallel4");
+
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);

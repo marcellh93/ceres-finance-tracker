@@ -49,10 +49,10 @@ public class LoginCrossFeatureTests : IAsyncLifetime
 }
 
 [Collection("IntegrationParallel3")]
-public class LoginCrossFeatureRegressionTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class LoginCrossFeatureRegressionTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
-    public LoginCrossFeatureRegressionTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    private readonly Bucket3AuthFactory _factory;
+    public LoginCrossFeatureRegressionTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

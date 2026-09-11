@@ -40,6 +40,20 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     private string? _overrideDb;
     private bool _built;
 
+    // Stage 12.18 (final-review fix) — guards the _built/_overrideDb transition. xUnit
+    // 2.5.3 parallelizes test CLASSES within one collection, not just collections against
+    // each other (DisableParallelization=false is the default, and none of the bucket
+    // collections opt out) — so multiple classes sharing one bucket's TestWebApplicationFactory
+    // construct concurrently on different threads. Without this lock, one thread's
+    // UseDatabase(...) could interleave with a second thread's factory.CreateClient() (which
+    // triggers the lazy host build via ConfigureWebHost): the build could latch _built=true
+    // against the still-unpinned InitDbName a heartbeat before the first thread's UseDatabase
+    // call runs, making that call see "already built targeting the legacy DB" and throw.
+    // Reproduced 2026-09-11: ApiInfrastructureTests/DbContextRegistrationTests/ImportApiTests/
+    // SettingsApiTests (all IntegrationParallel3) failed at the identical timestamp with that
+    // exact conflict — a same-collection race, not a per-class bug.
+    private readonly object _dbPinLock = new();
+
     public string DatabaseName => _overrideDb ?? InitDbName;
 
     /// <summary>
@@ -49,20 +63,24 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     /// lazy build starts. Idempotent for the same DB: a bucket's collection-shared factory
     /// is pinned once by whichever test class builds it first; every other class in that
     /// bucket calls UseDatabase with that same DB afterward — a no-op, not an error. Only a
-    /// genuinely conflicting DB after build throws.
+    /// genuinely conflicting DB after build throws. Thread-safe: shares _dbPinLock with the
+    /// _built latch in ConfigureWebHost so a concurrent lazy-build cannot interleave.
     /// </summary>
     public void UseDatabase(string db)
     {
-        if (_built)
+        lock (_dbPinLock)
         {
-            var current = _overrideDb ?? InitDbName;
-            if (current == db) return;
-            throw new InvalidOperationException(
-                $"UseDatabase(\"{db}\") conflicts: factory already built targeting \"{current}\". " +
-                "A bucket's classes must all request the same database.");
-        }
+            if (_built)
+            {
+                var current = _overrideDb ?? InitDbName;
+                if (current == db) return;
+                throw new InvalidOperationException(
+                    $"UseDatabase(\"{db}\") conflicts: factory already built targeting \"{current}\". " +
+                    "A bucket's classes must all request the same database.");
+            }
 
-        _overrideDb = db;
+            _overrideDb = db;
+        }
     }
 
     // Stage 7.5 / ADR-0068 — three role-scoped connection strings, routed through
@@ -113,7 +131,14 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         // Latch build-started so UseDatabase throws instead of silently no-op'ing once
         // the host is under construction (WebApplicationFactory builds lazily on first
         // Services/CreateClient() access; ConfigureWebHost is the earliest hook of that build).
-        _built = true;
+        // Shares _dbPinLock with UseDatabase: the framework's own internal build-once lock
+        // is a DIFFERENT object, so without also taking _dbPinLock here, a concurrent
+        // UseDatabase(...) call on another thread could still interleave between this line
+        // and that call's own lock acquisition, latching _built against an unpinned
+        // InitDbName a heartbeat before the pin lands. Taking the same lock here makes the
+        // two operations mutually exclusive regardless of which thread the framework picks
+        // to actually run this method.
+        lock (_dbPinLock) { _built = true; }
 
         // Stage 12.11 — run the integration-test host as "Testing", not the default
         // Development. The dev SPA-shell bug was unfixable while IsDevelopment() meant

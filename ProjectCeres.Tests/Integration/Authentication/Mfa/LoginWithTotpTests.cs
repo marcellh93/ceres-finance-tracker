@@ -13,11 +13,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
 [Collection("IntegrationParallel2")]
-public class LoginWithTotpTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class LoginWithTotpTests : IntegrationTestBase<Bucket2AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
 
-    public LoginWithTotpTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public LoginWithTotpTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

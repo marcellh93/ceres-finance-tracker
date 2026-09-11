@@ -19,12 +19,12 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// with a genuine authenticated session, which is where the SPA's 400 came from.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class SpaCsrfContractTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class SpaCsrfContractTests : IntegrationTestBase<Bucket1AuthFactory>, IAsyncLifetime
 {
     private const string EmailSuffix = "@spa-csrf-test.local";
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket1AuthFactory _factory;
 
-    public SpaCsrfContractTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public SpaCsrfContractTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

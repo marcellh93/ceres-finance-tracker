@@ -13,11 +13,11 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class CsrfTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class CsrfTests : IntegrationTestBase<Bucket2AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
 
-    public CsrfTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public CsrfTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

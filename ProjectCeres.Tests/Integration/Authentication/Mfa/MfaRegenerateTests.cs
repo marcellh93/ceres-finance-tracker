@@ -14,10 +14,10 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
 [Collection("IntegrationParallel4")]
-public class MfaRegenerateTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class MfaRegenerateTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
-    public MfaRegenerateTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    private readonly Bucket4AuthFactory _factory;
+    public MfaRegenerateTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

@@ -25,8 +25,15 @@ namespace ProjectCeres.Tests.Integration;
 /// ("RateLimitTests") so the in-memory partition state does not leak across test
 /// classes that share IntegrationTests.
 /// </summary>
-public sealed class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplicationFactory
+public class RateLimitedAuthTestWebApplicationFactory : AuthTestWebApplicationFactory
 {
+    // Stage 12.18 — pin every user of this factory (IClassFixture in the RateLimitTests
+    // collection, plus MfaRateLimitTestsCollection below) to the RateLimitTests DB. Neither
+    // collection routes through IntegrationTestBase (both are DisableParallelization=true,
+    // ad-hoc-factory collections, not bucketed), so without this override the factory falls
+    // back to TestWebApplicationFactory.InitDbName (the legacy DB) instead of its own clone.
+    protected override string InitDbName => TestDatabaseRouter.DatabaseForCollection("RateLimitTests");
+
     // No test-window compression: each test that needs a fresh limiter state
     // builds a derived inner host via WithFreshRateLimiter() below, which gives
     // an empty middleware partition without sleeping. The window stays at production
@@ -386,6 +393,18 @@ public class RateLimitTestsCollection
 { }
 
 /// <summary>
+/// Stage 12.18 — MfaRateLimitTests needs its own DATABASE (project_ceres_test_mfaratelimit,
+/// per TestDatabaseRouter), not just its own in-process partition state. A same-typed
+/// ICollectionFixture&lt;RateLimitedAuthTestWebApplicationFactory&gt; here would collapse
+/// onto that base type's InitDbName override (the RateLimitTests DB) and defeat the
+/// separation MfaRateLimitTestsCollection exists for — hence this distinct subclass.
+/// </summary>
+public sealed class MfaRateLimitedAuthTestWebApplicationFactory : RateLimitedAuthTestWebApplicationFactory
+{
+    protected override string InitDbName => TestDatabaseRouter.DatabaseForCollection("MfaRateLimitTests");
+}
+
+/// <summary>
 /// Separate collection for MFA-specific rate-limit tests. Uses its own
 /// RateLimitedAuthTestWebApplicationFactory instance so the in-process login/TOTP
 /// partition state from RateLimitedAuthEndpointTests does not bleed into
@@ -393,5 +412,5 @@ public class RateLimitTestsCollection
 /// </summary>
 [CollectionDefinition("MfaRateLimitTests", DisableParallelization = true)]
 public class MfaRateLimitTestsCollection
-    : ICollectionFixture<RateLimitedAuthTestWebApplicationFactory>
+    : ICollectionFixture<MfaRateLimitedAuthTestWebApplicationFactory>
 { }

@@ -12,10 +12,10 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel4")]
-public class MfaPendingCookieTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class MfaPendingCookieTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
-    public MfaPendingCookieTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    private readonly Bucket4AuthFactory _factory;
+    public MfaPendingCookieTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

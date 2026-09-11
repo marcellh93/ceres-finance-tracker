@@ -11,11 +11,11 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class FailedLoginRecorderTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class FailedLoginRecorderTests : IntegrationTestBase<Bucket2AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
 
-    public FailedLoginRecorderTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public FailedLoginRecorderTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -398,6 +398,12 @@ public class FailedLoginRecorderTests : IntegrationTestBase<AuthTestWebApplicati
 /// </summary>
 public sealed class ThrowingRecorderFactory : AuthTestWebApplicationFactory
 {
+    // Ad-hoc factory (constructed directly by the test, not a bucket collection fixture),
+    // so it pins its own database to the IntegrationParallel2 bucket rather than going
+    // through IntegrationTestBase. Matches the collection this test class lives in.
+    protected override string InitDbName =>
+        TestDatabaseRouter.DatabaseForCollection("IntegrationParallel2");
+
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);

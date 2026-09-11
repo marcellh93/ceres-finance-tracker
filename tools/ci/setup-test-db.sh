@@ -107,7 +107,15 @@ if [[ "${1:-}" == "--template" ]]; then
     clone_from_template "project_ceres_test_${s}" "$TEMPLATE"
   done
 
-  log "done: template + ${clones} bucket DBs + ${#SERIAL_DB_SUFFIXES[@]} serial DBs provisioned"
+  # 5. Backstop: provision the legacy shared DB too. A handful of test classes have no
+  #    [Collection] and build ad-hoc factories (ArchitectureTests, EmailChangeCancelTests,
+  #    PreAuthWritesUnderRlsTests) — they fall through TestDatabaseRouter straight to
+  #    LegacyDatabase regardless of CloneCount. They're serial/uncollected, so they don't
+  #    race the bucket DBs; they just need project_ceres_test to actually EXIST in a clean
+  #    --template run, which a stale local dev DB was previously masking.
+  provision_one "project_ceres_test"
+
+  log "done: template + ${clones} bucket DBs + ${#SERIAL_DB_SUFFIXES[@]} serial DBs + legacy DB provisioned"
 else
   # Legacy single-DB mode (E2E uses this: setup-test-db.sh project_ceres_e2e).
   provision_one "${1:?usage: setup-test-db.sh <db-name>  |  setup-test-db.sh --template --clones N}"

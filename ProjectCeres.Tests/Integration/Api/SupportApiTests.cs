@@ -17,17 +17,17 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// answer 404, never 403, so the response cannot be used to probe which ids exist.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class SupportApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class SupportApiTests : IntegrationTestBase<Bucket1Factory>, IAsyncLifetime
 {
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid OtherUser = new("00000000-0000-0000-0000-0000000000fe");
 
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket1Factory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededTicketIds = [];
     private readonly List<Guid> _foreignTicketIds = [];
 
-    public SupportApiTests(TestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb)
+    public SupportApiTests(Bucket1Factory factory, Bucket1Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

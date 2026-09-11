@@ -14,11 +14,11 @@ namespace ProjectCeres.Tests.Integration;
 /// not behaviour tests of EF or the interceptor itself.
 /// </summary>
 [Collection("IntegrationParallel3")]
-public class DbContextRegistrationTests : IntegrationTestBase<TestWebApplicationFactory>
+public class DbContextRegistrationTests : IntegrationTestBase<Bucket3Factory>
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket3Factory _factory;
 
-    public DbContextRegistrationTests(TestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
+    public DbContextRegistrationTests(Bucket3Factory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
     }

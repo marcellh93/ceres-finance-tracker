@@ -11,11 +11,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
 [Collection("IntegrationParallel4")]
-public class MfaEnrollmentTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class MfaEnrollmentTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public MfaEnrollmentTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public MfaEnrollmentTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

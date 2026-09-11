@@ -11,17 +11,17 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel3")]
-public class RecurringTransactionsCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class RecurringTransactionsCrudApiTests : IntegrationTestBase<Bucket3Factory>, IAsyncLifetime
 {
     private static readonly Guid CheckingAccountId = new("10000000-0000-0000-0000-000000000002");
     private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
 
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket3Factory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _createdIds = [];
     private readonly List<Guid> _createdTransactionIds = [];
 
-    public RecurringTransactionsCrudApiTests(TestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
+    public RecurringTransactionsCrudApiTests(Bucket3Factory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

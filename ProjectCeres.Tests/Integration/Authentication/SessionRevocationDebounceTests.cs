@@ -10,10 +10,10 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class SessionRevocationDebounceTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class SessionRevocationDebounceTests : IntegrationTestBase<Bucket2AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
-    public SessionRevocationDebounceTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    private readonly Bucket2AuthFactory _factory;
+    public SessionRevocationDebounceTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

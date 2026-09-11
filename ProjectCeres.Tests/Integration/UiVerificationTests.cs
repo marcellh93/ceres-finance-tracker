@@ -28,13 +28,13 @@ namespace ProjectCeres.Tests.Integration;
 ///   CurrencyId    1 = EUR
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class UiVerificationTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class UiVerificationTests : IntegrationTestBase<Bucket4Factory>, IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket4Factory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededAccountIds = [];
 
-    public UiVerificationTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
+    public UiVerificationTests(Bucket4Factory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = _factory.CreateClient(

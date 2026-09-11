@@ -26,7 +26,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// "intruder UserId" with another authenticated user and the same shape holds.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class IntruderIsolationTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class IntruderIsolationTests : IntegrationTestBase<Bucket4Factory>, IAsyncLifetime
 {
     private static readonly Guid Sentinel              = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CashAccountId         = new("10000000-0000-0000-0000-000000000001");
@@ -35,7 +35,7 @@ public class IntruderIsolationTests : IntegrationTestBase<TestWebApplicationFact
     private static readonly Guid HousingCategoryId     = new("20000000-0000-0000-0000-000000000008");
     private static readonly Guid SalaryCategoryId      = new("20000000-0000-0000-0000-000000000002");
 
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket4Factory _factory;
     private readonly HttpClient _client;
     private readonly Guid _intruderUserId = Guid.NewGuid();
     private readonly List<Guid> _intruderAccountIds            = [];
@@ -47,7 +47,7 @@ public class IntruderIsolationTests : IntegrationTestBase<TestWebApplicationFact
     private readonly List<Guid> _intruderCategoryBudgetIds     = [];
     private readonly List<Guid> _intruderRecurringIds          = [];
 
-    public IntruderIsolationTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
+    public IntruderIsolationTests(Bucket4Factory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

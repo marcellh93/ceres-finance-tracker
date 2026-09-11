@@ -16,12 +16,12 @@ namespace ProjectCeres.Tests.Integration;
 /// every test run. 57,267 orphaned rows had accumulated in the shared test database.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class UserOwnedCleanupTests : IntegrationTestBase<AuthTestWebApplicationFactory>
+public class UserOwnedCleanupTests : IntegrationTestBase<Bucket1AuthFactory>
 {
     private const string EmailSuffix = "@cleanup-test.local";
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket1AuthFactory _factory;
 
-    public UserOwnedCleanupTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public UserOwnedCleanupTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     /// <summary>
     /// The regression itself: registering seeds categories, and deleting the user

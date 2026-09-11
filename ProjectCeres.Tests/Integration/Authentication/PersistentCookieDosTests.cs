@@ -11,10 +11,10 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel1")]
-public class PersistentCookieDosTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class PersistentCookieDosTests : IntegrationTestBase<Bucket1AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
-    public PersistentCookieDosTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    private readonly Bucket1AuthFactory _factory;
+    public PersistentCookieDosTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

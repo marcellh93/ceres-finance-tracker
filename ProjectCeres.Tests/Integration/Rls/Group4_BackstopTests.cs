@@ -96,7 +96,7 @@ public class Group4_BackstopTests
             // connection without DISCARD ALL, the GUC would still hold user A's value and
             // we'd see A's rows. With DISCARD ALL the GUC is reset to empty string; the
             // policy's NULLIF collapses that to NULL; the count is 0.
-            await using var connB = new NpgsqlConnection(TestDbFixture.AppConnectionString);
+            await using var connB = new NpgsqlConnection(RlsTestFixture.AppConnectionString);
             await connB.OpenAsync();
             await using var cmdB = connB.CreateCommand();
             cmdB.CommandText = "SELECT COUNT(*) FROM \"Accounts\"";
@@ -133,7 +133,7 @@ public class Group4_BackstopTests
     {
         var accessor = new FakeCurrentUserAccessor(userId);
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(TestDbFixture.AppConnectionString)
+            .UseNpgsql(RlsTestFixture.AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(accessor))
             .AddInterceptors(interceptor)
             .Options;

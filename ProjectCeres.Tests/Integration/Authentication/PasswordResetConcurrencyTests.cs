@@ -11,11 +11,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class PasswordResetConcurrencyTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
+public class PasswordResetConcurrencyTests : IntegrationTestBase<Bucket3AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
 
-    public PasswordResetConcurrencyTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public PasswordResetConcurrencyTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;

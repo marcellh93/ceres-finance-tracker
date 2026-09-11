@@ -21,8 +21,8 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 [Collection("MfaRateLimitTests")]
 public class MfaRegenerateRateLimitTests : IAsyncLifetime
 {
-    private readonly RateLimitedAuthTestWebApplicationFactory _factory;
-    public MfaRegenerateRateLimitTests(RateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
+    private readonly MfaRateLimitedAuthTestWebApplicationFactory _factory;
+    public MfaRegenerateRateLimitTests(MfaRateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

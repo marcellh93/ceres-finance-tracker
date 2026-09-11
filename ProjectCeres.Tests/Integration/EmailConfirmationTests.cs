@@ -23,15 +23,15 @@ namespace ProjectCeres.Tests.Integration;
 /// Stage 9.3 — pins the contract of the Register → email-confirmation token →
 /// /api/auth/email/verify pipeline + the /api/auth/email/verify/resend re-issue
 /// endpoint + the Login EMAIL_NOT_CONFIRMED branch. Mirrors PasswordReset* tests
-/// in shape: AuthTestWebApplicationFactory, strict-mock IEmailService, per-test
+/// in shape: Bucket4AuthFactory, strict-mock IEmailService, per-test
 /// GUID-suffixed emails, IgnoreQueryFilters on the user-owned token table.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class EmailConfirmationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmailConfirmationTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public EmailConfirmationTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public EmailConfirmationTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     // WAF tests don't go through TestDbFixture's migrate hook; if this class runs
     // before any TestDbFixture-based class in the IntegrationTests collection, the
@@ -453,7 +453,7 @@ public class EmailConfirmationTests : IntegrationTestBase<AuthTestWebApplication
     {
         // Service-side per-email gate is MemoryCache-backed (5/hour/email). The
         // middleware EmailByUser policy + GlobalLimiter [ApplyEmailIpRateLimit] are
-        // no-op'd in the base TestWebApplicationFactory, so this test isolates the
+        // no-op'd in the base Bucket4Factory, so this test isolates the
         // service-side gate. Fresh IMemoryCache so the bucket starts empty regardless
         // of prior tests sharing the factory.
         var (mock, _) = CapturingEmailMock();

@@ -12,11 +12,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel1")]
-public class PasswordResetConfirmMfaTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
+public class PasswordResetConfirmMfaTests : IntegrationTestBase<Bucket1AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket1AuthFactory _factory;
 
-    public PasswordResetConfirmMfaTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public PasswordResetConfirmMfaTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -39,11 +39,11 @@ public class PasswordResetConfirmMfaTests : IntegrationTestBase<AuthTestWebAppli
     /// (email, token, seed) so tests can compute TOTP codes for the confirm step.
     /// </summary>
     private async Task<(string email, string token, string seed)> SetupMfaUserAndRequestResetAsync(
-        AuthTestWebApplicationFactory factory, HttpClient client, List<EmailMessage> captured)
+        Bucket1AuthFactory factory, HttpClient client, List<EmailMessage> captured)
     {
         var email = $"mfa-reset-{Guid.NewGuid():N}@example.com";
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
-        // EnrollUserMfaAsync requires AuthTestWebApplicationFactory; use _factory directly
+        // EnrollUserMfaAsync requires Bucket1AuthFactory; use _factory directly
         // (derived factories share the same underlying DB, so enrollment is visible to all).
         var seed = await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
 

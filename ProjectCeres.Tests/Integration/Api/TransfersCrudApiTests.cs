@@ -10,14 +10,14 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class TransfersCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class TransfersCrudApiTests : IntegrationTestBase<Bucket2Factory>, IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket2Factory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededTransferIds = [];
     private readonly List<Guid> _seededAccountIds = [];
 
-    public TransfersCrudApiTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
+    public TransfersCrudApiTests(Bucket2Factory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

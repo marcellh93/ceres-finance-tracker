@@ -37,7 +37,7 @@ public class RlsParityMetaTests
         try
         {
             var act = async () => await RlsParityStartupCheck
-                .EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(admin.Model, TestDbFixture.AppConnectionString);
+                .EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(admin.Model, RlsTestFixture.AppConnectionString);
 
             await act.Should().ThrowAsync<InvalidOperationException>()
                 .WithMessage("*refusing to start*Accounts*");
@@ -52,7 +52,7 @@ public class RlsParityMetaTests
     // is DDL and Postgres requires ownership — ceres_admin's BYPASSRLS is not enough.
     private static async Task SetForceRlsAsync(string table, bool force)
     {
-        await using var conn = new NpgsqlConnection(TestDbFixture.MigratorConnectionString);
+        await using var conn = new NpgsqlConnection(RlsTestFixture.MigratorConnectionString);
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = $"ALTER TABLE \"{table}\" {(force ? "FORCE" : "NO FORCE")} ROW LEVEL SECURITY;";
@@ -68,7 +68,7 @@ public class RlsParityMetaTests
         await using var admin = _fixture.CreateAdminContext();
 
         var act = async () => await RlsParityStartupCheck
-            .EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(admin.Model, TestDbFixture.AppConnectionString);
+            .EnsureAppliedUserOwnedTablesAreRlsProtectedAsync(admin.Model, RlsTestFixture.AppConnectionString);
 
         await act.Should().NotThrowAsync();
     }

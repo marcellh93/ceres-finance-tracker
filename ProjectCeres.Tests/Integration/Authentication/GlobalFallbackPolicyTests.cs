@@ -5,11 +5,11 @@ using FluentAssertions;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class GlobalFallbackPolicyTests : IntegrationTestBase<AuthTestWebApplicationFactory>
+public class GlobalFallbackPolicyTests : IntegrationTestBase<Bucket2AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
 
-    public GlobalFallbackPolicyTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public GlobalFallbackPolicyTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     [Fact]
     public async Task Anonymous_GET_to_authed_endpoint_returns_401()

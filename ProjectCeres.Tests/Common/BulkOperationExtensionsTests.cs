@@ -11,12 +11,18 @@ namespace ProjectCeres.Tests.Common;
 /// Stage 7.6.3 — unit tests for <see cref="BulkOperationExtensions"/>. Wraps
 /// <c>ExecuteUpdateAsync</c> / <c>ExecuteDeleteAsync</c> with row-count enforcement so a
 /// future "GUC didn't get set" bug fails loud instead of silently returning 0 rows. Tests
-/// exercise the helper against <c>project_ceres_test</c> via <see cref="TestDbFixture"/>;
-/// per <c>feedback_filter_test_queries_by_test_data</c> every query is filtered by a
-/// per-test GUID-suffixed account name to avoid order-dependent reads in the shared
-/// IntegrationTests xUnit collection.
+/// exercise the helper via <see cref="TestDbFixture"/>; per
+/// <c>feedback_filter_test_queries_by_test_data</c> every query is filtered by a per-test
+/// GUID-suffixed account name to avoid order-dependent reads in the shared DB.
+///
+/// Stage 12.18 — lives in the <c>TestDbFixtureTests</c> serial collection, not a parallel
+/// bucket: <see cref="TestDbFixture"/> connects to the TestDbFixtureTests DB
+/// (<c>project_ceres_test_txfixture</c> under clones), so this class must share that
+/// collection's serialization or it would race the other TestDbFixture consumers on that
+/// database. It was previously mis-tagged into IntegrationParallel3, which touches a
+/// different bucket DB it never actually used.
 /// </summary>
-[Collection("IntegrationParallel3")]
+[Collection("TestDbFixtureTests")]
 public class BulkOperationExtensionsTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

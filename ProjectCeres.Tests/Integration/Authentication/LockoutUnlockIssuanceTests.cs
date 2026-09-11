@@ -15,13 +15,13 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class LockoutUnlockIssuanceTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class LockoutUnlockIssuanceTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyncLifetime
 {
     private const string EmailDomain = "@lockout-issue.local";
 
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
 
-    public LockoutUnlockIssuanceTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public LockoutUnlockIssuanceTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -59,7 +59,7 @@ public class LockoutUnlockIssuanceTests : IntegrationTestBase<AuthTestWebApplica
 
     private static async Task DriveLockoutAsync(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory,
-        AuthTestWebApplicationFactory baseFactory,
+        Bucket3AuthFactory baseFactory,
         HttpClient client, string email)
     {
         for (int i = 0; i < 10; i++)
@@ -261,6 +261,12 @@ public class LockoutUnlockIssuanceTests : IntegrationTestBase<AuthTestWebApplica
 /// </summary>
 public sealed class ThrowingLockoutUnlockServiceFactory : AuthTestWebApplicationFactory
 {
+    // Ad-hoc factory (constructed directly by the test, not a bucket collection fixture),
+    // so it pins its own database to the IntegrationParallel3 bucket rather than going
+    // through IntegrationTestBase. Matches the collection this test class lives in.
+    protected override string InitDbName =>
+        TestDatabaseRouter.DatabaseForCollection("IntegrationParallel3");
+
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);

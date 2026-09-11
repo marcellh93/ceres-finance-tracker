@@ -11,12 +11,13 @@ using ProjectCeres.Tests.Integration.Authentication;
 namespace ProjectCeres.Tests.Common;
 
 [Collection("IntegrationParallel2")]
-public class UserJobRunnerTests : IAsyncLifetime
+public class UserJobRunnerTests : IntegrationTestBase<Bucket2AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
     private const string TestEmailSuffix = "@user-job-runner-test.local";
 
-    public UserJobRunnerTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public UserJobRunnerTests(Bucket2AuthFactory factory, Bucket2Database bucketDb)
+        : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

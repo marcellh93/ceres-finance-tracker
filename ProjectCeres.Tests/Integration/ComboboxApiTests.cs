@@ -6,8 +6,8 @@ using FluentAssertions;
 namespace ProjectCeres.Tests.Integration;
 
 [Collection("IntegrationParallel1")]
-public class ComboboxApiTests(TestWebApplicationFactory factory)
-    : IClassFixture<TestWebApplicationFactory>
+public class ComboboxApiTests(Bucket1Factory factory, Bucket1Database bucketDb)
+    : IntegrationTestBase<Bucket1Factory>(factory, bucketDb)
 {
     private readonly HttpClient _client = factory.CreateClient();
 

@@ -23,13 +23,13 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// _factory (only that overload exists) — both factories share the same DB.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class MfaSecurityEmailTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class MfaSecurityEmailTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLifetime
 {
     private const string EmailDomain = "@mfa-secemail-test.local";
 
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket4AuthFactory _factory;
 
-    public MfaSecurityEmailTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public MfaSecurityEmailTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -116,7 +116,7 @@ public class MfaSecurityEmailTests : IntegrationTestBase<AuthTestWebApplicationF
         SetupAuthenticatedMfaUserAsync(WebApplicationFactory<Program> factory, string email)
     {
         var user = await AuthTestFixture.RegisterUserAsync(factory, email);
-        // EnrollUserMfaAsync has only the AuthTestWebApplicationFactory overload; both
+        // EnrollUserMfaAsync has only the Bucket4AuthFactory overload; both
         // factories back the same DB, so enrolling via _factory persists to this user.
         var seed = await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
 

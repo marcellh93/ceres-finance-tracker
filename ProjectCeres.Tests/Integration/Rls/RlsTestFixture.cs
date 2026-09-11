@@ -23,6 +23,23 @@ namespace ProjectCeres.Tests.Integration.Rls;
 /// </summary>
 public sealed class RlsTestFixture : IAsyncLifetime
 {
+    // Stage 12.18 — route through TestDatabaseRouter so this fixture (and every RlsTests
+    // collection member that references these — Group4_BackstopTests, RlsParityMetaTests)
+    // targets its OWN clone DB instead of TestDbFixture's TestDbFixtureTests DB
+    // (project_ceres_test_txfixture). Falls back to the legacy shared DB when
+    // CERES_TEST_DB_CLONES is unset, same as every other router caller. internal (not
+    // private) for the same reason TestDbFixture's own connection strings are internal —
+    // sibling RlsTests classes build raw connections/contexts outside CreateAppContext /
+    // CreateAdminContext and need the same DB these do.
+    internal static string AppConnectionString =>
+        TestDatabaseRouter.ConnectionsFor(TestDatabaseRouter.DatabaseForCollection("RlsTests")).app;
+
+    internal static string AdminConnectionString =>
+        TestDatabaseRouter.ConnectionsFor(TestDatabaseRouter.DatabaseForCollection("RlsTests")).admin;
+
+    internal static string MigratorConnectionString =>
+        TestDatabaseRouter.ConnectionsFor(TestDatabaseRouter.DatabaseForCollection("RlsTests")).migrator;
+
     public Guid UserA { get; } = Guid.NewGuid();
     public Guid UserB { get; } = Guid.NewGuid();
 
@@ -57,7 +74,7 @@ public sealed class RlsTestFixture : IAsyncLifetime
         // branch automatically.
         var accessor = new FakeCurrentUserAccessor(actingAs);
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(TestDbFixture.AppConnectionString)
+            .UseNpgsql(AppConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(accessor))
             .AddInterceptors(new RowLevelSecurityInterceptor(
                 accessor, NullLogger<RowLevelSecurityInterceptor>.Instance))
@@ -73,7 +90,7 @@ public sealed class RlsTestFixture : IAsyncLifetime
     {
         var accessor = new FakeCurrentUserAccessor(UserA); // any non-empty Guid is fine
         var options = new DbContextOptionsBuilder<AdminDbContext>()
-            .UseNpgsql(TestDbFixture.AdminConnectionString)
+            .UseNpgsql(AdminConnectionString)
             .AddInterceptors(new UserOwnershipInterceptor(accessor))
             .Options;
         return new AdminDbContext(options, accessor);
@@ -87,7 +104,7 @@ public sealed class RlsTestFixture : IAsyncLifetime
     /// </summary>
     public async Task<NpgsqlConnection> OpenAppConnectionAsync(Guid actingAs)
     {
-        var conn = new NpgsqlConnection(TestDbFixture.AppConnectionString);
+        var conn = new NpgsqlConnection(AppConnectionString);
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = $"SELECT set_config('app.current_user_ref', '{actingAs:D}', false)";

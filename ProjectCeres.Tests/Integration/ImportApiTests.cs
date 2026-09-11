@@ -8,11 +8,11 @@ namespace ProjectCeres.Tests.Integration;
 
 /// <summary>
 /// WAF integration test for POST /api/import.
-/// Uses the test DB via TestWebApplicationFactory.
+/// Uses the test DB via Bucket3Factory.
 /// </summary>
 [Collection("IntegrationParallel3")]
-public class ImportApiTests(TestWebApplicationFactory factory)
-    : IClassFixture<TestWebApplicationFactory>
+public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
+    : IntegrationTestBase<Bucket3Factory>(factory, bucketDb)
 {
     private static readonly string FixturesDir =
         Path.Combine(AppContext.BaseDirectory, "Fixtures");

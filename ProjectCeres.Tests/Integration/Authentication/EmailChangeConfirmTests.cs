@@ -15,11 +15,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class EmailChangeConfirmTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
+public class EmailChangeConfirmTests : IntegrationTestBase<Bucket2AuthFactory>
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
 
-    public EmailChangeConfirmTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public EmailChangeConfirmTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
@@ -70,7 +70,7 @@ public class EmailChangeConfirmTests : IntegrationTestBase<AuthTestWebApplicatio
     }
 
     private static async Task<HttpResponseMessage> PostConfirmAsync(
-        WebApplicationFactory<Program> factory, AuthTestWebApplicationFactory baseFactory, string token)
+        WebApplicationFactory<Program> factory, Bucket2AuthFactory baseFactory, string token)
     {
         var (csrf, header) = AuthTestFixture.MintCsrf(baseFactory);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });

@@ -8,12 +8,12 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class RegistrationSeedsCategoriesTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class RegistrationSeedsCategoriesTests : IntegrationTestBase<Bucket2AuthFactory>, IAsyncLifetime
 {
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket2AuthFactory _factory;
     private const string EmailSuffix = "@reg-seed-cat-test.local";
 
-    public RegistrationSeedsCategoriesTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
+    public RegistrationSeedsCategoriesTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

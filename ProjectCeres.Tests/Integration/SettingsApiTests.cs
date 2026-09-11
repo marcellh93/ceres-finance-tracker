@@ -6,8 +6,8 @@ using FluentAssertions;
 namespace ProjectCeres.Tests.Integration;
 
 [Collection("IntegrationParallel3")]
-public class SettingsApiTests(TestWebApplicationFactory factory)
-    : IClassFixture<TestWebApplicationFactory>
+public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
+    : IntegrationTestBase<Bucket3Factory>(factory, bucketDb)
 {
     private readonly HttpClient _client = factory.CreateClient();
 

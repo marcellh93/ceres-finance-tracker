@@ -10,18 +10,18 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class MovementsTypeFilterTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class MovementsTypeFilterTests : IntegrationTestBase<Bucket2Factory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
 
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket2Factory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededAccountIds = [];
     private readonly List<Guid> _seededTransactionIds = [];
     private readonly List<Guid> _seededTransferIds = [];
     private readonly List<Guid> _seededPaymentIds = [];
 
-    public MovementsTypeFilterTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
+    public MovementsTypeFilterTests(Bucket2Factory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

@@ -11,15 +11,15 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class TransferAttachmentsApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
+public class TransferAttachmentsApiTests : IntegrationTestBase<Bucket2Factory>, IAsyncLifetime
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly Bucket2Factory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededAccountIds = [];
     private readonly List<Guid> _seededTransferIds = [];
     private readonly List<Guid> _seededAttachmentIds = [];
 
-    public TransferAttachmentsApiTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
+    public TransferAttachmentsApiTests(Bucket2Factory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

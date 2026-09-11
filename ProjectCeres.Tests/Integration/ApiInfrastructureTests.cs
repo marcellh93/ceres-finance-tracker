@@ -8,8 +8,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace ProjectCeres.Tests.Integration;
 
 [Collection("IntegrationParallel3")]
-public class ApiInfrastructureTests(TestWebApplicationFactory factory)
-    : IClassFixture<TestWebApplicationFactory>
+public class ApiInfrastructureTests(Bucket3Factory factory, Bucket3Database bucketDb)
+    : IntegrationTestBase<Bucket3Factory>(factory, bucketDb)
 {
     private readonly HttpClient _client = factory.CreateClient();
 

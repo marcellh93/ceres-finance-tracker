@@ -19,15 +19,15 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// Purpose values and we want independent regression coverage for both.
 /// </summary>
 [Collection("IntegrationParallel3")]
-public class EmailChangeVerifyDosAmplificationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
+public class EmailChangeVerifyDosAmplificationTests : IntegrationTestBase<Bucket3AuthFactory>
 {
     private const int DummyRowCount = 200;
     private const string MarkerEmailVerify = "dos-amp-emailchange-verify@example.com";
     private const string MarkerEmailRevoke = "dos-amp-emailchange-revoke@example.com";
 
-    private readonly AuthTestWebApplicationFactory _factory;
+    private readonly Bucket3AuthFactory _factory;
 
-    public EmailChangeVerifyDosAmplificationTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => 
+    public EmailChangeVerifyDosAmplificationTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => 
         _factory = factory;
 
     [Fact]
