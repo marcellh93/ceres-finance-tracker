@@ -49,6 +49,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 # Non-root uid 1000. adduser -D creates a system user with no password.
 RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser appuser
+# alpine runs globalization-invariant by default; the app uses en/es cultures, so install ICU.
+RUN apk add --no-cache icu-libs
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 COPY --from=build /app/publish .
 USER appuser
 ENV ASPNETCORE_HTTP_PORTS=8080
