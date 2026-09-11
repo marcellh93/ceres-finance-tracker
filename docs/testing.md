@@ -312,22 +312,30 @@ Razor controller actions remain untested — they are thin HTTP handlers with a 
 
 > **Testcontainers** deferred to Phase 3 when CI/CD pipelines are introduced.
 
-### Test Collection Serialization (Phase 2)
+### Integration test collections — DB-per-bucket parallelism (Stage 12.18)
 
-All integration test classes carry `[Collection("IntegrationTests")]`. The collection is defined in `WafCollection.cs`:
+Integration test classes are split across **four runtime-balanced bucket collections** — `IntegrationParallel1..4` — plus a handful of purpose-specific serial collections. This superseded the single serialized `IntegrationTests` collection in Stage 12.18 (2026-09-11) to run the suite in parallel; see roadmap-phase-three.md § Stage 12.18 and the spec at `docs/superpowers/specs/2026-09-10-stage-12-18-parallel-integration-tests-design.md`.
 
-```csharp
-[CollectionDefinition("IntegrationTests")]
-public class IntegrationCollection : ICollectionFixture<TestWebApplicationFactory> { }
-```
+**How isolation works.** Each bucket is pinned to its own cloned Postgres database (`project_ceres_test_1..4`); the five serial collections get their own (`_ratelimit`, `_mfaratelimit`, `_approle`, `_rls`, `_txfixture`). A distinct database name = a distinct Npgsql connection pool, so the connection-scoped RLS GUC (`app.current_user_ref` via `SET LOCAL`) and any unique-constraint / shared-read races cannot cross buckets. Transaction isolation levels do **not** solve those races — physical DB separation does.
 
-**Why this matters:**
+**The mechanism (what to do when adding a test):**
 
-- xUnit runs all classes in a shared collection **sequentially on one thread**. Without this, concurrent writes from two test classes in the same test run race on `project_ceres_test` and produce non-deterministic failures.
-- `TestWebApplicationFactory` overrides the connection string in `ConfigureWebHost`, pinning every WAF-based test to `project_ceres_test` regardless of what `appsettings.json` says. This prevents any integration test from accidentally hitting the dev database.
-- Both `TestDbFixture`-based tests and `WebApplicationFactory`-based tests join the same collection, so the entire suite is serialized.
+- A bucketed class carries `[Collection("IntegrationParallelK")]` and inherits `IntegrationTestBase<BucketKFactory>` or `IntegrationTestBase<BucketKAuthFactory>`, taking `(BucketKFactory factory, BucketKDatabase db)` in its constructor (K = the bucket number, 1–4). Example:
+  ```csharp
+  [Collection("IntegrationParallel3")]
+  public class SettingsApiTests(Bucket3Factory factory, Bucket3Database db)
+      : IntegrationTestBase<Bucket3Factory>(factory, db)
+  {
+      private readonly HttpClient _client = factory.CreateClient(); // builds against project_ceres_test_3
+  }
+  ```
+- **Use the bucket-pinned factory subclass, never the bare `TestWebApplicationFactory` / `AuthTestWebApplicationFactory` inside a bucket.** `Bucket{K}Factory.InitDbName` already resolves to the bucket DB, so the host builds against the right database even though a field initializer (`= factory.CreateClient()`) runs *before* the base constructor in C#. Injecting the bare base type would build against the legacy DB and defeat isolation.
+- An **ad-hoc factory** a test constructs itself (`new SomeThrowingFactory()`) must derive from the plain base factory and override `InitDbName => TestDatabaseRouter.DatabaseForCollection("IntegrationParallelK")` to match its class's collection.
+- **Serial/role-specific collections** (`RlsTests`, `RateLimitTests`, `MfaRateLimitTests`, `AppRoleTests`, `TestDbFixtureTests`) still exist for classes needing a different factory/role wiring or the transaction-rollback `TestDbFixture`. A class using `TestDbFixture` belongs in `TestDbFixtureTests` (it targets `_txfixture`), not a parallel bucket.
 
-Add `[Collection("IntegrationTests")]` to most new integration test classes. The project does run **sibling** collections deliberately — `RlsTests`, `RateLimitTests`, `MfaRateLimitTests`, and `AppRoleTests` — when a class needs a different factory/role wiring than the shared `TestWebApplicationFactory`. The real cross-collection safety net is **per-test data isolation by marker** (per-test GUID-suffixed emails / UserIds; see `feedback_filter_test_queries_by_test_data`), not single-collection serialization. A sibling collection whose tests are timing-sensitive OR whose concurrent load destabilizes other collections should carry `DisableParallelization = true` (as `RateLimitTests`/`MfaRateLimitTests`/`AppRoleTests` do). Prefer joining `IntegrationTests` unless you have such a reason.
+**Local vs CI.** `xunit.runner.json` keeps `parallelizeTestCollections: false` by default, and `TestDatabaseRouter.CloneCount` falls back to `1` when `CERES_TEST_DB_CLONES` is unset — so a plain local `dotnet test` collapses every bucket onto the single legacy `project_ceres_test` DB and runs serially (race-free, no clone provisioning needed). Parallelism is opt-in: provision clones with `tools/ci/setup-test-db.sh --template --clones 4`, then run `dotnet test -- xUnit.ParallelizeTestCollections=true xUnit.MaxParallelThreads=4` with `CERES_TEST_DB_CLONES=4`. CI does exactly this. Each bucket carries `DisableParallelization = true` so its own classes serialize (safe pool warm-up), while the four buckets run concurrently against each other.
+
+The real cross-class safety net remains **per-test data isolation by marker** (per-test GUID-suffixed emails / UserIds; see `feedback_filter_test_queries_by_test_data`) — the DB-per-bucket split adds physical isolation on top of it, not instead of it.
 
 ---
 
@@ -369,7 +377,7 @@ already run. DB provisioning is shared via `tools/ci/setup-test-db.sh` (also use
 **Jobs** (five, parallel, fail-fast off — one push surfaces all failures):
 | Job | Runs |
 |---|---|
-| `dotnet-test` | full `dotnet test` (no filter) against a Postgres 16 service |
+| `dotnet-test` | full `dotnet test` (no filter) against a Postgres 16 service, **parallel-with-clones** (Stage 12.18): provisions `setup-test-db.sh --template --clones 4` then runs with `CERES_TEST_DB_CLONES=4 -- xUnit.ParallelizeTestCollections=true xUnit.MaxParallelThreads=4` |
 | `analyzer-test` | the Roslyn analyzer suite |
 | `client-test` | `pnpm build` (tsc + vite + size budget) + Vitest |
 | `e2e` | Playwright sharded over chromium/firefox/webkit; traces on failure |

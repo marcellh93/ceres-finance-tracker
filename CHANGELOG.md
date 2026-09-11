@@ -10,6 +10,10 @@
 - New CI pipeline (`.github/workflows/ci.yml`) running on every push to `main`: full server test suite, Roslyn analyzers, client build + Vitest, Playwright E2E across chromium/firefox/webkit, and a hygiene job (vulnerable-package scan, gitleaks secret scan, hook self-tests, roadmap consistency). Runs on a fresh, stateless environment — the un-tiered superset of the local per-turn test gate, which is unchanged.
 - New `tools/ci/setup-test-db.sh` — one script that creates + role-provisions + migrates a Ceres database, consumed by both CI and the E2E `run-server.sh` so the two never drift.
 
+**Tests / CI (Stage 12.18 — parallel integration suite, 2026-09-11)**
+- The integration test suite now runs in parallel: the single serialized 136-file collection is split into four runtime-balanced buckets, each pinned to its own cloned Postgres database, so buckets run concurrently with per-bucket isolation. Locally ~2× faster on a multi-core machine; a plain `dotnet test` still runs serially against one shared database with no setup change.
+- `tools/ci/setup-test-db.sh` gains a `--template --clones N` mode — migrates one template DB then file-copies it into the bucket + serial-collection databases; CI provisions four bucket clones and runs with collection parallelism enabled.
+
 **Authentication (Stage 12.5.1 — per-session IP anchor, 2026-09-08)**
 - You can now "anchor" an active session to the network it started from, on `/settings/sessions`. An anchored session is signed out if it's used from a different IP — defending against a stolen session cookie replayed from another network. It's opt-in per session, with a confirm dialog that's clear it protects against a replayed cookie, not someone signing in with your password. Recovery from a legitimate IP change is simply signing in again (and the anchor carries across a "remember me" cookie rotation).
 
