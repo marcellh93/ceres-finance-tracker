@@ -1678,6 +1678,23 @@ troubleshooting captured in `docs/runbooks/ci-actions-troubleshooting.md`.
 
 ---
 
+## Stage 12.14 — Docker containerization ✅ Done (2026-09-11)
+
+**Status: ✅ Done (2026-09-11).** A hardened, minimal container image runs the app (React SPA + Tailwind baked in) so Stage 16 hosting starts from a known-good artifact. Decoupled from CI. Spec: [`2026-09-11-stage-12-14-docker-containerization-design.md`](superpowers/specs/2026-09-11-stage-12-14-docker-containerization-design.md). Decision: [ADR-0081](decisions/ADR-0081-docker-containerization.md).
+
+Three-stage build: `node:22-alpine` builds both pnpm projects (SPA + Tailwind CSS) → `dotnet/sdk:10.0-alpine` runs `dotnet publish -c Release` with `SkipSpaBuild=true SkipTailwind=true` (no Node in the .NET stage) → `dotnet/aspnet:10.0-alpine` runtime copies only the publish output. Verified end-to-end: `docker build` green, the container boots against Postgres and serves `GET /` as `200 text/html`, runs non-root (uid 1000) on :8080, and the runtime image carries no Node/pnpm/SDK (174MB).
+
+Two build-time gotchas surfaced and were fixed (both provable only by a real build + boot, not a static read): corepack rejects the sha512-suffixed `packageManager` pin, so pnpm is installed via `npm i -g pnpm@10.33.2`; and the alpine .NET runtime is globalization-invariant by default, which crashed the app's `en`/`es` culture setup — fixed by installing `icu-libs` + `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`.
+
+- [x] `Dockerfile` (repo root) — three-stage build; pnpm 10.33.2 via npm; `--frozen-lockfile`; `test -f …/dist/app.html` SPA-shell guard.
+- [x] `.dockerignore` (repo root) — excludes build outputs + tooling/docs + `appsettings.*.json` overlays; keeps the placeholder base `appsettings.json` (no baked secrets).
+- [x] Wave-1 hardening in the image — non-root uid 1000, port 8080, minimal alpine surface, ICU for real cultures, config runtime-injected via env vars.
+- [x] Verified: `docker build` + boot smoke test (serves SPA shell, non-root) + minimal-surface check (no Node/pnpm/SDK).
+- [→] **Wave-2 hardening (read-only fs + tmpfs, image digest pinning, `--cap-drop=ALL`, resource limits) — DEFERRED. Why:** needs the runtime writable-path inventory and orchestration flags, done "after deployment is stable" per `security-model.md § Container / Runtime Hardening`; not image-authoring work. **Where:** receiving line at Stage 16.13 below (Container / runtime hardening — the ADR-0081 wave-2 checklist).
+- [→] **EF migrations on deploy + CI image build/push — DEFERRED. Why:** the app does not self-migrate (by design — keeps the runtime image least-privilege per ADR-0068); the operator applies migrations out-of-band with `ceres_migrator`, and image build/push is CD work the brainstorm kept decoupled from CI. **Where:** receiving lines at Stage 16.10/16.15 (migrations) and 16.11 (CD image build/push) below.
+
+---
+
 ## Stage 12.16 — Dependency-advisory triage ✅ Done (2026-09-10)
 
 **Status: ✅ Done (2026-09-10).** Surfaced when Stage 12.13's `repo-hygiene` job put `pnpm audit --audit-level high` on the critical path and it went red on the existing advisory backlog (16 `pnpm audit` alerts: 7 high, 8 moderate, 1 low; the `dotnet list package --vulnerable` half was already green — a JS-only backlog). Resolved per [ADR-0079](decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md): re-pinned four stale transitive overrides to their newest in-range patched floor, added three new overrides (`@hono/node-server`, `browserslist`, `postcss-selector-parser`), and bumped the direct devDependency `vitest`. See the ADR's 2026-09-10 update note for the per-package rationale and condition-3 verification.
@@ -2173,9 +2190,9 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 | 16.8 | **[→] DELIVERED EARLY at §12.13.** CI dependency vulnerability scanning. Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml` `repo-hygiene` job (`dotnet list package --vulnerable` + `pnpm audit`), shipped under Stage 12.13. | `security-model.md` § Dependency Scanning |
 | 16.9 | **[→] DELIVERED EARLY at §12.13.** CI secrets scanning. Why: user accelerated CI out of Stage 16. Where: `.github/workflows/ci.yml` `repo-hygiene` job (gitleaks), shipped under Stage 12.13. | `security-model.md` § Secrets Scanning |
 | 16.10 | Production migration strategy (`dotnet ef database update` vs. CI step vs. reviewed SQL) | `planning.md` § Open Questions |
-| 16.11 | CD pipeline (trigger, staging, migration step, rollback plan) | `planning.md` § Open Questions: CD strategy |
+| 16.11 | CD pipeline (trigger, staging, migration step, rollback plan). **Carried in from §12.14:** build + push the container image (the §12.14 `Dockerfile` exists and is verified; CI/registry wiring was kept decoupled). | `planning.md` § Open Questions: CD strategy |
 | 16.12 | Monitoring + alerting (uptime, error rate, certificate expiry) | (operational) |
-| 16.13 | Container / runtime hardening | `security-model.md` § Container / Runtime Hardening |
+| 16.13 | Container / runtime hardening. **Carried in from §12.14:** wave-1 controls (non-root, minimal alpine, no baked secrets, ICU) already realised in the `Dockerfile`; this row is the wave-2 checklist per ADR-0081 — read-only root fs + tmpfs/volumes (writable-path inventory in the §12.14 spec), image digest pinning, `--cap-drop=ALL`, resource limits. | `security-model.md` § Container / Runtime Hardening |
 | 16.14 | Data Protection key persistence + rotation | `security-model.md` § TOTP Secrets + § Secrets Rotation Procedures + Stage 6 carry-forward |
 | 16.15 | **Stage 7.5 follow-up.** Production database setup creates `ceres_app`, `ceres_admin`, `ceres_migrator` per `scripts/setup-postgres-roles.sql`. Only `ceres_app` (NOBYPASSRLS) and `ceres_admin` (BYPASSRLS) credentials are deployed with the application; `ceres_migrator` (DDL + BYPASSRLS) credentials are held by the deploy operator and used only when applying migrations. The privilege-leak startup check in `Program.cs` refuses to start if the runtime `ApplicationConnection` is wired to a privileged role — confirm it fires correctly under the production deployment configuration. | Stage 7.5 / ADR-0068 |
 | 16.16 | **Stage 9.11 follow-up — delivered early, see §12.13.** Playwright E2E suite (shipped in Stage 9.11) wired into `.github/workflows/ci.yml`: `npx playwright install --with-deps` cached via `actions/cache`; sharded across runner instances; trace + HTML report uploaded as workflow artefact on failure. Suite runs on every PR + on `main`. | [ADR-0071](decisions/ADR-0071-e2e-testing-on-playwright.md) § Implementation gates / Stage 9.11 |
