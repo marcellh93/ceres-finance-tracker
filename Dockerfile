@@ -2,10 +2,10 @@
 
 # ---- Stage 1: build the two pnpm projects (SPA + Tailwind CSS) ----
 FROM node:22-alpine AS spa
-# corepack ships with node:22; it reads the pinned pnpm version from packageManager,
-# sidestepping the pnpm/action-setup sha512 misparse CI hit. Pin explicitly to match.
-RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
-ENV COREPACK_ENABLE_STRICT=0
+# Install pnpm via npm at the pinned 10.33.2 because corepack rejects the hashed
+# packageManager field (+sha512 suffix) in package.json.
+RUN npm i -g pnpm@10.33.2
+ENV CI=true
 WORKDIR /src
 
 # SPA (ProjectCeres.Client): tsc -b && vite build && check-size -> dist/
