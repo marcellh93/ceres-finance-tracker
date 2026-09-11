@@ -13,6 +13,10 @@ ProjectCeres/wwwroot/css
 .superpowers
 docs
 tools
+# Root scripts/ only (role DDL + hook tests — not COPY'd by any stage). Anchored with a
+# leading slash so it does NOT also match ProjectCeres.Client/scripts/, which the client
+# build's `check-size` (node scripts/check-bundle-size.mjs) needs.
+/scripts
 **/*.user
 **/TestResults
 ProjectCeres.Client/e2e/.artifacts
