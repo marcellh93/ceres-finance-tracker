@@ -44,12 +44,15 @@ jobs:
       - name: Restore ProjectCeres (so dotnet ef can build it)
         run: dotnet restore ProjectCeres/ProjectCeres.csproj
       - name: Provision + migrate the test databases
-        # Both DBs: project_ceres_test for the integration suite, project_ceres_e2e
-        # for E2eDatabaseGuardStartupCheckTests (which connects to it to prove the
-        # guard passes against the correct DB). A clean runner has neither.
+        # Stage 12.18: --template --clones 4 migrates one template then clones the
+        # 4 parallel bucket DBs (project_ceres_test_1..4) + 5 serial-collection DBs,
+        # so the integration suite runs in parallel with per-bucket isolation.
+        # project_ceres_test_e2e (legacy single-DB mode) is still needed by
+        # E2eDatabaseGuardStartupCheckTests, which connects to it to prove the guard
+        # passes against the correct DB. A clean runner has none of these.
         run: |
           which dotnet-ef && dotnet-ef --version
-          tools/ci/setup-test-db.sh project_ceres_test
+          tools/ci/setup-test-db.sh --template --clones 4
           tools/ci/setup-test-db.sh project_ceres_e2e
         env:
           PGHOST: localhost
@@ -75,7 +78,17 @@ jobs:
         # No secret env var needed: WafCollection.cs supplies Authentication:TokenLookupSecret:Secret
         # itself via UseSetting (the Stage 12.12 fix), so the integration suite is self-sufficient
         # on secrets — it needs only a reachable Postgres. E2E generates its own in run-server.sh.
-        run: dotnet test ProjectCeres.Tests/ProjectCeres.Tests.csproj --no-build
+        #
+        # Stage 12.18: run PARALLEL here. CERES_TEST_DB_CLONES=4 flips the router out of the
+        # N=1 fallback so each bucket collection targets its own clone DB; the xUnit `--`
+        # overrides enable collection parallelism (xunit.runner.json keeps it OFF by default
+        # so a local `dotnet test` without clones stays serial and race-free). ~2x faster than
+        # serial (verified locally 1390/1390 in ~2m vs ~4-5m).
+        run: >-
+          dotnet test ProjectCeres.Tests/ProjectCeres.Tests.csproj --no-build
+          -- xUnit.ParallelizeTestCollections=true xUnit.MaxParallelThreads=4
+        env:
+          CERES_TEST_DB_CLONES: "4"
 
   analyzer-test:
     runs-on: ubuntu-latest
