@@ -10,14 +10,14 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration;
 
 [Collection("IntegrationParallel4")]
-public class LiabilityPaymentsApiTests : IAsyncLifetime
+public class LiabilityPaymentsApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _seededPaymentIds = [];
     private readonly List<Guid> _seededAccountIds = [];
 
-    public LiabilityPaymentsApiTests(TestWebApplicationFactory factory)
+    public LiabilityPaymentsApiTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

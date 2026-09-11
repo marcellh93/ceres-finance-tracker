@@ -27,11 +27,11 @@ namespace ProjectCeres.Tests.Integration;
 /// GUID-suffixed emails, IgnoreQueryFilters on the user-owned token table.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class EmailConfirmationTests : IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
+public class EmailConfirmationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public EmailConfirmationTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public EmailConfirmationTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     // WAF tests don't go through TestDbFixture's migrate hook; if this class runs
     // before any TestDbFixture-based class in the IntegrationTests collection, the

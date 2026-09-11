@@ -8,11 +8,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class MfaCookieHygieneTests : IAsyncLifetime
+public class MfaCookieHygieneTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public MfaCookieHygieneTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public MfaCookieHygieneTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

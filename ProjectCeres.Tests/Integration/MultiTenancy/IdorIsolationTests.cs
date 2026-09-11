@@ -26,7 +26,7 @@ namespace ProjectCeres.Tests.Integration.MultiTenancy;
 /// is bypassed entirely.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class IdorIsolationTests : IAsyncLifetime
+public class IdorIsolationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
     private const string EmailSuffix = "@idor-test.local";
@@ -44,7 +44,7 @@ public class IdorIsolationTests : IAsyncLifetime
     // B's session cookie — set after login in InitializeAsync.
     private string _bSessionCookie = null!;
 
-    public IdorIsolationTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public IdorIsolationTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     // ---------------------------------------------------------------------------
     // Setup

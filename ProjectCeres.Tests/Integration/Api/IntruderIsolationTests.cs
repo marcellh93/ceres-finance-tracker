@@ -26,7 +26,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// "intruder UserId" with another authenticated user and the same shape holds.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class IntruderIsolationTests : IAsyncLifetime
+public class IntruderIsolationTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid Sentinel              = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CashAccountId         = new("10000000-0000-0000-0000-000000000001");
@@ -47,7 +47,7 @@ public class IntruderIsolationTests : IAsyncLifetime
     private readonly List<Guid> _intruderCategoryBudgetIds     = [];
     private readonly List<Guid> _intruderRecurringIds          = [];
 
-    public IntruderIsolationTests(TestWebApplicationFactory factory)
+    public IntruderIsolationTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

@@ -18,11 +18,11 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// worked, so they submit again and trigger two more emails.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class EmailChangePendingTests : IClassFixture<AuthTestWebApplicationFactory>
+public class EmailChangePendingTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public EmailChangePendingTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public EmailChangePendingTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;

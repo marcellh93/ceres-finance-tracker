@@ -22,11 +22,11 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// same-IP request.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class SessionIpAnchorTests : IAsyncLifetime
+public class SessionIpAnchorTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public SessionIpAnchorTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public SessionIpAnchorTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

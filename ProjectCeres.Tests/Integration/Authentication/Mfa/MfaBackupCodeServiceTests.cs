@@ -7,11 +7,11 @@ using ProjectCeres.Data;
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
 [Collection("IntegrationParallel2")]
-public class MfaBackupCodeServiceTests : IAsyncLifetime
+public class MfaBackupCodeServiceTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public MfaBackupCodeServiceTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public MfaBackupCodeServiceTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

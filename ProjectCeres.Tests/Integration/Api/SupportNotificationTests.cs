@@ -19,14 +19,14 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// the configured mailbox rather than to anything user-supplied, are both load-bearing.
 /// </summary>
 [Collection("IntegrationParallel1")]
-public class SupportNotificationTests : IAsyncLifetime
+public class SupportNotificationTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private const string SupportAddress = "support-desk@ceres-test.local";
 
     private readonly TestWebApplicationFactory _factory;
     private readonly List<Guid> _seededTicketIds = [];
 
-    public SupportNotificationTests(TestWebApplicationFactory factory) => _factory = factory;
+    public SupportNotificationTests(TestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

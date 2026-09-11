@@ -16,13 +16,13 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class LockoutUnlockConfirmTests : IAsyncLifetime
+public class LockoutUnlockConfirmTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailDomain = "@lockout-confirm.local";
 
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public LockoutUnlockConfirmTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public LockoutUnlockConfirmTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

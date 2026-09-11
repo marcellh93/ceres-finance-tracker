@@ -8,11 +8,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 
 [Collection("IntegrationParallel3")]
-public class TotpReplayGuardTests : IAsyncLifetime
+public class TotpReplayGuardTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public TotpReplayGuardTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public TotpReplayGuardTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

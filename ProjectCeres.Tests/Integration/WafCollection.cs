@@ -46,14 +46,21 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
     /// Overrides <see cref="DatabaseName"/> for this factory instance. Must be called
     /// before the host is built (i.e. before the first <c>Services</c>/<c>CreateClient()</c>
     /// access) — <see cref="ConfigureWebHost"/> latches <see cref="_built"/> as soon as the
-    /// lazy build starts, and a call after that point throws rather than silently no-op.
+    /// lazy build starts. Idempotent for the same DB: a bucket's collection-shared factory
+    /// is pinned once by whichever test class builds it first; every other class in that
+    /// bucket calls UseDatabase with that same DB afterward — a no-op, not an error. Only a
+    /// genuinely conflicting DB after build throws.
     /// </summary>
     public void UseDatabase(string db)
     {
         if (_built)
+        {
+            var current = _overrideDb ?? InitDbName;
+            if (current == db) return;
             throw new InvalidOperationException(
-                $"UseDatabase(\"{db}\") called after {nameof(TestWebApplicationFactory)} " +
-                "already built its host. Call UseDatabase before the first Services/CreateClient() access.");
+                $"UseDatabase(\"{db}\") conflicts: factory already built targeting \"{current}\". " +
+                "A bucket's classes must all request the same database.");
+        }
 
         _overrideDb = db;
     }
@@ -457,5 +464,10 @@ public class AuthTestWebApplicationFactory : TestWebApplicationFactory
 /// </summary>
 public class SweepingTestWebApplicationFactory : TestWebApplicationFactory
 {
-    protected override bool SweepOnDispose => true;
+    // Stage 12.18: only sweep when this factory's database is bucket-private (clones
+    // active). Under the N=1 fallback all 4 bucket collections share project_ceres_test,
+    // so a per-bucket sweep at one bucket's teardown would delete peer buckets' users
+    // still in play mid-run. Accumulation under N=1 is handled by the next provisioned
+    // run's setup + the existing UserOwnedCleanup tooling, not by this sweep.
+    protected override bool SweepOnDispose => TestDatabaseRouter.CloneCount >= 2;
 }

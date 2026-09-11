@@ -11,7 +11,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel3")]
-public class ReconciliationReviewApiTests : IAsyncLifetime
+public class ReconciliationReviewApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
 
@@ -22,7 +22,7 @@ public class ReconciliationReviewApiTests : IAsyncLifetime
     private readonly List<Guid> _accountIds = [];
     private readonly List<Guid> _transactionIds = [];
 
-    public ReconciliationReviewApiTests(TestWebApplicationFactory factory)
+    public ReconciliationReviewApiTests(TestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

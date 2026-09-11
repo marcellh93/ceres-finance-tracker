@@ -15,12 +15,12 @@ using ProjectCeres.Tests.Integration.Authentication;
 namespace ProjectCeres.Tests.Integration.Admin;
 
 [Collection("IntegrationParallel3")]
-public class AdminAuthorizationTests : IAsyncLifetime
+public class AdminAuthorizationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailSuffix = "@admin-authz-test.local";
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public AdminAuthorizationTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public AdminAuthorizationTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

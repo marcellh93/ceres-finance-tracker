@@ -14,11 +14,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class EmailChangeRequestTests : IClassFixture<AuthTestWebApplicationFactory>
+public class EmailChangeRequestTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public EmailChangeRequestTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public EmailChangeRequestTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private static CancellationToken Timeout30s() =>
         new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;

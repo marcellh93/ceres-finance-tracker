@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class TransactionsCrudApiTests : IAsyncLifetime
+public class TransactionsCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
 
@@ -20,7 +20,7 @@ public class TransactionsCrudApiTests : IAsyncLifetime
     private readonly List<Guid> _seededAccountIds = [];
     private readonly List<Guid> _seededAttachmentIds = [];
 
-    public TransactionsCrudApiTests(TestWebApplicationFactory factory)
+    public TransactionsCrudApiTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

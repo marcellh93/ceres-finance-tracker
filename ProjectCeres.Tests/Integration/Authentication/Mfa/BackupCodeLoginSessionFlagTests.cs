@@ -17,13 +17,13 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// drives the dashboard backup-code banner.
 /// </summary>
 [Collection("IntegrationParallel3")]
-public class BackupCodeLoginSessionFlagTests : IAsyncLifetime
+public class BackupCodeLoginSessionFlagTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailSuffix = "@backup-flag-test.local";
 
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public BackupCodeLoginSessionFlagTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public BackupCodeLoginSessionFlagTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

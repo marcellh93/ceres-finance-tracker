@@ -20,7 +20,7 @@ namespace ProjectCeres.Tests.Integration;
 /// never touch the dev database. Seeded rows are deleted in DisposeAsync.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class MovementsApiTests : IAsyncLifetime
+public class MovementsApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId = new("20000000-0000-0000-0000-000000000002");
 
@@ -31,7 +31,7 @@ public class MovementsApiTests : IAsyncLifetime
     private readonly List<Guid> _seededTransferIds = [];
     private readonly List<Guid> _seededPaymentIds = [];
 
-    public MovementsApiTests(TestWebApplicationFactory factory)
+    public MovementsApiTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = _factory.CreateClient();

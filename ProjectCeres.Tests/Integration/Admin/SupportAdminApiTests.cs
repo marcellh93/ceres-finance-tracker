@@ -22,13 +22,13 @@ namespace ProjectCeres.Tests.Integration.Admin;
 /// Every DB read is keyed on this run's own ids; users and their owned rows are purged on teardown.
 /// </summary>
 [Collection("IntegrationParallel2")]
-public class SupportAdminApiTests : IAsyncLifetime
+public class SupportAdminApiTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailSuffix = "@support-admin-test.local";
     private readonly AuthTestWebApplicationFactory _factory;
     private readonly List<Guid> _userIds = [];
 
-    public SupportAdminApiTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public SupportAdminApiTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

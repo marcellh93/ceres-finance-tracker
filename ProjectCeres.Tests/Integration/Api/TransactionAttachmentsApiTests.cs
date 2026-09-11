@@ -11,7 +11,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel1")]
-public class TransactionAttachmentsApiTests : IAsyncLifetime
+public class TransactionAttachmentsApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
 
@@ -21,7 +21,7 @@ public class TransactionAttachmentsApiTests : IAsyncLifetime
     private readonly List<Guid> _seededTransactionIds = [];
     private readonly List<Guid> _seededAttachmentIds = [];
 
-    public TransactionAttachmentsApiTests(TestWebApplicationFactory factory)
+    public TransactionAttachmentsApiTests(TestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

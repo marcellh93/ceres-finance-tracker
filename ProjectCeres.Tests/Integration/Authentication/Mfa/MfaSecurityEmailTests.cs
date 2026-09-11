@@ -23,13 +23,13 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// _factory (only that overload exists) — both factories share the same DB.
 /// </summary>
 [Collection("IntegrationParallel4")]
-public class MfaSecurityEmailTests : IAsyncLifetime
+public class MfaSecurityEmailTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailDomain = "@mfa-secemail-test.local";
 
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public MfaSecurityEmailTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public MfaSecurityEmailTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

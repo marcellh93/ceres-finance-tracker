@@ -9,10 +9,10 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class ReauthCrossFeatureTests : IClassFixture<AuthTestWebApplicationFactory>
+public class ReauthCrossFeatureTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
-    public ReauthCrossFeatureTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public ReauthCrossFeatureTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     [Fact]
     public async Task Existing_login_flow_still_works_with_LastReauthAt_added()

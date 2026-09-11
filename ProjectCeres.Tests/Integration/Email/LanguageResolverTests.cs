@@ -11,11 +11,11 @@ using Xunit;
 namespace ProjectCeres.Tests.Integration.Email;
 
 [Collection("IntegrationParallel4")]
-public sealed class LanguageResolverTests
+public sealed class LanguageResolverTests : IntegrationTestBase<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public LanguageResolverTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public LanguageResolverTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     [Fact]
     public async Task Falls_back_to_CurrentUICulture_en_when_no_settings_row()

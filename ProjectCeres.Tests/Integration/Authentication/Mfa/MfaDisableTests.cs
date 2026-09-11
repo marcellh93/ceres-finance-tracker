@@ -18,10 +18,10 @@ namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 /// same login → TOTP step → session-cookie flow, same per-test cleanup).
 /// </summary>
 [Collection("IntegrationParallel3")]
-public class MfaDisableTests : IAsyncLifetime
+public class MfaDisableTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
-    public MfaDisableTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public MfaDisableTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

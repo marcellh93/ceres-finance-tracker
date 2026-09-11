@@ -11,7 +11,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel3")]
-public class RecurringTransactionsCrudApiTests : IAsyncLifetime
+public class RecurringTransactionsCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid CheckingAccountId = new("10000000-0000-0000-0000-000000000002");
     private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
@@ -21,7 +21,7 @@ public class RecurringTransactionsCrudApiTests : IAsyncLifetime
     private readonly List<Guid> _createdIds = [];
     private readonly List<Guid> _createdTransactionIds = [];
 
-    public RecurringTransactionsCrudApiTests(TestWebApplicationFactory factory)
+    public RecurringTransactionsCrudApiTests(TestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

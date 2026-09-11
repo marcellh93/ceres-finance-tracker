@@ -21,7 +21,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// the authenticated user's id, returned by ICurrentUserAccessor.
 /// </summary>
 [Collection("IntegrationParallel2")]
-public class UserIdStampingTests : IAsyncLifetime
+public class UserIdStampingTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid Sentinel              = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CashAccountId         = new("10000000-0000-0000-0000-000000000001");
@@ -40,7 +40,7 @@ public class UserIdStampingTests : IAsyncLifetime
     private readonly List<Guid> _createdRecurringIds     = [];
     private readonly List<Guid> _createdCategoryIds      = [];
 
-    public UserIdStampingTests(TestWebApplicationFactory factory)
+    public UserIdStampingTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

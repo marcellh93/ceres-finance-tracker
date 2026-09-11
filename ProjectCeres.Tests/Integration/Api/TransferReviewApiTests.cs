@@ -11,7 +11,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class TransferReviewApiTests : IAsyncLifetime
+public class TransferReviewApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
@@ -21,7 +21,7 @@ public class TransferReviewApiTests : IAsyncLifetime
     private readonly List<Guid> _transferIds = [];
     private readonly List<Guid> _transactionIds = [];
 
-    public TransferReviewApiTests(TestWebApplicationFactory factory)
+    public TransferReviewApiTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

@@ -4,11 +4,11 @@ using FluentAssertions;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class CurrenciesApiTests
+public class CurrenciesApiTests : IntegrationTestBase<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
-    public CurrenciesApiTests(TestWebApplicationFactory factory)
+    public CurrenciesApiTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _client = factory.CreateClient();
     }

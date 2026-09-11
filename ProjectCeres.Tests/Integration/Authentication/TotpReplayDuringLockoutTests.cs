@@ -10,10 +10,10 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class TotpReplayDuringLockoutTests : IAsyncLifetime
+public class TotpReplayDuringLockoutTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
-    public TotpReplayDuringLockoutTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public TotpReplayDuringLockoutTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

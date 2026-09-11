@@ -17,13 +17,13 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel4")]
-public class AuditLogIntegrationTests : IAsyncLifetime
+public class AuditLogIntegrationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailDomain = "@audit-test.local";
 
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public AuditLogIntegrationTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public AuditLogIntegrationTests(AuthTestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

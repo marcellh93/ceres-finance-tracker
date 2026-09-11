@@ -20,7 +20,7 @@ namespace ProjectCeres.Tests.Integration.Api;
 /// DB read is keyed on a marker unique to the test, because the test database is shared.
 /// </summary>
 [Collection("IntegrationParallel3")]
-public class SupportConversationApiTests : IAsyncLifetime
+public class SupportConversationApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid Sentinel = new("00000000-0000-0000-0000-000000000001");
     private static readonly Guid OtherUser = new("00000000-0000-0000-0000-0000000000fd");
@@ -29,7 +29,7 @@ public class SupportConversationApiTests : IAsyncLifetime
     private readonly HttpClient _client;
     private readonly List<Guid> _seededTicketIds = [];
 
-    public SupportConversationApiTests(TestWebApplicationFactory factory)
+    public SupportConversationApiTests(TestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

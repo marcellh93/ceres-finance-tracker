@@ -25,11 +25,11 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// check would still pass the existing happy-path/expiry/consumed suite.
 /// </summary>
 [Collection("IntegrationParallel2")]
-public class TokenLookupTamperResistanceTests : IClassFixture<AuthTestWebApplicationFactory>
+public class TokenLookupTamperResistanceTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public TokenLookupTamperResistanceTests(AuthTestWebApplicationFactory factory) =>
+    public TokenLookupTamperResistanceTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => 
         _factory = factory;
 
     [Fact]

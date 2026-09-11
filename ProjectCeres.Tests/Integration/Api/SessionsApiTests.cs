@@ -14,11 +14,11 @@ using ProjectCeres.Tests.Integration.Authentication;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class SessionsApiTests : IAsyncLifetime
+public class SessionsApiTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public SessionsApiTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public SessionsApiTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

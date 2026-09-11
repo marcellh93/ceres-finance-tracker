@@ -9,7 +9,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Startup;
 
 [Collection("IntegrationParallel1")]
-public class EmptyDbStartupTests : IAsyncLifetime
+public class EmptyDbStartupTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
@@ -18,7 +18,7 @@ public class EmptyDbStartupTests : IAsyncLifetime
     private readonly List<Account>  _backedUpAccounts  = new();
     private readonly List<Settings> _backedUpSettings  = new();
 
-    public EmptyDbStartupTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public EmptyDbStartupTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public async Task InitializeAsync()
     {

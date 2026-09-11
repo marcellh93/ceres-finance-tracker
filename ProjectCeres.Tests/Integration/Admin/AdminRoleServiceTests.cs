@@ -21,12 +21,12 @@ public class AppRolesTests
 }
 
 [Collection("IntegrationParallel1")]
-public class AdminRoleServiceTests : IAsyncLifetime
+public class AdminRoleServiceTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private const string EmailSuffix = "@admin-role-test.local";
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public AdminRoleServiceTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public AdminRoleServiceTests(AuthTestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

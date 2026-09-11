@@ -7,10 +7,10 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel3")]
-public class ReauthMfaEndpointGatingTests : IClassFixture<AuthTestWebApplicationFactory>
+public class ReauthMfaEndpointGatingTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
-    public ReauthMfaEndpointGatingTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public ReauthMfaEndpointGatingTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private async Task<HttpResponseMessage> HitWithStaleClaimAsync(
         ApplicationUser user, string url, object? body = null)

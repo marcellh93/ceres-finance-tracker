@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel1")]
-public class MovementsBulkClearedTests : IAsyncLifetime
+public class MovementsBulkClearedTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
 
@@ -21,7 +21,7 @@ public class MovementsBulkClearedTests : IAsyncLifetime
     private readonly List<Guid> _seededTransferIds = [];
     private readonly List<Guid> _seededLiabilityPaymentIds = [];
 
-    public MovementsBulkClearedTests(TestWebApplicationFactory factory)
+    public MovementsBulkClearedTests(TestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client = factory.CreateClient();

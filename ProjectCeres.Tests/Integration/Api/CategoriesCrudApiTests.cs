@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel4")]
-public class CategoriesCrudApiTests : IAsyncLifetime
+public class CategoriesCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid OpeningBalanceCategoryId = new("20000000-0000-0000-0000-000000000001"); // IsSystem
     private static readonly Guid UncategorizedExpenseId   = new("20000000-0000-0000-0000-000000000026"); // reserved
@@ -20,7 +20,7 @@ public class CategoriesCrudApiTests : IAsyncLifetime
     private readonly HttpClient _client;
     private readonly List<Guid> _createdIds = [];
 
-    public CategoriesCrudApiTests(TestWebApplicationFactory factory)
+    public CategoriesCrudApiTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

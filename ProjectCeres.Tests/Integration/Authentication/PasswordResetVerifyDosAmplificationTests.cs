@@ -17,14 +17,14 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 /// seeds 200 dummy rows and asserts the confirm call still returns in under one second.
 /// </summary>
 [Collection("IntegrationParallel2")]
-public class PasswordResetVerifyDosAmplificationTests : IClassFixture<AuthTestWebApplicationFactory>
+public class PasswordResetVerifyDosAmplificationTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private const int DummyRowCount = 200;
     private const string MarkerEmail = "dos-amp-pwreset@example.com";
 
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public PasswordResetVerifyDosAmplificationTests(AuthTestWebApplicationFactory factory) =>
+    public PasswordResetVerifyDosAmplificationTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => 
         _factory = factory;
 
     [Fact]

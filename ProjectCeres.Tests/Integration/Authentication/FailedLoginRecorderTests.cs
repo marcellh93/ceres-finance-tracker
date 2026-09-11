@@ -11,11 +11,11 @@ using ProjectCeres.Tests.Integration;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class FailedLoginRecorderTests : IAsyncLifetime
+public class FailedLoginRecorderTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public FailedLoginRecorderTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public FailedLoginRecorderTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     public Task InitializeAsync() => Task.CompletedTask;
 

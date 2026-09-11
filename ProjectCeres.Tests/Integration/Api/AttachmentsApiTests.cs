@@ -11,7 +11,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel4")]
-public class AttachmentsApiTests : IAsyncLifetime
+public class AttachmentsApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
     private readonly Guid _intruderUserId = Guid.NewGuid();
@@ -24,7 +24,7 @@ public class AttachmentsApiTests : IAsyncLifetime
     private readonly List<Guid> _attachmentIds = [];
     private readonly List<Guid> _transferAttachmentIds = [];
 
-    public AttachmentsApiTests(TestWebApplicationFactory factory)
+    public AttachmentsApiTests(TestWebApplicationFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

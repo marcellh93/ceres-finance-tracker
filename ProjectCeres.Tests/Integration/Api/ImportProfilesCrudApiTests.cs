@@ -11,13 +11,13 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel1")]
-public class ImportProfilesCrudApiTests : IAsyncLifetime
+public class ImportProfilesCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _createdIds = [];
 
-    public ImportProfilesCrudApiTests(TestWebApplicationFactory factory)
+    public ImportProfilesCrudApiTests(TestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

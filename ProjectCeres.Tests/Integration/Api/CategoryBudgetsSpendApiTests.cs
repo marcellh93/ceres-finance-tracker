@@ -10,7 +10,7 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel1")]
-public class CategoryBudgetsSpendApiTests : IAsyncLifetime
+public class CategoryBudgetsSpendApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private static readonly Guid HousingCategoryId = new("20000000-0000-0000-0000-000000000008");
 
@@ -21,7 +21,7 @@ public class CategoryBudgetsSpendApiTests : IAsyncLifetime
     private readonly List<Guid> _seededBudgetIds = [];
     private int? _originalStartDay;
 
-    public CategoryBudgetsSpendApiTests(TestWebApplicationFactory factory)
+    public CategoryBudgetsSpendApiTests(TestWebApplicationFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

@@ -9,12 +9,12 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.MultiTenancy;
 
 [Collection("IntegrationParallel3")]
-public class GlobalQueryFilterTests : IAsyncLifetime
+public class GlobalQueryFilterTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly AuthTestWebApplicationFactory _factory;
     private const string EmailSuffix = "@query-filter-test.local";
 
-    public GlobalQueryFilterTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public GlobalQueryFilterTests(AuthTestWebApplicationFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync()

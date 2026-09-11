@@ -9,13 +9,13 @@ using ProjectCeres.Data;
 namespace ProjectCeres.Tests.Integration.Api;
 
 [Collection("IntegrationParallel2")]
-public class AccountsCrudApiTests : IAsyncLifetime
+public class AccountsCrudApiTests : IntegrationTestBase<TestWebApplicationFactory>, IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly List<Guid> _createdAccountIds = [];
 
-    public AccountsCrudApiTests(TestWebApplicationFactory factory)
+    public AccountsCrudApiTests(TestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb)
     {
         _factory = factory;
         _client  = factory.CreateClient();

@@ -9,11 +9,11 @@ using ProjectCeres.Models;
 namespace ProjectCeres.Tests.Integration.Authentication;
 
 [Collection("IntegrationParallel2")]
-public class ReauthGateTests : IClassFixture<AuthTestWebApplicationFactory>
+public class ReauthGateTests : IntegrationTestBase<AuthTestWebApplicationFactory>, IClassFixture<AuthTestWebApplicationFactory>
 {
     private readonly AuthTestWebApplicationFactory _factory;
 
-    public ReauthGateTests(AuthTestWebApplicationFactory factory) => _factory = factory;
+    public ReauthGateTests(AuthTestWebApplicationFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
     private async Task<HttpResponseMessage> CallGatedEndpointAsync(
         ApplicationUser user, long? lastReauthAtUnix)
