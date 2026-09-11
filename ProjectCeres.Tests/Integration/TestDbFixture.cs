@@ -31,9 +31,11 @@ namespace ProjectCeres.Tests.Integration;
 public class TestDbFixture : IAsyncDisposable
 {
     // Stage 12.18 — routed through TestDatabaseRouter so this fixture targets the
-    // AppRoleTests collection's own database (falls back to the legacy shared DB
-    // when CERES_TEST_DB_CLONES is unset).
-    internal static string DatabaseName => TestDatabaseRouter.DatabaseForCollection("AppRoleTests");
+    // TestDbFixtureTests serial collection's own database (falls back to the legacy
+    // shared DB when CERES_TEST_DB_CLONES is unset). All TestDbFixture-based classes
+    // share this one database name regardless of which collection they run in — safe
+    // because TestDbFixture rollback-isolates every test via its own transaction.
+    internal static string DatabaseName => TestDatabaseRouter.DatabaseForCollection("TestDbFixtureTests");
 
     internal static string AppConnectionString => TestDatabaseRouter.ConnectionsFor(DatabaseName).app;
 
@@ -86,3 +88,13 @@ public class TestDbFixture : IAsyncDisposable
         await Db.DisposeAsync();
     }
 }
+
+// Stage 12.18 (Task 5b-1): these classes each construct their own `new TestDbFixture()`
+// (a static shared connection + transaction-rollback isolation) and cannot join the
+// DB-per-bucket parallel model. DisableParallelization=true is required, not optional:
+// per xUnit's own contract, a collection opted out of parallelism "is guaranteed not to
+// run concurrently with any other test" — matching the RateLimitTests/MfaRateLimitTests/
+// AppRoleTests precedent. Without it this collection would still run concurrently with
+// the IntegrationParallelK buckets, which is exactly the race this move exists to avoid.
+[CollectionDefinition("TestDbFixtureTests", DisableParallelization = true)]
+public class TestDbFixtureTestsCollection { }

@@ -20,7 +20,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CategoryId 20000000-0000-0000-0000-000000000009 = Groceries  (Expense, non-system)
 ///   AccountTypeId 1 = Asset
 /// </summary>
-[Collection("IntegrationParallel2")]
+[Collection("TestDbFixtureTests")]
 public class CategoryBudgetServiceTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");

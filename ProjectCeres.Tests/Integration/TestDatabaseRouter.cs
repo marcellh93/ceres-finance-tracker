@@ -22,6 +22,7 @@ public static class TestDatabaseRouter
         ["MfaRateLimitTests"] = "project_ceres_test_mfaratelimit",
         ["AppRoleTests"] = "project_ceres_test_approle",
         ["RlsTests"] = "project_ceres_test_rls",
+        ["TestDbFixtureTests"] = "project_ceres_test_txfixture",
     };
 
     /// <summary>Number of parallel bucket databases; 1 (fallback) when unset.</summary>

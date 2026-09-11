@@ -17,7 +17,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CurrencyId    1 = EUR
 ///   CurrencyId    2 = USD  (used for currency-mismatch validation tests)
 /// </summary>
-[Collection("IntegrationParallel1")]
+[Collection("TestDbFixtureTests")]
 public class LiabilityPaymentServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

@@ -16,7 +16,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   AccountTypeId 1 = Asset, CurrencyId 1 = EUR
 ///   CategoryId 20000000-0000-0000-0000-000000000002 = Salary (Income)
 /// </summary>
-[Collection("IntegrationParallel4")]
+[Collection("TestDbFixtureTests")]
 public class IsClearedTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId = new("20000000-0000-0000-0000-000000000002");

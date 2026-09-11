@@ -10,7 +10,7 @@ using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Tests.Integration;
 
-[Collection("IntegrationParallel4")]
+[Collection("TestDbFixtureTests")]
 public class TransferStagingImportTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

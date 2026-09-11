@@ -12,7 +12,7 @@ namespace ProjectCeres.Tests.Integration;
 /// Integration tests for ImportProfileService against the real project_ceres_test database.
 /// Each test rolls back its transaction — no test data persists between tests.
 /// </summary>
-[Collection("IntegrationParallel2")]
+[Collection("TestDbFixtureTests")]
 public class ImportProfileServiceTests : IAsyncLifetime
 {
     private readonly TestDbFixture _fixture = new();

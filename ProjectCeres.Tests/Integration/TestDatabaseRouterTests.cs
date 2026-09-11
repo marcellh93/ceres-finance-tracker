@@ -37,6 +37,7 @@ public class TestDatabaseRouterTests
         TestDatabaseRouter.DatabaseForCollection("AppRoleTests").Should().Be("project_ceres_test_approle");
         TestDatabaseRouter.DatabaseForCollection("RlsTests").Should().Be("project_ceres_test_rls");
         TestDatabaseRouter.DatabaseForCollection("MfaRateLimitTests").Should().Be("project_ceres_test_mfaratelimit");
+        TestDatabaseRouter.DatabaseForCollection("TestDbFixtureTests").Should().Be("project_ceres_test_txfixture");
     }
 
     [Fact]

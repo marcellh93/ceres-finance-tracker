@@ -19,7 +19,7 @@ namespace ProjectCeres.Tests.Integration;
 ///   CategoryId 20000000-0000-0000-0000-000000000002 = Salary     (Income)
 ///   CategoryId 20000000-0000-0000-0000-000000000008 = Housing     (Expense)
 /// </summary>
-[Collection("IntegrationParallel1")]
+[Collection("TestDbFixtureTests")]
 public class MovementServiceTests : IAsyncLifetime
 {
     private static readonly Guid SalaryCategoryId  = new("20000000-0000-0000-0000-000000000002");
