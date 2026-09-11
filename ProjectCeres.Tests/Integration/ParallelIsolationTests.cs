@@ -49,8 +49,10 @@ public class ParallelIsolationTests
 
     /// <summary>
     /// The load-bearing isolation proof: a user written into bucket 1's database must be
-    /// completely absent from bucket 2's database — not merely invisible behind a query
-    /// filter, but not present in the row set at all (IgnoreQueryFilters).
+    /// completely absent from bucket 2's database. Isolation here is by separate PHYSICAL
+    /// database (distinct Npgsql pool per bucket clone), not a query filter — Identity's
+    /// AspNetUsers is deliberately unfiltered (cross-tenant by definition), so the
+    /// IgnoreQueryFilters() below is a belt-and-suspenders no-op, not the thing that isolates.
     /// </summary>
     [Fact]
     public async Task A_user_written_in_bucket1_is_absent_in_bucket2()
