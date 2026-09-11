@@ -76,6 +76,17 @@ if [[ "${1:-}" == "--template" ]]; then
 
   TEMPLATE="project_ceres_test_template"
 
+  # 0. Re-enable connections on the template if a PRIOR run left it
+  #    datallowconn=false (step 2 below). Postgres refuses ALL new connections
+  #    to such a DB — superuser included — so without this, re-provisioning
+  #    (provision_one → provision_roles/migrate_db, which both connect to the
+  #    template) fails with "database is not currently accepting connections".
+  #    This makes --template idempotent for local re-runs and persistent CI
+  #    runners. No-op on a first run (the row simply doesn't exist yet).
+  log "resetting $TEMPLATE datallowconn/datistemplate (if it exists from a prior run)"
+  psql -d postgres -v ON_ERROR_STOP=1 -c \
+    "UPDATE pg_database SET datistemplate=false, datallowconn=true WHERE datname='$TEMPLATE';" >/dev/null
+
   # 1. Build the template once (idempotent — full existing single-DB flow).
   provision_one "$TEMPLATE"
 
