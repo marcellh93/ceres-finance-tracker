@@ -21,4 +21,3 @@ ProjectCeres.Client/e2e/.artifacts
 # Config overlays + local secrets — only the placeholder base appsettings.json enters the image
 **/appsettings.*.json
 **/.env*
-scripts/Untitled-1.json

@@ -5,6 +5,7 @@ FROM node:22-alpine AS spa
 # corepack ships with node:22; it reads the pinned pnpm version from packageManager,
 # sidestepping the pnpm/action-setup sha512 misparse CI hit. Pin explicitly to match.
 RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+ENV COREPACK_ENABLE_STRICT=0
 WORKDIR /src
 
 # SPA (ProjectCeres.Client): tsc -b && vite build && check-size -> dist/
