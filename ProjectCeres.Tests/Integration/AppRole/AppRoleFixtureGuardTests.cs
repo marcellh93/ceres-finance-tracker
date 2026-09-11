@@ -14,7 +14,7 @@ public class AppRoleFixtureGuardTests
     [Fact]
     public async Task Ceres_app_role_does_not_have_BYPASSRLS()
     {
-        await using var conn = new NpgsqlConnection(TestDbFixture.AppConnectionString);
+        await using var conn = new NpgsqlConnection(AppRoleFixture.AppConnectionString);
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'ceres_app'";

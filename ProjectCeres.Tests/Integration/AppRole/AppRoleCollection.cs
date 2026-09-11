@@ -10,11 +10,25 @@ namespace ProjectCeres.Tests.Integration.AppRole;
 /// </summary>
 public sealed class AppRoleFixture : IAsyncLifetime
 {
+    // Stage 12.18: this collection's OWN database, not TestDbFixture's (that one resolves to
+    // project_ceres_test_txfixture). Under clones, raw connections opened via TestDbFixture here
+    // would split-brain against Factory/AppRoleFixture-seeded data, which lives on _approle.
+    internal static string DatabaseName => TestDatabaseRouter.DatabaseForCollection("AppRoleTests");
+    internal static string AppConnectionString => TestDatabaseRouter.ConnectionsFor(DatabaseName).app;
+    internal static string MigratorConnectionString => TestDatabaseRouter.ConnectionsFor(DatabaseName).migrator;
+
     public DualContextWebApplicationFactory Factory { get; } = new();
 
     public async Task InitializeAsync()
     {
-        await using var conn = new NpgsqlConnection(TestDbFixture.AppConnectionString);
+        // Stage 12.18: pin Factory to this collection's own DB before anything touches
+        // Factory.Services (UseDatabase must run before the host builds). Without this,
+        // DualContextWebApplicationFactory falls back to InitDbName (the legacy DB) even
+        // though AppConnectionString/MigratorConnectionString above resolve to _approle —
+        // a split-brain in the opposite direction of the one this file fixed.
+        Factory.UseDatabase(DatabaseName);
+
+        await using var conn = new NpgsqlConnection(AppConnectionString);
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'ceres_app'";

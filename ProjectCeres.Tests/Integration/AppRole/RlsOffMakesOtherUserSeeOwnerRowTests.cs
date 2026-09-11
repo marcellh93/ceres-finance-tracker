@@ -88,7 +88,7 @@ public sealed class RlsOffMakesOtherUserSeeOwnerRowTests : AppRoleTestBase
     // transient mutation cannot race a sibling test.
     private static async Task SetRlsEnabledAsync(string table, bool enabled)
     {
-        await using var conn = new NpgsqlConnection(TestDbFixture.MigratorConnectionString);
+        await using var conn = new NpgsqlConnection(AppRoleFixture.MigratorConnectionString);
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = enabled

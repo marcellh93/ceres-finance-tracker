@@ -568,6 +568,13 @@ public class AuditLogIntegrationTests : IntegrationTestBase<AuthTestWebApplicati
     public async Task Failed_audit_insert_during_login_returns_500_AND_does_NOT_issue_session_cookie()
     {
         await using var factory = new ThrowingAuditLogWriterFactory();
+        // Stage 12.18: pin this ad-hoc factory to the SAME database as the bucket-shared
+        // _factory (must happen before Services/CreateClient() build the host). Without
+        // this, the throwing factory defaults to InitDbName (the legacy DB), while the
+        // user below is registered into the bucket's DB — under clones those are two
+        // different databases, so login can't find the user it just registered and 401s
+        // before ever reaching the audit-write path this test means to exercise.
+        factory.UseDatabase(_factory.DatabaseName);
         var email = $"boom-{Guid.NewGuid():N}{EmailDomain}";
 
         // Registration itself writes an audit row (via the throwing writer in this
