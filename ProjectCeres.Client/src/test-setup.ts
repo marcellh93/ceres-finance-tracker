@@ -38,6 +38,16 @@ afterEach(() => {
   global.fetch = _originalFetch
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  // Drop any timer a component left pending. RTL's cleanup() unmounts components
+  // (so their own clearInterval/clearTimeout run first), but a library timer that
+  // ticks in the gap between file-end and jsdom teardown throws "window is not
+  // defined" and fails the run as an unhandled error. input-otp (used by LoginTotp)
+  // runs a 1s setInterval reading window.innerWidth + several setTimeouts calling
+  // document.elementFromPoint — exactly that leak. clearAllTimers drops them;
+  // useRealTimers restores the clock if a test enabled fake timers and didn't undo
+  // it. See docs/testing-flakiness.md § 5 (resource-leak root cause).
+  vi.clearAllTimers()
+  vi.useRealTimers()
   // Drop the singleton so no settings fetch or subscriber survives into the next
   // test — the source of the intermittent post-teardown unhandled rejection.
   __resetSettingsForTests()

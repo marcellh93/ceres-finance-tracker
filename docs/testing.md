@@ -30,6 +30,8 @@ If the answer is none of (1), (2), or (3), the test is not legitimately failing 
 
 A test that fails intermittently is treated as a failing test until proven otherwise. Do not add retries, do not mark `[Fact(Skip="flaky")]` silently, do not rerun until green. State that it is flaky, propose a root cause, and wait for direction.
 
+**Read [`docs/testing-flakiness.md`](testing-flakiness.md) before diagnosing or mitigating any flake** — it holds the root-cause taxonomy (async wait, isolation/order dependency, concurrency, resource leaks…), what mature teams do (detect → quarantine → fix → un-quarantine, with an SLA), a full audit of our existing mitigations, and the standing rule: **suppressing a flake without a root-cause ticket is prohibited, same as `[Fact(Skip=…)]`.** A filter or a retry is a quarantine with an owed fix, never a silent end-state.
+
 **Two narrow, CI-scoped exceptions exist, each earned by a root-cause first** — neither is a licence to retry away a red test: the Vitest one-retry for a known isolation flake (§ Definition of Done), and the Playwright CI-only single retry (§ E2E, Stage 12.17). Both keep local runs at zero retries, cap the retry at one, and surface a retried pass as a flake rather than silent-green. Adding a new retry carve-out requires the same: a documented root cause proving the failure is environmental (not a real bug), CI-only scope, and a one-retry cap.
 
 ### IMPORTANT — prohibited shortcuts

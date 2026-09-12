@@ -167,23 +167,22 @@ export default defineConfig({
       count: 2,
       condition: /Unable to find|Unable to fire|timed out|timeout/i,
     },
-    // Late async escaping a test's teardown under CI load — reported but non-fatal.
-    // All these are post-teardown artifacts on the slow 2-core runner, never an
-    // assertion failure (a real bug fails its own test deterministically on run 1):
-    //   - a stray settings fetch rejecting after teardown (the useSettings singleton
-    //     is seeded+reset in test-setup, but an in-flight resolution can land late);
-    //   - `window is not defined` (2026-09-12): a timer/fetch resolving after jsdom's
-    //     window is gone, attributed by Vitest to whichever file was running
-    //     (LoginTotp.test.tsx) — all 1113 tests passed, does not reproduce running
-    //     that file alone, only surfaces under full-suite concurrency.
-    // Narrower than the blanket dangerouslyIgnoreUnhandledErrors.
+    // A stray settings fetch can reject after a test's teardown (the useSettings
+    // singleton is seeded+reset in test-setup, but an in-flight resolution can land
+    // late under CI load). Filter that specific rejection so it's reported but doesn't
+    // fail an otherwise-green run — narrower than the blanket dangerouslyIgnoreUnhandledErrors.
+    //
+    // NOTE (2026-09-12): the `window is not defined` post-teardown error was FIXED at the
+    // source (a leaked input-otp setInterval — see test-setup.ts afterEach's
+    // vi.clearAllTimers()), NOT suppressed here. Do not re-add a `window is not defined`
+    // filter — if that error returns it means a timer is leaking teardown again, which is
+    // a real resource leak to fix, not to hide. See docs/testing-flakiness.md § 5.
     // https://vitest.dev/config/#onunhandlederror
     onUnhandledError(error): boolean | void {
       const msg = String(error?.message ?? '');
       if (
         msg.includes('/api/settings') ||
-        msg.includes('Failed to parse URL') ||
-        msg.includes('window is not defined')
+        msg.includes('Failed to parse URL')
       ) {
         return false;
       }

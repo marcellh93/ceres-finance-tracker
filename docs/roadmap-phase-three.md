@@ -1778,6 +1778,18 @@ Stage 12.3 (2026-08-23) added `Block IP` + a `SELF_LOCKOUT` guard but no way to 
 
 ---
 
+## Stage 12.19 — Flakiness: root-cause pass + quarantine discipline
+
+**Status: 🚧 In progress (2026-09-12).** After a run of "suppress the symptom and move on" responses to CI flakes, a proper study of test flakiness (causes, industry practice, our codebase) landed in [`docs/testing-flakiness.md`](testing-flakiness.md). Every flake we've hit fits the standard taxonomy (async-wait/timeout under CPU contention; isolation/shared-state leakage) — the textbook profile of a UI-heavy JS + parallel-.NET stack. This stage does the root-cause work the doc's § 6 plan lays out.
+
+- [x] Research + audit written (`docs/testing-flakiness.md`) — taxonomy, enterprise quarantine lifecycle, full inventory of our existing mitigations, cited sources.
+- [x] **Root-caused + fixed the 2026-09-11 `window is not defined` client-test flake at the source** — a leaked `input-otp` `setInterval` (used by `LoginTotp`) ticking after jsdom teardown. Added `vi.clearAllTimers()` + `vi.useRealTimers()` to `test-setup.ts afterEach`; verified over 3 full-suite runs (2 at 8-worker high contention) with the suppression filter REMOVED — no unhandled error. Deleted the `window is not defined` `onUnhandledError` line (dead config that would hide a real future bug).
+- [ ] Extend `docs/testing.md § Flaky tests` with the detect→quarantine→fix→un-quarantine lifecycle + SLA: a flake may be made non-fatal only with a documented root-cause hypothesis, a tracked `[ ]` owing the fix, and a scope/expiry — never a silent filter.
+- [ ] Audit `waitFor`/`findBy` sites that lean on the 15s budget or the `App.test.tsx` 3000ms bump; replace fixed-timeout waits with condition-based assertions where the awaited condition is specific.
+- [ ] Evaluate a lightweight flake-detection signal (label a retried pass as "flaky" into a tracked list) so flakes are found before they erode trust, without a retry silently greening a real failure.
+
+---
+
 ## Stage 13 — GDPR baseline (Batch 5)
 
 **Status: ❌ Pending.** Legal gate before opening to invited beta testers in the EU. Covers the privacy policy, cookie consent, retention enforcement, full data export, and right-to-erasure flow.
