@@ -17,7 +17,6 @@ public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
     private static readonly string FixturesDir =
         Path.Combine(AppContext.BaseDirectory, "Fixtures");
 
-    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task PostImport_ValidCsv_Returns200WithImportResultShape()
@@ -46,7 +45,7 @@ public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
         // A full valid request requires seeded account IDs — test shape only for now.
         // A follow-up test below sends a well-formed request with invalid IDs to assert 422.
 
-        var response = await _client.PostAsync("/api/import", form);
+        var response = await Client.PostAsync("/api/import", form);
 
         // Without a valid accountId the request should fail with 422 (validation error).
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity);
@@ -66,7 +65,7 @@ public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
         form.Add(new StringContent("Description"), "descriptionColumn");
         // Omit accountId intentionally.
 
-        var response = await _client.PostAsync("/api/import", form);
+        var response = await Client.PostAsync("/api/import", form);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -90,7 +89,7 @@ public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
         form.Add(new StringContent("Description"), "descriptionColumn");
         // accountId is required — without it we expect 422, not 400
         // This test asserts XLSX is no longer rejected at the format level (no longer 400)
-        var response = await _client.PostAsync("/api/import", form);
+        var response = await Client.PostAsync("/api/import", form);
 
         response.StatusCode.Should().NotBe(HttpStatusCode.BadRequest,
             "XLSX files should no longer be rejected at the format level");
@@ -114,7 +113,7 @@ public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
         form.Add(new StringContent("Description"), "descriptionColumn");
         form.Add(new StringContent(Guid.NewGuid().ToString()), "accountId");
 
-        var response = await _client.PostAsync("/api/import", form);
+        var response = await Client.PostAsync("/api/import", form);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadAsStringAsync();
@@ -128,7 +127,7 @@ public class ImportApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
         using var content = new MultipartFormDataContent();
         content.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(csv)), "file", "test.csv");
 
-        var response = await _client.PostAsync("/api/import/headers", content);
+        var response = await Client.PostAsync("/api/import/headers", content);
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<ViewModels.HeaderDetectionResult>();

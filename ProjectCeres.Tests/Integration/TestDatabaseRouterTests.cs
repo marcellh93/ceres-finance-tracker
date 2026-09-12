@@ -1,6 +1,7 @@
 using FluentAssertions;
-using ProjectCeres.Tests.Integration;
 using Xunit;
+
+namespace ProjectCeres.Tests.Integration;
 
 public class TestDatabaseRouterTests
 {

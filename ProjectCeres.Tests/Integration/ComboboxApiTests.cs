@@ -9,12 +9,11 @@ namespace ProjectCeres.Tests.Integration;
 public class ComboboxApiTests(Bucket1Factory factory, Bucket1Database bucketDb)
     : IntegrationTestBase<Bucket1Factory>(factory, bucketDb)
 {
-    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task GetActiveAccounts_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/accounts/active");
+        var response = await Client.GetAsync("/api/accounts/active");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -34,7 +33,7 @@ public class ComboboxApiTests(Bucket1Factory factory, Bucket1Database bucketDb)
     [Fact]
     public async Task GetActiveCategories_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/categories/active");
+        var response = await Client.GetAsync("/api/categories/active");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 

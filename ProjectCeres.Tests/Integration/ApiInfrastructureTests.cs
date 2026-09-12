@@ -11,12 +11,11 @@ namespace ProjectCeres.Tests.Integration;
 public class ApiInfrastructureTests(Bucket3Factory factory, Bucket3Database bucketDb)
     : IntegrationTestBase<Bucket3Factory>(factory, bucketDb)
 {
-    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task GetHealth_Returns200_WithStatusOk()
     {
-        var response = await _client.GetAsync("/api/health");
+        var response = await Client.GetAsync("/api/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -28,7 +27,7 @@ public class ApiInfrastructureTests(Bucket3Factory factory, Bucket3Database buck
     public async Task PostToApiEndpoint_WithInvalidBody_Returns422_WithValidationErrorShape()
     {
         var payload = new StringContent("{}", Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync("/api/health/validate", payload);
+        var response = await Client.PostAsync("/api/health/validate", payload);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
 

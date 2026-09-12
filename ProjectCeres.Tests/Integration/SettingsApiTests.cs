@@ -9,12 +9,11 @@ namespace ProjectCeres.Tests.Integration;
 public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
     : IntegrationTestBase<Bucket3Factory>(factory, bucketDb)
 {
-    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task Get_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/settings");
+        var response = await Client.GetAsync("/api/settings");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -38,7 +37,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
     public async Task Patch_updates_settings_and_persists()
     {
         // Snapshot the current state so we can restore.
-        var before = await _client.GetFromJsonAsync<JsonElement>("/api/settings");
+        var before = await Client.GetFromJsonAsync<JsonElement>("/api/settings");
         var beforeNumberFormat = before.GetProperty("numberFormat").GetString()!;
         var beforeDateFormat   = before.GetProperty("dateFormat").GetString()!;
         var beforePeriodStart  = before.GetProperty("periodStartDay").GetInt32();
@@ -46,7 +45,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
 
         try
         {
-            var res = await _client.PatchAsJsonAsync("/api/settings", new
+            var res = await Client.PatchAsJsonAsync("/api/settings", new
             {
                 numberFormat      = "period_decimal",
                 dateFormat        = "YYYY-MM-DD",
@@ -55,7 +54,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
             });
             res.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-            var after = await _client.GetFromJsonAsync<JsonElement>("/api/settings");
+            var after = await Client.GetFromJsonAsync<JsonElement>("/api/settings");
             after.GetProperty("numberFormat").GetString().Should().Be("period_decimal");
             after.GetProperty("dateFormat").GetString().Should().Be("YYYY-MM-DD");
             after.GetProperty("periodStartDay").GetInt32().Should().Be(15);
@@ -68,7 +67,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
             {
                 "EUR" => 1, "USD" => 2, "GBP" => 3, "COP" => 4, "ARS" => 5, "VED" => 6, _ => 1
             };
-            await _client.PatchAsJsonAsync("/api/settings", new
+            await Client.PatchAsJsonAsync("/api/settings", new
             {
                 numberFormat      = beforeNumberFormat,
                 dateFormat        = beforeDateFormat,
@@ -81,7 +80,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
     [Fact]
     public async Task Patch_returns_422_on_invalid_format()
     {
-        var res = await _client.PatchAsJsonAsync("/api/settings", new
+        var res = await Client.PatchAsJsonAsync("/api/settings", new
         {
             numberFormat      = "spanish_decimal",
             dateFormat        = "YYYY-MM-DD",
@@ -94,7 +93,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
     [Fact]
     public async Task Patch_returns_422_on_unknown_currency()
     {
-        var res = await _client.PatchAsJsonAsync("/api/settings", new
+        var res = await Client.PatchAsJsonAsync("/api/settings", new
         {
             numberFormat      = "comma_decimal",
             dateFormat        = "DD/MM/YYYY",
@@ -109,7 +108,7 @@ public class SettingsApiTests(Bucket3Factory factory, Bucket3Database bucketDb)
     [Fact]
     public async Task Patch_returns_422_on_period_start_day_out_of_range()
     {
-        var res = await _client.PatchAsJsonAsync("/api/settings", new
+        var res = await Client.PatchAsJsonAsync("/api/settings", new
         {
             numberFormat      = "comma_decimal",
             dateFormat        = "DD/MM/YYYY",

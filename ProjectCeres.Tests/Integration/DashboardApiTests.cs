@@ -10,12 +10,11 @@ namespace ProjectCeres.Tests.Integration;
 public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     : IntegrationTestBase<Bucket4Factory>(factory, bucketDb)
 {
-    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task GetCategoryBudgets_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/dashboard/category-budgets");
+        var response = await Client.GetAsync("/api/dashboard/category-budgets");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -36,7 +35,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetGoalBudgets_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/dashboard/goal-budgets");
+        var response = await Client.GetAsync("/api/dashboard/goal-budgets");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -56,7 +55,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetNetWorthTrend_Returns200_WithWrappedShape_And12MonthWindow()
     {
-        var response = await _client.GetAsync("/api/dashboard/net-worth-trend");
+        var response = await Client.GetAsync("/api/dashboard/net-worth-trend");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -85,7 +84,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetIncomeExpense_Returns200_WithWrappedShape_And12MonthWindow()
     {
-        var response = await _client.GetAsync("/api/dashboard/income-expense");
+        var response = await Client.GetAsync("/api/dashboard/income-expense");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -110,7 +109,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetSpendingByCategory_Returns200_WithWrappedShape_AndTotal()
     {
-        var response = await _client.GetAsync("/api/dashboard/spending-by-category");
+        var response = await Client.GetAsync("/api/dashboard/spending-by-category");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -134,7 +133,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetAccountBalances_Returns200_WithWrappedShape()
     {
-        var response = await _client.GetAsync("/api/dashboard/account-balances");
+        var response = await Client.GetAsync("/api/dashboard/account-balances");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -156,7 +155,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetCashFlow_Returns200_WithWrappedShape_And12MonthWindow()
     {
-        var response = await _client.GetAsync("/api/dashboard/cash-flow");
+        var response = await Client.GetAsync("/api/dashboard/cash-flow");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -179,7 +178,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetHealth_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/dashboard/health");
+        var response = await Client.GetAsync("/api/dashboard/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -204,7 +203,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetHealth_CurrencyCodeAndSymbol_AreNonNullStrings()
     {
-        var response = await _client.GetAsync("/api/dashboard/health");
+        var response = await Client.GetAsync("/api/dashboard/health");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         body.GetProperty("currencyCode").ValueKind.Should().Be(JsonValueKind.String);
@@ -216,7 +215,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetSummary_Returns200_WithExpectedShape()
     {
-        var response = await _client.GetAsync("/api/dashboard/summary");
+        var response = await Client.GetAsync("/api/dashboard/summary");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -236,7 +235,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetSummary_MtdHasIncomeExpensesAndSavingsRate()
     {
-        var response = await _client.GetAsync("/api/dashboard/summary");
+        var response = await Client.GetAsync("/api/dashboard/summary");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var mtd = body.GetProperty("mtd");
 
@@ -251,7 +250,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetSummary_NetWorthEntryHasExpectedFields()
     {
-        var response = await _client.GetAsync("/api/dashboard/summary");
+        var response = await Client.GetAsync("/api/dashboard/summary");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var netWorth = body.GetProperty("netWorth");
 
@@ -272,7 +271,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
         // Razor controllers. The legacy path now falls through to the SPA fallback
         // (MapFallbackToFile) and serves the app shell at 200; React Router renders the
         // route client-side. No server redirect remains.
-        using var noRedirectClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        using var noRedirectClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
         });
@@ -290,7 +289,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetDesignSystem_RedirectsToTheStaticShowcase()
     {
-        using var noRedirectClient = factory.CreateClient(new WebApplicationFactoryClientOptions
+        using var noRedirectClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
         });
@@ -306,7 +305,7 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
     [Fact]
     public async Task GetDesignSystem_DoesNotRequireAuthentication()
     {
-        using var anonymous = factory.CreateClient(new WebApplicationFactoryClientOptions
+        using var anonymous = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
         });
