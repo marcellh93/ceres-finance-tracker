@@ -1,295 +1,304 @@
 {
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/decision-mode/hooks/decision-detect.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/pushback-detect.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/stage-start-detect.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-touch-detect.js\""
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash|Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-protected-path-gate.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-spec-write-gate.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/warn-on-test-edit.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/pre-write-deferral.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/stage-completeness-check.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-stage-close-gate.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-commit-gate.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-full-test-run-gate.js\""
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/flag-doc-change.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/roadmap-consistency-check.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/check-assertion-count.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|Edit|Write|Read|Grep|Glob",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/loop-fingerprint.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/same-target-edit-count.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/track-session-writes.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Skill|Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/state-record-skill-fire.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-spec-postcheck.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Skill",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/brainstorm-needs-decision-mode.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/snapshot-on-turn-end.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/surface-build-warnings.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/read-failure-first.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-tests-on-write.js\""
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/snapshot-on-pre-compact.js\""
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/detect-compaction.js\""
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-image-claims/hooks/stop-image-claim-detect.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.sh\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/evidence-bundle-check.js\""
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spa-dist-freshness.js\""
-          }
-        ]
-      }
+ "hooks": {
+  "UserPromptSubmit": [
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/decision-mode/hooks/decision-detect.js\""
+     }
     ]
-  }
+   },
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/pushback-detect.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/stage-start-detect.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-touch-detect.js\""
+     }
+    ]
+   }
+  ],
+  "PreToolUse": [
+   {
+    "matcher": "Bash|Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-protected-path-gate.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-spec-write-gate.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/warn-on-test-edit.sh\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/no-unjustified-deferrals/hooks/pre-write-deferral.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/stage-completeness-check.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-stage-close-gate.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Bash",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/pre-commit-gate.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Bash",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-full-test-run-gate.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/suppress-without-research-gate.js\""
+     }
+    ]
+   }
+  ],
+  "PostToolUse": [
+   {
+    "matcher": "Edit|Write",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/flag-doc-change.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/roadmap-consistency-check.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/check-assertion-count.sh\""
+     }
+    ]
+   },
+   {
+    "matcher": "Bash|Edit|Write|Read|Grep|Glob",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/loop-fingerprint.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/deep-fix-mode/hooks/same-target-edit-count.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/track-session-writes.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Skill|Edit|Write|MultiEdit|NotebookEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/state-record-skill-fire.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/frontend-spec-postcheck.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Skill",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/playbook/hooks/brainstorm-needs-decision-mode.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/snapshot-on-turn-end.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Bash",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/surface-build-warnings.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Bash",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/read-failure-first.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-tests-on-write.js\""
+     }
+    ]
+   }
+  ],
+  "PreCompact": [
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/snapshot-on-pre-compact.js\""
+     }
+    ]
+   }
+  ],
+  "SessionStart": [
+   {
+    "matcher": "",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/state-rehydration/hooks/detect-compaction.js\""
+     }
+    ]
+   }
+  ],
+  "Stop": [
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-image-claims/hooks/stop-image-claim-detect.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.sh\""
+     }
+    ]
+   },
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/verify-stage-completeness/hooks/evidence-bundle-check.js\""
+     }
+    ]
+   },
+   {
+    "matcher": "*",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/spa-dist-freshness.js\""
+     }
+    ]
+   }
+  ]
+ }
 }
