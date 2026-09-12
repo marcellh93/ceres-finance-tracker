@@ -114,3 +114,22 @@ doesn't re-derive them.
   The value written spanned multiple lines (`pnpm ls --parseable` emits two path
   lines). `$GITHUB_OUTPUT` is a single-line `key=value` protocol — write exactly one
   clean value.
+
+## Gotcha (2026-09-11, Stage 12.14): gitleaks license flake
+
+- **`repo-hygiene` fails at "Secret scan (gitleaks)" with `🛑 missing gitleaks
+  license` / `API rate limit exceeded ... License key validation will be enforced`
+  — and NO secret was actually found.** `gitleaks/gitleaks-action@v3` requires a
+  paid `GITLEAKS_LICENSE` for organization accounts and validates it via a GitHub
+  API call; when that call hits the rate limit it hard-fails the job. It is a
+  transient infra flake, not a finding — the identical step passes on other runs
+  and on `gh run rerun <id> --failed`. **This is the textbook re-run-to-confirm
+  case** (see § Standing posture): same step green on the 3 prior runs, red on a
+  docs-only push, green on re-run.
+- **The durable fix (applied 2026-09-11):** don't use the action wrapper. The CI
+  step now installs the pinned gitleaks BINARY and runs it directly —
+  `gitleaks git . --redact --exit-code 1` (the `git` subcommand scans full history;
+  `checkout` uses `fetch-depth: 0`). The binary has no license gate and no
+  rate-limited validation call, so the flake cannot recur. To bump the version,
+  change `GITLEAKS_VERSION` in `.github/workflows/ci.yml` and confirm the release
+  asset name still matches `gitleaks_<v>_linux_x64.tar.gz`.

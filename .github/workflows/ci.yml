@@ -235,7 +235,19 @@ jobs:
             echo "::error::Vulnerable package(s) reported by dotnet list --vulnerable"; exit 1
           fi
       - name: Secret scan (gitleaks)
-        uses: gitleaks/gitleaks-action@v3
+        # Run the pinned gitleaks BINARY directly, not gitleaks/gitleaks-action@v3.
+        # The v3 action requires a paid GITLEAKS_LICENSE for org accounts and validates
+        # it via a GitHub API call that intermittently hits the rate limit and hard-fails
+        # the job ("missing gitleaks license") even though no secret was found — a flake
+        # that reddened an unrelated docs-only push on 2026-09-11 (Stage 12.14). The binary
+        # has no license gate. `git` scans full history (checkout uses fetch-depth: 0);
+        # --exit-code 1 fails the job on any finding; --redact keeps secrets out of logs.
+        # See docs/runbooks/ci-actions-troubleshooting.md § gitleaks.
+        run: |
+          GITLEAKS_VERSION=8.30.1
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks git . --redact --exit-code 1
       - name: Node hook self-tests
         run: bash scripts/test-hooks.sh
       - name: Roadmap marker/status consistency
