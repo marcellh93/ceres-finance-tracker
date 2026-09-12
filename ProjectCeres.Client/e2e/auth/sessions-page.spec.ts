@@ -223,7 +223,12 @@ test('Sessions: a blocked address can be unblocked from the Blocked addresses se
   await page.getByRole('button', { name: 'Unblock' }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByText(new RegExp(`Unblock ${blockedIp.replace(/\./g, '\\.')}\\?`))).toBeVisible()
+  // Match the dialog title as a literal string (SessionsPage renders `Unblock {ip}?`),
+  // not a regex built from blockedIp. Building a RegExp from a string while escaping
+  // only `.` is incomplete sanitization (CodeQL js/incomplete-sanitization): any other
+  // regex metacharacter in the value would pass through unescaped. A literal getByText
+  // needs no escaping and expresses the assertion directly.
+  await expect(dialog.getByText(`Unblock ${blockedIp}?`, { exact: false })).toBeVisible()
   await dialog.getByRole('button', { name: 'Unblock' }).click()
 
   // The section disappears once the only block is gone (it renders only when non-empty).

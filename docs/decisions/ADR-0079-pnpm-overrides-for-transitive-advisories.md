@@ -2,7 +2,7 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-08-10; re-pinned 2026-09-10 (Stage 12.16). Fifteen overrides now live in `ProjectCeres.Client/package.json`, one in `ProjectCeres/package.json`.
+**Status:** Accepted — 2026-08-10; re-pinned 2026-09-10 (Stage 12.16); `postcss-selector-parser` added 2026-09-12 (Dependabot #68). Fifteen overrides live in `ProjectCeres.Client/package.json`, two in `ProjectCeres/package.json`.
 
 > **Update 2026-09-10 (Stage 12.16).** A fresh advisory wave (16 alerts, 7 high) outran several existing pins and added new transitive targets. Re-pinned to the newest in-range patched floor (condition 3 re-verified against each parent's registry manifest): `fast-uri` `^3.1.5→^3.1.7`, `js-yaml` `^4.3.1→^4.3.2`, `qs` `^6.15.2→^6.16.0`, `hono` `^4.12.34→^4.13.7`. Added three new overrides — `@hono/node-server` `^1.19.17`, `browserslist` `^4.28.9`, `postcss-selector-parser` `^7.1.6` — and bumped the direct devDependency `vitest` `^4.1.6→^4.1.11` (which also cleared its transitive `@vitest/mocker`). `@hono/node-server` is no longer *left open*: this wave's advisory is fixed in the **1.x** line (`>=1.19.15`, inside the SDK's `^1.19.9` range), unlike the earlier one that needed a 2.x major. Result: **`pnpm audit` fully clean (0 at every severity)**. All four required commands below pass (lint's 5 pre-existing `setState-in-effect` errors are unrelated and tracked separately).
 
@@ -62,8 +62,9 @@ If an override would violate condition 3, it is not an override — it is an unv
 | Override | Pinned | Resolves to | Cleared | Reached the tree via |
 | --- | --- | --- | --- | --- |
 | `postcss` | `^8.5.23` | 8.5.26 | (shared) | tailwindcss 3.4.19 |
+| `postcss-selector-parser` | `^6.1.3` | 6.1.4 | Dependabot #68 (low, dev) | tailwindcss 3.4 → postcss-nested |
 
-The Razor-layer entry exists because the same postcss advisory affected both lockfiles. Fixing only the manifest Dependabot named would have left the client on a vulnerable copy.
+The Razor-layer entries exist because the postcss-family advisories affected this lockfile too. `postcss-selector-parser` was added 2026-09-12 (Dependabot #68 — uncontrolled AST recursion DoS, `>=6.1.0 <6.1.3`, dev-only): pinned to `^6.1.3` (resolves 6.1.4, inside tailwind/postcss-nested's `^6` range — ADR condition 3). Verified: `pnpm --dir ProjectCeres install --frozen-lockfile` + `run build:css` succeed; `pnpm audit` reports no known vulnerabilities.
 
 **None of the thirteen were reachable from application code.** Each was verified individually — no path in `ProjectCeres.Client/src` parses YAML, IP addresses, or URIs; there is no hono server (CORS is ASP.NET Core's); `undici` serves only jsdom inside the test environment. They were fixed because unreachable-today is not unreachable-forever, and because open high-severity alerts on a public portfolio repository carry their own cost.
 

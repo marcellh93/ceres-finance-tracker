@@ -6,6 +6,15 @@ on:
   pull_request:            # dormant — no PR workflow today; armed for the future
   workflow_dispatch:       # manual "Run workflow" button
 
+# Least-privilege GITHUB_TOKEN for every job (CodeQL actions/missing-workflow-permissions).
+# Without this, the token defaults to the repo-wide setting, which can be read/write. No job
+# here pushes commits, comments on PRs, publishes packages, or creates releases — they only
+# check out the repo and run tests. `actions/upload-artifact` (e2e traces) uses the Actions
+# API and needs no contents:write. So the whole workflow needs only contents: read. A job
+# that later needs more (e.g. a CD image push, §16.11) adds its own narrower `permissions:`.
+permissions:
+  contents: read
+
 # Supersede in-flight runs on rapid pushes to the same ref (saves minutes;
 # does not hide failures within a run).
 concurrency:

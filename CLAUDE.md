@@ -24,7 +24,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 - **React client (`ProjectCeres.Client/`):** React 19 + Vite + TypeScript. Tailwind CSS v4 (via `@tailwindcss/vite`). shadcn/ui with `base-nova` style, Lucide icons, CSS variables enabled. Component aliases: `@/components`, `@/lib/utils`, `@/components/ui`, `@/lib`, `@/hooks`. Tests: Vitest + React Testing Library.
 - **Package manager (frontend):** pnpm, pinned to 10.33.2 via `packageManager` in both `package.json` files
 - **Tests:** xUnit + Moq + FluentAssertions (server); Vitest + React Testing Library (client)
-- **pnpm overrides:** eight in `ProjectCeres.Client`, one in `ProjectCeres`, pinning transitive packages past npm advisories their parents cannot reach. An override is global — it rewrites the resolved version for *every* consumer of that name, across both projects. Read [ADR-0079](docs/decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md) before changing or removing one; it lists each pin's blast radius and the four commands that must pass afterwards.
+- **pnpm overrides:** several in `ProjectCeres.Client`, two in `ProjectCeres`, pinning transitive packages past npm advisories their parents cannot reach. An override is global — it rewrites the resolved version for *every* consumer of that name, across both projects. Read [ADR-0079](docs/decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md) before changing or removing one; it lists each pin's blast radius and the four commands that must pass afterwards.
 
 ## Key Commands
 
