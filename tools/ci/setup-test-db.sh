@@ -24,7 +24,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # The 5 serial-collection databases — must match
 # ProjectCeres.Tests/Integration/TestDatabaseRouter.cs SerialCollectionDatabases.
-SERIAL_DB_SUFFIXES=(ratelimit mfaratelimit approle rls txfixture)
+SERIAL_DB_SUFFIXES=(ratelimit mfaratelimit approle rls txfixture specs)
 
 log() { echo "[setup-test-db] $*" >&2; }
 

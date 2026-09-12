@@ -23,6 +23,7 @@ public static class TestDatabaseRouter
         ["AppRoleTests"] = "project_ceres_test_approle",
         ["RlsTests"] = "project_ceres_test_rls",
         ["TestDbFixtureTests"] = "project_ceres_test_txfixture",
+        ["SpecsTests"] = "project_ceres_test_specs",
     };
 
     /// <summary>Number of parallel bucket databases; 1 (fallback) when unset.</summary>

@@ -49,6 +49,13 @@ public class TestDatabaseRouterTests
     }
 
     [Fact]
+    public void DatabaseForCollection_gives_the_specs_project_its_own_db()
+    {
+        using var _ = new EnvVarScope("CERES_TEST_DB_CLONES", "4");
+        TestDatabaseRouter.DatabaseForCollection("SpecsTests").Should().Be("project_ceres_test_specs");
+    }
+
+    [Fact]
     public void Waf_uses_the_database_name_it_is_given_for_its_app_connection()
     {
         using var factory = new FixedDbFactory("project_ceres_test_3");
