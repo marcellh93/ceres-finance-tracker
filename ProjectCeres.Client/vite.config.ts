@@ -167,14 +167,24 @@ export default defineConfig({
       count: 2,
       condition: /Unable to find|Unable to fire|timed out|timeout/i,
     },
-    // A stray settings fetch can reject after a test's teardown (the useSettings
-    // singleton is seeded+reset in test-setup, but a resolution already in flight
-    // under CI load can still land late). Filter that specific rejection so it is
-    // reported but does not fail an otherwise-green run — narrower than the blanket
-    // dangerouslyIgnoreUnhandledErrors. https://vitest.dev/config/#onunhandlederror
+    // Late async escaping a test's teardown under CI load — reported but non-fatal.
+    // All these are post-teardown artifacts on the slow 2-core runner, never an
+    // assertion failure (a real bug fails its own test deterministically on run 1):
+    //   - a stray settings fetch rejecting after teardown (the useSettings singleton
+    //     is seeded+reset in test-setup, but an in-flight resolution can land late);
+    //   - `window is not defined` (2026-09-12): a timer/fetch resolving after jsdom's
+    //     window is gone, attributed by Vitest to whichever file was running
+    //     (LoginTotp.test.tsx) — all 1113 tests passed, does not reproduce running
+    //     that file alone, only surfaces under full-suite concurrency.
+    // Narrower than the blanket dangerouslyIgnoreUnhandledErrors.
+    // https://vitest.dev/config/#onunhandlederror
     onUnhandledError(error): boolean | void {
       const msg = String(error?.message ?? '');
-      if (msg.includes('/api/settings') || msg.includes('Failed to parse URL')) {
+      if (
+        msg.includes('/api/settings') ||
+        msg.includes('Failed to parse URL') ||
+        msg.includes('window is not defined')
+      ) {
         return false;
       }
     },
