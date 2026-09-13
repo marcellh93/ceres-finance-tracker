@@ -10,9 +10,10 @@
 #
 #   setup-test-db.sh --template --clones N
 #     Stage 12.18 parallel-test provisioning. Migrates ONE template database
-#     once, then clones it N+5 times (N parallel buckets + 5 serial-collection
-#     DBs) via `CREATE DATABASE ... TEMPLATE`, which is a cheap filesystem copy
-#     — far faster than running EF migrations N+5 times. Each clone still gets
+#     once, then clones it once per parallel bucket plus once per serial-collection
+#     DB (see SERIAL_DB_SUFFIXES below for the current set) via
+#     `CREATE DATABASE ... TEMPLATE`, which is a cheap filesystem copy
+#     — far faster than running EF migrations that many times. Each clone still gets
 #     its own role/grant pass, because grants are per-database and are not
 #     guaranteed to survive the TEMPLATE copy.
 #
