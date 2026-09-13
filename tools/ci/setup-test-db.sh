@@ -22,7 +22,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# The 5 serial-collection databases — must match
+# The serial-collection databases — must match
 # ProjectCeres.Tests/Integration/TestDatabaseRouter.cs SerialCollectionDatabases.
 SERIAL_DB_SUFFIXES=(ratelimit mfaratelimit approle rls txfixture specs)
 
