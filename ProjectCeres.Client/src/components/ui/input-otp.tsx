@@ -19,6 +19,14 @@ function InputOTP({
         containerClassName
       )}
       spellCheck={false}
+      // Disable the password-manager-badge nudge. It's the ONLY thing input-otp's
+      // background 1s setInterval + focus setTimeouts serve (they measure window.innerWidth
+      // to widen the field so a PWM icon doesn't overlap). With "none" those timers early-return
+      // and are never armed — so nothing can fire against a torn-down jsdom `window` after a
+      // test unmounts, which was the intermittent `ReferenceError: window is not defined` that
+      // failed client-test even with all assertions passing. Cosmetic feature, real leak removed
+      // in both tests and production. A caller can still override via props. See docs/testing-flakiness.md.
+      pushPasswordManagerStrategy="none"
       className={cn("disabled:cursor-not-allowed", className)}
       {...props}
     />

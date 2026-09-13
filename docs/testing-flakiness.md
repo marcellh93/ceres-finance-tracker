@@ -48,7 +48,7 @@ Honest inventory as of 2026-09-12 — much of this is genuinely good:
 - `retry { count: 2, condition: /Unable to find|timed out|timeout/i }` — retries **only** timeout/not-found flakes, never assertion failures. This is a reasonable stopgap and correctly scoped. ⚠️ stopgap, not a fix.
 - `onUnhandledError` filter for `/api/settings`, `Failed to parse URL`, and (2026-09-12) `window is not defined`. ⚠️ **This is symptom suppression** — see §5.
 - `test-setup.ts` `afterEach`: restores `global.fetch`, `vi.restoreAllMocks()`, `vi.unstubAllGlobals()`, resets the `useSettings` singleton; zeroes CSS animation/transition durations; polyfills matchMedia/ResizeObserver/scrollIntoView/getBoundingClientRect/elementFromPoint. This is strong isolation hygiene. ✅
-- **Gap:** the `afterEach` does **not** call `vi.clearAllTimers()` / `vi.useRealTimers()`. ❌ (root cause below.)
+- **Resolved (2026-09-13):** the `input-otp` real-`setInterval` leak (the "window is not defined" flake) is fixed at the source by defaulting `pushPasswordManagerStrategy="none"` in the `InputOTP` wrapper, so the interval is never armed. `afterEach` keeps `vi.useRealTimers()` (resets fake-timer state); `vi.clearAllTimers()` was removed — it only affects fake timers and was inert here. See § 5. ✅
 
 **Playwright (`e2e/playwright.golden.config.ts`):** `retries: process.env.CI ? 1 : 0`, `workers: 1`, `fullyParallel: false`, `timeout: 60_000`. Serial + one CI retry. ⚠️ retry is a stopgap; the serialization avoids concurrency flakes at a speed cost.
 
@@ -75,12 +75,13 @@ React clears these on unmount, but under full-suite CPU contention a tick can fi
 
 Our `afterEach` restores mocks and globals but **never clears pending timers**, so a leaked interval survives teardown. That is the exact gap the [Vitest best-practice guidance](https://qaskills.sh/blog/vitest-unhandled-errors-detected-fix) names: "fake timers left running / not-cleared timers cause unhandled rejections; clear them in `afterEach`."
 
-**The root-cause fix** (superseding the suppression filter): add to `test-setup.ts`'s `afterEach`:
-```ts
-vi.clearAllTimers()   // drop any interval/timeout a component left pending
-vi.useRealTimers()    // in case a test enabled fake timers and didn't restore
-```
-combined with ensuring RTL `cleanup()` runs (it does, via the jest-dom import + globals) so components unmount and their own `clearInterval` runs first. Once verified over repeated full-suite runs, the `window is not defined` line in `onUnhandledError` should be **removed** — a suppressed error we no longer produce is dead config that would hide a *real* future `window` bug.
+**Correction (2026-09-13) — a first fix that didn't work, and the one that did.** The first attempt added `vi.clearAllTimers()` + `vi.useRealTimers()` to `afterEach` and, after three green runs, was declared fixed. It wasn't: [Vitest docs](https://vitest.dev/api/vi.html) confirm **`vi.clearAllTimers()` only clears FAKE timers** (created under `vi.useFakeTimers()`); `input-otp` uses a **real** `setInterval` with no fake timers active, so the call was a no-op against this leak. The three green runs were the intermittent flake simply not firing — a classic under-sampling error (see § 7). It recurred on CI two days later.
+
+**The real root cause:** RTL auto-cleanup unmounts the component and runs its own `clearInterval`, but that only stops *future* ticks — a tick already dispatched onto the macrotask queue microseconds before the Vitest worker tears down jsdom (after a file's last test) still runs, against a gone `window`. No `afterEach` call can un-dispatch an already-queued real-timer callback.
+
+**The fix that works** (verified 3× full-suite at 8-worker contention with the suppression filter absent — zero `window is not defined`): stop arming the interval at all. `input-otp`'s 1s `setInterval` (and its focus `setTimeout`s) exist solely to power the password-manager-badge nudge, and the library **early-returns them when `pushPasswordManagerStrategy="none"`**. Our `components/ui/input-otp.tsx` wrapper now defaults that prop to `"none"` — no interval is armed, in tests *or* production (the nudge is cosmetic). This removes the leak class at the source rather than trying to clean up after it. The `window is not defined` suppression line was removed from `onUnhandledError` (the error is no longer produced).
+
+**Lesson for the register:** "N green runs" is not proof against an *intermittent* failure unless N is large and the runs stress the trigger (worker contention). Prefer a fix that makes the failure *structurally impossible* (no timer armed) over one that races to clean up (clear-on-teardown), and verify the API you're relying on actually applies (real vs. fake timers).
 
 ## 6. Our plan — reduce flakiness at the source
 
