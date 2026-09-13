@@ -4,8 +4,9 @@ Feature: Support ticket lifecycle
     Background:
         Given a signed-in user
 
-    Scenario: A user reply keeps the ticket Open
+    Scenario: A user reply returns a Pending ticket to Open
         Given the user has an open support ticket
+        And an operator has replied setting the status to "Pending"
         When the user replies to the ticket
         Then the ticket status is "Open"
 

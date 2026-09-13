@@ -41,8 +41,6 @@ public sealed class SupportTicketSteps
         _userId = user.Id;
         _userClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         _userSession = await AuthTestFixture.LoginViaHttpAsync(_factory, _userClient, user.Email!);
-        _userClient.DefaultRequestHeaders.Add(
-            "Cookie", $"{SessionConstants.SessionCookieName}={_userSession}");
     }
 
     [Given("the user has an open support ticket")]
@@ -79,8 +77,9 @@ public sealed class SupportTicketSteps
         return request;
     }
 
+    [Given("an operator has replied setting the status to \"(.*)\"")]
     [When("an operator replies to the ticket setting the status to \"(.*)\"")]
-    public async Task WhenOperatorRepliesSettingTheStatusTo(string status)
+    public async Task OperatorRepliesSettingTheStatusTo(string status)
     {
         var targetStatus = Enum.Parse<SupportTicketStatus>(status);
 
@@ -100,7 +99,7 @@ public sealed class SupportTicketSteps
         {
             Content = JsonContent.Create(new
             {
-                body = $"{_marker:N} operator reply",
+                body = $"{_marker:N} operator reply {Guid.NewGuid():N}",
                 status = targetStatus,
             }),
         };
@@ -117,7 +116,10 @@ public sealed class SupportTicketSteps
     {
         var expectedStatus = Enum.Parse<SupportTicketStatus>(expected);
 
-        var response = await _userClient.GetAsync($"/api/support/tickets/{_ticketId}");
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/support/tickets/{_ticketId}");
+        request.Headers.Add("Cookie", $"{SessionConstants.SessionCookieName}={_userSession}");
+
+        var response = await _userClient.SendAsync(request);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var thread = await response.Content.ReadFromJsonAsync<JsonElement>();
 
