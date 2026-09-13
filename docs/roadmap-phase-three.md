@@ -1695,6 +1695,19 @@ Two build-time gotchas surfaced and were fixed (both provable only by a real bui
 
 ---
 
+## Stage 12.15 — BDD (Reqnroll) ✅ Done (2026-09-13)
+
+**Status: ✅ Done (2026-09-13).** Adds a Gherkin/BDD layer (`ProjectCeres.Specs`, using Reqnroll — the maintained SpecFlow successor) alongside the existing xUnit integration suite, so a load-bearing user-facing flow (the support-ticket lifecycle) has an executable spec readable by a non-.NET reviewer, not just assertions in C#. Reuses the integration suite's real-auth `WebApplicationFactory` harness via a `[ScenarioDependencies]` DI bridge rather than building parallel test infrastructure. Completes the CI→Docker→BDD sequence started at Stage 12.13 (CI pipeline) and 12.14 (containerization): the pipeline now runs unit, integration, BDD, analyzer, client, and E2E suites on every push.
+
+- [x] `xunit` bumped `ProjectCeres.Tests` → `2.9.3` (`xunit.runner.visualstudio` → `2.8.2`) to satisfy `Reqnroll.xUnit`'s `xunit` ≥ 2.8.1 floor (`ProjectCeres.Specs` project-references `ProjectCeres.Tests`, so both must resolve to a mutually compatible xUnit); full suite confirmed green after the bump.
+- [x] `project_ceres_test_specs` added as a sixth serial-collection database (`SERIAL_DB_SUFFIXES` in `tools/ci/setup-test-db.sh`), provisioned by `--template --clones N` alongside the other five.
+- [x] `ProjectCeres.Specs` project created (`Reqnroll.xUnit` + `Reqnroll.Microsoft.Extensions.DependencyInjection`, `net10.0`, referenced into `ProjectCeres.sln`) with the DI bridge — `SpecsAuthFactory : AuthTestWebApplicationFactory` pinned to `TestDatabaseRouter.DatabaseForCollection("SpecsTests")`, registered via `[ScenarioDependencies]` in `Support/SpecsHooks.cs` — so step definitions reuse the real integration-test auth harness (`AuthTestFixture`, CSRF, sessions) instead of a parallel one.
+- [x] Support-ticket-lifecycle feature (`Features/SupportTicketLifecycle.feature`) with 2 load-bearing scenarios exercising the real `/api/support/tickets*` and `/api/admin/support/tickets/{id}/messages` endpoints end-to-end through `Steps/SupportTicketSteps.cs`: a user reply returns a Pending ticket to Open, and an operator reply moves an Open ticket to Pending. Both green.
+- [x] CI step (`ci.yml` `dotnet-test` job) — `BDD specs (Reqnroll)` runs after the "Full test suite" step, restoring + building + testing `ProjectCeres.Specs` against the reused Postgres service and its own `project_ceres_test_specs` clone (`CERES_TEST_DB_CLONES=4`), serial (no parallel override).
+- [x] `docs/testing.md` § BDD (Reqnroll) documents the pattern; `docs/roadmap-consistency-check.js` (Stop-hook auto-pickup) picks up this stage's checklist automatically — no hook change needed.
+
+---
+
 ## Stage 12.16 — Dependency-advisory triage ✅ Done (2026-09-10)
 
 **Status: ✅ Done (2026-09-10).** Surfaced when Stage 12.13's `repo-hygiene` job put `pnpm audit --audit-level high` on the critical path and it went red on the existing advisory backlog (16 `pnpm audit` alerts: 7 high, 8 moderate, 1 low; the `dotnet list package --vulnerable` half was already green — a JS-only backlog). Resolved per [ADR-0079](decisions/ADR-0079-pnpm-overrides-for-transitive-advisories.md): re-pinned four stale transitive overrides to their newest in-range patched floor, added three new overrides (`@hono/node-server`, `browserslist`, `postcss-selector-parser`), and bumped the direct devDependency `vitest`. See the ADR's 2026-09-10 update note for the per-package rationale and condition-3 verification.

@@ -54,7 +54,8 @@ jobs:
         run: dotnet restore ProjectCeres/ProjectCeres.csproj
       - name: Provision + migrate the test databases
         # Stage 12.18: --template --clones 4 migrates one template then clones the
-        # 4 parallel bucket DBs (project_ceres_test_1..4) + 5 serial-collection DBs,
+        # 4 parallel bucket DBs (project_ceres_test_1..4) + 6 serial-collection DBs
+        # (Stage 12.15 added project_ceres_test_specs for the BDD suite below),
         # so the integration suite runs in parallel with per-bucket isolation.
         # project_ceres_test_e2e (legacy single-DB mode) is still needed by
         # E2eDatabaseGuardStartupCheckTests, which connects to it to prove the guard
@@ -96,6 +97,18 @@ jobs:
         run: >-
           dotnet test ProjectCeres.Tests/ProjectCeres.Tests.csproj --no-build
           -- xUnit.ParallelizeTestCollections=true xUnit.MaxParallelThreads=4
+        env:
+          CERES_TEST_DB_CLONES: "4"
+      - name: BDD specs (Reqnroll)
+        # Reuses the provisioned Postgres + the project_ceres_test_specs clone
+        # (setup-test-db --template provisions it). Serial — no parallel override.
+        # Restored explicitly: the earlier restore/build steps target only
+        # ProjectCeres and ProjectCeres.Tests, not the whole solution, so nothing
+        # else in this job restores ProjectCeres.Specs's dependency graph.
+        run: |
+          dotnet restore ProjectCeres.Specs/ProjectCeres.Specs.csproj
+          dotnet build ProjectCeres.Specs/ProjectCeres.Specs.csproj --no-restore
+          dotnet test ProjectCeres.Specs/ProjectCeres.Specs.csproj --no-build
         env:
           CERES_TEST_DB_CLONES: "4"
 

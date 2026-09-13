@@ -13,6 +13,11 @@
 **Tooling (Stage 12.14 — Docker containerization, 2026-09-11)**
 - New `Dockerfile` + `.dockerignore` producing a hardened, minimal container image (174MB) that runs the app with the React SPA and Tailwind CSS baked in. Three-stage build (Node builds the SPA + CSS, the .NET SDK publishes, a slim non-root Alpine runtime serves it); the running image carries no build tooling and no secrets (all config is injected via environment variables at run time). Verified end-to-end: the container boots, serves the SPA shell, and runs as a non-root user on port 8080. Container hosting/deployment wiring (read-only filesystem, image registry push, migrations-on-deploy) is deferred to Stage 16. See [ADR-0081](docs/decisions/ADR-0081-docker-containerization.md).
 
+**Tests (Stage 12.15 — BDD via Reqnroll, 2026-09-13)**
+- New `ProjectCeres.Specs` project runs Gherkin/BDD scenarios (Reqnroll, the maintained SpecFlow successor) alongside the xUnit integration suite, reusing the same real-auth `WebApplicationFactory` test harness through a dependency-injection bridge. First feature: the support-ticket lifecycle (a user reply reopens a Pending ticket to Open; an operator reply moves an Open ticket to Pending), driving the real `/api/support/tickets*` endpoints end-to-end.
+- CI's `dotnet-test` job now runs the BDD specs against their own dedicated test database clone after the main suite.
+- `xunit` bumped to 2.9.3 in `ProjectCeres.Tests` to satisfy Reqnroll's minimum version requirement.
+
 **Tests / CI (Stage 12.18 — parallel integration suite, 2026-09-11)**
 - The integration test suite now runs in parallel: the single serialized 136-file collection is split into four runtime-balanced buckets, each pinned to its own cloned Postgres database, so buckets run concurrently with per-bucket isolation. Locally ~2× faster on a multi-core machine; a plain `dotnet test` still runs serially against one shared database with no setup change.
 - `tools/ci/setup-test-db.sh` gains a `--template --clones N` mode — migrates one template DB then file-copies it into the bucket + serial-collection databases; CI provisions four bucket clones and runs with collection parallelism enabled.

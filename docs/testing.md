@@ -343,6 +343,51 @@ The real cross-class safety net remains **per-test data isolation by marker** (p
 
 ---
 
+## BDD (Reqnroll) — Stage 12.15
+
+**What Reqnroll is.** [Reqnroll](https://reqnroll.net) is the actively maintained successor to SpecFlow (SpecFlow itself is end-of-life). It runs Gherkin `.feature` files as executable specs on top of .NET 10, using `Reqnroll.xUnit` as the test-runner binding — so scenarios show up as ordinary xUnit tests to `dotnet test`, CI, and the Stop hook's tiering. `Reqnroll.Microsoft.Extensions.DependencyInjection` wires `[ScenarioDependencies]` so each scenario gets its own DI container, matching how the integration suite already scopes state per test.
+
+**Where things live**, all under `ProjectCeres.Specs/`:
+
+| Folder | Contents |
+|---|---|
+| `Features/*.feature` | Gherkin scenarios (Given/When/Then). Reqnroll's MSBuild generator emits a matching `*.feature.cs` next to each one — generated, do not hand-edit. |
+| `Steps/*.cs` | `[Binding]` classes with `[Given]`/`[When]`/`[Then]` methods that implement the Gherkin steps by calling real HTTP endpoints through `WebApplicationFactory`, exactly like an integration test. |
+| `Support/*.cs` | Reqnroll wiring — hooks and the `[ScenarioDependencies]` DI registration. |
+
+**The harness-reuse pattern.** `ProjectCeres.Specs` takes a `ProjectReference` on `ProjectCeres.Tests`, so step definitions reuse the same `AuthTestWebApplicationFactory`, `AuthTestFixture` helpers (`RegisterUserAsync`, `LoginViaHttpAsync`, `MintCsrf`), and CSRF/session plumbing the API integration tests already use — no parallel test infrastructure. `Support/SpecsHooks.cs` defines:
+
+```csharp
+public sealed class SpecsAuthFactory : AuthTestWebApplicationFactory
+{
+    protected override string InitDbName => TestDatabaseRouter.DatabaseForCollection("SpecsTests");
+}
+
+public static class SpecsDependencies
+{
+    [ScenarioDependencies]
+    public static IServiceCollection Register()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<SpecsAuthFactory>();
+        return services;
+    }
+}
+```
+
+`SpecsAuthFactory` pins the BDD suite to its own serial collection database (`project_ceres_test_specs` under `--clones`; the legacy single DB under the N=1 local fallback) via `TestDatabaseRouter`, the same router the parallel integration buckets use (§ Integration test collections above) — so BDD scenarios get real auth (`UseTestAuthHandler=false`) without colliding with the parallel buckets or the other serial collections. `SERIAL_DB_SUFFIXES` in `tools/ci/setup-test-db.sh` includes `specs`, so `--template --clones N` provisions its clone alongside the other five.
+
+**How to add a feature:**
+
+1. Add a `.feature` file under `Features/` describing the behavior in Given/When/Then.
+2. Run a build (or `dotnet build ProjectCeres.Specs`) so Reqnroll's generator emits the matching `.feature.cs`.
+3. Add a `[Binding]` step class under `Steps/` implementing any steps that don't already exist, driving real endpoints the way `SupportTicketSteps.cs` drives `/api/support/tickets*` — inject `SpecsAuthFactory`, register/login a user via `AuthTestFixture`, and mark rows with a per-scenario GUID so assertions never see another scenario's data on the shared serial DB.
+4. `dotnet test ProjectCeres.Specs` locally (falls back to the legacy DB when `CERES_TEST_DB_CLONES` is unset, same as the integration suite).
+
+**xUnit-version coupling.** `ProjectCeres.Specs` depends on `Reqnroll.xUnit`, which requires `xunit` ≥ 2.8.1. Because `ProjectCeres.Specs` project-references `ProjectCeres.Tests`, both projects must resolve to a mutually compatible xUnit version — this is why `ProjectCeres.Tests` was bumped from its prior pin to `xunit 2.9.3` / `xunit.runner.visualstudio 2.8.2` in the same stage. Bumping xUnit again in `ProjectCeres.Tests` without checking `ProjectCeres.Specs`'s constraint (or vice versa) risks a version conflict that only shows up as a restore/build failure, not a test failure — verify both projects build after any future xUnit version change.
+
+---
+
 ## CI/CD — Phase 3 Scope
 
 > **Superseded 2026-09-10 for the CI shape:** the actual pipeline is documented in § Continuous Integration (Stage 12.13) below. The Testcontainers / single-job / PR-gating description here predates it and is retained only for its CD / future-hosting notes.
@@ -381,7 +426,7 @@ already run. DB provisioning is shared via `tools/ci/setup-test-db.sh` (also use
 **Jobs** (five, parallel, fail-fast off — one push surfaces all failures):
 | Job | Runs |
 |---|---|
-| `dotnet-test` | full `dotnet test` (no filter) against a Postgres 16 service, **parallel-with-clones** (Stage 12.18): provisions `setup-test-db.sh --template --clones 4` then runs with `CERES_TEST_DB_CLONES=4 -- xUnit.ParallelizeTestCollections=true xUnit.MaxParallelThreads=4` |
+| `dotnet-test` | full `dotnet test` (no filter) against a Postgres 16 service, **parallel-with-clones** (Stage 12.18): provisions `setup-test-db.sh --template --clones 4` then runs with `CERES_TEST_DB_CLONES=4 -- xUnit.ParallelizeTestCollections=true xUnit.MaxParallelThreads=4`; then a serial **BDD specs (Reqnroll)** step runs `ProjectCeres.Specs` against its own `project_ceres_test_specs` clone (Stage 12.15) |
 | `analyzer-test` | the Roslyn analyzer suite |
 | `client-test` | `pnpm build` (tsc + vite + size budget) + Vitest |
 | `e2e` | Playwright sharded over chromium/firefox/webkit; traces on failure |
