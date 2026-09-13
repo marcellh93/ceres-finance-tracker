@@ -15,6 +15,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 - **Legacy CSS pipeline:** a Tailwind v3 build (`Styles/app.css` → `wwwroot/css/site.css`) still runs on every `dotnet build`. It is a leftover from the pre-SPA Razor layer and no longer styles anything — see *Known cruft* below.
 - **Analyzers:** custom Roslyn rules (`ProjectCeres.Analyzers`) that enforce project invariants at compile time
 - **Tests:** xUnit, Moq, FluentAssertions (server) · Reqnroll (BDD, `ProjectCeres.Specs`) · Vitest + React Testing Library (client) · Playwright (E2E)
+- **Container:** a hardened multi-stage `Dockerfile` builds a deployment image (SPA + CSS baked in, non-root, no secrets) — see [ADR-0081](docs/decisions/ADR-0081-docker-containerization.md). It is a **deployment** artifact, not the local-dev path: the image expects an external, already-migrated Postgres and runtime-injected config, so use the Quick Start below to run locally. A one-command local `docker compose` stack (app + Postgres + migrations) is deferred to Stage 16.
 
 ### Solution layout
 
