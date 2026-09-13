@@ -146,3 +146,8 @@ docs/guide/
 docs/gaps-review.md
 docs/code-quality-audit-*.md
 docs/hook-architecture-audit-*.md
+
+# Reqnroll (Stage 12.15 BDD) — code-behind auto-generated from *.feature on every
+# build. Regenerated deterministically, never hand-edited; committing it would let it
+# drift from the .feature source. The .feature files themselves ARE tracked.
+*.feature.cs
