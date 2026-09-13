@@ -14,7 +14,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 - **React client (`ProjectCeres.Client/`):** React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui (`base-nova` style)
 - **Legacy CSS pipeline:** a Tailwind v3 build (`Styles/app.css` → `wwwroot/css/site.css`) still runs on every `dotnet build`. It is a leftover from the pre-SPA Razor layer and no longer styles anything — see *Known cruft* below.
 - **Analyzers:** custom Roslyn rules (`ProjectCeres.Analyzers`) that enforce project invariants at compile time
-- **Tests:** xUnit, Moq, FluentAssertions (server) · Vitest + React Testing Library (client) · Playwright (E2E)
+- **Tests:** xUnit, Moq, FluentAssertions (server) · Reqnroll (BDD, `ProjectCeres.Specs`) · Vitest + React Testing Library (client) · Playwright (E2E)
 
 ### Solution layout
 
@@ -23,6 +23,7 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 | `ProjectCeres` | Web host — `/api/*` controllers, services, EF Core model, SPA fallback |
 | `ProjectCeres.Client` | React SPA (Vite) |
 | `ProjectCeres.Tests` | Server unit + integration tests |
+| `ProjectCeres.Specs` | BDD executable specifications (Reqnroll + Gherkin `.feature` files), reusing the `ProjectCeres.Tests` harness |
 | `ProjectCeres.Analyzers` | Roslyn analyzers + source generators (CER001–CER020) |
 | `ProjectCeres.Analyzers.Annotations` | Attributes the analyzers key off (e.g. `[PreAuthScope]`, `[RlsBypassJustified]`) |
 | `ProjectCeres.Analyzers.Tests` | Tests for the analyzers |
@@ -157,7 +158,7 @@ Two leftovers from the pre-SPA architecture that a new contributor will otherwis
 
 ### Running the tests
 
-`dotnet test` requires `project_ceres_test` to exist with the three roles (steps 1–2). The integration suite shares that one database and serializes access through a single xUnit collection — **do not run two `dotnet test` processes at once**, or they will trample each other and produce failures unrelated to your change.
+`dotnet test` requires `project_ceres_test` to exist with the three roles (steps 1–2). A plain local `dotnet test` runs the integration suite **serially against that one database** (the default), so **do not run two `dotnet test` processes at once** — they will trample each other and produce failures unrelated to your change. The suite is also split into per-bucket collections that can run in **parallel, each against its own cloned database**, when clones are provisioned (`tools/ci/setup-test-db.sh --template --clones N` + `CERES_TEST_DB_CLONES`); that is how CI runs it. See `docs/testing.md` § Integration test collections for the DB-per-bucket model.
 
 Before considering a change done, all four should exit 0: `dotnet build`, `dotnet test`, `pnpm build`, `pnpm test`.
 
