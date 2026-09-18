@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Admin;
+using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Controllers.Api;
 using ProjectCeres.Data;
@@ -159,6 +160,19 @@ public class AdminAuthorizationTests : IntegrationTestBase<Bucket3AuthFactory>, 
         {
             var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
             await svc.GrantAsync(caller.Id);
+
+            // The last-admin guard is a GLOBAL admin count (AdminRoleService.AdminCountAsync),
+            // so "caller is the only admin" is a precondition this test must MAKE true, not
+            // assume. The shared DB can hold admins from sibling tests / bucket co-tenants;
+            // when one lingers, the demote is (correctly) allowed → 204, and this asserts 409
+            // against a false premise. Revoke every other admin first so the count is exactly 1.
+            // (Isolation flake root-caused 2026-09-18, §12.19.)
+            var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            foreach (var other in await um.GetUsersInRoleAsync(AppRoles.Admin))
+            {
+                if (other.Id != caller.Id) await svc.RevokeAsync(other.Id);
+            }
+            (await svc.AdminCountAsync()).Should().Be(1, "the test must isolate the last-admin precondition");
         }
 
         var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory, caller.Id);
