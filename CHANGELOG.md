@@ -6,6 +6,9 @@
 
 #### Added
 
+**Tests / CI (Stage 12.19 — flaky-test surfacing, 2026-09-18)**
+- CI now names any test that passed only after a retry. Both test runners allow a CI-only retry (Vitest twice, Playwright once) to absorb load-induced timing slips; previously a retry that turned red green left no trace. Now each retried-then-passed test is written by name to the GitHub Actions run summary plus an inline warning, so a slowly-degrading test stays visible instead of hiding behind the retry. Reporting only — it never changes a run's pass/fail.
+
 **Tooling / CI (Stage 12.13 — GitHub Actions, 2026-09-10)**
 - New CI pipeline (`.github/workflows/ci.yml`) running on every push to `main`: full server test suite, Roslyn analyzers, client build + Vitest, Playwright E2E across chromium/firefox/webkit, and a hygiene job (vulnerable-package scan, gitleaks secret scan, hook self-tests, roadmap consistency). Runs on a fresh, stateless environment — the un-tiered superset of the local per-turn test gate, which is unchanged.
 - New `tools/ci/setup-test-db.sh` — one script that creates + role-provisions + migrates a Ceres database, consumed by both CI and the E2E `run-server.sh` so the two never drift.
@@ -271,6 +274,11 @@
 - `ProjectCeres/Common/UserOwnedTables.cs` (the hand-typed `UserOwnedTables.All` list) — superseded by the model-derived `UserOwnedModel`
 
 #### Fixed
+
+**Tests (Stage 12.19 — flake root-causes, 2026-09-18)**
+- Fixed the recurring `window is not defined` client-test crash at its source — an upstream missing-cleanup bug in `input-otp` — by upgrading to 1.5.0 (two earlier local-only fixes didn't hold on CI).
+- Replaced a wall-clock timing assertion in a password-reset test (which failed on a fast CI runner that finished faster than the expected threshold) with a deterministic call counter that asserts the real invariant.
+- Fixed an order-dependent failure in the admin authorization suite: the "last admin can't be demoted" test now enforces the single-admin precondition it depended on, instead of assuming it (the guard counts admins globally against a shared test database).
 
 **Security (Stage 12.5 A1 — follow-up ticket isolation, 2026-09-08)**
 - A support follow-up ticket can no longer reference another user's ticket at the database level (previously only the service refused it) — closed with a composite owner-scoped foreign key.

@@ -167,16 +167,25 @@ export default defineConfig({
       count: 2,
       condition: /Unable to find|Unable to fire|timed out|timeout/i,
     },
+    // Reporters. Default (human) always; on CI, add github-actions (native
+    // annotations for failures) and our flaky reporter (§12.19 item 5), which
+    // surfaces retried-then-passed tests to the job summary so a CI retry can
+    // never silently green a degrading test. Local runs keep the plain default.
+    reporters: process.env.CI
+      ? ['default', 'github-actions', './vitest.flaky-reporter.ts']
+      : ['default'],
     // A stray settings fetch can reject after a test's teardown (the useSettings
     // singleton is seeded+reset in test-setup, but an in-flight resolution can land
     // late under CI load). Filter that specific rejection so it's reported but doesn't
     // fail an otherwise-green run — narrower than the blanket dangerouslyIgnoreUnhandledErrors.
     //
-    // NOTE (2026-09-12): the `window is not defined` post-teardown error was FIXED at the
-    // source (a leaked input-otp setInterval — see test-setup.ts afterEach's
-    // vi.clearAllTimers()), NOT suppressed here. Do not re-add a `window is not defined`
-    // filter — if that error returns it means a timer is leaking teardown again, which is
-    // a real resource leak to fix, not to hide. See docs/testing-flakiness.md § 5.
+    // NOTE (2026-09-12, corrected 2026-09-18): the `window is not defined` post-teardown
+    // error was FIXED at the source — an upstream missing-cleanup bug in input-otp 1.4.2,
+    // resolved by the bump to 1.5.0 (be0c743f). It was NOT suppressed here, and the earlier
+    // `vi.clearAllTimers()` attempt was inert (it only clears fake timers). Do not re-add a
+    // `window is not defined` filter — if that error returns it means a timer is leaking
+    // teardown again, which is a real resource leak to fix, not to hide. See
+    // docs/testing-flakiness.md § 5.
     // https://vitest.dev/config/#onunhandlederror
     onUnhandledError(error): boolean | void {
       const msg = String(error?.message ?? '');

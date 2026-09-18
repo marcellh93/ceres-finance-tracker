@@ -21,7 +21,15 @@ export default defineConfig({
   fullyParallel: false,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [['list'], ['html', { outputFolder: '.artifacts/report', open: 'never' }]],
+  // JSON reporter added for the flaky-signal parse step (§12.19 item 5):
+  // tools/e2e/report-flaky.mjs reads results.json for status==='flaky' (a test
+  // that passed only after the CI retry) and writes it to the GH job summary +
+  // annotations, so a retry can never silently green a degrading test.
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: '.artifacts/report', open: 'never' }],
+    ['json', { outputFile: '.artifacts/results.json' }],
+  ],
   outputDir: './.artifacts/test-results',
   use: {
     baseURL: APP_URL,

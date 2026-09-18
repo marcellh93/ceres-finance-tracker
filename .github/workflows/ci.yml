@@ -216,6 +216,11 @@ jobs:
           PGHOST: localhost
           PGUSER: postgres
           PGPASSWORD: postgres
+      - name: Surface flaky tests (retried-then-passed)
+        # Runs even when E2E fails so a flake alongside a real failure still surfaces.
+        # Reporting only — never changes the job outcome (§12.19 item 5).
+        if: always()
+        run: node tools/e2e/report-flaky.mjs ProjectCeres.Client/e2e/.artifacts/results.json
       - name: Upload traces + report on failure
         if: failure()
         uses: actions/upload-artifact@v6

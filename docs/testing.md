@@ -40,6 +40,16 @@ A flake moves through four states — **detect → quarantine → fix → un-qua
 
 1. **Detect.** A test fails, and the same test passes on an unchanged tree (a re-run, a different CI shard, a historical green). That is the signal. Confirm it is a flake, not a real intermittent bug, by reading the actual failure — and remember that some flakes fire **only** on the CI runner (slower, 2-core) and never locally, so *local green is not proof a flake is fixed* (see the 2026-09-18 `input-otp` case in [`testing-flakiness.md`](testing-flakiness.md) § 5).
 
+   **The CI flaky signal (§12.19 item 5).** The CI-only retries (Playwright one, Vitest two) would otherwise green a retried pass silently — so a retry that succeeds is surfaced, by name, on the run it happened:
+   - **Playwright** — `tools/e2e/report-flaky.mjs` parses the JSON report for `status: "flaky"` and writes a table to the run's **GitHub job summary** plus a `::warning::` annotation per test.
+   - **Vitest** — `ProjectCeres.Client/vitest.flaky-reporter.ts` (active on CI only) flags any test whose result is `passed` but carries attached errors (Vitest's marker for passed-after-retry), to the same job summary + annotations.
+
+   **The response rule (this is what makes the signal load-bearing).** A test that appears in the CI flaky table is never ignored:
+   - **First sighting →** open a tracked `[ ]` in the active stage owing its root-cause. The retry *is* the quarantine mechanism (step 2), so the test is already non-fatal-but-visible; the owed-fix `[ ]` is the missing half.
+   - **Recurrence →** root-cause it now (step 3). A test flaky across multiple runs is either a real environmental issue to fix structurally, or an early warning of a real regression that happens to pass part of the time — both demand action, not another green run.
+
+   The per-run table does **not** aggregate frequency across runs; watching that trend is manual today. Automated cross-run counting is tracked as a Stage 16 follow-up (see [`roadmap-phase-three.md`](roadmap-phase-three.md) § 12.19).
+
 2. **Quarantine — allowed ONLY with all four of these in the same change.** A quarantine makes the flake **non-fatal but still visible**; it is a waiting room, not a graveyard. To quarantine, you must ship together:
    - a **documented root-cause hypothesis** (what you believe is leaking/racing, and the evidence);
    - a **tracked `[ ]` line** in the active batch stage owing the real fix (a quarantine with no owed-fix checkbox is a silent suppression — forbidden, and the `suppress-without-research-gate` hook denies it);
@@ -449,6 +459,14 @@ already run. DB provisioning is shared via `tools/ci/setup-test-db.sh` (also use
 | `client-test` | `pnpm build` (tsc + vite + size budget) + Vitest |
 | `e2e` | Playwright sharded over chromium/firefox/webkit; traces on failure |
 | `repo-hygiene` | `dotnet list package --vulnerable` + client `pnpm audit` + gitleaks + Node hook tests (`scripts/test-hooks.sh`) + roadmap consistency |
+
+**Flaky surfacing (§12.19 item 5):** the `client-test` and `e2e` jobs allow a
+CI-only retry (Vitest ×2, Playwright ×1). A retry that turns red green is not silent —
+each retried-then-passed test is written by name to the run's GitHub job summary plus a
+`::warning::` annotation (`vitest.flaky-reporter.ts`, `tools/e2e/report-flaky.mjs`). What
+to do when a test appears there is the response rule in § The quarantine lifecycle step 1
+(track it on first sighting, root-cause on recurrence). Cross-run frequency aggregation is
+a Stage 16.18 follow-up.
 
 **Secrets:** none real — fixed test-only values (the `*_dev_password` role passwords
 in `scripts/setup-postgres-roles.sql` and a fixed test token-lookup secret). Real
