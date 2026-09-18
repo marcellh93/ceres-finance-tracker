@@ -435,9 +435,8 @@ describe('Login page', () => {
     await user.type(screen.getByLabelText(/password/i), 'pw');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    await waitFor(
-      () => expect(screen.getByLabelText(/password/i)).toBe(document.activeElement),
-      { timeout: 3000 },
+    await waitFor(() =>
+      expect(screen.getByLabelText(/password/i)).toBe(document.activeElement),
     );
   });
 
