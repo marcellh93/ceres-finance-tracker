@@ -34,6 +34,24 @@ A test that fails intermittently is treated as a failing test until proven other
 
 **Two narrow, CI-scoped exceptions exist, each earned by a root-cause first** — neither is a licence to retry away a red test: the Vitest one-retry for a known isolation flake (§ Definition of Done), and the Playwright CI-only single retry (§ E2E, Stage 12.17). Both keep local runs at zero retries, cap the retry at one, and surface a retried pass as a flake rather than silent-green. Adding a new retry carve-out requires the same: a documented root cause proving the failure is environmental (not a real bug), CI-only scope, and a one-retry cap.
 
+### The quarantine lifecycle (binding)
+
+A flake moves through four states — **detect → quarantine → fix → un-quarantine** — and never skips to a silent end-state. This is what "suppressing a flake without a root-cause ticket is prohibited" means in practice.
+
+1. **Detect.** A test fails, and the same test passes on an unchanged tree (a re-run, a different CI shard, a historical green). That is the signal. Confirm it is a flake, not a real intermittent bug, by reading the actual failure — and remember that some flakes fire **only** on the CI runner (slower, 2-core) and never locally, so *local green is not proof a flake is fixed* (see the 2026-09-18 `input-otp` case in [`testing-flakiness.md`](testing-flakiness.md) § 5).
+
+2. **Quarantine — allowed ONLY with all four of these in the same change.** A quarantine makes the flake **non-fatal but still visible**; it is a waiting room, not a graveyard. To quarantine, you must ship together:
+   - a **documented root-cause hypothesis** (what you believe is leaking/racing, and the evidence);
+   - a **tracked `[ ]` line** in the active batch stage owing the real fix (a quarantine with no owed-fix checkbox is a silent suppression — forbidden, and the `suppress-without-research-gate` hook denies it);
+   - an **expiry / scope** (which environment, which test, and by when it must be resolved) — the SLA below;
+   - a mechanism that **keeps the test running and surfaces the outcome as a flake**, never as silent green. Acceptable mechanisms in this repo, in order of preference: the CI-only one-retry (Playwright/Vitest — a retried pass is reported as `flaky`); a narrow, commented `onUnhandledError` filter for a specific message. **Never**: `[Fact(Skip=…)]`, `it.skip`, a blanket retry, or deleting the assertion.
+
+3. **Fix at the root**, then remove the quarantine mechanism in the same change (the filter line / the `[ ]`). Prefer a fix that makes the failure **structurally impossible** (a missing cleanup restored, a timer never armed, physical DB isolation) over one that races teardown or widens a timeout. Verify on the surface where the flake actually fires — if it is CI-only, the CI run is the gate, not a local pass.
+
+4. **Un-quarantine.** Delete the retry/filter and confirm green on the real surface with the quarantine mechanism absent (so a clean run genuinely proves the fix, not the suppression).
+
+**The SLA.** A quarantine is time-boxed: its owed-fix `[ ]` lives in the active stage and is resolved before that stage closes (Phase E blocks a stage-close with any unchecked `[ ]` under its heading). A quarantine that would outlive its stage is escalated to the user, not silently carried. A red build is never made green by adding a quarantine mechanism the same turn the flake is discovered *without* the four elements above — that is the exact "suppress and move on" reflex this stage (§12.19) exists to stop.
+
 ### IMPORTANT — prohibited shortcuts
 
 Do not delete tests, do not add `[Fact(Skip="…")]`, do not comment out assertions, do not wrap failing calls in `try/catch` to silence them, and do not call `DbContext`, repositories, or services directly to set state that the feature under test was supposed to set. If a test cannot be made to pass without one of these, stop and tell the user.
