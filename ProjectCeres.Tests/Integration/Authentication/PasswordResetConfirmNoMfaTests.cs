@@ -460,19 +460,21 @@ public class PasswordResetConfirmNoMfaTests : IntegrationTestBase<Bucket3AuthFac
     [Fact]
     public async Task Confirm_with_unknown_token_runs_at_least_one_argon2_verify()
     {
-        await using var factory = _factory.WithReplacedService<IEmailService>(new NoopEmailService());
+        // Assert the Argon2id verify happened by COUNTING it, not by timing it. The old
+        // wall-clock assertion (elapsed > 50ms) is flaky: a fast/differently-tuned CI runner
+        // completes the verify in ~31ms and fails a real, correct run (observed 2026-09-18).
+        // The counting hasher is the deterministic replacement built for exactly this.
+        await using var factory = _factory.WithArgon2idCounter(out var counter);
         var client = factory.CreateClient();
+        counter.Reset();
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
         var resp = await AuthTestFixture.PostJsonWithCsrfAsync(
             factory, client, "/api/auth/password-reset/confirm",
             new { token = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", newPassword = "fresh horse battery staple" });
-        sw.Stop();
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        sw.ElapsedMilliseconds.Should().BeGreaterThan(50,
-            "Argon2id verify should dominate wall-clock time on the unknown-token branch; " +
-            "elapsed was {0}ms — if this is < 50ms RunDummyHash was likely removed",
-            sw.ElapsedMilliseconds);
+        counter.Count.Should().BeGreaterThanOrEqualTo(1,
+            "the unknown-token branch must run at least one Argon2id verify (the RunDummyHash " +
+            "constant-time defence) — a count of 0 means RunDummyHash was removed");
     }
 }
