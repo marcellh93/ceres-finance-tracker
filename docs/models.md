@@ -1120,7 +1120,7 @@ Records every rejected authentication attempt for credential-stuffing forensics 
 **GDPR / retention:**
 
 - Erasure (Stage 6c): on right-to-erasure, the 6c flow nullifies `EmailAttempted` for matching rows (column is nullable, no schema change required).
-- Retention purge (Stage 7+): 1-year flat cross-tenant `DELETE WHERE OccurredAt < now() - interval '1 year'`. Different cadence from `AuditLog` (6 months, per-user fan-out via `IUserJobRunner`).
+- Retention purge (Stage 13): 1-year flat cross-tenant `DELETE WHERE OccurredAt < now() - interval '1 year'`. `AuditLog` uses the **same** flat cross-tenant sweep at a **12-month** cadence (Stage 13 decision 2026-09-19, superseding the earlier "6 months, per-user fan-out"). Both run on the external-cron `SweepSessions` trigger pattern.
 
 ### AuditLog (Phase 3, Stage 6.14)
 
@@ -1154,7 +1154,7 @@ Append-only record of security-relevant authentication events for the user's own
 **GDPR / retention:**
 
 - Erasure (Stage 13): `UserId` is **not** nulled — it remains as a pseudonymized identifier (the user-row's PII is erased separately). `IpAddress` is rewritten to `"erased"` in the same erasure transaction.
-- Retention purge (Stage 7+): 6-month per-user fan-out via `IUserJobRunner` — `DELETE WHERE UserId = @u AND OccurredAt < now() - interval '6 months'`. Different cadence from `FailedLoginAttempt` (1-year flat cross-tenant `DELETE`).
+- Retention purge (Stage 13): 12-month flat cross-tenant sweep via `AdminDbContext` (BYPASSRLS) — `DELETE WHERE OccurredAt < now() - interval '12 months'`, on the external-cron `SweepSessions` trigger pattern. Same shape as `FailedLoginAttempt` (1-year flat cross-tenant `DELETE`), just a 12-month cadence. (Stage 13 decision 2026-09-19: 12-month SOC 2/ISO/PCI-aligned retention, cross-tenant not per-user — supersedes the earlier "6 months, per-user fan-out via `IUserJobRunner`".)
 
 **No financial amounts:** `AuditLog` has no `Amount`, `Balance`, `Value`, `Total`, or any `decimal` property. Enforced by architecture test `AuditLog_entity_contains_no_financial_amount_columns`.
 

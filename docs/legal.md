@@ -83,7 +83,9 @@ Only collect data that is necessary for the stated purpose. Do not add data fiel
 | Data | Retention | Action |
 |------|-----------|--------|
 | Soft-deleted SavedReports | 90 days from `DeletedAt` | Auto-purge after 90 days |
-| Audit logs (Phase 3+) | 6 months from creation | Auto-purge after 6 months |
+| Audit logs (Phase 3+) | 12 months from creation | Auto-purge after 12 months |
+| Failed-login logs | 1 year from creation | Auto-purge after 1 year |
+| GDPR erasure-request record | 3 years (accountability) | Keep the anonymised erasure record; the referenced personal data is deleted at erasure time |
 | Deactivated accounts/categories | Indefinite | Never purge — required for historical integrity |
 | User account — natural churn (no erasure request) | 30-day grace period, then sealed archive for 150 days, then permanent deletion at 180 days | Grace: data intact, free reactivation. Archive: compressed file on filesystem, restoration available at a cost. Day 180: archive file deleted, no restoration possible. |
 | User account — GDPR erasure request (Art. 17) | Anonymise personal identifiers immediately | Replace name, email, and direct identifiers with anonymous tokens. Retain anonymised financial records for legal period. No archive created — restoration is not possible. |

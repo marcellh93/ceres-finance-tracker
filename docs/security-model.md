@@ -1494,7 +1494,7 @@ Define explicit numeric retention periods for every data category. Indefinite re
 |--------------|-----------|-----------------|
 | Transactions, accounts | Duration of active account + 5 years (statute of limitations) | Soft-delete on user erasure; hard-delete 5 years after account closure |
 | File attachments | Duration of parent transaction | Hard-delete from filesystem; row deleted |
-| Audit log (security events) | 6 months | Auto-purge via `IUserJobRunner` per-user fan-out — aligned with `planning-phase3.md` § Audit log entity + writer (Stage 6c sequencing) |
+| Audit log (security events) | 12 months | Auto-purge via a flat cross-tenant `ExecuteDeleteAsync` through `AdminDbContext` (BYPASSRLS), triggered by external cron — same pattern as the `SweepSessions` job. Aligned to the SOC 2 / ISO 27001 / PCI 12-month security-log floor (Stage 13 decision, 2026-09-19; supersedes the 6-month / per-user-fan-out figure). |
 | Application logs | 30 days | Log sink rotation |
 | UserSession rows (revoked) | 90 days | Auto-purge via the `SweepSessions` daily cron (`--sweep-sessions`, Stage 12.10): a flat cross-tenant `DELETE` through `AdminDbContext` (BYPASSRLS) of revoked rows past 90 days plus expired unrevoked ephemeral rows. Deleting the row also removes its `UserAgent`. |
 | IP addresses | Retained within session/audit rows per the above schedule | Follows parent row deletion |

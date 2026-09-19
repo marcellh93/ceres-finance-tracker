@@ -1820,7 +1820,7 @@ Stage 12.3 (2026-08-23) added `Block IP` + a `SELF_LOCKOUT` guard but no way to 
 | 13.3 | Records of Processing Activities (RoPA) document | `security-model.md` § Article 30 |
 | 13.4 | Subprocessor inventory + DPA list | `security-model.md` § Article 28 |
 | 13.5 | Data retention policy enforced | `security-model.md` § Data Retention and Deletion Policy |
-| 13.6 | Audit-log auto-purge job (6 months) | `planning-phase3.md` § Audit logging + ADR-0067 |
+| 13.6 | Audit-log auto-purge job (12 months) | `planning-phase3.md` § Audit logging + ADR-0067 |
 | 13.7 | Failed-login retention purge job | (above) |
 | 13.8 | Full ZIP data export — async background job | `planning-phase3.md` § Full data export |
 | 13.9 | Right-to-erasure flow | `security-model.md` § Article 30 + § Data Retention |
@@ -1849,8 +1849,8 @@ RoPA + DPA:
 
 Retention policy:
 
-- [ ] Audit log: 6-month auto-purge cron job registered with the background runtime; runs daily, deletes `AuditLog` rows older than 6 months
-- [ ] Failed-login records: same auto-purge, e.g., 90 days
+- [ ] Audit log: 12-month auto-purge cron job (external-cron trigger, flat cross-tenant `ExecuteDeleteAsync` via `AdminDbContext`, `SweepSessions` pattern); runs daily, deletes `AuditLog` rows older than 12 months
+- [ ] Failed-login records: same external-cron cross-tenant auto-purge, 1 year
 - [ ] Soft-deleted SavedReports: hard-deleted after 90 days
 - [ ] Soft-deleted CsvImportProfiles: hard-deleted after 90 days (already implemented; verify)
 - [ ] Inactive user records: archived after defined period per `security-model.md` § Data Retention
