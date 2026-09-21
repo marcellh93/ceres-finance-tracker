@@ -31,4 +31,10 @@ public enum EmailTemplateKey
     /// {1} device summary, {2} sign-in time.
     /// </summary>
     NewSessionAlert,
+
+    /// <summary>
+    /// Notifies user that their data export is ready for download. Stage 13.8.
+    /// Args: {0} download URL (valid 24 hours, single use).
+    /// </summary>
+    GdprExportReady,
 }

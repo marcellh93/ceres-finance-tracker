@@ -43,6 +43,8 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
     [InlineData(EmailTemplateKey.BackupCodesRegenerated, "es")]
     [InlineData(EmailTemplateKey.NewSessionAlert, "en")]
     [InlineData(EmailTemplateKey.NewSessionAlert, "es")]
+    [InlineData(EmailTemplateKey.GdprExportReady, "en")]
+    [InlineData(EmailTemplateKey.GdprExportReady, "es")]
     public void Renders_all_templates_en_and_es(EmailTemplateKey key, string culture)
     {
         using var scope = _factory.Services.CreateScope();
@@ -202,6 +204,28 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
         msg.BodyHtml.Should().Contain("href=\"https://ceres.invalid/support/xyz789\"");
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    public void GdprExportReady_includes_download_url_and_expiry_text(string culture)
+    {
+        // {0} = download URL (24-hour, single-use link). Pin that it renders + contains validity note.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.GdprExportReady,
+            new CultureInfo(culture),
+            "https://example.invalid/export-download-token-ABC123");
+
+        msg.Subject.Should().NotBeNullOrWhiteSpace();
+        msg.BodyText.Should().Contain("https://example.invalid/export-download-token-ABC123");
+        // Both EN "24 hours" and ES "24 horas" are valid.
+        var bodyText = msg.BodyText;
+        (bodyText.Contains("24 hours") || bodyText.Contains("24 horas")).Should().BeTrue("must mention 24-hour expiry");
+        msg.BodyHtml.Should().Contain("href=\"https://example.invalid/export-download-token-ABC123\"");
+    }
+
     [Fact]
     public void All_resx_keys_present_in_both_cultures()
     {
@@ -223,6 +247,6 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(51, "17 templates × 3 keys each (NewSessionAlert added Stage 12.5.3)");
+        enKeys.Should().HaveCount(54, "18 templates × 3 keys each (GdprExportReady added Stage 13.8)");
     }
 }

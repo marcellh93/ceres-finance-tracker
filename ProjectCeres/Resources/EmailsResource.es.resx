@@ -135,4 +135,11 @@ Cuándo:       {2}
 
 Si fuiste tú, no hace falta hacer nada. Si no fuiste tú, cambia tu contraseña de inmediato y revisa tus sesiones activas en Configuración — Seguridad.</value></data>
   <data name="NewSessionAlert.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Se inició sesión en tu cuenta de Ceres desde una red que no habíamos visto antes.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Dirección IP:&lt;/strong&gt; {0}&lt;br /&gt;&lt;strong&gt;Dispositivo:&lt;/strong&gt; {1}&lt;br /&gt;&lt;strong&gt;Cuándo:&lt;/strong&gt; {2}&lt;/p&gt;&lt;p&gt;Si fuiste tú, no hace falta hacer nada. Si no fuiste tú, cambia tu contraseña de inmediato y revisa tus sesiones activas en Configuración — Seguridad.&lt;/p&gt;</value></data>
+  <data name="GdprExportReady.Subject" xml:space="preserve"><value>Tu descarga de datos de Ceres está lista</value></data>
+  <data name="GdprExportReady.BodyText" xml:space="preserve"><value>Tu descarga de datos está lista.
+
+Descargar: {0}
+
+El enlace es válido por 24 horas y se puede usar una sola vez. Después, solicita una nueva descarga desde la configuración de tu cuenta si lo necesitas.</value></data>
+  <data name="GdprExportReady.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Tu descarga de datos está lista.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Descargar tus datos&lt;/a&gt;&lt;/p&gt;&lt;p&gt;El enlace es válido por 24 horas y se puede usar una sola vez. Después, solicita una nueva descarga desde la configuración de tu cuenta si lo necesitas.&lt;/p&gt;</value></data>
 </root>

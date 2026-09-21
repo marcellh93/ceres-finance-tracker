@@ -135,4 +135,11 @@ When:       {2}
 
 If this was you, no action is needed. If it wasn't, change your password right away and review your active sessions under Settings — Security.</value></data>
   <data name="NewSessionAlert.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your Ceres account was signed in to from a network we haven't seen before.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;IP address:&lt;/strong&gt; {0}&lt;br /&gt;&lt;strong&gt;Device:&lt;/strong&gt; {1}&lt;br /&gt;&lt;strong&gt;When:&lt;/strong&gt; {2}&lt;/p&gt;&lt;p&gt;If this was you, no action is needed. If it wasn't, change your password right away and review your active sessions under Settings — Security.&lt;/p&gt;</value></data>
+  <data name="GdprExportReady.Subject" xml:space="preserve"><value>Your Ceres data export is ready</value></data>
+  <data name="GdprExportReady.BodyText" xml:space="preserve"><value>Your data export is ready to download.
+
+Download: {0}
+
+The link is valid for 24 hours and can be used once. After that, request a new export from your account settings if needed.</value></data>
+  <data name="GdprExportReady.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your data export is ready to download.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Download your data&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The link is valid for 24 hours and can be used once. After that, request a new export from your account settings if needed.&lt;/p&gt;</value></data>
 </root>
