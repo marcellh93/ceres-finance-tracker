@@ -102,6 +102,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<EmailConfirmationToken> EmailConfirmationTokens => Set<EmailConfirmationToken>();
     public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
     public DbSet<LockoutUnlockToken> LockoutUnlockTokens => Set<LockoutUnlockToken>();
+    public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<EmailDeliveryEvent> EmailDeliveryEvents => Set<EmailDeliveryEvent>();
 
@@ -117,6 +118,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureEmailConfirmationEntities(modelBuilder);
         ConfigureEmailChangeEntities(modelBuilder);
         ConfigureLockoutUnlockEntities(modelBuilder);
+        ConfigureExportJobEntities(modelBuilder);
         ConfigureAuditLogEntities(modelBuilder);
         ConfigureEmailDeliveryEventEntities(modelBuilder);
         SeedData(modelBuilder);
@@ -314,6 +316,19 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasIndex(e => e.TokenLookup).IsUnique();
             b.Property(e => e.TokenLookup).HasMaxLength(32);
             b.Property(e => e.TokenHash).HasMaxLength(512);
+        });
+    }
+
+    private static void ConfigureExportJobEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ExportJob>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TokenLookup).IsRequired();
+            // Filtered unique index: many rows can share the empty pre-Ready lookup, so only
+            // enforce uniqueness on non-empty fingerprints.
+            b.HasIndex(e => e.TokenLookup).IsUnique().HasFilter("octet_length(\"TokenLookup\") > 0");
+            b.HasIndex(e => new { e.UserId, e.Status });
         });
     }
 

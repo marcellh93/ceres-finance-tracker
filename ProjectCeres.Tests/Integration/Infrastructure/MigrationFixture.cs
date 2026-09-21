@@ -20,6 +20,13 @@ internal static class MigrationFixture
         var accessor = new FakeCurrentUserAccessor(SentinelUserId);
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(TestDbFixture.MigratorConnectionString)
+            // Stage 13.8 Task 1: ExportJob is deliberately in the model with no migration
+            // yet (Task 2). EF Core throws PendingModelChangesWarning on any model/snapshot
+            // mismatch during MigrateAsync, which would otherwise hard-fail every test that
+            // shares this fixture. Suppressing only skips that consistency check — it does
+            // not change what SQL gets applied — and is transitional until Task 2's
+            // migration closes the gap.
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .Options;
         await using var migrator = new AppDbContext(options, accessor);
         await migrator.Database.MigrateAsync();

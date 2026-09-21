@@ -44,11 +44,12 @@ public class UserOwnedModelTests
     // migration, query filter, cleanup) rather than only the DbSet.
     // 25 -> 26: SupportTickets (Stage 12.5). 26 -> 27: SupportTicketAttachments (Stage
     // 12.5). 27 -> 28: SupportMessages (Stage 12.6) — the conversation model split the
-    // ticket's single Message column out into its own IUserOwned table.
+    // ticket's single Message column out into its own IUserOwned table. 28 -> 29:
+    // ExportJob (Stage 13.8 Task 1) — its RLS migration lands in Task 2.
     [Fact]
-    public void RlsTables_has_exactly_28_entries()
+    public void RlsTables_has_exactly_29_entries()
     {
-        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(28);
+        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(29);
     }
 
     [Fact]

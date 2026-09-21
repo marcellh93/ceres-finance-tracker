@@ -27,6 +27,7 @@ public static class UserOwnedCleanup
     {
         foreach (var table in DeletionOrder(db))
         {
+            if (!await TableExistsAsync(db, table, ct)) continue; // creating migration not yet applied
             // Raw SQL: the caller may not have a DbSet for every table, and query
             // filters would otherwise scope the delete to the current user.
             await db.Database.ExecuteSqlRawAsync(
@@ -46,9 +47,31 @@ public static class UserOwnedCleanup
 
         foreach (var table in DeletionOrder(db))
         {
+            if (!await TableExistsAsync(db, table, ct)) continue; // creating migration not yet applied
             await db.Database.ExecuteSqlRawAsync(
                 $"DELETE FROM \"{table}\" WHERE \"UserId\" = ANY({{0}})", [ids], ct);
         }
+    }
+
+    /// <summary>
+    /// True if <paramref name="table"/> physically exists. A user-owned entity can land in
+    /// the EF model (and therefore in <see cref="UserOwnedModel.RlsTables"/>) before its
+    /// creating migration is applied — same transitional state <c>RlsParityStartupCheck</c>
+    /// already tolerates. Without this check, every test's teardown would hard-fail the
+    /// moment such an entity is added, regardless of whether that test touches it.
+    /// </summary>
+    private static async Task<bool> TableExistsAsync(AppDbContext db, string table, CancellationToken ct)
+    {
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync(ct);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT to_regclass(@qualified) IS NOT NULL";
+        var p = cmd.CreateParameter();
+        p.ParameterName = "qualified";
+        p.Value = $"public.\"{table}\"";
+        cmd.Parameters.Add(p);
+        return (bool)(await cmd.ExecuteScalarAsync(ct) ?? false);
     }
 
     /// <summary>

@@ -27,6 +27,10 @@ public static class UserOwnedModel
         // SupportTickets: created in Stage 12.5, long after the Phase 1/2 sentinel
         // era, so it can never hold sentinel rows for the dev-seed remap to move.
         "SupportTickets",
+        // ExportJobs: operational bookkeeping (job status, expiry, a download-token
+        // lookup) — not user financial content, so GDPR export/erasure and the
+        // dev-seed remap have no reason to touch it. Same category as SupportTickets.
+        "ExportJobs",
     };
 
     /// <summary>Every user-owned table that must carry an RLS policy.</summary>
