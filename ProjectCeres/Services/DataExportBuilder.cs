@@ -3,6 +3,8 @@ using System.IO.Compression;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.Options;
+using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Helpers;
@@ -19,9 +21,15 @@ namespace ProjectCeres.Services;
 /// <c>IgnoreQueryFilters().Where(UserId == userId)</c> — the SweepSessions
 /// cross-user pattern, not the RLS-scoped path Task 4's ExportJobService uses.
 /// </summary>
-public sealed class DataExportBuilder(AdminDbContext db, IWebHostEnvironment env)
+[RequiresAdminContext]
+public sealed class DataExportBuilder(
+    AdminDbContext db,
+    IWebHostEnvironment env,
+    IOptions<FileAttachmentOptions>? options = null)
 {
-    private readonly string _root = env.ContentRootPath;
+    // Mirror FileAttachmentService: attachment paths must resolve against the same
+    // root, or a configured FileAttachments:RootPath would strand export attachments.
+    private readonly string _root = options?.Value.RootPath ?? env.ContentRootPath;
 
     public async Task<string> BuildAsync(Guid userId, string outputDir, CancellationToken ct)
     {

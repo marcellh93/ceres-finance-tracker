@@ -121,6 +121,7 @@ public class DataExportBuilderTests : IAsyncLifetime
     {
         await using (var admin = _fixture.CreateAdminContext())
         {
+            await admin.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == _userId).ExecuteDeleteAsync();
             await admin.TransactionAttachments.IgnoreQueryFilters().Where(a => a.UserId == _userId).ExecuteDeleteAsync();
             await admin.Transactions.IgnoreQueryFilters().Where(t => t.UserId == _userId).ExecuteDeleteAsync();
             await admin.Categories.IgnoreQueryFilters().Where(c => c.UserId == _userId).ExecuteDeleteAsync();
@@ -152,6 +153,23 @@ public class DataExportBuilderTests : IAsyncLifetime
     [Fact]
     public async Task BuildAsync_does_not_export_security_log_tables()
     {
+        // Seed a REAL security-log row for this user with a distinctive marker, so the
+        // test proves the export LAYER never surfaces seeded security data — not merely
+        // that the table-name filter excludes the file (that's the unit test's job).
+        const string sentinelIp = "203.0.113.199-audit-sentinel";
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            admin.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = _userId,
+                Action = default,
+                OccurredAt = DateTime.UtcNow,
+                IpAddress = sentinelIp,
+            });
+            await admin.SaveChangesAsync();
+        }
+
         var zipPath = await _builder.BuildAsync(_userId, _outputDir, CancellationToken.None);
 
         using var zip = ZipFile.OpenRead(zipPath);
@@ -160,6 +178,15 @@ public class DataExportBuilderTests : IAsyncLifetime
         names.Should().NotContain(n => n.Contains("AuditLog", StringComparison.OrdinalIgnoreCase));
         names.Should().NotContain(n => n.Contains("FailedLoginAttempt", StringComparison.OrdinalIgnoreCase));
         names.Should().NotContain(n => n.Contains("UserSession", StringComparison.OrdinalIgnoreCase));
+
+        // The seeded audit row's marker must appear NOWHERE in the archive bytes.
+        foreach (var entry in zip.Entries)
+        {
+            using var reader = new StreamReader(entry.Open());
+            var content = await reader.ReadToEndAsync();
+            content.Should().NotContain(sentinelIp,
+                $"the export layer must not leak seeded security-log data (entry {entry.FullName})");
+        }
     }
 
     [Fact]
