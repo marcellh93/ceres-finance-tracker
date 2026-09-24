@@ -19,5 +19,8 @@ public sealed class ExportJob : IUserOwned
     public string? StoredPath { get; set; }
     // HMAC-SHA256(serverSecret, rawToken); unique. Empty until the worker builds the ZIP.
     public byte[] TokenLookup { get; set; } = Array.Empty<byte>();
+    // Argon2id hash of the raw token, verified after TokenLookup narrows to one
+    // candidate — mirrors the 4 sibling token tables (e.g. LockoutUnlockToken).
+    public string TokenHash { get; set; } = "";
     public DateTime? EmailedAt { get; set; }
 }

@@ -161,6 +161,7 @@ builder.Services.AddScoped<EmailChangeTokenGenerator>();
 builder.Services.AddScoped<EmailChangeService>();
 builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
 builder.Services.AddScoped<LockoutUnlockService>();
+builder.Services.AddScoped<ExportTokenGenerator>();
 builder.Services.AddMemoryCache();
 builder.Services.AddOptions<LockoutCacheOptions>()
     .Validate(o => o.IpPointerTtl > TimeSpan.Zero, "LockoutCacheOptions.IpPointerTtl must be positive.");
@@ -534,6 +535,7 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IExportJobService, ExportJobService>();
+builder.Services.AddScoped<DataExportBuilder>();
 builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NetWorthGenerator>();
@@ -629,6 +631,14 @@ if (args.Length > 0 && args[0] == "--seed-dev-user")
 if (args.Length > 0 && args[0] == "--sweep-sessions")
 {
     Environment.Exit(await ProjectCeres.Tools.SweepSessions.RunAsync(builder));
+}
+
+// Cron-invokable export-job worker: builds Pending export ZIPs, emails download
+// links, retries/fails, and cleans up expired jobs.
+// Invocation: dotnet run --project ProjectCeres -- --run-export-jobs
+if (args.Length > 0 && args[0] == "--run-export-jobs")
+{
+    Environment.Exit(await ProjectCeres.Tools.ExportJobWorker.RunAsync(builder));
 }
 
 var app = builder.Build();

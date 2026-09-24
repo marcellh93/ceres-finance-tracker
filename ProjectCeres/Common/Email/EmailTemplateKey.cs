@@ -37,4 +37,10 @@ public enum EmailTemplateKey
     /// Args: {0} download URL (valid 24 hours, single use).
     /// </summary>
     GdprExportReady,
+
+    /// <summary>
+    /// Notifies user that their data export could not be built after the retry
+    /// budget was exhausted. Stage 13.8. No args.
+    /// </summary>
+    GdprExportFailed,
 }

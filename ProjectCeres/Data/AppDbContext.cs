@@ -326,6 +326,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             b.HasKey(e => e.Id);
             b.Property(e => e.TokenLookup).IsRequired();
             b.Property(e => e.TokenLookup).HasMaxLength(32);
+            b.Property(e => e.TokenHash).HasMaxLength(512);
             // Filtered unique index: many rows can share the empty pre-Ready lookup, so only
             // enforce uniqueness on non-empty fingerprints.
             b.HasIndex(e => e.TokenLookup).IsUnique().HasFilter("octet_length(\"TokenLookup\") > 0");

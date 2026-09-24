@@ -773,6 +773,7 @@ public class ArchitectureTests
             "ProjectCeres/Controllers/Api/ResendWebhookController.cs",                // Stage 8e: Resend webhook is pre-auth (Svix HMAC IS the auth) and cross-tenant by design — looks up users by NormalizedEmail to attach an optional UserId to the recorded event
             "ProjectCeres/Tools/SweepSessions.cs",                                    // Stage 12.10: cross-tenant by design — the retention sweep spans all users. Stage 10 architecture test allow-lists this file.
             "ProjectCeres/Services/DataExportBuilder.cs",                             // Stage 13.8 Task 5: worker acts for one user with no HTTP principal — reads that user's rows cross-tenant via AdminDbContext, same pattern as SweepSessions.
+            "ProjectCeres/Tools/ExportJobWorker.cs",                                  // Stage 13.8 Task 6: cron poll-drain across all users' Pending/Ready ExportJob rows — SweepSessions pattern.
         };
 
         var repoRoot = FindRepoRoot();

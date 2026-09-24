@@ -142,4 +142,9 @@ Descargar: {0}
 
 El enlace es válido por 24 horas y se puede usar una sola vez. Después, solicita una nueva descarga desde la configuración de tu cuenta si lo necesitas.</value></data>
   <data name="GdprExportReady.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Tu descarga de datos está lista.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Descargar tus datos&lt;/a&gt;&lt;/p&gt;&lt;p&gt;El enlace es válido por 24 horas y se puede usar una sola vez. Después, solicita una nueva descarga desde la configuración de tu cuenta si lo necesitas.&lt;/p&gt;</value></data>
+  <data name="GdprExportFailed.Subject" xml:space="preserve"><value>No pudimos generar tu descarga de datos de Ceres</value></data>
+  <data name="GdprExportFailed.BodyText" xml:space="preserve"><value>Tuvimos un problema al preparar tu descarga de datos y no pudimos completarla después de varios intentos.
+
+Por favor, solicita una nueva descarga desde la configuración de tu cuenta. Si el problema continúa, contacta con soporte.</value></data>
+  <data name="GdprExportFailed.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Tuvimos un problema al preparar tu descarga de datos y no pudimos completarla después de varios intentos.&lt;/p&gt;&lt;p&gt;Por favor, solicita una nueva descarga desde la configuración de tu cuenta. Si el problema continúa, contacta con soporte.&lt;/p&gt;</value></data>
 </root>

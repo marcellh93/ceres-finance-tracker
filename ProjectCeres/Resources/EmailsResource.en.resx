@@ -142,4 +142,9 @@ Download: {0}
 
 The link is valid for 24 hours and can be used once. After that, request a new export from your account settings if needed.</value></data>
   <data name="GdprExportReady.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Your data export is ready to download.&lt;/p&gt;&lt;p&gt;&lt;a href="{0}"&gt;Download your data&lt;/a&gt;&lt;/p&gt;&lt;p&gt;The link is valid for 24 hours and can be used once. After that, request a new export from your account settings if needed.&lt;/p&gt;</value></data>
+  <data name="GdprExportFailed.Subject" xml:space="preserve"><value>We couldn't build your Ceres data export</value></data>
+  <data name="GdprExportFailed.BodyText" xml:space="preserve"><value>We ran into a problem preparing your data export and were unable to complete it after several attempts.
+
+Please try requesting a new export from your account settings. If the problem continues, contact support.</value></data>
+  <data name="GdprExportFailed.BodyHtml" xml:space="preserve"><value>&lt;p&gt;We ran into a problem preparing your data export and were unable to complete it after several attempts.&lt;/p&gt;&lt;p&gt;Please try requesting a new export from your account settings. If the problem continues, contact support.&lt;/p&gt;</value></data>
 </root>
