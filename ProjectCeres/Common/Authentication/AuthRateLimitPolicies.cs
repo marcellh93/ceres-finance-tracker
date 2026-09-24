@@ -40,4 +40,8 @@ public static class AuthRateLimitPolicies
     /// policy against an attacker who rotates the "email" payload across many addresses
     /// from a single source. Stage 8d.</summary>
     public const string EmailByIp = "email-by-ip";
+
+    /// <summary>1/24h/user sliding window keyed off authenticated NameIdentifier claim.
+    /// Applied to POST /api/profile/export. Stage 13.8 Task 8.</summary>
+    public const string ProfileExportByUser = "profile-export-by-user";
 }

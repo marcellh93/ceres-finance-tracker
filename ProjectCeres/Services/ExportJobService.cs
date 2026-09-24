@@ -30,4 +30,11 @@ public class ExportJobService(AppDbContext db, ICurrentUserAccessor user, TimePr
 
     public async Task<ExportJob?> FindOwnByTokenAsync(byte[] tokenLookup, CancellationToken ct) =>
         await db.ExportJobs.Owned(user).FirstOrDefaultAsync(j => j.TokenLookup == tokenLookup, ct);
+
+    public async Task MarkConsumedAsync(ExportJob job, CancellationToken ct)
+    {
+        job.ConsumedAt = timeProvider.GetUtcNow().UtcDateTime;
+        db.ExportJobs.Update(job);
+        await db.SaveChangesAsync(ct);
+    }
 }

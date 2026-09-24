@@ -9,4 +9,7 @@ public interface IExportJobService
 
     /// <summary>The caller's own job matching the token fingerprint. RLS hides other users' rows.</summary>
     Task<ExportJob?> FindOwnByTokenAsync(byte[] tokenLookup, CancellationToken ct);
+
+    /// <summary>Stamps ConsumedAt on the job and persists it — single-use download tokens.</summary>
+    Task MarkConsumedAsync(ExportJob job, CancellationToken ct);
 }
