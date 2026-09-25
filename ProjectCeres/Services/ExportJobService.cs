@@ -1,11 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Services;
 
-public class ExportJobService(AppDbContext db, ICurrentUserAccessor user, TimeProvider timeProvider) : IExportJobService
+public class ExportJobService(
+    AppDbContext db,
+    ICurrentUserAccessor user,
+    TimeProvider timeProvider,
+    IAuditLogWriter auditLog) : IExportJobService
 {
     public async Task<ExportJob> CreateOrGetPendingAsync(CancellationToken ct)
     {
@@ -25,6 +30,10 @@ public class ExportJobService(AppDbContext db, ICurrentUserAccessor user, TimePr
         };
         db.ExportJobs.Add(job);
         await db.SaveChangesAsync(ct);
+
+        // GDPR accountability: record the request itself (not a dedupe-return).
+        await auditLog.RecordAsync(user.UserId, AuditLogAction.DataExportRequested,
+            entityType: nameof(ExportJob), entityId: job.Id, ct: ct);
         return job;
     }
 

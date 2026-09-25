@@ -1,11 +1,25 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
+using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Integration.Profile;
+
+/// <summary>Records the audit calls the service makes, so the dedupe test can prove
+/// a returned-existing job does NOT re-log. Real audit-writing is covered at the API level.</summary>
+sealed class RecordingAuditLogWriter : IAuditLogWriter
+{
+    public List<AuditLogAction> Recorded { get; } = [];
+    public Task RecordAsync(Guid userId, AuditLogAction action, string? entityType = null,
+        Guid? entityId = null, CancellationToken ct = default)
+    {
+        Recorded.Add(action);
+        return Task.CompletedTask;
+    }
+}
 
 /// <summary>
 /// ExportJobService against the real project_ceres_test database, under the caller's
@@ -19,12 +33,14 @@ public class ExportJobServiceTests : IAsyncLifetime
 
     private readonly TestDbFixture _fixture = new();
     private ExportJobService _service = null!;
+    private RecordingAuditLogWriter _audit = null!;
 
     public async Task InitializeAsync()
     {
         await _fixture.InitAsync();
         var user = new FakeCurrentUserAccessor(Sentinel);
-        _service = new ExportJobService(_fixture.Db, user, TimeProvider.System);
+        _audit = new RecordingAuditLogWriter();
+        _service = new ExportJobService(_fixture.Db, user, TimeProvider.System, _audit);
     }
 
     public async Task DisposeAsync() => await _fixture.DisposeAsync();
@@ -53,6 +69,8 @@ public class ExportJobServiceTests : IAsyncLifetime
         second.Id.Should().Be(first.Id, "an existing Pending/Processing job is reused, never duplicated");
         var count = await _fixture.Db.ExportJobs.CountAsync(j => j.UserId == Sentinel);
         count.Should().Be(1, "no second row should have been inserted");
+        _audit.Recorded.Should().ContainSingle().Which.Should().Be(AuditLogAction.DataExportRequested,
+            "the audit row is written once for the real request, not again on a dedupe-return");
     }
 
     [Fact]
