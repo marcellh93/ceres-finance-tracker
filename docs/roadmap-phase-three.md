@@ -1858,15 +1858,18 @@ Retention policy:
 
 Full data export:
 
-- [ ] Endpoint: `POST /api/me/export` returns 202 Accepted with a job id
-- [ ] Background job (registered with `IUserJobRunner.EnterAs`) generates the ZIP
-- [ ] ZIP contents: one CSV per entity (accounts, transactions, transfers, liability_payments, budgets, category_budgets, categories, recurring_transactions, saved_reports, support_tickets, settings); one folder per attachment type with original files
-- [ ] Each CSV uses UTF-8 BOM for Excel compatibility
-- [ ] Generation logs an `AuditLog` entry
-- [ ] When done, sends email with authenticated download link — adds `GdprExportReady` to `EmailTemplateKey` + EN/ES resx keys (`GdprExportReady.Subject/BodyText/BodyHtml`), then calls `IEmailComposer.Compose(...)` from the export-job completion handler. Resx keys do NOT yet exist (deferred from Stage 8 because the call site lands here).
-- [ ] Download link 24-hour expiry; tied to a single signed token, single-use
-- [ ] Rate limit: max 1 export request / 24 hours / user
-- [ ] Synchronous fallback rejected (see `planning-phase3.md` warning about HTTP worker exhaustion)
+- [x] Endpoint: `POST /api/profile/export` returns 202 Accepted with a job id — `ProfileApiController` (route corrected from the original `/api/me/export` to `/api/profile/export`: `api/me` is a novel prefix this codebase doesn't use, and `api/account` would collide one char off `api/accounts`; `api/profile` is the self-service module. `[RequireRecentAuth]` + dedupe + 202 `{data:{jobId,message}}`). `ProfileExportApiTests` #1/#3/#4.
+- [x] Background job generates the ZIP — poll-drain cron worker `ExportJobWorker` (`--run-export-jobs`, flat cross-tenant `AdminDbContext` + `IgnoreQueryFilters` per user, the `SweepSessions` pattern — NOT `IUserJobRunner.EnterAs`; the external-cron model was the recorded scheduler decision). `ExportJobWorkerTests`.
+- [x] ZIP contents: one CSV per user-content entity (via the single-sourced `UserContentEntities.List` = `FinanceTables` + support tables) + `profile.csv` + attachment files + `manifest.txt`; security/audit tables excluded. `DataExportBuilderTests` (incl. the negative content-boundary proof).
+- [x] Each CSV uses UTF-8 BOM for Excel compatibility — reuses `CsvFormattingHelper`. `DataExportBuilderTests` BOM assertion.
+- [ ] Generation logs an `AuditLog` entry — **NOT yet implemented.** `AuditLogAction.DataExportRequested`/`.GdprErasureRequested` placeholders exist but the worker/controller do not write an audit row. Owed follow-up (see the `[ ]` added below).
+- [x] When done, sends email with authenticated download link — `GdprExportReady` `EmailTemplateKey` + EN/ES resx + composer arm shipped; the worker composes+sends on `Ready`, idempotent resend if un-emailed. A `GdprExportFailed` template was also added for terminal-failure notices. `EmailComposerTests` + `ExportJobWorkerTests`.
+- [x] Download link 24-hour expiry; single-use — `GET /api/profile/export/download`, two-factor token (HMAC `TokenLookup` + Argon2id `TokenHash`), login-AND-token dual gate, `ConsumedAt` single-use, `ExpiresAt = ReadyAt+24h`. `ProfileExportApiTests` #6–#11.
+- [x] Rate limit: max 1 export request / 24 hours / user — `ProfileExportByUser` policy (1 permit/24h). `ProfileExportApiTests` #2.
+- [x] Synchronous fallback rejected — the whole flow is async (202 → cron worker → email); no synchronous path exists.
+- [x] SPA `/settings/account` page with the export action — `AccountPage`, reachable from `/settings`; reauth-gated action → Sonner toast. `AccountPage.test.tsx` 5/5 + `account-export.spec.ts` E2E 3/3.
+- [ ] **Audit-log the export request (follow-up from the 13.8 build).** The `Generation logs an AuditLog entry` item above was not implemented in the Stage-13.8 build. Wire `AuditLogAction.DataExportRequested` at the request (or ready) point. Small, and the enum value already exists.
+- [ ] **Extract `<SettingsSectionCard>` primitive (Phase 6, deferred by user 2026-09-25).** The heading+description+action card pattern now repeats in Settings' Security + Account cards and will be reused by 13.9's erasure section. Promote to a documented design-system recipe via the frontend-orchestrator's Phase 6 (extract-to-primitive) and propagate to all uses in the same pass.
 
 Right-to-erasure:
 

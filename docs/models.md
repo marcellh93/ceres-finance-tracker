@@ -1419,3 +1419,27 @@ Append-only record of every action performed by an admin. No endpoint exposes ed
 | ImpersonationSessionId | uuid | nullable | Groups all actions within one impersonation session |
 
 **Append-only:** INSERT is the only permitted operation. No UPDATE or DELETE — not even for admins.
+
+### ExportJob (Phase 3, Stage 13.8)
+
+A user's GDPR data-export request. User-owned (`IUserOwned`, RLS `user_isolation`), but excluded from `UserOwnedModel.FinanceTables`/`UserContentEntities` (it is operational bookkeeping, not user content — so it is not itself included in an export). The ZIP is built asynchronously by an external-cron worker (`--run-export-jobs`, the `SweepSessions` pattern) and delivered via a one-time, 24h-expiring emailed link.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | RLS discriminator |
+| Status | int | NOT NULL | Enum `ExportJobStatus`: `Pending`=0, `Processing`=1, `Ready`=2, `Failed`=3 |
+| Format | int | NOT NULL | Enum `ExportFormat`: `Zip`=0 (only value in 13.8; the field reserves the seam for xlsx/json) |
+| RequestedAt | datetime | NOT NULL | UTC |
+| ReadyAt | datetime | nullable | Set when the ZIP is built |
+| ExpiresAt | datetime | nullable | `ReadyAt + 24h`; download refused (410) after |
+| ConsumedAt | datetime | nullable | Single-use stamp; download refused (410) once set |
+| FailureCount | int | NOT NULL | Retry budget (3), then `Failed` |
+| StoredPath | varchar | nullable | Filesystem path to the ZIP (never a DB blob); nulled on cleanup |
+| TokenLookup | bytea | NOT NULL, unique (filtered, non-empty) | HMAC-SHA256 fingerprint of the raw download token — O(1) lookup. Empty until `Ready`. |
+| TokenHash | varchar(512) | NOT NULL | Argon2id hash of the raw token — the second factor verified after lookup (matches the four sibling token tables). |
+| EmailedAt | datetime | nullable | Idempotency stamp for the ready-email |
+
+**Download token:** two-factor — the raw token exists only in the emailed URL (never persisted); the DB stores the HMAC `TokenLookup` (indexed) + the Argon2id `TokenHash`. The download endpoint requires **both** a logged-in session and a token that passes both factors.
+
+**Erasure interaction (Stage 13.9 `[ ]`):** because `ExportJob` is excluded from the erasure content loop, erasure must explicitly delete any live `ExportJob` ZIP at `StoredPath` + drop the row (a `Ready` job's ZIP is a full personal-data copy). Tracked in the roadmap § 13.9.

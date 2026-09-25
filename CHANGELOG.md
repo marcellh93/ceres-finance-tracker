@@ -6,6 +6,10 @@
 
 #### Added
 
+**Privacy & data (Stage 13.8 — GDPR data export, 2026-09-25)**
+- You can now download a full copy of your own data. A new **Account** page (under Settings) has an "Export my data" button that packages your accounts, transactions, transfers, categories, budgets, saved reports, support messages, profile, and uploaded attachments into a ZIP. Because the archive can be large, it's built in the background and we email you a secure download link when it's ready — you're not left waiting on a spinner.
+- The download link is private and single-use: it works only while you're signed in, only once, and expires after 24 hours. You can request one export per day.
+
 **Tests / CI (Stage 12.19 — flaky-test surfacing, 2026-09-18)**
 - CI now names any test that passed only after a retry. Both test runners allow a CI-only retry (Vitest twice, Playwright once) to absorb load-induced timing slips; previously a retry that turned red green left no trace. Now each retried-then-passed test is written by name to the GitHub Actions run summary plus an inline warning, so a slowly-degrading test stays visible instead of hiding behind the retry. Reporting only — it never changes a run's pass/fail.
 

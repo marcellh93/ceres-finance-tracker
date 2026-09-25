@@ -237,6 +237,12 @@ Files stored in `uploads/` are never served directly by the web server. Every fi
 
 **Per-user storage quota:** enforce a maximum total file storage per user (e.g. 500 MB for Phase 3 beta). Check the current total before writing any new attachment to disk. Return 422 with a clear error message when the quota is exceeded. Without a quota, a single user can exhaust server disk space and take down the application for all users. Log quota utilization for monitoring.
 
+**Data-export download (Stage 13.8).** The GDPR data-export ZIP is served by `GET /api/profile/export/download?token=<raw>` under a deliberately stronger model than attachment downloads, because the payload is the user's *entire* dataset and the link travels through an email inbox:
+- **Dual gate — login AND token.** The endpoint is `[Authorize]` (a valid session is required) *and* requires a token that passes two factors. The emailed token proves *which* export; the session proves *who is asking*. A valid token presented without a session returns `401`.
+- **Two-factor token.** The raw token exists only in the emailed URL (never persisted). The `ExportJob` row stores an HMAC `TokenLookup` (indexed, for O(1) location) and an Argon2id `TokenHash` (verified after the row is located). A matched lookup whose hash does not verify returns `404` — the same as an unknown token, so there is no existence oracle. Foreign-user tokens are invisible via RLS (`Owned()`-scoped read) → `404`, not `403`.
+- **Single-use + expiry.** `ConsumedAt` is stamped before the stream begins (a second GET → `410`); links expire 24h after `ReadyAt` (→ `410`). Reauth (`[RequireRecentAuth]`) gates the *request* endpoint (`POST /api/profile/export`), not the download — forcing reauth on an email-link click is hostile, and the token is the second factor.
+- **File handling.** The ZIP lives on the filesystem (never a DB blob), referenced by `ExportJob.StoredPath`; the worker deletes it on expiry/consumption. Erasure (Stage 13.9) must also delete any live export ZIP.
+
 ### List Endpoint Scoping
 
 IDOR prevention applies equally to list endpoints (GET /api/v1/transactions, GET /api/v1/accounts, etc.) and to single-resource endpoints. An unfiltered list endpoint that returns all users' records is the same severity as a direct IDOR — it is just less obvious.
