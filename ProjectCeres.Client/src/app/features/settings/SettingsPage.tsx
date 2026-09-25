@@ -132,6 +132,23 @@ export function SettingsPage() {
           </Link>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Account</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-muted-foreground text-sm">
+            Manage your personal data, including downloading a copy of everything we hold.
+          </p>
+          <Link
+            to="/settings/account"
+            className={cn(buttonVariants({ variant: 'outline' }), 'shrink-0')}
+          >
+            Manage account
+          </Link>
+        </CardContent>
+      </Card>
     </PageShell>
   );
 }

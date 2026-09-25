@@ -26,6 +26,7 @@ import { TransactionHistory } from './features/reports/TransactionHistory';
 const Security = lazy(() => import('./pages/Security').then((m) => ({ default: m.Security })));
 import { Settings } from './pages/Settings';
 import { Sessions } from './pages/Sessions';
+import { Account } from './pages/Account';
 import { Support } from './pages/Support';
 import { AdminSupport } from './pages/AdminSupport';
 import { RequireAdmin } from './admin/RequireAdmin';
@@ -132,6 +133,7 @@ export function App() {
         </Route>
         <Route path="settings" element={<Settings />} />
         <Route path="settings/sessions" element={<Sessions />} />
+        <Route path="settings/account" element={<Account />} />
         <Route path="support" element={<Support />} />
         <Route path="support/new" element={<Support />} />
         <Route path="support/:ticketId" element={<Support />} />
