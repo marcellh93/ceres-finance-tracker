@@ -102,6 +102,70 @@ public class AccountSealTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncL
         body!.error.code.Should().Be("ACCOUNT_SEALED");
     }
 
+    [Fact]
+    public async Task LoginTotp_with_valid_code_for_sealed_account_is_refused_no_session_issued()
+    {
+        var user = await AuthTestFixture.RegisterUserAsync(_factory, "sealed-mfa@seal-test.local");
+        var seed = await AuthTestFixture.EnrollUserMfaAsync(_factory, user);
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        // Step 1: credentials login while NOT yet sealed — obtains the half-authenticated
+        // Identity.TwoFactorUserId cookie (RequiresTwoFactor branch runs before any seal
+        // check would matter here, since the account isn't sealed yet at this point).
+        var (csrf, header) = AuthTestFixture.MintCsrf(_factory);
+        var loginReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new
+            {
+                email = "sealed-mfa@seal-test.local",
+                password = AuthTestFixture.ValidPassword,
+                rememberMe = false
+            }),
+        };
+        loginReq.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={csrf}");
+        loginReq.Headers.Add(SessionConstants.CsrfHeaderName, header);
+        var loginResp = await client.SendAsync(loginReq);
+        loginResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var twoFactorCookie = ExtractSetCookie(loginResp, "Identity.TwoFactorUserId");
+        twoFactorCookie.Should().NotBeNullOrEmpty();
+
+        // Step 2: seal the account mid-MFA-flow, after the password step, before TOTP.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Users
+                .IgnoreQueryFilters()
+                .Where(u => u.Id == user.Id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(u => u.SealedAt, DateTime.UtcNow));
+        }
+
+        // Step 3: submit a VALID TOTP code. This is the load-bearing assertion — without
+        // the LoginTotp seal check, this would return 204 + a session cookie despite the
+        // account being sealed.
+        var code = AuthTestFixture.ComputeCurrentTotpCode(seed);
+        var (totpCsrf, totpHeader) = AuthTestFixture.MintCsrf(_factory);
+        var totpReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login/totp")
+        {
+            Content = JsonContent.Create(new { code }),
+        };
+        totpReq.Headers.Add("Cookie",
+            $"Identity.TwoFactorUserId={twoFactorCookie}; {SessionConstants.CsrfCookieName}={totpCsrf}");
+        totpReq.Headers.Add(SessionConstants.CsrfHeaderName, totpHeader);
+        var totpResp = await client.SendAsync(totpReq);
+
+        totpResp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var body = await totpResp.Content.ReadFromJsonAsync<ErrorEnvelope>();
+        body!.error.code.Should().Be("ACCOUNT_SEALED");
+        var setCookies = totpResp.Headers.TryGetValues("Set-Cookie", out var v) ? v.ToList() : new List<string>();
+        setCookies.Should().NotContain(c => c.StartsWith($"{SessionConstants.SessionCookieName}="));
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var sessionCount = await verifyDb.UserSessions.IgnoreQueryFilters()
+            .Where(s => s.UserId == user.Id).CountAsync();
+        sessionCount.Should().Be(0, "a sealed account must never get a UserSession row issued via LoginTotp");
+    }
+
     private static string? ExtractSetCookie(HttpResponseMessage response, string cookieName)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var values)) return null;

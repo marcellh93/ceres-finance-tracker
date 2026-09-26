@@ -220,6 +220,19 @@ public sealed class AuthController : ControllerBase
 
         if (signIn.RequiresTwoFactor)
         {
+            // Stage 13.9 fix round 1: RequiresTwoFactor already confirms the password
+            // matched, so refusing a sealed account here is not an enumeration oracle.
+            // LoginTotp still carries the load-bearing check (a client could skip this
+            // and go straight there), but this saves a sealed user a wasted TOTP round-trip.
+            if (userStub.SealedAt is not null || userStub.ErasedAt is not null)
+            {
+                HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+                var (ip, ua) = RequestContext();
+                await _failedLogins.RecordAsync(request.Email, userStub.Id, FailedLoginReason.AccountSealed, ip, ua, HttpContext.RequestAborted);
+                return UnauthorizedEnvelope("ACCOUNT_SEALED",
+                    "This account is scheduled for deletion and can no longer sign in.");
+            }
+
             // Identity has set Identity.TwoFactorUserId scoped cookie automatically.
             // No __Host-Session, no UserSession row — those wait for /login/totp.
             // Stash rememberMe so the TOTP step can honour it (HttpContext is per-request,
@@ -334,6 +347,19 @@ public sealed class AuthController : ControllerBase
         // and resolves the half-authenticated user.
         var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
         if (user is null) return UnauthorizedEnvelope("UNAUTHENTICATED", "Authentication required.");
+
+        // Stage 13.9 fix round 1: this is the load-bearing seal check for MFA accounts.
+        // Login's seal check never runs for RequiresTwoFactor (it returns early), so a
+        // sealed/erased MFA account must be refused HERE, before SignInAsync issues a
+        // real session cookie — otherwise the cookie validator only catches the NEXT
+        // request, and the login round-trip falsely succeeds.
+        if (user.SealedAt is not null || user.ErasedAt is not null)
+        {
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(user.Email, user.Id, FailedLoginReason.AccountSealed, ip, ua, HttpContext.RequestAborted);
+            return UnauthorizedEnvelope("ACCOUNT_SEALED",
+                "This account is scheduled for deletion and can no longer sign in.");
+        }
 
         var rememberMe = ReadRememberMeCookie();
         var sessionId = Guid.NewGuid();
