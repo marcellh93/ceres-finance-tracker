@@ -103,6 +103,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<EmailChangeToken> EmailChangeTokens => Set<EmailChangeToken>();
     public DbSet<LockoutUnlockToken> LockoutUnlockTokens => Set<LockoutUnlockToken>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
+    public DbSet<ErasureRequest> ErasureRequests => Set<ErasureRequest>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<EmailDeliveryEvent> EmailDeliveryEvents => Set<EmailDeliveryEvent>();
 
@@ -119,6 +120,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureEmailChangeEntities(modelBuilder);
         ConfigureLockoutUnlockEntities(modelBuilder);
         ConfigureExportJobEntities(modelBuilder);
+        ConfigureErasureRequestEntities(modelBuilder);
         ConfigureAuditLogEntities(modelBuilder);
         ConfigureEmailDeliveryEventEntities(modelBuilder);
         SeedData(modelBuilder);
@@ -330,6 +332,21 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             // Filtered unique index: many rows can share the empty pre-Ready lookup, so only
             // enforce uniqueness on non-empty fingerprints.
             b.HasIndex(e => e.TokenLookup).IsUnique().HasFilter("octet_length(\"TokenLookup\") > 0");
+            b.HasIndex(e => new { e.UserId, e.Status });
+        });
+    }
+
+    private static void ConfigureErasureRequestEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ErasureRequest>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.CancelTokenLookup).IsRequired();
+            b.Property(e => e.CancelTokenLookup).HasMaxLength(32);
+            b.Property(e => e.CancelTokenHash).HasMaxLength(512);
+            // Filtered unique index: many rows can share the empty pre-token lookup, so only
+            // enforce uniqueness on non-empty fingerprints.
+            b.HasIndex(e => e.CancelTokenLookup).IsUnique().HasFilter("octet_length(\"CancelTokenLookup\") > 0");
             b.HasIndex(e => new { e.UserId, e.Status });
         });
     }

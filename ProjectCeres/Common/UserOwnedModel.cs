@@ -31,6 +31,9 @@ public static class UserOwnedModel
         // lookup) — not user financial content, so GDPR export/erasure and the
         // dev-seed remap have no reason to touch it. Same category as SupportTickets.
         "ExportJobs",
+        // ErasureRequests: operational bookkeeping (seal status, cancel-token lookup) —
+        // an erasure job is not itself user content to erase. Same category as ExportJobs.
+        "ErasureRequests",
     };
 
     /// <summary>Every user-owned table that must carry an RLS policy.</summary>
