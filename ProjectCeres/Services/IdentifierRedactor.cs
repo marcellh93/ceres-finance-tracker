@@ -56,11 +56,12 @@ public static class IdentifierRedactor
             RegexOptions.IgnoreCase
         );
 
-        // IBAN pattern: country code (2 letters) + check digits (2) + account (space-separated groups of 1-4 digits)
-        // Ends with a digit (not a letter followed by more text)
+        // IBAN pattern: country code (2 letters) + check digits (2) + account
+        // Covers spaced (ES91 2100 0418...) and unspaced (ES9121000418...) formats, including lettered BBANs (GB29NWBK...)
+        // Pattern 1: unspaced 11-30 alphanumerics; Pattern 2: space-separated groups ending with a digit group
         result = Regex.Replace(
             result,
-            @"\b[A-Z]{2}\d{2}(?: \d{1,4})+(?=\s|$)",
+            @"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b|\b[A-Z]{2}\d{2}\s[A-Z0-9]{1,4}(?:\s\d{1,4})+\b",
             "[redacted]",
             RegexOptions.IgnoreCase
         );

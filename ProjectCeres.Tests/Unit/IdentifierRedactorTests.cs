@@ -166,4 +166,58 @@ public class IdentifierRedactorTests
         // Assert
         result.Should().Be("[redacted] and [redacted] both appear here.");
     }
+
+    [Fact]
+    public void Pass2_catches_unspaced_iban()
+    {
+        // Arrange: IBAN without spaces (common paste format)
+        var body = "Transfer to account ES9121000418450200051332 please.";
+        var known = new IdentifierRedactor.ErasureIdentifiers(
+            Email: "",
+            DisplayName: "",
+            AccountTokens: new List<string>()
+        );
+
+        // Act
+        var result = IdentifierRedactor.Redact(body, known);
+
+        // Assert
+        result.Should().Be("Transfer to account [redacted] please.");
+    }
+
+    [Fact]
+    public void Pass2_catches_lettered_iban()
+    {
+        // Arrange: GB IBAN with alphabetic bank code
+        var body = "Use IBAN GB29NWBK60161331926819 for UK account.";
+        var known = new IdentifierRedactor.ErasureIdentifiers(
+            Email: "",
+            DisplayName: "",
+            AccountTokens: new List<string>()
+        );
+
+        // Act
+        var result = IdentifierRedactor.Redact(body, known);
+
+        // Assert
+        result.Should().Be("Use IBAN [redacted] for UK account.");
+    }
+
+    [Fact]
+    public void Pass2_catches_lettered_iban_spaced()
+    {
+        // Arrange: GB IBAN with spaces (formatted)
+        var body = "Account number: GB29 NWBK 6016 1331 9268 19.";
+        var known = new IdentifierRedactor.ErasureIdentifiers(
+            Email: "",
+            DisplayName: "",
+            AccountTokens: new List<string>()
+        );
+
+        // Act
+        var result = IdentifierRedactor.Redact(body, known);
+
+        // Assert
+        result.Should().Be("Account number: [redacted].");
+    }
 }
