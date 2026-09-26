@@ -20,4 +20,5 @@ public enum FailedLoginReason
     UnknownUser,
     PasswordResetUnknownEmail,
     EmailNotConfirmed,
+    AccountSealed,
 }

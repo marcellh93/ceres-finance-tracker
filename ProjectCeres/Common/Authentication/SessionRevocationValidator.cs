@@ -48,6 +48,14 @@ public static class SessionRevocationValidator
             return;
         }
 
+        // Sealed account (Stage 13.9): an erasure request seals the account immediately.
+        // A sealed principal is rejected + signed out on the next request — same mechanism
+        // as a revoked session. The 72h hold is server-side; the emailed cancel link un-seals.
+        var user = await db.Users.IgnoreQueryFilters()
+            .Where(u => u.Id == session.UserId && u.SealedAt != null)
+            .FirstOrDefaultAsync();
+        if (user is not null) { await RejectAsync(ctx); return; }
+
         // Stage 12.5.1: IP-anchored sessions are rejected when the request's source IP
         // differs from the address the session was created on (exact match). This defends
         // a stolen session cookie replayed from another network — the replayed cookie

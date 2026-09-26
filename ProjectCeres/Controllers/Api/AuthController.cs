@@ -304,6 +304,18 @@ public sealed class AuthController : ControllerBase
             return UnauthorizedEnvelope("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
+        // Stage 13.9: a sealed (or fully erased) account refuses login even with a
+        // correct password. Mirrors the lockout/not-allowed refusals above — checked
+        // after PasswordSignInAsync succeeds so credential-enumeration timing is unaffected.
+        if (userStub.SealedAt is not null || userStub.ErasedAt is not null)
+        {
+            HttpContext.Items.Remove(SessionConstants.PendingSessionItemKey);
+            var (ip, ua) = RequestContext();
+            await _failedLogins.RecordAsync(request.Email, userStub.Id, FailedLoginReason.AccountSealed, ip, ua, HttpContext.RequestAborted);
+            return UnauthorizedEnvelope("ACCOUNT_SEALED",
+                "This account is scheduled for deletion and can no longer sign in.");
+        }
+
         await IssueSessionAndCookiesAsync(userStub, sessionId, request.RememberMe, usedBackupCode: false);
         await _auditLog.RecordAsync(userStub.Id, AuditLogAction.LoginSucceeded, ct: HttpContext.RequestAborted);
         return NoContent();
