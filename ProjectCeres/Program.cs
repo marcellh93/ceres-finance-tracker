@@ -162,6 +162,7 @@ builder.Services.AddScoped<EmailChangeService>();
 builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
 builder.Services.AddScoped<LockoutUnlockService>();
 builder.Services.AddScoped<ExportTokenGenerator>();
+builder.Services.AddScoped<ErasureTokenGenerator>();
 builder.Services.AddMemoryCache();
 builder.Services.AddOptions<LockoutCacheOptions>()
     .Validate(o => o.IpPointerTtl > TimeSpan.Zero, "LockoutCacheOptions.IpPointerTtl must be positive.");
@@ -553,6 +554,7 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IExportJobService, ExportJobService>();
+builder.Services.AddScoped<IErasureService, ErasureService>();
 builder.Services.AddScoped<DataExportBuilder>();
 builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>();
 builder.Services.AddScoped<IReportService, ReportService>();

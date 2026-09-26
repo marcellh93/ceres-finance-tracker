@@ -774,6 +774,7 @@ public class ArchitectureTests
             "ProjectCeres/Tools/SweepSessions.cs",                                    // Stage 12.10: cross-tenant by design — the retention sweep spans all users. Stage 10 architecture test allow-lists this file.
             "ProjectCeres/Services/DataExportBuilder.cs",                             // Stage 13.8 Task 5: worker acts for one user with no HTTP principal — reads that user's rows cross-tenant via AdminDbContext, same pattern as SweepSessions.
             "ProjectCeres/Tools/ExportJobWorker.cs",                                  // Stage 13.8 Task 6: cron poll-drain across all users' Pending/Ready ExportJob rows — SweepSessions pattern.
+            "ProjectCeres/Services/ErasureService.cs",                                // Stage 13.9 Task 5: cancel-token verify before the sealed caller can authenticate (LockoutUnlockService pattern).
         };
 
         var repoRoot = FindRepoRoot();
