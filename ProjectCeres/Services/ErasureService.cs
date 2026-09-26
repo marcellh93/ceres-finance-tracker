@@ -27,6 +27,7 @@ public class ErasureService(
     TimeProvider timeProvider,
     ErasureTokenGenerator tokens,
     TokenLookupHasher lookupHasher,
+    Argon2idPasswordHasher argon,
     IAuditLogWriter auditLog) : IErasureService
 {
     public static readonly TimeSpan CancelWindow = TimeSpan.FromHours(72);
@@ -75,6 +76,9 @@ public class ErasureService(
     {
         if (string.IsNullOrWhiteSpace(rawToken))
         {
+            // Constant-time: pad the empty-token path with one Argon2 verify so it costs
+            // the same as a real match, matching LockoutUnlockService.ConfirmAsync.
+            argon.RunDummyHash();
             return new ErasureCancelOutcome.NotFound();
         }
 
@@ -87,6 +91,10 @@ public class ErasureService(
 
         if (candidate is null || !tokens.Verify(rawToken, candidate.CancelTokenHash))
         {
+            // Constant-time: even with no matching row, run one Argon2 verify so timing
+            // doesn't reveal "no such token" vs "token found but wrong secret" — the
+            // enumeration oracle LockoutUnlockService.ConfirmAsync guards against.
+            if (candidate is null) argon.RunDummyHash();
             return new ErasureCancelOutcome.NotFound();
         }
 
@@ -125,6 +133,11 @@ public class ErasureService(
             .IgnoreQueryFilters()
             .Where(u => u.Id == candidate.UserId)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.SealedAt, (DateTime?)null), ct);
+
+        // Audit the undo, mirroring EmailChangeService.RevokeAsync — "who un-sealed this
+        // account and when" is exactly the trail Stage 13's erasure audit exists to hold.
+        await auditLog.RecordAsync(candidate.UserId, AuditLogAction.GdprErasureCancelled,
+            entityType: nameof(ErasureRequest), entityId: candidate.Id, ct: ct);
 
         await rlsScope.CommitAsync(ct);
 

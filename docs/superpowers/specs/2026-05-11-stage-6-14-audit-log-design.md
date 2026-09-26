@@ -92,6 +92,13 @@ public enum AuditLogAction
     LockoutSelfServiceUnlock,   // wired in Stage 6.10
     DataExportRequested,        // wired in Stage 13
     GdprErasureRequested,       // wired in Stage 13
+
+    // Wired after 6.14 — kept in sync with the ArchitectureTests enum pin
+    EmailVerificationRequested, // wired in Stage 9.3
+    EmailVerified,              // wired in Stage 9.3
+    SupportTicketCreated,       // wired in Stage 12.5
+    SupportMessageByAgent,      // wired in Stage 12.6
+    GdprErasureCancelled,       // wired in Stage 13.9 — undo of an erasure request (mirrors EmailChangeRevoked)
 }
 ```
 

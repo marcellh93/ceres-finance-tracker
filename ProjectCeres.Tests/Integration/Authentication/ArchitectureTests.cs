@@ -591,6 +591,8 @@ public class ArchitectureTests
         // Stage 12.5 (2026-08-27) added SupportTicketCreated, wired by SupportApiController.
         // Stage 12.6 (2026-08-28) added SupportMessageByAgent, wired by SupportAdminApiController
         // for an operator reply/status set on another user's ticket.
+        // Stage 13.9 (2026-09-26) added GdprErasureCancelled — the undo of an erasure request,
+        // wired by ErasureService.CancelAsync (mirrors EmailChangeRevoked auditing its undo).
         var expected = new[]
         {
             "LoginSucceeded", "LoginSucceededMfa", "LoginSucceededBackupCode",
@@ -602,6 +604,7 @@ public class ArchitectureTests
             "DataExportRequested", "GdprErasureRequested",
             "EmailVerificationRequested", "EmailVerified",
             "SupportTicketCreated", "SupportMessageByAgent",
+            "GdprErasureCancelled",
         };
         Enum.GetNames<AuditLogAction>()
             .Should().BeEquivalentTo(expected);

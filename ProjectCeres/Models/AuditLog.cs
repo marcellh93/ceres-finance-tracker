@@ -38,4 +38,6 @@ public enum AuditLogAction
 
     SupportTicketCreated,       // wired in Stage 12.5
     SupportMessageByAgent,      // wired in Stage 12.6 — operator reply/status set
+
+    GdprErasureCancelled,       // wired in Stage 13.9 — undo of an erasure request
 }
