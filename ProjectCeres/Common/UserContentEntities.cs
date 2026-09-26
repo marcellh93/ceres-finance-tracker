@@ -11,8 +11,9 @@ namespace ProjectCeres.Common;
 /// </summary>
 public static class UserContentEntities
 {
-    private static readonly HashSet<string> SupportContentTables =
-        new(StringComparer.Ordinal) { "SupportTickets", "SupportMessages", "SupportTicketAttachments" };
+    /// <summary>Support-correspondence tables — redact-retain lane (Stage 13.9 B3a).</summary>
+    public static readonly IReadOnlyCollection<string> SupportContentTables =
+        new HashSet<string>(StringComparer.Ordinal) { "SupportTickets", "SupportMessages", "SupportTicketAttachments" };
 
     public static IReadOnlyList<UserOwnedTable> List(IReadOnlyModel model)
     {
