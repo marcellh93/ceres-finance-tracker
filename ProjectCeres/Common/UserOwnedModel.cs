@@ -34,6 +34,9 @@ public static class UserOwnedModel
         // ErasureRequests: operational bookkeeping (seal status, cancel-token lookup) —
         // an erasure job is not itself user content to erase. Same category as ExportJobs.
         "ErasureRequests",
+        // ErasedEmailHolds: operational bookkeeping (the 30-day re-registration cooling-off
+        // fingerprint) — not user financial content. Same category as ErasureRequests.
+        "ErasedEmailHolds",
     };
 
     /// <summary>Every user-owned table that must carry an RLS policy.</summary>

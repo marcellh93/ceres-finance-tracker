@@ -47,10 +47,11 @@ public class UserOwnedModelTests
     // ticket's single Message column out into its own IUserOwned table. 28 -> 29:
     // ExportJob (Stage 13.8 Task 1) — its RLS migration lands in Task 2. 29 -> 30:
     // ErasureRequest (Stage 13.9 Task 1) — its RLS migration lands in this same task.
+    // 30 -> 31: ErasedEmailHold (Stage 13.9 Task 6b) — the D3 re-registration hold.
     [Fact]
-    public void RlsTables_has_exactly_30_entries()
+    public void RlsTables_has_exactly_31_entries()
     {
-        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(30);
+        UserOwnedModel.RlsTables(Ctx().Model).Should().HaveCount(31);
     }
 
     [Fact]

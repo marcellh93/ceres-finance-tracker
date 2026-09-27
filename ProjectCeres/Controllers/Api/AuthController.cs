@@ -32,6 +32,7 @@ public sealed class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly AppDbContext _db;
+    private readonly AdminDbContext _admin;
     private readonly Argon2idPasswordHasher _argon;
     private readonly PersistentTokenService _tokens;
     private readonly IAntiforgery _antiforgery;
@@ -44,11 +45,13 @@ public sealed class AuthController : ControllerBase
     private readonly EmailConfirmationService _emailConfirmation;
     private readonly TimeProvider _timeProvider;
     private readonly Common.Email.INewSessionNotificationService _newSessionNotifier;
+    private readonly TokenLookupHasher _lookupHasher;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         AppDbContext db,
+        AdminDbContext admin,
         Argon2idPasswordHasher argon,
         PersistentTokenService tokens,
         IAntiforgery antiforgery,
@@ -60,11 +63,13 @@ public sealed class AuthController : ControllerBase
         LockoutCache lockoutCache,
         EmailConfirmationService emailConfirmation,
         TimeProvider timeProvider,
-        Common.Email.INewSessionNotificationService newSessionNotifier)
+        Common.Email.INewSessionNotificationService newSessionNotifier,
+        TokenLookupHasher lookupHasher)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _db = db;
+        _admin = admin;
         _argon = argon;
         _tokens = tokens;
         _antiforgery = antiforgery;
@@ -77,6 +82,21 @@ public sealed class AuthController : ControllerBase
         _emailConfirmation = emailConfirmation;
         _timeProvider = timeProvider;
         _newSessionNotifier = newSessionNotifier;
+        _lookupHasher = lookupHasher;
+    }
+
+    /// <summary>
+    /// D3's 30-day re-registration cooling-off (spec § 8 step 5). Pre-auth, cross-tenant
+    /// lookup via AdminDbContext (BYPASSRLS) — same reasoning as LockoutUnlockService.ConfirmAsync.
+    /// </summary>
+    [RlsBypassJustified("CER-1302")]
+    private async Task<bool> IsEmailHeldAsync(string email, CancellationToken ct)
+    {
+        var fingerprint = _lookupHasher.ComputeLookup(email.ToUpperInvariant());
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        return await _admin.ErasedEmailHolds
+            .IgnoreQueryFilters()
+            .AnyAsync(h => h.EmailFingerprint == fingerprint && h.ExpiresAt > now, ct);
     }
 
     private (string ip, string ua) RequestContext() =>
@@ -88,6 +108,15 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+        // D3 re-registration hold (spec § 8 step 5): a live hold must be indistinguishable
+        // from a confirmed-duplicate email — same dummy-hash-then-204 branch, no CreateAsync
+        // attempt (the email is otherwise available and CreateAsync would succeed).
+        if (await IsEmailHeldAsync(request.Email, HttpContext.RequestAborted))
+        {
+            _argon.RunDummyHash();
+            return NoContent();
+        }
 
         // Atomicity: AspNetUsers row + category seed + audit log entry must commit or
         // roll back together. Without the transaction, a post-CreateAsync failure

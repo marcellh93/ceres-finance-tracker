@@ -104,6 +104,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<LockoutUnlockToken> LockoutUnlockTokens => Set<LockoutUnlockToken>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
     public DbSet<ErasureRequest> ErasureRequests => Set<ErasureRequest>();
+    public DbSet<ErasedEmailHold> ErasedEmailHolds => Set<ErasedEmailHold>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<EmailDeliveryEvent> EmailDeliveryEvents => Set<EmailDeliveryEvent>();
 
@@ -121,6 +122,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         ConfigureLockoutUnlockEntities(modelBuilder);
         ConfigureExportJobEntities(modelBuilder);
         ConfigureErasureRequestEntities(modelBuilder);
+        ConfigureErasedEmailHoldEntities(modelBuilder);
         ConfigureAuditLogEntities(modelBuilder);
         ConfigureEmailDeliveryEventEntities(modelBuilder);
         SeedData(modelBuilder);
@@ -348,6 +350,17 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             // enforce uniqueness on non-empty fingerprints.
             b.HasIndex(e => e.CancelTokenLookup).IsUnique().HasFilter("octet_length(\"CancelTokenLookup\") > 0");
             b.HasIndex(e => new { e.UserId, e.Status });
+        });
+    }
+
+    private static void ConfigureErasedEmailHoldEntities(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ErasedEmailHold>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EmailFingerprint).IsRequired();
+            b.Property(e => e.EmailFingerprint).HasMaxLength(32);
+            b.HasIndex(e => e.EmailFingerprint).IsUnique();
         });
     }
 
