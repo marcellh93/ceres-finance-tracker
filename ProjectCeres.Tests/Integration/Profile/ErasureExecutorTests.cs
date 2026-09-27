@@ -46,6 +46,7 @@ public class ErasureExecutorTests : IAsyncLifetime
     private Guid _categoryId;
     private Guid _transactionId;
     private Guid _budgetId;
+    private Guid _recurringTransactionId;
     private Guid _supportTicketId;
     private Guid _supportMessageId;
     private Guid _supportAttachmentId;
@@ -135,6 +136,27 @@ public class ErasureExecutorTests : IAsyncLifetime
                 UserId = _userId,
             });
 
+            admin.Settings.Add(new Settings
+            {
+                UserId = _userId,
+                NumberFormat = "en-US",
+                DateFormat = "MM/dd/yyyy",
+                DefaultCurrencyId = 1,
+            });
+
+            _recurringTransactionId = Guid.NewGuid();
+            admin.RecurringTransactions.Add(new RecurringTransaction
+            {
+                Id = _recurringTransactionId,
+                Name = "Victim's Rent",
+                AccountId = _accountId,
+                CategoryId = _categoryId,
+                Frequency = Frequency.Monthly,
+                NextDueDate = DateOnly.FromDateTime(DateTime.Today),
+                IsActive = true,
+                UserId = _userId,
+            });
+
             _transactionId = Guid.NewGuid();
             admin.Transactions.Add(new Transaction
             {
@@ -175,7 +197,7 @@ public class ErasureExecutorTests : IAsyncLifetime
             {
                 Id = _supportTicketId,
                 UserId = _userId,
-                Subject = "Help with my account",
+                Subject = $"Can't log in as {RealEmail}",
                 Status = SupportTicketStatus.Open,
                 Priority = SupportTicketPriority.Normal,
                 CreatedAt = DateTime.UtcNow,
@@ -286,21 +308,25 @@ public class ErasureExecutorTests : IAsyncLifetime
 
         await using var admin = _fixture.CreateAdminContext();
 
-        // Purge lane: Budget is gone entirely.
+        // Purge lane: Budget, Settings, RecurringTransaction are gone entirely.
         (await admin.Budgets.IgnoreQueryFilters().CountAsync(b => b.Id == _budgetId))
+            .Should().Be(0, "purge-lane rows are hard-deleted");
+        (await admin.Settings.IgnoreQueryFilters().CountAsync(s => s.UserId == _userId))
+            .Should().Be(0, "purge-lane rows are hard-deleted");
+        (await admin.RecurringTransactions.IgnoreQueryFilters().CountAsync(r => r.Id == _recurringTransactionId))
             .Should().Be(0, "purge-lane rows are hard-deleted");
 
         // Statutory lane: rows remain, identity is anonymised (negative assertions).
         var account = await admin.Accounts.IgnoreQueryFilters().AsNoTracking().SingleAsync(a => a.Id == _accountId);
         account.Name.Should().NotBe(RealAccountName);
         account.Name.Should().NotContain(RealEmail);
-        account.Description.Should().NotContain(RealEmail);
+        account.Description.Should().BeNull("the seeded description contained the real email and must be cleared, not just fail to match a substring check that passes vacuously on null");
 
         var category = await admin.Categories.IgnoreQueryFilters().AsNoTracking().SingleAsync(c => c.Id == _categoryId);
         category.Name.Should().NotBe(RealCategoryName);
 
         var transaction = await admin.Transactions.IgnoreQueryFilters().AsNoTracking().SingleAsync(t => t.Id == _transactionId);
-        transaction.Description.Should().NotContain(RealEmail);
+        transaction.Description.Should().BeNull("the seeded description contained the real email and must be cleared, not just fail to match a substring check that passes vacuously on null");
         transaction.AccountId.Should().Be(_accountId, "the statutory row survives with its FK intact");
         transaction.BudgetId.Should().BeNull("the purge-lane Budget it pointed to is gone; the FK must be severed first");
 
@@ -323,6 +349,9 @@ public class ErasureExecutorTests : IAsyncLifetime
         supportAttachment.FileName.Should().Be("[removed]");
         File.Exists(_supportAttachmentFullPath).Should().BeFalse(
             "a support attachment has no legal retention duty and its file must be deleted");
+
+        var ticket = await admin.SupportTickets.IgnoreQueryFilters().AsNoTracking().SingleAsync(t => t.Id == _supportTicketId);
+        ticket.Subject.Should().NotContain(RealEmail, "a ticket subject is free text and can carry the same PII as a message body");
 
         // ExportJob: row + ZIP both gone.
         (await admin.ExportJobs.IgnoreQueryFilters().CountAsync(j => j.Id == _exportJobId))
@@ -358,19 +387,65 @@ public class ErasureExecutorTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ExecuteAsync_is_idempotent_on_a_second_run()
+    public async Task ExecuteAsync_on_a_completed_request_is_a_no_op()
     {
         await _executor.ExecuteAsync(_userId, CancellationToken.None);
 
-        // A second run (simulating a crash-then-retry) must not throw, and must
-        // remain a no-op: 0-row purge deletes and already-anonymised statutory
-        // rows are legitimate, and the ErasureRequest is already Completed so the
-        // executor finds no Sealed request and returns immediately.
+        // A second call against an already-Completed request must not throw. This
+        // does NOT exercise re-running the lane logic — the top-of-method query only
+        // matches Status == Sealed, so this hits the early-return before any lane
+        // runs. See ExecuteAsync_a_second_pass_after_a_simulated_crash_does_not_double_complete
+        // for the genuine re-run-against-already-processed-data case.
         var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
         await act.Should().NotThrowAsync();
 
         _audit.Recorded.Count(r => r.Action == AuditLogAction.GdprErasureCompleted)
             .Should().Be(1, "a re-run after Completed must not write a second audit row");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_a_second_pass_after_a_simulated_crash_does_not_double_complete()
+    {
+        await _executor.ExecuteAsync(_userId, CancellationToken.None);
+
+        // Simulates an operator/retry re-running a fully-completed erasure: force
+        // the request back to Sealed so the second call actually re-runs every lane
+        // against already-processed data, rather than hitting the early-return.
+        // The production IAuditLogWriter persists into the same AuditLogs table
+        // ErasureExecutor reads for its guard; the test's in-memory fake does not,
+        // so the completion row it would have written is seeded here directly —
+        // this mirrors real post-first-run DB state, not a test-only shortcut.
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            await admin.ErasureRequests.IgnoreQueryFilters()
+                .Where(r => r.UserId == _userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, ErasureStatus.Sealed));
+
+            // CK_AuditLog_EntityPair requires EntityType/EntityId to be both null or
+            // both set — EntityId's exact value doesn't matter to the guard check
+            // below, which filters only on UserId + Action.
+            admin.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = _userId,
+                Action = AuditLogAction.GdprErasureCompleted,
+                EntityType = _pseudonym.Compute(_userId),
+                EntityId = Guid.NewGuid(),
+                OccurredAt = DateTime.UtcNow,
+                IpAddress = "erased",
+            });
+            await admin.SaveChangesAsync();
+        }
+
+        var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
+        await act.Should().NotThrowAsync("a re-run against already-erased data must not throw");
+
+        _audit.Recorded.Count(r => r.Action == AuditLogAction.GdprErasureCompleted)
+            .Should().Be(1, "a second real pass must not write a second completion audit row");
+
+        await using var check = _fixture.CreateAdminContext();
+        var request = await check.ErasureRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.UserId == _userId);
+        request.Status.Should().Be(ErasureStatus.Completed);
     }
 
     [Fact]
