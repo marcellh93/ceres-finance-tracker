@@ -47,6 +47,7 @@ public sealed class AuthController : ControllerBase
     private readonly TimeProvider _timeProvider;
     private readonly Common.Email.INewSessionNotificationService _newSessionNotifier;
     private readonly TokenLookupHasher _lookupHasher;
+    private readonly ILookupNormalizer _normalizer;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -65,7 +66,8 @@ public sealed class AuthController : ControllerBase
         EmailConfirmationService emailConfirmation,
         TimeProvider timeProvider,
         Common.Email.INewSessionNotificationService newSessionNotifier,
-        TokenLookupHasher lookupHasher)
+        TokenLookupHasher lookupHasher,
+        ILookupNormalizer normalizer)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -84,6 +86,7 @@ public sealed class AuthController : ControllerBase
         _timeProvider = timeProvider;
         _newSessionNotifier = newSessionNotifier;
         _lookupHasher = lookupHasher;
+        _normalizer = normalizer;
     }
 
     /// <summary>
@@ -93,7 +96,10 @@ public sealed class AuthController : ControllerBase
     [RlsBypassJustified("CER-1302")]
     private async Task<bool> IsEmailHeldAsync(string email, CancellationToken ct)
     {
-        var fingerprint = _lookupHasher.ComputeLookup(email.ToUpperInvariant());
+        // Must match ErasureExecutor.RecordEmailHoldAsync's normalization exactly —
+        // a divergent normalizer means the hold can never match on lookup.
+        var normalized = _normalizer.NormalizeEmail(email) ?? email;
+        var fingerprint = _lookupHasher.ComputeLookup(normalized);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         return await _admin.ErasedEmailHolds
             .IgnoreQueryFilters()
@@ -112,9 +118,17 @@ public sealed class AuthController : ControllerBase
 
         // D3 re-registration hold (spec § 8 step 5): a live hold must be indistinguishable
         // from a confirmed-duplicate email — same dummy-hash-then-204 branch, no CreateAsync
-        // attempt (the email is otherwise available and CreateAsync would succeed).
+        // attempt (the email is otherwise available and CreateAsync would succeed). The
+        // confirmed-duplicate branch below also pays an open+commit transaction; mirror that
+        // shape here (on a throwaway id — no user exists to key it to) so both branches cost
+        // approximately the same wall-clock time. Never call CreateAsync here: that would
+        // create the account, defeating the hold.
         if (await IsEmailHeldAsync(request.Email, HttpContext.RequestAborted))
         {
+            await using (var heldTx = await _db.BeginPreAuthUserScopeAsync(Guid.NewGuid(), HttpContext.RequestAborted))
+            {
+                await heldTx.CommitAsync(HttpContext.RequestAborted);
+            }
             _argon.RunDummyHash();
             return NoContent();
         }
