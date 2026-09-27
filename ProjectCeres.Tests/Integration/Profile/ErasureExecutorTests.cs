@@ -261,7 +261,8 @@ public class ErasureExecutorTests : IAsyncLifetime
         _audit = new RecordingErasureAuditLogWriter();
         _executor = new ErasureExecutor(
             _fixture.CreateAdminContext(), _pseudonym, _audit, env.Object, TimeProvider.System,
-            new LowercaseLookupNormalizer(), lookup);
+            new LowercaseLookupNormalizer(), lookup,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ErasureExecutor>.Instance);
     }
 
     public async Task DisposeAsync()

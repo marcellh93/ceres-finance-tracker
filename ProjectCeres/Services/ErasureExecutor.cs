@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common;
@@ -17,9 +18,14 @@ namespace ProjectCeres.Services;
 ///
 /// Cross-tenant by design — acts for an arbitrary erased user with no HTTP
 /// principal, same AdminDbContext + IgnoreQueryFilters().Where(UserId==) pattern
-/// as ExportJobWorker/DataExportBuilder. Each lane is check-then-act so a mid-run
-/// crash followed by a re-run (Task 10's ErasureWorker retry) completes cleanly
-/// without double-processing or throwing on an already-empty lane.
+/// as ExportJobWorker/DataExportBuilder. The whole sequence runs inside one DB
+/// transaction, so a mid-run crash rolls back to the pre-run state rather than
+/// leaving the user half-erased. A re-run against an already-Completed request is
+/// a no-op (top-of-method Sealed check); a re-run against a Sealed request whose
+/// prior pass actually finished the DB work but crashed before the status flip is
+/// safe to repeat (each lane is check-then-act) and the final status-flip guard
+/// prevents a second completion audit row. Full crash-mid-transaction resume/retry
+/// orchestration is Task 10's ErasureWorker, not this class.
 /// </summary>
 [RequiresAdminContext]
 public class ErasureExecutor(
@@ -30,6 +36,7 @@ public class ErasureExecutor(
     TimeProvider timeProvider,
     ILookupNormalizer normalizer,
     TokenLookupHasher lookupHasher,
+    ILogger<ErasureExecutor> logger,
     IOptions<FileAttachmentOptions>? options = null)
 {
     // Mirrors DataExportBuilder/FileAttachmentService: attachment StoredPath is
@@ -45,9 +52,17 @@ public class ErasureExecutor(
             .FirstOrDefaultAsync(ct);
         if (request is null) return; // cancelled/already-completed job — nothing to do (idempotent no-op)
 
+        logger.LogInformation("Erasure starting for user {UserId}, request {RequestId}", userId, request.Id);
+
         var token = pseudonym.Compute(userId);
 
         var lanes = ErasureLanes.Classify(db.Model);
+
+        // Whole sequence is one transaction: a thrown exception anywhere below rolls
+        // everything back when `await using` disposes the uncommitted transaction —
+        // no explicit rollback needed. Standard EF Core DML transaction behavior;
+        // no DDL is involved.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         await AnonymiseStatutoryAsync(userId, token, ct);
         await RedactSupportAsync(userId, ct);
@@ -56,27 +71,49 @@ public class ErasureExecutor(
         await RecordEmailHoldAsync(userId, ct);
         await AnonymiseAccountAsync(userId, token, ct);
 
-        await auditLog.RecordAsync(
-            userId: userId,
-            action: AuditLogAction.GdprErasureCompleted,
-            entityType: token,
-            entityId: null,
-            ct: ct);
-
         // Stage 6.14 GDPR-on-erasure: historical audit rows keep UserId as a pseudonym
-        // but must not retain a real IP. Runs after the completion write above — that
+        // but must not retain a real IP. Runs after the completion write below — that
         // row's IpAddress is "unknown" (no HttpContext in this background path), never
         // a real address, so rewriting before or after it makes no observable difference.
         await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.IpAddress, "erased"), ct);
 
+        // Guard the status flip: if some other path already completed/cancelled this
+        // request (race, or a resumed call that got past the top check before a prior
+        // pass's transaction committed), this affects 0 rows instead of re-flipping it.
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        await db.ErasureRequests
+        var flipped = await db.ErasureRequests
             .IgnoreQueryFilters()
-            .Where(r => r.Id == request.Id)
+            .Where(r => r.Id == request.Id && r.Status == ErasureStatus.Sealed)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.Status, ErasureStatus.Completed)
                 .SetProperty(r => r.CompletedAt, now), ct);
+
+        // A prior pass can have completed all the DB work and even written its audit
+        // row, then crashed before this flip landed, leaving Status back at Sealed for
+        // a legitimate resumed re-run — the flip guard alone allows that resumed call
+        // to flip Sealed->Completed a second time. Check for an existing completion
+        // row too, so a genuine second full pass over already-processed data can't
+        // double the "exactly one audit row" guarantee.
+        var alreadyRecorded = await db.AuditLogs.IgnoreQueryFilters()
+            .AnyAsync(a => a.UserId == userId && a.Action == AuditLogAction.GdprErasureCompleted, ct);
+
+        if (flipped > 0 && !alreadyRecorded)
+        {
+            // CK_AuditLog_EntityPair (and AuditLogWriter's own guard) require
+            // EntityType/EntityId to be both set or both null — entityId is the
+            // completed ErasureRequest's id, the only real entity here.
+            await auditLog.RecordAsync(
+                userId: userId,
+                action: AuditLogAction.GdprErasureCompleted,
+                entityType: token,
+                entityId: request.Id,
+                ct: ct);
+        }
+
+        await tx.CommitAsync(ct);
+
+        logger.LogInformation("Erasure completed for user {UserId}", userId);
     }
 
     /// <summary>
@@ -114,10 +151,10 @@ public class ErasureExecutor(
     }
 
     /// <summary>
-    /// Step 2 — redact-retain support (B3a). Bodies are redacted via
-    /// <see cref="IdentifierRedactor"/>; attachment files are deleted from disk (no
-    /// legal duty to keep them) and their rows redacted, not removed — the thread
-    /// survives as de-identified knowledge.
+    /// Step 2 — redact-retain support (B3a). Bodies and ticket subjects are redacted
+    /// via <see cref="IdentifierRedactor"/>; attachment files are deleted from disk
+    /// (no legal duty to keep them) and their rows redacted, not removed — the
+    /// thread survives as de-identified knowledge.
     /// </summary>
     private async Task RedactSupportAsync(Guid userId, CancellationToken ct)
     {
@@ -139,13 +176,25 @@ public class ErasureExecutor(
         }
         if (messages.Count > 0) await db.SaveChangesAsync(ct);
 
+        var tickets = await db.SupportTickets.IgnoreQueryFilters()
+            .Where(t => t.UserId == userId)
+            .ToListAsync(ct);
+        foreach (var ticket in tickets)
+        {
+            ticket.Subject = IdentifierRedactor.Redact(ticket.Subject, known);
+        }
+        if (tickets.Count > 0) await db.SaveChangesAsync(ct);
+
+        // Row mutation is queued and saved BEFORE the physical unlink: a crash
+        // between the two leaves a retained file with an already-redacted row
+        // (recoverable) rather than a deleted file with a still-PII-bearing row.
         var attachments = await db.SupportTicketAttachments.IgnoreQueryFilters()
             .Where(a => a.UserId == userId)
             .ToListAsync(ct);
+        var pathsToDelete = new List<string>(attachments.Count);
         foreach (var attachment in attachments)
         {
-            var fullPath = Path.Combine(_root, attachment.StoredPath);
-            if (File.Exists(fullPath)) File.Delete(fullPath);
+            pathsToDelete.Add(Path.Combine(_root, attachment.StoredPath));
 
             attachment.FileName = "[removed]";
             // StoredPath is non-nullable string; the path is now dead, so empty it —
@@ -154,6 +203,11 @@ public class ErasureExecutor(
             attachment.StoredPath = "";
         }
         if (attachments.Count > 0) await db.SaveChangesAsync(ct);
+
+        foreach (var fullPath in pathsToDelete)
+        {
+            if (File.Exists(fullPath)) File.Delete(fullPath);
+        }
     }
 
     /// <summary>Step 3 — hard-delete every remaining user-content table. 0 rows in a
@@ -173,13 +227,22 @@ public class ErasureExecutor(
         }
     }
 
-    /// <summary>Step 4 — delete any outstanding ExportJob ZIP + row. Naturally
-    /// idempotent: File.Exists guards the delete, and an absent row is a no-op.</summary>
+    /// <summary>Step 4 — delete any outstanding ExportJob row + ZIP. Naturally
+    /// idempotent: File.Exists guards the delete, and an absent row is a no-op.
+    /// Rows are deleted before their files are unlinked — if the row-delete
+    /// throws, no files are touched yet; if it succeeds, the files are orphans of
+    /// an already-deleted row, which is the safe state even if the unlink below
+    /// itself later fails.</summary>
     private async Task DeleteExportJobAsync(Guid userId, CancellationToken ct)
     {
         var jobs = await db.ExportJobs.IgnoreQueryFilters()
             .Where(j => j.UserId == userId)
             .ToListAsync(ct);
+
+        await db.ExportJobs.IgnoreQueryFilters()
+            .Where(j => j.UserId == userId)
+            .ExecuteDeleteAsync(ct);
+
         foreach (var job in jobs)
         {
             if (!string.IsNullOrEmpty(job.StoredPath))
@@ -188,10 +251,6 @@ public class ErasureExecutor(
                 if (File.Exists(fullPath)) File.Delete(fullPath);
             }
         }
-
-        await db.ExportJobs.IgnoreQueryFilters()
-            .Where(j => j.UserId == userId)
-            .ExecuteDeleteAsync(ct);
     }
 
     /// <summary>
