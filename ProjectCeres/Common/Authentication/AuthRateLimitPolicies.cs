@@ -44,4 +44,9 @@ public static class AuthRateLimitPolicies
     /// <summary>1/24h/user sliding window keyed off authenticated NameIdentifier claim.
     /// Applied to POST /api/profile/export. Stage 13.8 Task 8.</summary>
     public const string ProfileExportByUser = "profile-export-by-user";
+
+    /// <summary>1/24h/user sliding window keyed off authenticated NameIdentifier claim.
+    /// Applied to POST /api/profile/erasure. Mirrors ProfileExportByUser's limit — an
+    /// irreversible, rarely-repeated action. Stage 13.9 Task 9.</summary>
+    public const string ProfileErasureByUser = "profile-erasure-by-user";
 }

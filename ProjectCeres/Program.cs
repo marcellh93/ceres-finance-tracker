@@ -470,6 +470,24 @@ builder.Services.AddRateLimiter(options =>
         });
     });
 
+    options.AddPolicy(AuthRateLimitPolicies.ProfileErasureByUser, httpContext =>
+    {
+        // Rate limiter runs BEFORE UseAuthentication, so httpContext.User is empty here.
+        // Explicitly authenticate against the application cookie scheme to resolve the
+        // current user id for per-user partitioning. Mirrors ProfileExportByUser above.
+        var task = httpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        task.Wait();
+        var userId = task.Result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? "anonymous-profile-erasure";
+        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 1,
+            Window = TimeSpan.FromHours(24),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0,
+        });
+    });
+
     options.AddPolicy(AuthRateLimitPolicies.EmailByUser, httpContext =>
     {
         // Stage 8d. Partition by the NORMALIZED email from the JSON body when present,
