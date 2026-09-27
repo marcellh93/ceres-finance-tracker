@@ -50,6 +50,8 @@ public class ErasureExecutorTests : IAsyncLifetime
     private Guid _supportAttachmentId;
     private Guid _transactionAttachmentId;
     private Guid _exportJobId;
+    private Guid _priorLoginAuditId;
+    private Guid _priorRegisteredAuditId;
 
     private string _supportAttachmentFullPath = null!;
     private string _transactionAttachmentFullPath = null!;
@@ -227,6 +229,28 @@ public class ErasureExecutorTests : IAsyncLifetime
                 TokenHash = "unused",
             });
 
+            // Prior audit rows (Stage 6.14 GDPR-on-erasure): historical IpAddress values
+            // must be rewritten to "erased" by the executor, separate from the one new
+            // completion row.
+            _priorRegisteredAuditId = Guid.NewGuid();
+            admin.AuditLogs.Add(new AuditLog
+            {
+                Id = _priorRegisteredAuditId,
+                UserId = _userId,
+                Action = AuditLogAction.Registered,
+                OccurredAt = DateTime.UtcNow.AddDays(-10),
+                IpAddress = "203.0.113.5",
+            });
+            _priorLoginAuditId = Guid.NewGuid();
+            admin.AuditLogs.Add(new AuditLog
+            {
+                Id = _priorLoginAuditId,
+                UserId = _userId,
+                Action = AuditLogAction.LoginSucceeded,
+                OccurredAt = DateTime.UtcNow.AddDays(-1),
+                IpAddress = "203.0.113.5",
+            });
+
             await admin.SaveChangesAsync();
         }
 
@@ -344,5 +368,20 @@ public class ErasureExecutorTests : IAsyncLifetime
 
         _audit.Recorded.Count(r => r.Action == AuditLogAction.GdprErasureCompleted)
             .Should().Be(1, "a re-run after Completed must not write a second audit row");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_rewrites_historical_audit_log_ip_addresses_to_erased()
+    {
+        await _executor.ExecuteAsync(_userId, CancellationToken.None);
+
+        await using var admin = _fixture.CreateAdminContext();
+        var rows = await admin.AuditLogs.IgnoreQueryFilters().AsNoTracking()
+            .Where(a => a.Id == _priorRegisteredAuditId || a.Id == _priorLoginAuditId)
+            .ToListAsync();
+
+        rows.Should().HaveCount(2);
+        rows.Should().OnlyContain(a => a.IpAddress == "erased",
+            "a user's prior audit rows must have their real IP addresses erased, not just the new completion row");
     }
 }

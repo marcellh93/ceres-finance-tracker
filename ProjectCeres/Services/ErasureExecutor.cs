@@ -59,6 +59,13 @@ public class ErasureExecutor(
             entityId: null,
             ct: ct);
 
+        // Stage 6.14 GDPR-on-erasure: historical audit rows keep UserId as a pseudonym
+        // but must not retain a real IP. Runs after the completion write above — that
+        // row's IpAddress is "unknown" (no HttpContext in this background path), never
+        // a real address, so rewriting before or after it makes no observable difference.
+        await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == userId)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.IpAddress, "erased"), ct);
+
         var now = timeProvider.GetUtcNow().UtcDateTime;
         await db.ErasureRequests
             .IgnoreQueryFilters()
