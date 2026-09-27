@@ -52,12 +52,16 @@ public class ErasedEmailHoldRegistrationTests : IntegrationTestBase<Bucket3AuthF
     {
         using var scope = _factory.Services.CreateScope();
         var hasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
+        var normalizer = scope.ServiceProvider.GetRequiredService<ILookupNormalizer>();
         var admin = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
         admin.ErasedEmailHolds.Add(new ErasedEmailHold
         {
             Id = Guid.NewGuid(),
             UserId = _holderUserId,
-            EmailFingerprint = hasher.ComputeLookup(email.ToUpperInvariant()),
+            // Must match AuthController.IsEmailHeldAsync / ErasureExecutor.RecordEmailHoldAsync's
+            // normalization exactly (the project's registered ILookupNormalizer, not a hand-rolled
+            // case conversion) — a divergent normalizer means the seeded hold can never match.
+            EmailFingerprint = hasher.ComputeLookup(normalizer.NormalizeEmail(email) ?? email),
             ErasedAt = erasedAt,
             ExpiresAt = expiresAt,
         });
