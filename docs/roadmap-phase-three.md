@@ -1826,7 +1826,6 @@ Stage 12.3 (2026-08-23) added `Block IP` + a `SELF_LOCKOUT` guard but no way to 
 | 13.9 | Right-to-erasure flow | `security-model.md` § Article 30 + § Data Retention |
 | 13.10 | Breach notification runbook | `security-model.md` § Article 33/34 |
 | 13.11 | DPIA (Data Protection Impact Assessment) document | `security-model.md` § Article 35 |
-| 13.a | **Scrutor assembly-scanning DI registration** (infra, not GDPR — logged here at user request rather than in Stage 12's infra family; letter-suffixed since 13.1–13.11 is a closed numeric GDPR sequence). Replaces `Program.cs`'s ~73 manual `AddScoped`/`AddSingleton` interface-pair + concrete-class lines with scan-based registration; ~12 true non-scannables (DbContexts, options binders, one typed `HttpClient`, `IEmailService`'s 3-way environment-conditional branch) stay manual by design. | `docs/superpowers/specs/2026-09-27-stage-13a-scrutor-di-scanning-design.md` |
 
 ### Verification checklist
 
@@ -1906,6 +1905,22 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] `/privacy` and `/legal` pages render readably on 375px (no horizontal overflow; line length comfortable on mobile)
 - [ ] Erasure confirmation dialog touch targets: confirm + cancel buttons ≥ 44×44px on mobile; destructive button visually distinct without relying on color alone (per WCAG 1.4.1)
 - [ ] Data export request flow on mobile: `/settings/account` export button ≥ 44×44px; the post-202 confirmation message wraps cleanly
+
+---
+
+## Stage 13.a — Scrutor assembly-scanning DI registration
+
+**Status: ❌ Pending.** Infrastructure change, not GDPR — letter-suffixed rather than numbered into Stage 13's 13.1–13.11 sequence (a closed GDPR-baseline list) or Stage 12's infra family, per explicit user placement. See [`docs/superpowers/specs/2026-09-27-stage-13a-scrutor-di-scanning-design.md`](superpowers/specs/2026-09-27-stage-13a-scrutor-di-scanning-design.md) for the full design.
+
+> **Goal:** Replace `Program.cs`'s ~73 manual `AddScoped`/`AddSingleton` interface-pair and concrete-class registrations with [Scrutor](https://github.com/khellang/Scrutor) assembly scanning, so adding a new service no longer needs a hand-written DI line remembered. ~12 true non-scannables (two `DbContext`s, options binders, one typed `HttpClient`, `IEmailService`'s 3-way environment-conditional branch) stay manual by design — Scrutor's naming-convention scan has nothing to match against for these.
+
+- [ ] `Scrutor` NuGet package referenced in `ProjectCeres.csproj` (v7.0.0+, targets .NET 10)
+- [ ] `[RegisterAsSingleton]` marker attribute — escape hatch for the minority of scanned classes needing `Singleton` instead of the default `Scoped`
+- [ ] Two `Scan(...)` rules in `Program.cs`: interface-pair classes → `AsImplementedInterfaces()`; self-registered concrete classes (no interface) → `AsSelf()` — both scoped to `ProjectCeres.Services`, `ProjectCeres.Admin`, `ProjectCeres.Common.Authentication`
+- [ ] Startup-time DI-completeness check (walks every constructor dependency, confirms it resolves) — runs at real app boot AND as a fast automated test
+- [ ] ~73 manual registration lines removed incrementally (namespace/category batches, full suite green between each), the ~12 true non-scannables left untouched
+- [ ] `docs/architecture.md` documents the scan naming/namespace convention
+- [ ] `IUserOwned` 5-registry documentation updated — the DI step changes from "add a line to `Program.cs`" to "name the class/interface per convention; the scan + completeness check cover it"
 
 ---
 

@@ -1,8 +1,8 @@
 # Stage 13.a — Scrutor Assembly-Scanning DI Registration (Design Spec)
 
-> **Diataxis type:** Reference — design for a new sub-stage in the Stage 13 family, consumed by `superpowers:writing-plans` next.
+> **Diataxis type:** Reference — design for a new standalone top-level stage, consumed by `superpowers:writing-plans` next.
 >
-> **Stage id:** `13.a`. Deliberately letter-suffixed, not `13.12`: Stage 13's numeric sub-stages (13.1–13.11) are all GDPR-baseline items tracked against `legal.md`/`security-model.md`; this stage is an unrelated infrastructure change (how services get wired into DI) that the user asked to log inside the Stage 13 family rather than the Stage 12 infra family, without colliding with an existing GDPR sub-stage number. `13.1` is taken ("Privacy policy text + page") — confirmed by reading `docs/roadmap-phase-three.md` line 1818 before choosing this id.
+> **Stage id:** `13.a` — a top-level `## Stage 13.a` heading in `docs/roadmap-phase-three.md`, a sibling of `## Stage 13` and `## Stage 14` (same shape as `## Stage 12.13`–`12.19`), NOT a row inside Stage 13's own `### Sub-stages` table. Deliberately letter-suffixed, not `13.12`: Stage 13's numeric sub-stages (13.1–13.11) are all GDPR-baseline items tracked against `legal.md`/`security-model.md` and nested under Stage 13's umbrella; this stage is an unrelated infrastructure change (how services get wired into DI) that the user asked to log inside the Stage 13 family — meaning positioned alongside it in the roadmap file, not folded into its GDPR sub-stage table — rather than the Stage 12 infra family, without colliding with an existing GDPR sub-stage number. `13.1` is taken ("Privacy policy text + page") — confirmed by reading `docs/roadmap-phase-three.md` line 1818 before choosing this id. (First attempt at this wrongly added it as a row in Stage 13's sub-stage table, which mislabels it as GDPR-related; corrected to a standalone top-level heading between Stage 13 and Stage 14.)
 
 ---
 
@@ -101,7 +101,7 @@ Step 5's incremental-removal-with-test-runs-between-batches is the concrete answ
 
 ## 10. Docs to sync
 
-**At spec creation, same commit window as this file:** every new stage — spec'd or not, planned or not — gets logged in the corresponding roadmap file up front, per standing project convention (precedent: commit `755b678e`, "roadmap — add §12.13 CI stage", added the same day the stage was scoped, well before its close-out). `docs/roadmap-phase-three.md` § Stage 13 sub-stages table already has the Stage 13.a row (added alongside this spec) pointing back at this file.
+**At spec creation, same commit window as this file:** every new stage — spec'd or not, planned or not — gets logged in the corresponding roadmap file up front, per standing project convention (precedent: commit `755b678e`, "roadmap — add §12.13 CI stage", added the same day the stage was scoped, well before its close-out). `docs/roadmap-phase-three.md` already has a standalone `## Stage 13.a` top-level section (added alongside this spec, between `## Stage 13` and `## Stage 14`, matching the `## Stage 12.13`–`12.19` pattern — NOT a row in Stage 13's own `### Sub-stages` table) pointing back at this file.
 
 **On implementation completion:**
 - `docs/architecture.md` — document the scan convention (namespace + naming pattern) as the new "how a service gets wired up" story, replacing/supplementing whatever it currently says (verified in research: currently silent on this, a doctrinal gap, not a contradiction to resolve).
