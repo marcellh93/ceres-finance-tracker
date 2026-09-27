@@ -43,4 +43,10 @@ public enum EmailTemplateKey
     /// budget was exhausted. Stage 13.8. No args.
     /// </summary>
     GdprExportFailed,
+
+    /// <summary>
+    /// Confirms an account erasure request and carries the 72-hour cancel link.
+    /// Stage 13.9. Args: {0} cancel URL.
+    /// </summary>
+    GdprErasureInitiated,
 }

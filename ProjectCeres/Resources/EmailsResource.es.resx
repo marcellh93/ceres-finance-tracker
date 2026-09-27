@@ -147,4 +147,11 @@ El enlace es válido por 24 horas y se puede usar una sola vez. Después, solici
 
 Por favor, solicita una nueva descarga desde la configuración de tu cuenta. Si el problema continúa, contacta con soporte.</value></data>
   <data name="GdprExportFailed.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Tuvimos un problema al preparar tu descarga de datos y no pudimos completarla después de varios intentos.&lt;/p&gt;&lt;p&gt;Por favor, solicita una nueva descarga desde la configuración de tu cuenta. Si el problema continúa, contacta con soporte.&lt;/p&gt;</value></data>
+  <data name="GdprErasureInitiated.Subject" xml:space="preserve"><value>Recibimos tu solicitud de borrado de cuenta de Ceres</value></data>
+  <data name="GdprErasureInitiated.BodyText" xml:space="preserve"><value>Recibimos una solicitud para borrar permanentemente tu cuenta de Ceres y todos los datos asociados.
+
+¿Cambiaste de opinión? Cancela aquí: {0}
+
+Esta solicitud se puede cancelar durante 72 horas. Después de ese plazo, el borrado será irreversible y no podrá deshacerse.</value></data>
+  <data name="GdprErasureInitiated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Recibimos una solicitud para borrar permanentemente tu cuenta de Ceres y todos los datos asociados.&lt;/p&gt;&lt;p&gt;¿Cambiaste de opinión? &lt;a href="{0}"&gt;Cancela esta solicitud&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;Esta solicitud se puede cancelar durante 72 horas. Después de ese plazo, el borrado será irreversible y no podrá deshacerse.&lt;/p&gt;</value></data>
 </root>

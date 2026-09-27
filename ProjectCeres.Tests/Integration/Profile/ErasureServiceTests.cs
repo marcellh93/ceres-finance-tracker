@@ -1,12 +1,18 @@
+using System.Globalization;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Tests.Common;
+using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Profile;
 
@@ -42,11 +48,14 @@ public class ErasureServiceTests : IAsyncLifetime
     private AppDbContext _appDb = null!;
     private ErasureService _service = null!;
     private RecordingAuditLogWriter _audit = null!;
+    private readonly List<EmailMessage> _sentEmails = [];
     private readonly Argon2idPasswordHasher _argon = new(Options.Create(new Argon2idOptions()));
     private readonly ErasureTokenGenerator _tokens =
         new(new Argon2idPasswordHasher(Options.Create(new Argon2idOptions())));
     private readonly TokenLookupHasher _lookup =
         new(Options.Create(new TokenLookupOptions { Secret = Convert.ToBase64String(new byte[32]) }));
+    private IStringLocalizer<EmailsResource> _localizer = null!;
+    private ServiceProvider _localizationProvider = null!;
 
     public async Task InitializeAsync()
     {
@@ -69,12 +78,25 @@ public class ErasureServiceTests : IAsyncLifetime
             await admin.SaveChangesAsync();
         }
 
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddLocalization(o => o.ResourcesPath = "Resources");
+        _localizationProvider = services.BuildServiceProvider();
+        _localizer = _localizationProvider.GetRequiredService<IStringLocalizer<EmailsResource>>();
+
         _appDb = _fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId));
         _audit = new RecordingAuditLogWriter();
-        _service = new ErasureService(
-            _appDb, _fixture.CreateAdminContext(), new FakeCurrentUserAccessor(_userId),
-            TimeProvider.System, _tokens, _lookup, _argon, _audit);
+        _service = BuildService(_appDb);
     }
+
+    private ErasureService BuildService(AppDbContext appDb) => new(
+        appDb, _fixture.CreateAdminContext(), new FakeCurrentUserAccessor(_userId),
+        TimeProvider.System, _tokens, _lookup, _argon, _audit,
+        new EmailComposer(_localizer), new CapturingEmailService(_sentEmails),
+        new EmailRecipientResolver(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId))),
+        new LanguageResolver(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId))),
+        Options.Create(new EmailOptions { PublicBaseUrl = "https://ceres.invalid" }),
+        NullLogger<ErasureService>.Instance);
 
     public async Task DisposeAsync()
     {
@@ -87,6 +109,7 @@ public class ErasureServiceTests : IAsyncLifetime
         }
         await _appDb.DisposeAsync();
         await _fixture.DisposeAsync();
+        _localizationProvider.Dispose();
     }
 
     /// <summary>Seed a committed Sealed ErasureRequest (+ sealed user) for the CancelAsync
@@ -118,9 +141,7 @@ public class ErasureServiceTests : IAsyncLifetime
     /// the app context inside its own BeginPreAuthUserScopeAsync transaction — both see the
     /// committed seeded row. Mirrors production: request and cancel are separate requests.</summary>
     private ErasureService CommittedCancelService()
-        => new(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId)),
-            _fixture.CreateAdminContext(), new FakeCurrentUserAccessor(_userId),
-            TimeProvider.System, _tokens, _lookup, _argon, _audit);
+        => BuildService(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId)));
 
     [Fact]
     public async Task RequestAsync_seals_the_account_creates_a_request_and_audits_once()
@@ -141,6 +162,21 @@ public class ErasureServiceTests : IAsyncLifetime
         (await admin.Users.IgnoreQueryFilters().AsNoTracking().FirstAsync(u => u.Id == _userId))
             .SealedAt.Should().NotBeNull("the account is sealed immediately on request");
         _audit.Recorded.Should().ContainSingle().Which.Should().Be(AuditLogAction.GdprErasureRequested);
+    }
+
+    [Fact]
+    public async Task RequestAsync_sends_GdprErasureInitiated_email_with_cancel_link()
+    {
+        var (_, rawToken) = await _service.RequestAsync(CancellationToken.None);
+
+        _sentEmails.Should().ContainSingle();
+        var sent = _sentEmails[0];
+        await using var admin = _fixture.CreateAdminContext();
+        var expectedEmail = (await admin.Users.IgnoreQueryFilters().AsNoTracking().FirstAsync(u => u.Id == _userId)).Email;
+        sent.To.Address.Should().Be(expectedEmail);
+        sent.BodyText.Should().Contain(Uri.EscapeDataString(rawToken),
+            "the cancel link must carry the raw token, URL-escaped exactly as ExportJobWorker's downloadUrl does");
+        sent.BodyText.Should().Contain("/api/profile/erasure/cancel");
     }
 
     [Fact]

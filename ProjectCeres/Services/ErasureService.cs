@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
+using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 
@@ -28,7 +31,13 @@ public class ErasureService(
     ErasureTokenGenerator tokens,
     TokenLookupHasher lookupHasher,
     Argon2idPasswordHasher argon,
-    IAuditLogWriter auditLog) : IErasureService
+    IAuditLogWriter auditLog,
+    IEmailComposer composer,
+    IEmailService email,
+    IEmailRecipientResolver recipients,
+    ILanguageResolver languages,
+    IOptions<EmailOptions> emailOptions,
+    ILogger<ErasureService> logger) : IErasureService
 {
     public static readonly TimeSpan CancelWindow = TimeSpan.FromHours(72);
 
@@ -68,7 +77,33 @@ public class ErasureService(
         await auditLog.RecordAsync(user.UserId, AuditLogAction.GdprErasureRequested,
             entityType: nameof(ErasureRequest), entityId: request.Id, ct: ct);
 
+        await SendInitiatedEmailAsync(user.UserId, rawToken, ct);
+
         return (request, rawToken);
+    }
+
+    /// <summary>
+    /// Fires once, at request time, with the cancel link — per design spec § 6 (not
+    /// from the worker, which only executes 72h later). A failed send is logged but
+    /// never rolls back the seal/request creation, mirroring ExportJobWorker.SendReadyEmailAsync.
+    /// </summary>
+    private async Task SendInitiatedEmailAsync(Guid userId, string rawToken, CancellationToken ct)
+    {
+        try
+        {
+            var baseUrl = emailOptions.Value.PublicBaseUrl?.TrimEnd('/') ?? "";
+            var cancelUrl = $"{baseUrl}/api/profile/erasure/cancel?token={Uri.EscapeDataString(rawToken)}";
+
+            var recipient = await recipients.ResolveAsync(userId, ct);
+            var culture = await languages.ResolveForUserAsync(userId, ct);
+            var msg = composer.Compose(EmailTemplateKey.GdprErasureInitiated, culture, cancelUrl)
+                with { To = recipient };
+            await email.SendAsync(msg, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to send GdprErasureInitiated email for user {UserId}.", userId);
+        }
     }
 
     [RlsBypassJustified("CER-1301")]

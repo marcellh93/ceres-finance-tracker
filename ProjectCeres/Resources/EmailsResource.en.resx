@@ -147,4 +147,11 @@ The link is valid for 24 hours and can be used once. After that, request a new e
 
 Please try requesting a new export from your account settings. If the problem continues, contact support.</value></data>
   <data name="GdprExportFailed.BodyHtml" xml:space="preserve"><value>&lt;p&gt;We ran into a problem preparing your data export and were unable to complete it after several attempts.&lt;/p&gt;&lt;p&gt;Please try requesting a new export from your account settings. If the problem continues, contact support.&lt;/p&gt;</value></data>
+  <data name="GdprErasureInitiated.Subject" xml:space="preserve"><value>Your Ceres account erasure request was received</value></data>
+  <data name="GdprErasureInitiated.BodyText" xml:space="preserve"><value>We received a request to permanently erase your Ceres account and all associated data.
+
+Changed your mind? Cancel here: {0}
+
+This request is cancellable for 72 hours. After that window, the erasure becomes irreversible and cannot be undone.</value></data>
+  <data name="GdprErasureInitiated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;We received a request to permanently erase your Ceres account and all associated data.&lt;/p&gt;&lt;p&gt;Changed your mind? &lt;a href="{0}"&gt;Cancel this request&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;This request is cancellable for 72 hours. After that window, the erasure becomes irreversible and cannot be undone.&lt;/p&gt;</value></data>
 </root>

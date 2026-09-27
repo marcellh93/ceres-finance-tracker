@@ -47,6 +47,8 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
     [InlineData(EmailTemplateKey.GdprExportReady, "es")]
     [InlineData(EmailTemplateKey.GdprExportFailed, "en")]
     [InlineData(EmailTemplateKey.GdprExportFailed, "es")]
+    [InlineData(EmailTemplateKey.GdprErasureInitiated, "en")]
+    [InlineData(EmailTemplateKey.GdprErasureInitiated, "es")]
     public void Renders_all_templates_en_and_es(EmailTemplateKey key, string culture)
     {
         using var scope = _factory.Services.CreateScope();
@@ -228,6 +230,27 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
         msg.BodyHtml.Should().Contain("href=\"https://example.invalid/export-download-token-ABC123\"");
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    public void GdprErasureInitiated_includes_cancel_url_and_72_hour_language(string culture)
+    {
+        // {0} = cancel URL. Pin that it renders + mentions the 72-hour cancellable window.
+        using var scope = _factory.Services.CreateScope();
+        var composer = scope.ServiceProvider.GetRequiredService<IEmailComposer>();
+
+        var msg = composer.Compose(
+            EmailTemplateKey.GdprErasureInitiated,
+            new CultureInfo(culture),
+            "https://example.invalid/erasure-cancel-token-ABC123");
+
+        msg.Subject.Should().NotBeNullOrWhiteSpace();
+        msg.BodyText.Should().Contain("https://example.invalid/erasure-cancel-token-ABC123");
+        msg.BodyText.Should().Contain("72");
+        msg.BodyHtml.Should().Contain("href=\"https://example.invalid/erasure-cancel-token-ABC123\"");
+        msg.BodyHtml.Should().Contain("72");
+    }
+
     [Fact]
     public void All_resx_keys_present_in_both_cultures()
     {
@@ -249,6 +272,6 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(57, "19 templates × 3 keys each (GdprExportFailed added Stage 13.8 Task 6)");
+        enKeys.Should().HaveCount(60, "20 templates × 3 keys each (GdprErasureInitiated added Stage 13.9 Task 8)");
     }
 }
