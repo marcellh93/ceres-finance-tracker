@@ -110,6 +110,7 @@ builder.Services.Configure<Argon2idOptions>(
 builder.Services.Configure<TokenLookupOptions>(
     builder.Configuration.GetSection("Authentication:TokenLookupSecret"));
 builder.Services.AddSingleton<TokenLookupHasher>();
+builder.Services.AddSingleton<ErasurePseudonym>();
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
