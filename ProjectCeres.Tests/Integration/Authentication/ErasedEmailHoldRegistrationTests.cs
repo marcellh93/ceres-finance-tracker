@@ -107,14 +107,23 @@ public class ErasedEmailHoldRegistrationTests : IntegrationTestBase<Bucket3AuthF
         user.Should().NotBeNull("an expired hold must no longer block registration");
     }
 
+    /// <summary>
+    /// The real indistinguishability contract is held-vs-confirmed-duplicate, not
+    /// held-vs-fresh: both fresh and held return an empty 204 body by definition,
+    /// so comparing those two bodies is vacuous ("" == ""). A confirmed-duplicate
+    /// email is the only OTHER branch that returns 204 without creating an account,
+    /// so it is the meaningful thing a held email must be indistinguishable from.
+    /// </summary>
     [Fact]
-    public async Task Register_with_live_held_email_returns_same_body_shape_as_fresh_email()
+    public async Task Register_with_live_held_email_is_indistinguishable_from_confirmed_duplicate()
     {
-        var freshResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _factory.CreateClient(),
+        const string confirmedEmail = "confirmed-dup@erased-hold-test.local";
+        await AuthTestFixture.RegisterUserAsync(_factory, confirmedEmail);
+
+        var dupResp = await AuthTestFixture.PostJsonWithCsrfAsync(_factory, _factory.CreateClient(),
             "/api/auth/register",
-            new { email = "fresh@erased-hold-test.local", password = "correct horse battery staple" });
-        freshResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        var freshBody = await freshResp.Content.ReadAsStringAsync();
+            new { email = confirmedEmail, password = "correct horse battery staple" });
+        dupResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         const string heldEmail = "held-shape@erased-hold-test.local";
         var now = DateTime.UtcNow;
@@ -124,9 +133,13 @@ public class ErasedEmailHoldRegistrationTests : IntegrationTestBase<Bucket3AuthF
             "/api/auth/register",
             new { email = heldEmail, password = "correct horse battery staple" });
         heldResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        var heldBody = await heldResp.Content.ReadAsStringAsync();
 
-        heldBody.Should().Be(freshBody,
-            "a held email must return the identical response shape as a fresh registration (no enumeration)");
+        heldResp.StatusCode.Should().Be(dupResp.StatusCode,
+            "a held email must return the identical status as a confirmed-duplicate email (no enumeration)");
+
+        var dupHeaderNames = dupResp.Headers.Select(h => h.Key).OrderBy(k => k, StringComparer.Ordinal).ToList();
+        var heldHeaderNames = heldResp.Headers.Select(h => h.Key).OrderBy(k => k, StringComparer.Ordinal).ToList();
+        heldHeaderNames.Should().BeEquivalentTo(dupHeaderNames,
+            "a held email must return the identical header set as a confirmed-duplicate email (no enumeration)");
     }
 }

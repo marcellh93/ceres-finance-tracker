@@ -1,15 +1,19 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Common.Authentication;
-using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Unit;
 
 /// <summary>
 /// Unit tests for the Stage 13.9 Task 6b re-registration hold. The hold's
 /// EmailFingerprint is computed via the same TokenLookupHasher HMAC mechanism as
-/// ErasureRequest.CancelTokenLookup — these tests pin the fingerprint's determinism
-/// and the 30-day expiry window the registration-time check relies on.
+/// ErasureRequest.CancelTokenLookup — these tests pin the fingerprint's determinism.
+/// The 30-day expiry boundary itself is exercised at the real call site:
+/// AuthController.IsEmailHeldAsync's ExpiresAt > now comparison, via the live/expired
+/// integration tests in ErasedEmailHoldRegistrationTests, and the real ErasedAt.AddDays(30)
+/// arithmetic in ErasureExecutorTests. Two prior tests here asserted only
+/// `DateTime.operator&gt;` on hand-built structs and were removed as tautological —
+/// they exercised no ErasedEmailHold or controller behavior.
 /// </summary>
 public class ErasedEmailHoldTests
 {
@@ -39,43 +43,5 @@ public class ErasedEmailHoldTests
         var b = hasher.ComputeLookup("TWO@EXAMPLE.COM");
 
         a.Should().NotBeEquivalentTo(b);
-    }
-
-    [Fact]
-    public void ExpiresAt_thirty_days_after_ErasedAt_is_still_live_one_second_before_expiry()
-    {
-        var erasedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var hold = new ErasedEmailHold
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            EmailFingerprint = BuildHasher().ComputeLookup("someone@example.com"),
-            ErasedAt = erasedAt,
-            ExpiresAt = erasedAt.AddDays(30),
-        };
-
-        var justBeforeExpiry = hold.ExpiresAt.AddSeconds(-1);
-
-        (hold.ExpiresAt > justBeforeExpiry).Should().BeTrue(
-            "the hold must still block registration one second before its 30-day window closes");
-    }
-
-    [Fact]
-    public void ExpiresAt_is_not_live_after_the_thirty_day_window_closes()
-    {
-        var erasedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var hold = new ErasedEmailHold
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            EmailFingerprint = BuildHasher().ComputeLookup("someone@example.com"),
-            ErasedAt = erasedAt,
-            ExpiresAt = erasedAt.AddDays(30),
-        };
-
-        var justAfterExpiry = hold.ExpiresAt.AddSeconds(1);
-
-        (hold.ExpiresAt > justAfterExpiry).Should().BeFalse(
-            "a hold past its 30-day window must no longer block registration");
     }
 }
