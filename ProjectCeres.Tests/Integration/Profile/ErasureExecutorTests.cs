@@ -11,18 +11,6 @@ using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Integration.Profile;
 
-/// <summary>Records the audit calls the executor makes.</summary>
-sealed class RecordingErasureAuditLogWriter : IAuditLogWriter
-{
-    public List<(Guid UserId, AuditLogAction Action, string? EntityType, Guid? EntityId)> Recorded { get; } = [];
-    public Task RecordAsync(Guid userId, AuditLogAction action, string? entityType = null,
-        Guid? entityId = null, CancellationToken ct = default)
-    {
-        Recorded.Add((userId, action, entityType, entityId));
-        return Task.CompletedTask;
-    }
-}
-
 /// <summary>
 /// ErasureExecutor against the real project_ceres_test database, reading/writing
 /// through AdminDbContext (BYPASSRLS) the same way the future ErasureWorker cron
@@ -38,7 +26,6 @@ public class ErasureExecutorTests : IAsyncLifetime
     private readonly TestDbFixture _fixture = new();
     private readonly Guid _userId = Guid.NewGuid();
     private string _contentRoot = null!;
-    private RecordingErasureAuditLogWriter _audit = null!;
     private ErasurePseudonym _pseudonym = null!;
     private ErasureExecutor _executor = null!;
 
@@ -280,9 +267,8 @@ public class ErasureExecutorTests : IAsyncLifetime
         var env = new Mock<IWebHostEnvironment>();
         env.Setup(e => e.ContentRootPath).Returns(_contentRoot);
 
-        _audit = new RecordingErasureAuditLogWriter();
         _executor = new ErasureExecutor(
-            _fixture.CreateAdminContext(), _pseudonym, _audit, env.Object, TimeProvider.System,
+            _fixture.CreateAdminContext(), _pseudonym, env.Object, TimeProvider.System,
             new LowercaseLookupNormalizer(), lookup,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ErasureExecutor>.Instance);
     }
@@ -368,13 +354,14 @@ public class ErasureExecutorTests : IAsyncLifetime
         user.NormalizedEmail.Should().Be(user.Email!.ToUpperInvariant(), "NormalizedEmail follows Identity's ToUpperInvariant convention");
         user.NormalizedUserName.Should().Be(user.UserName!.ToUpperInvariant());
 
-        // Audit: exactly one completion call, pseudonymised. IAuditLogWriter is a
-        // fake here (mirrors ExportJobServiceTests/ErasureServiceTests) — the real
-        // AuditLogWriter opens its own DI scope + PreAuthUserScope, which this
-        // fixture does not wire up; asserting the in-memory recording is the
-        // established pattern for this DbContext-less dependency.
+        // Audit: exactly one completion row, pseudonymised, landed inside the real
+        // transaction on AdminDbContext (post-Task-6-fixloop-round-2: this write is
+        // no longer routed through IAuditLogWriter, so it's read back from the DB
+        // directly rather than an in-memory fake).
         var expectedPseudonym = _pseudonym.Compute(_userId);
-        var completions = _audit.Recorded.Where(r => r.Action == AuditLogAction.GdprErasureCompleted).ToList();
+        var completions = await admin.AuditLogs.IgnoreQueryFilters()
+            .Where(a => a.UserId == _userId && a.Action == AuditLogAction.GdprErasureCompleted)
+            .ToListAsync();
         completions.Should().ContainSingle();
         completions[0].UserId.Should().Be(_userId);
         completions[0].EntityType.Should().Be(expectedPseudonym);
@@ -399,7 +386,9 @@ public class ErasureExecutorTests : IAsyncLifetime
         var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
         await act.Should().NotThrowAsync();
 
-        _audit.Recorded.Count(r => r.Action == AuditLogAction.GdprErasureCompleted)
+        await using var check = _fixture.CreateAdminContext();
+        (await check.AuditLogs.IgnoreQueryFilters()
+            .CountAsync(a => a.UserId == _userId && a.Action == AuditLogAction.GdprErasureCompleted))
             .Should().Be(1, "a re-run after Completed must not write a second audit row");
     }
 
@@ -411,39 +400,26 @@ public class ErasureExecutorTests : IAsyncLifetime
         // Simulates an operator/retry re-running a fully-completed erasure: force
         // the request back to Sealed so the second call actually re-runs every lane
         // against already-processed data, rather than hitting the early-return.
-        // The production IAuditLogWriter persists into the same AuditLogs table
-        // ErasureExecutor reads for its guard; the test's in-memory fake does not,
-        // so the completion row it would have written is seeded here directly —
-        // this mirrors real post-first-run DB state, not a test-only shortcut.
+        // Post-Task-6-fixloop-round-2, the completion row from the first real
+        // ExecuteAsync call above already landed in AuditLogs for real (direct
+        // db.AuditLogs write on the same AdminDbContext/transaction) — no manual
+        // seed needed to simulate it, unlike when the write went through the fake
+        // IAuditLogWriter and never touched the DB.
         await using (var admin = _fixture.CreateAdminContext())
         {
             await admin.ErasureRequests.IgnoreQueryFilters()
                 .Where(r => r.UserId == _userId)
                 .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, ErasureStatus.Sealed));
-
-            // CK_AuditLog_EntityPair requires EntityType/EntityId to be both null or
-            // both set — EntityId's exact value doesn't matter to the guard check
-            // below, which filters only on UserId + Action.
-            admin.AuditLogs.Add(new AuditLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = _userId,
-                Action = AuditLogAction.GdprErasureCompleted,
-                EntityType = _pseudonym.Compute(_userId),
-                EntityId = Guid.NewGuid(),
-                OccurredAt = DateTime.UtcNow,
-                IpAddress = "erased",
-            });
-            await admin.SaveChangesAsync();
         }
 
         var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
         await act.Should().NotThrowAsync("a re-run against already-erased data must not throw");
 
-        _audit.Recorded.Count(r => r.Action == AuditLogAction.GdprErasureCompleted)
+        await using var check = _fixture.CreateAdminContext();
+        (await check.AuditLogs.IgnoreQueryFilters()
+            .CountAsync(a => a.UserId == _userId && a.Action == AuditLogAction.GdprErasureCompleted))
             .Should().Be(1, "a second real pass must not write a second completion audit row");
 
-        await using var check = _fixture.CreateAdminContext();
         var request = await check.ErasureRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.UserId == _userId);
         request.Status.Should().Be(ErasureStatus.Completed);
     }

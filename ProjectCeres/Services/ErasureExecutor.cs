@@ -18,20 +18,24 @@ namespace ProjectCeres.Services;
 ///
 /// Cross-tenant by design — acts for an arbitrary erased user with no HTTP
 /// principal, same AdminDbContext + IgnoreQueryFilters().Where(UserId==) pattern
-/// as ExportJobWorker/DataExportBuilder. The whole sequence runs inside one DB
-/// transaction, so a mid-run crash rolls back to the pre-run state rather than
-/// leaving the user half-erased. A re-run against an already-Completed request is
-/// a no-op (top-of-method Sealed check); a re-run against a Sealed request whose
-/// prior pass actually finished the DB work but crashed before the status flip is
-/// safe to repeat (each lane is check-then-act) and the final status-flip guard
-/// prevents a second completion audit row. Full crash-mid-transaction resume/retry
-/// orchestration is Task 10's ErasureWorker, not this class.
+/// as ExportJobWorker/DataExportBuilder. All DB work, including the completion
+/// audit row, is one atomic transaction — a mid-run crash rolls it back to the
+/// pre-run state. The two physical file deletions (support attachment, export
+/// ZIP) are irreversible side effects outside that transaction: each runs after
+/// its row mutation is already saved, so a rollback after either point leaves a
+/// harmless "row exists, file gone" state, never "file gone, row also gone" —
+/// the deliberate ordering from fix-loop round 1. A re-run against an
+/// already-Completed request is a no-op (top-of-method Sealed check); a re-run
+/// against a Sealed request whose prior pass actually finished the DB work but
+/// crashed before the status flip is safe to repeat (each lane is check-then-act)
+/// and the final status-flip guard prevents a second completion audit row. Full
+/// crash-mid-transaction resume/retry orchestration is Task 10's ErasureWorker,
+/// not this class.
 /// </summary>
 [RequiresAdminContext]
 public class ErasureExecutor(
     AdminDbContext db,
     ErasurePseudonym pseudonym,
-    IAuditLogWriter auditLog,
     IWebHostEnvironment env,
     TimeProvider timeProvider,
     ILookupNormalizer normalizer,
@@ -64,54 +68,70 @@ public class ErasureExecutor(
         // no DDL is involved.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        await AnonymiseStatutoryAsync(userId, token, ct);
-        await RedactSupportAsync(userId, ct);
-        await PurgeAsync(userId, lanes.Purge, ct);
-        await DeleteExportJobAsync(userId, ct);
-        await RecordEmailHoldAsync(userId, ct);
-        await AnonymiseAccountAsync(userId, token, ct);
-
-        // Stage 6.14 GDPR-on-erasure: historical audit rows keep UserId as a pseudonym
-        // but must not retain a real IP. Runs after the completion write below — that
-        // row's IpAddress is "unknown" (no HttpContext in this background path), never
-        // a real address, so rewriting before or after it makes no observable difference.
-        await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.IpAddress, "erased"), ct);
-
-        // Guard the status flip: if some other path already completed/cancelled this
-        // request (race, or a resumed call that got past the top check before a prior
-        // pass's transaction committed), this affects 0 rows instead of re-flipping it.
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var flipped = await db.ErasureRequests
-            .IgnoreQueryFilters()
-            .Where(r => r.Id == request.Id && r.Status == ErasureStatus.Sealed)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.Status, ErasureStatus.Completed)
-                .SetProperty(r => r.CompletedAt, now), ct);
-
-        // A prior pass can have completed all the DB work and even written its audit
-        // row, then crashed before this flip landed, leaving Status back at Sealed for
-        // a legitimate resumed re-run — the flip guard alone allows that resumed call
-        // to flip Sealed->Completed a second time. Check for an existing completion
-        // row too, so a genuine second full pass over already-processed data can't
-        // double the "exactly one audit row" guarantee.
-        var alreadyRecorded = await db.AuditLogs.IgnoreQueryFilters()
-            .AnyAsync(a => a.UserId == userId && a.Action == AuditLogAction.GdprErasureCompleted, ct);
-
-        if (flipped > 0 && !alreadyRecorded)
+        try
         {
-            // CK_AuditLog_EntityPair (and AuditLogWriter's own guard) require
-            // EntityType/EntityId to be both set or both null — entityId is the
-            // completed ErasureRequest's id, the only real entity here.
-            await auditLog.RecordAsync(
-                userId: userId,
-                action: AuditLogAction.GdprErasureCompleted,
-                entityType: token,
-                entityId: request.Id,
-                ct: ct);
-        }
+            await AnonymiseStatutoryAsync(userId, token, ct);
+            await RedactSupportAsync(userId, ct);
+            await PurgeAsync(userId, lanes.Purge, ct);
+            await DeleteExportJobAsync(userId, ct);
+            await RecordEmailHoldAsync(userId, ct);
+            await AnonymiseAccountAsync(userId, token, ct);
 
-        await tx.CommitAsync(ct);
+            // Stage 6.14 GDPR-on-erasure: historical audit rows keep UserId as a pseudonym
+            // but must not retain a real IP. Runs after the completion write below — that
+            // row's IpAddress is "unknown" (no HttpContext in this background path), never
+            // a real address, so rewriting before or after it makes no observable difference.
+            await db.AuditLogs.IgnoreQueryFilters().Where(a => a.UserId == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.IpAddress, "erased"), ct);
+
+            // Guard the status flip: if some other path already completed/cancelled this
+            // request (race, or a resumed call that got past the top check before a prior
+            // pass's transaction committed), this affects 0 rows instead of re-flipping it.
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var flipped = await db.ErasureRequests
+                .IgnoreQueryFilters()
+                .Where(r => r.Id == request.Id && r.Status == ErasureStatus.Sealed)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, ErasureStatus.Completed)
+                    .SetProperty(r => r.CompletedAt, now), ct);
+
+            // A prior pass can have completed all the DB work and even written its audit
+            // row, then crashed before this flip landed, leaving Status back at Sealed for
+            // a legitimate resumed re-run — the flip guard alone allows that resumed call
+            // to flip Sealed->Completed a second time. Check for an existing completion
+            // row too, so a genuine second full pass over already-processed data can't
+            // double the "exactly one audit row" guarantee.
+            var alreadyRecorded = await db.AuditLogs.IgnoreQueryFilters()
+                .AnyAsync(a => a.UserId == userId && a.Action == AuditLogAction.GdprErasureCompleted, ct);
+
+            if (flipped > 0 && !alreadyRecorded)
+            {
+                // IAuditLogWriter opens its own scope + AppDbContext + transaction, so a
+                // call through it here would commit outside this method's transaction —
+                // a false completion record if the tx below then failed to commit. Insert
+                // directly on `db` (AdminDbContext, BYPASSRLS — no PreAuthUserScope needed)
+                // so this row is genuinely part of the one ambient transaction, mirroring
+                // the direct db.AuditLogs write used for the IpAddress rewrite above.
+                db.AuditLogs.Add(new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    Action = AuditLogAction.GdprErasureCompleted,
+                    EntityType = token,
+                    EntityId = request.Id,
+                    OccurredAt = timeProvider.GetUtcNow().UtcDateTime,
+                    IpAddress = "unknown",
+                });
+                await db.SaveChangesAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Erasure failed for user {UserId}", userId);
+            throw;
+        }
 
         logger.LogInformation("Erasure completed for user {UserId}", userId);
     }
