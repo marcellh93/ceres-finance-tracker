@@ -383,6 +383,21 @@ The real cross-class safety net remains **per-test data isolation by marker** (p
 
 ---
 
+### Suite performance — the baseline and the 10-minute trap
+
+**Baseline (measured 2026-08-24 from a trx logger, serial local run):** a full `dotnet test` (no filter) completes in **7–11 min**. Summed per-test time (444s) matched wall-clock (442s) — there is **no hidden overhead** (no hang, no lock contention, no framework tax); the suite is slow because the tests are slow. **Authentication is 74% of it** (327s of 444s): Argon2id hashing plus deliberate rate-limit-window waits, both intentional. A 7-minute run is the current normal, **not a regression**. (The old ~3:30 figure is historical, measured 2026-05-17 against a much smaller suite — do not size regression alerts off it.) Note the CI parallel path (four bucket DBs, see above) is much faster than this serial local number.
+
+**The 10-minute trap.** An agent Bash call caps at 10 minutes, so a 7–11 min full run *sometimes* times out and looks like a hang when it is simply still working. **Run it in the background and poll, or run a filtered subset — never re-run it repeatedly in the foreground trying to make it finish** (six consecutive full runs were burned this way on 2026-08-24). See `feedback_run_full_suite_once_per_turn`.
+
+**When a run drifts past ~11 min, diagnose in this order:**
+1. Grep the xUnit output for `[Long Running Test]` lines — they name the per-test culprits; don't kill a slow run without reading them.
+2. Check the rate-limit tests haven't regressed to real wall-clock sleeps. The fast path lives in `RateLimitedAuthTestWebApplicationFactory`: `WithFreshRateLimiter()` (a fresh inner WebHost per test = empty partition state, no sleep) and `WithShortLoginWindow()`/`WithMediumLoginWindow()` (reconfigure the `AuthLoginByIp` policy to a 1s/5s window for the two tests whose semantics require waiting). This replaced 490s of `Task.Delay(70s)` with ≤6.3s of unavoidable wait (commit `f8616087`, 2026-05-11). `TimeProvider` injection is **not** an option here — `System.Threading.RateLimiting` doesn't accept it (`dotnet/runtime#52079`); the fresh-WebHost pattern is the sanctioned workaround.
+3. Check the shared test DB for row bloat (the abandoned-user leak — see the sentinel-fixture section above). At its 2026-08-24 peak (229,840 categories / 6,830 users) purging to baseline cut a run from 11:07 to 7:22 — ~3½ min, worth reclaiming but a secondary factor, not the bulk.
+
+**Non-negotiable:** Argon2id parameters (OWASP minimums `m=19456 t=2 p=1`) are security policy — never propose lowering them to speed up tests. Never `[Skip]` a slow test to make CI green (see § Rules).
+
+---
+
 ## BDD (Reqnroll) — Stage 12.15
 
 **What Reqnroll is.** [Reqnroll](https://reqnroll.net) is the actively maintained successor to SpecFlow (SpecFlow itself is end-of-life). It runs Gherkin `.feature` files as executable specs on top of .NET 10, using `Reqnroll.xUnit` as the test-runner binding — so scenarios show up as ordinary xUnit tests to `dotnet test`, CI, and the Stop hook's tiering. `Reqnroll.Microsoft.Extensions.DependencyInjection` wires `[ScenarioDependencies]` so each scenario gets its own DI container, matching how the integration suite already scopes state per test.
