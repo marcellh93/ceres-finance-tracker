@@ -344,6 +344,18 @@ Razor controller actions remain untested — they are thin HTTP handlers with a 
 
 > **Testcontainers** deferred to Phase 3 when CI/CD pipelines are introduced.
 
+### The sentinel fixture and the abandoned-user sweep (binding)
+
+The sentinel user `00000000-0000-0000-0000-000000000001` (`TestDbFixture.SentinelUserId`) owns the **migration-seeded baseline finance fixtures**: 4 Accounts (`10000000-…-001..004` — Cash / Checking Account / Savings Account / Credit Card) and ~24 Categories (`20000000-…`), seeded **once** by `InitialCreate.InsertData` and stamped to the sentinel by `AddUserIdToUserOwnedEntities`. Many bucketed tests depend on these fixtures existing (`UserIdStampingTests`, `RecurringTransactionsCrudApiTests`, `AccountsCrudApiTests`, `CategoriesCrudApiTests`, `IntruderIsolationTests`). By design the sentinel has **no `AspNetUsers` row** — the finance rows carry a bare `UserId` and RLS handles isolation. Because these accounts are restorable from *no* migration (they were seeded once and never re-seeded — EF's idempotent migrate is a no-op once the migration is applied), destroying them means a full test-DB rebuild.
+
+**Two binding rules:**
+
+1. **Never seed an `AspNetUsers` row under the sentinel GUID.** `ProjectCeres.Tests/Integration/UserOwnedCleanup.SweepAbandonedTestUsersAsync` deletes every `AspNetUsers` row whose email ends `@example.com` / `@example.invalid` / `.local` **and every user-owned row it owns**. A test that gives the sentinel an `AspNetUsers` row with such an email makes the sweep treat the sentinel as an abandoned test user and hard-delete its baseline Accounts. (`UserOwnedCleanup` has a post-sweep guard that throws *"Test-user sweep destroyed sentinel fixtures … Restore the test database before running anything else"* — but the purge has already happened by then; the guard reports the damage, it does not prevent it.)
+
+2. **A test that must mutate an `AspNetUsers` row uses its own throwaway user, never the sentinel.** Create a fresh `Guid.NewGuid()` with an `@…-test.invalid` email, run RLS-bound app operations under it via `_fixture.CreateAppContext(new FakeCurrentUserAccessor(myUserId))`, and purge it on teardown with `UserOwnedCleanup.PurgeUserAsync(admin, myUserId)` + delete the user. `ErasureServiceTests` is the reference pattern (an erasure request seals/un-seals an `AspNetUsers` row, so it cannot use the row-less sentinel).
+
+**Recovery when the fixtures are already gone** (symptom: a swathe of finance/CRUD/stamping tests 422 or return `IsSuccess=false` because a fixed-ID account no longer exists): drop and re-migrate the shared DB — `DROP DATABASE project_ceres_test` then `tools/ci/setup-test-db.sh project_ceres_test`. This re-runs the seed migrations **and** clears any accumulated orphan-user leak in one move; `project_ceres_test` is disposable, rebuilt entirely from migrations. This is a destructive DB op — get explicit consent per `feedback_never_delete_db_without_consent`. (Cost a full-suite red + a drop/re-migrate, 2026-09-26, when Stage 13.9's `ErasureServiceTests` first seeded the sentinel an `@example.com` row.)
+
 ### Integration test collections — DB-per-bucket parallelism (Stage 12.18)
 
 Integration test classes are split across **four runtime-balanced bucket collections** — `IntegrationParallel1..4` — plus a handful of purpose-specific serial collections. This superseded the single serialized `IntegrationTests` collection in Stage 12.18 (2026-09-11) to run the suite in parallel; see roadmap-phase-three.md § Stage 12.18 and the spec at `docs/superpowers/specs/2026-09-10-stage-12-18-parallel-integration-tests-design.md`.
