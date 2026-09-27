@@ -781,6 +781,7 @@ public class ArchitectureTests
             "ProjectCeres/Tools/ExportJobWorker.cs",                                  // Stage 13.8 Task 6: cron poll-drain across all users' Pending/Ready ExportJob rows — SweepSessions pattern.
             "ProjectCeres/Services/ErasureService.cs",                                // Stage 13.9 Task 5: cancel-token verify before the sealed caller can authenticate (LockoutUnlockService pattern).
             "ProjectCeres/Services/ErasureExecutor.cs",                               // Stage 13.9 Task 6: worker acts for one erased user with no HTTP principal — SweepSessions/ExportJobWorker pattern.
+            "ProjectCeres/Controllers/Api/AuthController.cs",                         // Stage 13.9 Task 6b: D3 re-registration hold check before the registering caller has an account (LockoutUnlockService pattern).
         };
 
         var repoRoot = FindRepoRoot();
