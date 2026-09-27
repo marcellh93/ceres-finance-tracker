@@ -557,6 +557,7 @@ builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IExportJobService, ExportJobService>();
 builder.Services.AddScoped<IErasureService, ErasureService>();
 builder.Services.AddScoped<DataExportBuilder>();
+builder.Services.AddScoped<ErasureExecutor>();
 builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NetWorthGenerator>();

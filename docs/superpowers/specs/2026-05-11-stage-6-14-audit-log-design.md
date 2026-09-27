@@ -99,6 +99,7 @@ public enum AuditLogAction
     SupportTicketCreated,       // wired in Stage 12.5
     SupportMessageByAgent,      // wired in Stage 12.6
     GdprErasureCancelled,       // wired in Stage 13.9 — undo of an erasure request (mirrors EmailChangeRevoked)
+    GdprErasureCompleted,       // wired in Stage 13.9 — erasure completion, pseudonymised UserId in entityType
 }
 ```
 

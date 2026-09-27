@@ -593,6 +593,8 @@ public class ArchitectureTests
         // for an operator reply/status set on another user's ticket.
         // Stage 13.9 (2026-09-26) added GdprErasureCancelled — the undo of an erasure request,
         // wired by ErasureService.CancelAsync (mirrors EmailChangeRevoked auditing its undo).
+        // Stage 13.9 Task 6 added GdprErasureCompleted — written by ErasureExecutor at the
+        // end of the §8 sequence; EntityType carries the HMAC pseudonym, not the raw UserId.
         var expected = new[]
         {
             "LoginSucceeded", "LoginSucceededMfa", "LoginSucceededBackupCode",
@@ -604,7 +606,7 @@ public class ArchitectureTests
             "DataExportRequested", "GdprErasureRequested",
             "EmailVerificationRequested", "EmailVerified",
             "SupportTicketCreated", "SupportMessageByAgent",
-            "GdprErasureCancelled",
+            "GdprErasureCancelled", "GdprErasureCompleted",
         };
         Enum.GetNames<AuditLogAction>()
             .Should().BeEquivalentTo(expected);
@@ -778,6 +780,7 @@ public class ArchitectureTests
             "ProjectCeres/Services/DataExportBuilder.cs",                             // Stage 13.8 Task 5: worker acts for one user with no HTTP principal — reads that user's rows cross-tenant via AdminDbContext, same pattern as SweepSessions.
             "ProjectCeres/Tools/ExportJobWorker.cs",                                  // Stage 13.8 Task 6: cron poll-drain across all users' Pending/Ready ExportJob rows — SweepSessions pattern.
             "ProjectCeres/Services/ErasureService.cs",                                // Stage 13.9 Task 5: cancel-token verify before the sealed caller can authenticate (LockoutUnlockService pattern).
+            "ProjectCeres/Services/ErasureExecutor.cs",                               // Stage 13.9 Task 6: worker acts for one erased user with no HTTP principal — SweepSessions/ExportJobWorker pattern.
         };
 
         var repoRoot = FindRepoRoot();
