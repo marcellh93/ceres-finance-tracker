@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Analyzers.Annotations;
@@ -27,6 +28,8 @@ public class ErasureExecutor(
     IAuditLogWriter auditLog,
     IWebHostEnvironment env,
     TimeProvider timeProvider,
+    ILookupNormalizer normalizer,
+    TokenLookupHasher lookupHasher,
     IOptions<FileAttachmentOptions>? options = null)
 {
     // Mirrors DataExportBuilder/FileAttachmentService: attachment StoredPath is
@@ -50,6 +53,7 @@ public class ErasureExecutor(
         await RedactSupportAsync(userId, ct);
         await PurgeAsync(userId, lanes.Purge, ct);
         await DeleteExportJobAsync(userId, ct);
+        await RecordEmailHoldAsync(userId, ct);
         await AnonymiseAccountAsync(userId, token, ct);
 
         await auditLog.RecordAsync(
@@ -188,6 +192,50 @@ public class ErasureExecutor(
         await db.ExportJobs.IgnoreQueryFilters()
             .Where(j => j.UserId == userId)
             .ExecuteDeleteAsync(ct);
+    }
+
+    /// <summary>
+    /// D3's 30-day re-registration hold (spec § 8 step 5). Reads the user's REAL
+    /// email BEFORE <see cref="AnonymiseAccountAsync"/> overwrites it — that step is
+    /// a raw <c>ExecuteUpdateAsync</c>, so the real value is never otherwise loaded.
+    /// Upserts by fingerprint: a second erasure of the same email (post-expiry
+    /// re-registration, re-erasure) would otherwise collide on the unique index.
+    /// </summary>
+    private async Task RecordEmailHoldAsync(Guid userId, CancellationToken ct)
+    {
+        var email = await db.Users.IgnoreQueryFilters()
+            .Where(u => u.Id == userId)
+            .Select(u => u.Email)
+            .FirstOrDefaultAsync(ct);
+        if (string.IsNullOrEmpty(email)) return;
+
+        var normalized = normalizer.NormalizeEmail(email) ?? email;
+        var fingerprint = lookupHasher.ComputeLookup(normalized);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var expiresAt = now.AddDays(30);
+
+        var existing = await db.ErasedEmailHolds.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(h => h.EmailFingerprint == fingerprint, ct);
+        if (existing is not null)
+        {
+            await db.ErasedEmailHolds.IgnoreQueryFilters()
+                .Where(h => h.Id == existing.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(h => h.UserId, userId)
+                    .SetProperty(h => h.ErasedAt, now)
+                    .SetProperty(h => h.ExpiresAt, expiresAt), ct);
+            return;
+        }
+
+        db.ErasedEmailHolds.Add(new ErasedEmailHold
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            EmailFingerprint = fingerprint,
+            ErasedAt = now,
+            ExpiresAt = expiresAt,
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>

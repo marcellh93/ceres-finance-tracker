@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -259,7 +260,8 @@ public class ErasureExecutorTests : IAsyncLifetime
 
         _audit = new RecordingErasureAuditLogWriter();
         _executor = new ErasureExecutor(
-            _fixture.CreateAdminContext(), _pseudonym, _audit, env.Object, TimeProvider.System);
+            _fixture.CreateAdminContext(), _pseudonym, _audit, env.Object, TimeProvider.System,
+            new LowercaseLookupNormalizer(), lookup);
     }
 
     public async Task DisposeAsync()
@@ -383,5 +385,70 @@ public class ErasureExecutorTests : IAsyncLifetime
         rows.Should().HaveCount(2);
         rows.Should().OnlyContain(a => a.IpAddress == "erased",
             "a user's prior audit rows must have their real IP addresses erased, not just the new completion row");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_writes_an_ErasedEmailHold_with_a_real_thirty_day_expiry()
+    {
+        var before = TimeProvider.System.GetUtcNow().UtcDateTime;
+        await _executor.ExecuteAsync(_userId, CancellationToken.None);
+        var after = TimeProvider.System.GetUtcNow().UtcDateTime;
+
+        await using var admin = _fixture.CreateAdminContext();
+        var hold = await admin.ErasedEmailHolds.IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(h => h.UserId == _userId);
+
+        var expectedFingerprint = new TokenLookupHasher(Options.Create(new TokenLookupOptions
+        {
+            Secret = Convert.ToBase64String(new byte[32]),
+        })).ComputeLookup(new LowercaseLookupNormalizer().NormalizeEmail(RealEmail)!);
+        hold.EmailFingerprint.Should().BeEquivalentTo(expectedFingerprint,
+            "the hold must fingerprint the REAL pre-anonymisation email via the project's ILookupNormalizer");
+
+        hold.ErasedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        hold.ExpiresAt.Should().BeCloseTo(hold.ErasedAt.AddDays(30), TimeSpan.FromSeconds(5),
+            "ExpiresAt must be the real 30-day arithmetic, not a hand-seeded value");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_upserts_the_hold_when_the_same_email_was_erased_before()
+    {
+        // Simulates: erase user A with RealEmail, 30+ days pass, someone re-registers
+        // RealEmail as a different user, that user is erased too. The second erasure
+        // must update the existing fingerprint row, not collide on the unique index.
+        var fingerprint = new TokenLookupHasher(Options.Create(new TokenLookupOptions
+        {
+            Secret = Convert.ToBase64String(new byte[32]),
+        })).ComputeLookup(new LowercaseLookupNormalizer().NormalizeEmail(RealEmail)!);
+
+        var priorHoldId = Guid.NewGuid();
+        var priorOwnerId = Guid.NewGuid();
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            admin.ErasedEmailHolds.Add(new ErasedEmailHold
+            {
+                Id = priorHoldId,
+                UserId = priorOwnerId,
+                EmailFingerprint = fingerprint,
+                ErasedAt = DateTime.UtcNow.AddDays(-40),
+                ExpiresAt = DateTime.UtcNow.AddDays(-10),
+            });
+            await admin.SaveChangesAsync();
+        }
+
+        var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
+        await act.Should().NotThrowAsync("a repeat erasure of the same email must upsert, not collide on the unique index");
+
+        await using var check = _fixture.CreateAdminContext();
+        var rows = await check.ErasedEmailHolds.IgnoreQueryFilters().AsNoTracking()
+            .Where(h => h.EmailFingerprint == fingerprint)
+            .ToListAsync();
+        rows.Should().ContainSingle("the existing row must be updated in place, not duplicated");
+        rows[0].Id.Should().Be(priorHoldId, "the upsert reuses the existing row's identity");
+        rows[0].UserId.Should().Be(_userId, "the row now reflects the most recent erasure's owner");
+
+        await using var cleanup = _fixture.CreateAdminContext();
+        await cleanup.ErasedEmailHolds.IgnoreQueryFilters()
+            .Where(h => h.Id == priorHoldId).ExecuteDeleteAsync();
     }
 }
