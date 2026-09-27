@@ -663,6 +663,14 @@ if (args.Length > 0 && args[0] == "--run-export-jobs")
     Environment.Exit(await ProjectCeres.Tools.ExportJobWorker.RunAsync(builder));
 }
 
+// Cron-invokable erasure worker: executes Sealed ErasureRequest rows past their
+// 72-hour cancel window.
+// Invocation: dotnet run --project ProjectCeres -- --run-erasure-jobs
+if (args.Length > 0 && args[0] == "--run-erasure-jobs")
+{
+    Environment.Exit(await ProjectCeres.Tools.ErasureWorker.RunAsync(builder));
+}
+
 var app = builder.Build();
 
 // Stage 9.11 — under E2E, refuse to start unless pointed at a recognized e2e DB.
