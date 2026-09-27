@@ -19,6 +19,7 @@ namespace ProjectCeres.Controllers.Api;
 [ApiController]
 [Route("api/auth")]
 [PreAuthScope]
+[RequiresAdminContext]
 public sealed class AuthController : ControllerBase
 {
     // Per-user semaphore: serializes concurrent PasswordSignInAsync calls for the same
