@@ -99,8 +99,11 @@ Step 5's incremental-removal-with-test-runs-between-batches is the concrete answ
 - Any change to the `IEmailService` environment-conditional registration's *logic* — it stays exactly as-is, only confirmed (§3) as correctly out of scan-scope.
 - A NuGet-side pinning ADR — not needed unless a future Scrutor dependency-tree conflict forces one (§2 D1 note).
 
-## 10. Docs to sync on completion
+## 10. Docs to sync
 
+**At spec creation, same commit window as this file:** every new stage — spec'd or not, planned or not — gets logged in the corresponding roadmap file up front, per standing project convention (precedent: commit `755b678e`, "roadmap — add §12.13 CI stage", added the same day the stage was scoped, well before its close-out). `docs/roadmap-phase-three.md` § Stage 13 sub-stages table already has the Stage 13.a row (added alongside this spec) pointing back at this file.
+
+**On implementation completion:**
 - `docs/architecture.md` — document the scan convention (namespace + naming pattern) as the new "how a service gets wired up" story, replacing/supplementing whatever it currently says (verified in research: currently silent on this, a doctrinal gap, not a contradiction to resolve).
 - The `IUserOwned` 5-registry documentation — reword the DI step per §6's last row.
-- `docs/roadmap-phase-three.md` — add Stage 13.a to the sub-stage table (or an equivalent location outside the 13.1–13.11 numeric sequence, per the stage-id decision in this doc's header) once the plan is approved and work begins.
+- `docs/roadmap-phase-three.md` — tick Stage 13.a's verification checklist items (added by the implementation plan) and mark the stage done, per the same close-out flow every other stage follows (CLAUDE.md § After Completing Any Stage).

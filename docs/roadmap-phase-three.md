@@ -1826,6 +1826,7 @@ Stage 12.3 (2026-08-23) added `Block IP` + a `SELF_LOCKOUT` guard but no way to 
 | 13.9 | Right-to-erasure flow | `security-model.md` § Article 30 + § Data Retention |
 | 13.10 | Breach notification runbook | `security-model.md` § Article 33/34 |
 | 13.11 | DPIA (Data Protection Impact Assessment) document | `security-model.md` § Article 35 |
+| 13.a | **Scrutor assembly-scanning DI registration** (infra, not GDPR — logged here at user request rather than in Stage 12's infra family; letter-suffixed since 13.1–13.11 is a closed numeric GDPR sequence). Replaces `Program.cs`'s ~73 manual `AddScoped`/`AddSingleton` interface-pair + concrete-class lines with scan-based registration; ~12 true non-scannables (DbContexts, options binders, one typed `HttpClient`, `IEmailService`'s 3-way environment-conditional branch) stay manual by design. | `docs/superpowers/specs/2026-09-27-stage-13a-scrutor-di-scanning-design.md` |
 
 ### Verification checklist
 
