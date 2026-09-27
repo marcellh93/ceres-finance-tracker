@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,6 +38,7 @@ public class ErasureService(
     IEmailRecipientResolver recipients,
     ILanguageResolver languages,
     IOptions<EmailOptions> emailOptions,
+    IHttpContextAccessor httpContextAccessor,
     ILogger<ErasureService> logger) : IErasureService
 {
     public static readonly TimeSpan CancelWindow = TimeSpan.FromHours(72);
@@ -91,8 +93,7 @@ public class ErasureService(
     {
         try
         {
-            var baseUrl = emailOptions.Value.PublicBaseUrl?.TrimEnd('/') ?? "";
-            var cancelUrl = $"{baseUrl}/api/profile/erasure/cancel?token={Uri.EscapeDataString(rawToken)}";
+            var cancelUrl = $"{CancelUrlBase().TrimEnd('/')}/erasure/cancel#token={rawToken}";
 
             var recipient = await recipients.ResolveAsync(userId, ct);
             var culture = await languages.ResolveForUserAsync(userId, ct);
@@ -104,6 +105,21 @@ public class ErasureService(
         {
             logger.LogError(ex, "Failed to send GdprErasureInitiated email for user {UserId}.", userId);
         }
+    }
+
+    // Configured origin wins; otherwise the incoming request's scheme+host, matching
+    // SupportAdminApiController.SupportUrlBase() — RequestAsync always runs inside the
+    // authenticated caller's own HTTP request (never a background job), so the request
+    // Host is trustworthy here the same way it is there. Email:PublicBaseUrl is unset by
+    // design in dev/test (Program.cs's Production-only startup check), so this fallback
+    // is the normal path outside Production, not an edge case.
+    private string CancelUrlBase()
+    {
+        var configured = emailOptions.Value.PublicBaseUrl;
+        if (!string.IsNullOrWhiteSpace(configured)) return configured;
+        var ctx = httpContextAccessor.HttpContext
+            ?? throw new InvalidOperationException("RequestAsync must run inside an HTTP request.");
+        return $"{ctx.Request.Scheme}://{ctx.Request.Host}";
     }
 
     [RlsBypassJustified("CER-1301")]

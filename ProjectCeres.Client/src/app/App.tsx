@@ -51,6 +51,7 @@ import { EmailChangeRevoke } from './pages/auth/EmailChangeRevoke';
 import { PasswordReset } from './pages/auth/PasswordReset';
 import { Register } from './pages/auth/Register';
 import { AccountUnlock } from './pages/auth/AccountUnlock';
+import { ErasureCancel } from './pages/auth/ErasureCancel';
 
 function RecurringCreateBridge() {
   const ctx = useRecurringLayoutCtx();
@@ -88,6 +89,11 @@ export function App() {
             and, in the case revoke exists for, is not the person who started it. */}
         <Route path="email-change/confirm" element={<EmailChangeConfirm />} />
         <Route path="email-change/revoke" element={<EmailChangeRevoke />} />
+        {/* Stage 13.9. Emitted by GdprErasureInitiated with the token in the
+            fragment, same shape as email-change/revoke above. Anonymous by
+            design: the whole point of a sealed account's cancel link is that
+            the account itself can no longer authenticate. */}
+        <Route path="erasure/cancel" element={<ErasureCancel />} />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}

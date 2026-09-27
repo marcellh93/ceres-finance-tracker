@@ -1873,8 +1873,8 @@ Full data export:
 
 Right-to-erasure:
 
-- [ ] `/settings/account/erasure` page describes what will be deleted, when, what is retained (legal-basis-required records like audit log), and confirms intent — **Task 9, not yet built**
-- [ ] Reauthentication-gated initiation — **Task 9's `POST /api/profile/erasure` endpoint, not yet built** (the service-layer `ErasureService.RequestAsync` it will call is done; the `[RequireRecentAuth]`-gated controller action is not)
+- [x] `/settings/account` "Danger zone" section describes what will be deleted, when, what is retained (legal-basis-required records like audit log), and confirms intent via a typed "ERASE" gate — `ErasureDialog.tsx`, wired into `AccountPage.tsx` (not a separate `/settings/account/erasure` route — the section lives inline on the existing page, per the frontend-orchestrator brainstorm). `ErasureDialog.test.tsx` 13/13, `account-erasure.spec.ts` E2E 3/3 (chromium+firefox+webkit).
+- [x] Reauthentication-gated initiation — `POST /api/profile/erasure` (`[RequireRecentAuth]`), calls the existing `ErasureService.RequestAsync` (Task 9, commit `d3f0d8c2`). Anonymous cancel-link landing page `/erasure/cancel` (`ErasureCancel.tsx`) also shipped in the same pass, driving the real `POST /api/profile/erasure/cancel`.
 - [x] Audit log entry created at request time — `ErasureService.RequestAsync` writes `AuditLogAction.GdprErasureRequested` (Task 5, commit `dc63b359`)
 - [x] Confirmation email sent — `EmailTemplateKey.GdprErasureInitiated` + EN/ES resx (`GdprErasureInitiated.Subject/BodyText/BodyHtml`) + `IEmailComposer.Compose(...)` called from `ErasureService.RequestAsync` at request time (Task 8, commit `812bc276`)
 - [x] Erasure runs as background job; deletes all user-owned data per the documented retention policy — landed as `ErasureExecutor` (Task 6, `AdminDbContext` + `IgnoreQueryFilters()`, the `SweepSessions`/`ExportJobWorker` cross-tenant pattern — **not** `IUserScope.EnterAs` as originally planned here; that mechanism was never built for this flow) + `ErasureWorker`'s `--run-erasure-jobs` cron dispatch (Task 8, commit `014fbc36`)
@@ -1903,7 +1903,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [ ] Cookie consent banner mobile: "accept all" and "reject all" buttons equally prominent, side-by-side or stacked, each ≥ 44×44px on mobile per the AEPD-2024 equal-prominence requirement
 - [ ] Cookie consent banner does not obscure critical content at any breakpoint; granular-choice controls reachable without horizontal scroll
 - [ ] `/privacy` and `/legal` pages render readably on 375px (no horizontal overflow; line length comfortable on mobile)
-- [ ] Erasure confirmation dialog touch targets: confirm + cancel buttons ≥ 44×44px on mobile; destructive button visually distinct without relying on color alone (per WCAG 1.4.1)
+- [x] Erasure confirmation dialog touch targets: confirm + cancel buttons ≥ 44×44px on mobile (verified via `account-erasure.spec.ts`'s dedicated mobile test, incl. waiting out the dialog's own open-animation before measuring); destructive button visually distinct without relying on color alone — `AlertDialogCancel size="lg"` outranks the default-sized destructive `AlertDialogAction` in visual weight (the safe path gets the size, not the dangerous one), plus a case-sensitive typed-confirm gate and a deliberate enable-delay as the primary distinguishing friction.
 - [ ] Data export request flow on mobile: `/settings/account` export button ≥ 44×44px; the post-202 confirmation message wraps cleanly
 
 ---

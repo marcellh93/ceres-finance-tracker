@@ -44,6 +44,17 @@ const DEFAULT_ROUTES = ['/login', '/register', '/email-verify', '/account/unlock
 const BASE_PATH = '/app';
 const ROOT_LEVEL_ROUTES = ['/email-change/'];
 const HEALTH_TIMEOUT_SECONDS = 2;
+// Mirrors AUTH_PROBE_URLS in src/app/lib/api-client.ts: GET /api/auth/me (and
+// /api/auth/csrf) are intentional, unauthenticated-by-design probes that
+// return 401 on every anonymous page load — this walker never logs in, so
+// EVERY route swept fails on its very first request without this exemption.
+// Chromium's console.error text for a failed fetch is a generic "Failed to
+// load resource: 401" string with NO url in it, so we can't pattern-match the
+// console message itself (that would risk silently swallowing an unrelated
+// real 401). Instead: correlate by count. For each route, count how many
+// benign-probe 401s the network log actually saw, and forgive exactly that
+// many console errors — no more. Any console error beyond that count is real.
+const AUTH_PROBE_URLS = ['/api/auth/me', '/api/auth/csrf'];
 
 function die(code: number, message: string): never {
   process.stderr.write(`agent-walk: ${message}\n`);
@@ -169,8 +180,30 @@ async function main(): Promise<void> {
   await context.tracing.stop({ path: tracePath });
   await browser.close();
 
-  const consoleErrors = consoleLog.filter((e) => e.type === 'error');
+  const allConsoleErrors = consoleLog.filter((e) => e.type === 'error');
   const network5xx = networkLog.filter((e) => e.status >= 500 && e.status < 600);
+
+  // Forgive at most one console error per confirmed benign-probe 401, per
+  // route — never more than the network log actually justifies. A route with
+  // 3 console errors but only 1 real auth-probe 401 still fails on the other 2.
+  const consoleErrors: ConsoleEntry[] = [];
+  const benignProbeCountByRoute = new Map<string, number>();
+  for (const n of networkLog) {
+    if (n.status === 401 && AUTH_PROBE_URLS.some((u) => n.requested_url.includes(u))) {
+      benignProbeCountByRoute.set(n.route, (benignProbeCountByRoute.get(n.route) ?? 0) + 1);
+    }
+  }
+  const forgivenSoFarByRoute = new Map<string, number>();
+  for (const e of allConsoleErrors) {
+    const budget = benignProbeCountByRoute.get(e.route) ?? 0;
+    const usedSoFar = forgivenSoFarByRoute.get(e.route) ?? 0;
+    const looksLikeAResourceLoadFailure = /failed to load resource.*401/i.test(e.text);
+    if (looksLikeAResourceLoadFailure && usedSoFar < budget) {
+      forgivenSoFarByRoute.set(e.route, usedSoFar + 1);
+      continue;
+    }
+    consoleErrors.push(e);
+  }
 
   const summary = {
     stage_id: stageId,
@@ -179,6 +212,7 @@ async function main(): Promise<void> {
     started_at: startedAt,
     finished_at: new Date().toISOString(),
     console_errors_count: consoleErrors.length,
+    console_errors_forgiven_auth_probe_count: allConsoleErrors.length - consoleErrors.length,
     network_5xx_count: network5xx.length,
   };
 

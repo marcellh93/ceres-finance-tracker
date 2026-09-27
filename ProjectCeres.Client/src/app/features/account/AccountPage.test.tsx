@@ -19,9 +19,12 @@ vi.mock('../../auth/use-step-up', async (importOriginal) => ({
 }));
 
 const requestDataExport = vi.fn();
+const requestErasure = vi.fn();
 vi.mock('./account-api', () => ({
   EXPORT_URL: '/api/profile/export',
+  ERASURE_URL: '/api/profile/erasure',
   requestDataExport: () => requestDataExport(),
+  requestErasure: () => requestErasure(),
 }));
 
 function renderPage() {
@@ -38,6 +41,11 @@ describe('AccountPage', () => {
   it('shows the export action', () => {
     renderPage();
     expect(screen.getByRole('button', { name: /export my data/i })).toBeInTheDocument();
+  });
+
+  it('shows the danger-zone erasure trigger', () => {
+    renderPage();
+    expect(screen.getByRole('button', { name: /erase my account/i })).toBeInTheDocument();
   });
 
   it('requests an export and shows a success toast on 202', async () => {

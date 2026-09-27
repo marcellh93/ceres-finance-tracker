@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
 import { requestDataExport } from './account-api';
+import { ErasureDialog } from './ErasureDialog';
 
 /**
  * Account self-service surface (`/settings/account`). Stage 13.8 ships the data
@@ -62,6 +63,19 @@ export function AccountPage() {
             <Download aria-hidden="true" />
             {busy ? 'Starting…' : 'Export my data'}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/30 bg-destructive/10">
+        <CardHeader>
+          <CardTitle className="text-base font-medium text-destructive">Danger zone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-destructive/90">
+            Permanently erase your account and all its data. This cannot be undone once the
+            72-hour cancellation window has passed.
+          </p>
+          <ErasureDialog />
         </CardContent>
       </Card>
     </div>

@@ -1,10 +1,12 @@
 using System.Globalization;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
@@ -96,6 +98,10 @@ public class ErasureServiceTests : IAsyncLifetime
         new EmailRecipientResolver(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId))),
         new LanguageResolver(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId))),
         Options.Create(new EmailOptions { PublicBaseUrl = "https://ceres.invalid" }),
+        // Configured PublicBaseUrl above always wins over the HttpContext fallback in
+        // this suite, so a null-context mock is never actually dereferenced — see the
+        // dedicated fallback test below, which configures no PublicBaseUrl on purpose.
+        Mock.Of<IHttpContextAccessor>(),
         NullLogger<ErasureService>.Instance);
 
     public async Task DisposeAsync()
@@ -174,9 +180,45 @@ public class ErasureServiceTests : IAsyncLifetime
         await using var admin = _fixture.CreateAdminContext();
         var expectedEmail = (await admin.Users.IgnoreQueryFilters().AsNoTracking().FirstAsync(u => u.Id == _userId)).Email;
         sent.To.Address.Should().Be(expectedEmail);
-        sent.BodyText.Should().Contain(Uri.EscapeDataString(rawToken),
-            "the cancel link must carry the raw token, URL-escaped exactly as ExportJobWorker's downloadUrl does");
-        sent.BodyText.Should().Contain("/api/profile/erasure/cancel");
+        sent.BodyText.Should().Contain(rawToken,
+            "the cancel link must carry the raw base64url token in the fragment, unescaped, exactly as EmailChangeService's revokeUrl does");
+        sent.BodyText.Should().Contain("/erasure/cancel#token=",
+            "the link must point at the SPA route (which renders ErasureCancel.tsx and POSTs the token from the fragment), " +
+            "not the raw API endpoint — mirroring EmailChangeService's /email-change/revoke#token= shape");
+    }
+
+    [Fact]
+    public async Task RequestAsync_falls_back_to_the_request_host_when_PublicBaseUrl_is_unset()
+    {
+        // Email:PublicBaseUrl is unset by design outside Production (Program.cs's startup
+        // check only enforces it IsProduction()) — the real E2E/dev environment exercises
+        // THIS branch, not the configured one every other test in this file pins. Caught
+        // live: an E2E run against a real server produced a bare "/erasure/cancel#token="
+        // with no host at all before this fallback existed, which a mocked-options unit
+        // test alone could never have surfaced (mocks assume the config value is present).
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Scheme = "https";
+        httpContext.Request.Host = new HostString("erasure-fallback.invalid");
+        var httpAccessor = new Mock<IHttpContextAccessor>();
+        httpAccessor.SetupGet(h => h.HttpContext).Returns(httpContext);
+
+        var sentEmails = new List<EmailMessage>();
+        await using var appDb = _fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId));
+        var service = new ErasureService(
+            appDb, _fixture.CreateAdminContext(), new FakeCurrentUserAccessor(_userId),
+            TimeProvider.System, _tokens, _lookup, _argon, _audit,
+            new EmailComposer(_localizer), new CapturingEmailService(sentEmails),
+            new EmailRecipientResolver(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId))),
+            new LanguageResolver(_fixture.CreateAppContext(new FakeCurrentUserAccessor(_userId))),
+            Options.Create(new EmailOptions()), // PublicBaseUrl deliberately unset
+            httpAccessor.Object,
+            NullLogger<ErasureService>.Instance);
+
+        await service.RequestAsync(CancellationToken.None);
+
+        sentEmails.Should().ContainSingle();
+        sentEmails[0].BodyText.Should().Contain("https://erasure-fallback.invalid/erasure/cancel#token=",
+            "with no configured PublicBaseUrl, the cancel link must be built from the live request's scheme+host");
     }
 
     [Fact]

@@ -1081,6 +1081,56 @@ The component renders a muted error line with an icon, plus an outline-variant R
 
 ---
 
+## Danger zone card & typed-confirm gate
+
+Introduced Stage 13.9 (account erasure). Use for the single most destructive, hardest-to-undo action on a settings surface — not for routine deletes (an `<AlertDialog>` confirm without the typed gate is enough for those; see `MovementForm.tsx`'s delete-transaction dialog).
+
+**The card:**
+
+```tsx
+<Card className="border-destructive/30 bg-destructive/10">
+  <CardHeader>
+    <CardTitle className="text-base font-medium text-destructive">Danger zone</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    <p className="text-sm text-destructive/90">…</p>
+    {/* the typed-confirm dialog trigger */}
+  </CardContent>
+</Card>
+```
+
+Full `border-destructive/30 bg-destructive/10` tinting on the whole card (not just an icon or a badge) signals "this section is categorically different" at a glance, before the user reads any copy.
+
+**The typed-confirm dialog** (`ProjectCeres.Client/src/app/features/account/ErasureDialog.tsx` is the reference implementation):
+
+- `<AlertDialogTrigger render={<Button variant="destructive">…</Button>} />` — always wrap the trigger, never render the `Button` as a bare sibling of `<AlertDialog>`. A bare sibling can be made to work via fully-controlled `open`/`onOpenChange`, but it skips base-ui's own trigger↔popup ARIA wiring (`aria-haspopup`/`aria-expanded`/`aria-controls`) — an easy-to-miss regression since nothing fails at compile time.
+- A `<Field>`-wrapped `<Input placeholder={PHRASE}>` requiring the user to type an exact phrase (case-sensitive, matching the server's own check) before the confirm action enables. Show a `<Field error>` hint once text is typed but doesn't match yet — this gets you `aria-invalid`/`aria-describedby` for free from `<Field>`, rather than a hand-rolled sibling `<p>` with no programmatic association.
+- **A deliberate enable-delay** (roughly 1-1.5s) between the phrase matching and the confirm button becoming clickable. Color alone (`variant="destructive"`) is not enough friction differential from a routine confirm for the single most irreversible action on a page — the delay interrupts a reflexive click without blocking a deliberate one.
+- **Give the safe option the size, not the destructive one.** `<AlertDialogCancel size="lg">` while the destructive `<AlertDialogAction>` stays default-sized. The safe path should be the visually easier target for a rushed or emotional click; the destructive path's friction comes from the typed gate and the enable-delay, not from being small.
+- Branch failure toasts by actual status code (429 vs. 422 vs. everything else) — collapsing them into one generic "try again" message on the highest-risk action in the app leaves the user guessing whether a retry will even help.
+
+---
+
+## Severity-tinted status surface
+
+The icon + tinted-border-and-background pattern for a page whose entire content is "here is the outcome of something that just happened" (as opposed to a page with its own layout that merely shows a status inline). Reference: `ProjectCeres.Client/src/app/pages/auth/ErasureCancel.tsx`.
+
+```tsx
+<div className="flex items-start gap-3 rounded-md border border-success/30 bg-success/10 p-4">
+  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+  <div className="space-y-1.5" role="status" aria-live="polite">
+    <h1 className="text-base font-medium text-success">…</h1>
+    <p className="text-sm text-foreground/80">…</p>
+  </div>
+</div>
+```
+
+Swap `success` for `destructive` (an outcome that already happened and cannot be walked back) or `warning`/`warning-foreground` (the request itself was invalid or ambiguous, or a positive outcome that still needs the user's follow-up — e.g. `ErasureDialog.tsx`'s "erasure scheduled, check your email" banner). Pick `role="status"` when nothing further is required of the user; `role="alert"` when the content demands their attention or a decision (an invalid link, an unrecoverable outcome).
+
+This differs from the [`<Alert>` primitive](#alert--surface-level-nudge-named-recipe--primitive) in scope: `<Alert>` is a dismissible strip *within* an existing page; this recipe **is** the page's entire content for a single-purpose outcome route (an emailed confirm/cancel link landing page, for example).
+
+---
+
 ## Toasts
 
 The SPA uses [Sonner](https://sonner.emilkowal.ski/) for toast notifications. A single `<Toaster />` is mounted in `AppLayout.tsx` — anywhere in the app, import `toast` from `sonner` and call:

@@ -165,11 +165,21 @@ public class MfaRegenerateRateLimitTests : IAsyncLifetime
     // rate limiter ever decrements a permit. If this ever returns 429, the gate
     // ordering has changed and anonymous attackers can drain the shared bucket
     // without ever authenticating.
+    //
+    // WithFreshRateLimiter() is required here, not optional: this test asserts
+    // "the limiter is never reached," which two sibling tests in this same class
+    // (Regenerate_RateLimitedPerUser, MfaRegenerate_rate_limit_is_partitioned_by_user)
+    // deliberately falsify by draining shared bucket state on the class-fixture
+    // _factory instance. Without a fresh limiter, this test's pass/fail depends on
+    // xUnit's (undocumented, declaration-order) test execution order within the
+    // class — caught as a real full-suite flake 2026-09-28, passed every time in
+    // isolation, failed when run after the draining tests in the full run.
     [Fact]
     public async Task MfaRegenerate_anonymous_request_returns_401_not_429()
     {
-        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
-        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(_factory);
+        await using var freshFactory = _factory.WithFreshRateLimiter();
+        var client = freshFactory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var (csrfCookie, csrfHeader) = AuthTestFixture.MintCsrf(freshFactory);
 
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/auth/mfa/backup-codes/regenerate");
         req.Headers.Add("Cookie", $"{SessionConstants.CsrfCookieName}={csrfCookie}");

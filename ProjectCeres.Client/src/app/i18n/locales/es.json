@@ -176,6 +176,17 @@
       "invalidActionReset": "Restablece tu contraseña para bloquear la cuenta",
       "invalidActionSupport": "Después contacta con soporte para recuperar la dirección",
       "signInLink": "Ir a iniciar sesión"
+    },
+    "erasureCancel": {
+      "title": "Cancelando el borrado de la cuenta",
+      "verifying": "Confirmando tu cancelación…",
+      "cancelledTitle": "Borrado cancelado",
+      "cancelledBody": "Tu cuenta ya no está programada para el borrado. No se ha eliminado nada y puedes iniciar sesión con normalidad.",
+      "signInLink": "Ir a iniciar sesión",
+      "goneTitle": "Este enlace ya se ha utilizado",
+      "goneBody": "Tu solicitud de borrado ya se canceló, o ya se completó. Si tu cuenta fue borrada, este enlace no puede recuperarla — puedes registrar una cuenta nueva con el mismo correo electrónico cuando quieras.",
+      "invalidTitle": "Este enlace de cancelación no es válido",
+      "invalidBody": "El enlace puede estar incompleto, o puede que no coincida con ninguna solicitud de borrado que tengamos registrada. Si intentas cancelar el borrado de tu cuenta, revisa el correo de nuevo para el enlace exacto."
     }
   },
   "theme": {
