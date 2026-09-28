@@ -2342,6 +2342,19 @@ Data Protection key storage (Stage 6 carry-forward):
 
 ---
 
+## Stage 16.5 — Extract `AccountBalanceCalculator` (not yet scheduled)
+
+**Status: ❌ Open (deferred, not scheduled to a batch yet).** User decision 2026-09-28: keep the same-day Transfer-in-net-worth bug fix scoped to the four affected call sites rather than do the full extraction in the same turn (chosen over "audit-only" and "start the extraction now" alternatives presented at the time).
+
+**Why this is its own stage.** [`docs/code-quality-audit-2026-05-21.md`](code-quality-audit-2026-05-21.md) § "The five highest-leverage fixes" #3 flagged 5+ copies of asset/liability balance-derivation logic as already-diverged DRY-of-knowledge debt back in May — `AccountService.GetBalanceAsync`, `AccountService.GetLedgerAsync`, `DashboardService.GetSpendableBalanceAsync`, `DashboardService.GetRunwayAsync`, `ReportService.GetNetWorthAsync`, `DashboardApiController.GetNetWorthTrend`, `Services/Reports/NetWorthGenerator`, `Services/Reports/NetWorthOverTimeReportGenerator` — and recommended extracting one `AccountBalanceCalculator` (or `decimal Movement.SignedTo(Account)`) that all of them delegate to. On 2026-09-28 a real user hit exactly the predicted failure: four of those copies never summed `Transfer` records into an account's balance, so a liability account funded entirely by a transfer silently contributed nothing to the dashboard's Net Worth card, the saved Net Worth report, and the Net Worth Over Time chart. Fixed as four separate scoped patches (each now computes its own transfersIn/transfersOut aggregation) — the duplication itself is unresolved, so the same bug class (a future balance-affecting movement type, or a future call site) can recur silently again.
+
+- [ ] Extract `AccountBalanceCalculator` (or the entity-method shape from the audit) and migrate all 8 listed call sites to it, so the balance-direction/transfer/liability-payment logic lives in exactly one place.
+- [ ] Audit `DashboardService.GetSpendableBalanceAsync` and `GetRunwayAsync` — the two copies NOT touched by the 2026-09-28 patch — for the same missing-Transfer gap; fix if found, confirm safe with a test either way.
+- [ ] Once extracted, add one test on the calculator itself (Transfer-funded liability, Transfer-funded asset, LiabilityPayment reduction, statutory/purge-lane neutrality) instead of the current per-call-site duplication of that same test shape across `AccountServiceTests`, `ReportServiceTests`, `ReportGeneratorTests`, `DashboardServiceTests`.
+- *Tripwire: `ReportServiceTests.GetNetWorthAsync_IncludesLiabilityBalanceFundedEntirelyByATransfer`, `ReportGeneratorTests.NetWorth_IncludesLiabilityBalanceFundedEntirelyByATransfer`, `ReportGeneratorTests.NetWorthOverTime_IncludesLiabilityBalanceFundedEntirelyByATransfer` (added 2026-09-28, commit `73d0a545`) — each pins one of the four fixed call sites independently; a future call site added without going through a shared calculator has no equivalent test until this stage adds one.*
+
+---
+
 ## Stage 17 — Notification preferences (Batch 5 — not yet scheduled)
 
 **Status: ❌ Open (deferred, not scheduled to a batch yet).** A per-user notification-preferences surface. Renumbered out of the 12-family on 2026-09-10: it was briefly tracked as "§12.5.5", but a 12-numbered stage is 12-family by the project's number-is-the-contract rule, and this work is deliberately deferred rather than part of the Stage 12 close — so it lives here as its own stage instead. The Stage 12 work it relates to shipped; only this surface (and the opt-out it would host) remains, by decision.
