@@ -85,6 +85,19 @@ public class ReportGeneratorTests : IAsyncLifetime
         });
     }
 
+    private void AddTransfer(Guid sourceAccountId, Guid destAccountId, decimal amount, DateOnly? date = null)
+    {
+        _fixture.Db.Transfers.Add(new Transfer
+        {
+            Id              = Guid.NewGuid(),
+            Date            = date ?? DateOnly.FromDateTime(DateTime.Today),
+            Amount          = amount,
+            SourceAccountId = sourceAccountId,
+            DestAccountId   = destAccountId,
+            CreatedAt       = DateTime.UtcNow
+        });
+    }
+
     private async Task<Guid> CreateCategoryBudgetAsync(Guid categoryId, int currencyId, decimal limit) =>
         (await _categoryBudgetService.CreateAsync(new CategoryBudgetCreateViewModel
         {
@@ -465,6 +478,29 @@ public class ReportGeneratorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task NetWorthOverTime_IncludesLiabilityBalanceFundedEntirelyByATransfer()
+    {
+        // Real bug, 2026-09-28: identical gap to ReportService.GetNetWorthAsync — a
+        // liability account funded entirely by a Transfer (never a Transaction)
+        // contributed zero to the Liabilities total for every month on/after the
+        // transfer date.
+        var assetId     = await CreateAssetAccountAsync(currencyId: 1);
+        var liabilityId = await CreateLiabilityAccountAsync(currencyId: 1);
+
+        AddTransaction(assetId, SalaryCategoryId, 1000m, new DateOnly(2026, 1, 1));
+        AddTransfer(assetId, liabilityId, 608.03m, new DateOnly(2026, 1, 15));
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var result    = (List<NetWorthSnapshotRow>)await generator.GenerateAsync(
+            new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
+
+        var jan = result.Single();
+        jan.Assets.Should().Be(1000m - 608.03m);
+        jan.Liabilities.Should().Be(608.03m, "the transferred-in amount is the liability's ENTIRE balance — it must not be zero");
+    }
+
+    [Fact]
     public async Task NetWorthOverTime_FiltersByCurrency()
     {
         var eurAccountId = await CreateAssetAccountAsync(currencyId: 1);
@@ -499,5 +535,45 @@ public class ReportGeneratorTests : IAsyncLifetime
         result.Single(r => r.Month == 1).NetWorth.Should().Be(1000m);
         result.Single(r => r.Month == 2).NetWorth.Should().Be(2000m);
         result.Single(r => r.Month == 3).NetWorth.Should().Be(3000m);
+    }
+
+    // -------------------------------------------------------------------------
+    // NetWorthGenerator (the saved/ad-hoc "Net Worth" report type)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task NetWorth_ReturnsAssetAndLiabilityTotalsPerCurrency()
+    {
+        var assetId     = await CreateAssetAccountAsync(currencyId: 1, openingBalance: 1000m);
+        var liabilityId = await CreateLiabilityAccountAsync(currencyId: 1, openingBalance: 300m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new NetWorthGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var result    = (List<NetWorthEntry>)await generator.GenerateAsync(new ReportParameters());
+
+        var eur = result.First(e => e.CurrencyCode == "EUR");
+        eur.Assets.Should().Be(1000m);
+        eur.Liabilities.Should().Be(300m);
+        eur.NetWorth.Should().Be(700m);
+    }
+
+    [Fact]
+    public async Task NetWorth_IncludesLiabilityBalanceFundedEntirelyByATransfer()
+    {
+        // Real bug, 2026-09-28: identical gap to ReportService.GetNetWorthAsync and
+        // NetWorthOverTimeReportGenerator — this class also summed only Transactions,
+        // never Transfers, so a liability funded entirely by a transfer contributed
+        // zero to the Liabilities total.
+        var assetId     = await CreateAssetAccountAsync(currencyId: 1, openingBalance: 1000m);
+        var liabilityId = await CreateLiabilityAccountAsync(currencyId: 1, openingBalance: 0m);
+        AddTransfer(assetId, liabilityId, 608.03m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new NetWorthGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var result    = (List<NetWorthEntry>)await generator.GenerateAsync(new ReportParameters());
+
+        var eur = result.First(e => e.CurrencyCode == "EUR");
+        eur.Assets.Should().Be(1000m - 608.03m);
+        eur.Liabilities.Should().Be(608.03m, "the transferred-in amount is the liability's ENTIRE balance — it must not be zero");
     }
 }

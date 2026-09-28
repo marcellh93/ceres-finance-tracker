@@ -38,6 +38,24 @@ public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReport
             .GroupBy(p => p.LiabilityAccountId)
             .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
 
+        // A Transfer moves money between two of the user's own accounts and never
+        // touches Transactions — an account funded entirely by a transfer (e.g. an
+        // opening-balance transfer into a new liability) has no Transactions to sum
+        // above and would otherwise contribute nothing here, matching
+        // AccountService.GetBalanceAsync's own transfersIn/transfersOut terms.
+        var transfers = await db.Transfers
+            .Owned(user)
+            .AsNoTracking()
+            .Where(t => accountIds.Contains(t.SourceAccountId) || accountIds.Contains(t.DestAccountId))
+            .ToListAsync();
+
+        var transfersOutByAccount = transfers
+            .GroupBy(t => t.SourceAccountId)
+            .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+        var transfersInByAccount = transfers
+            .GroupBy(t => t.DestAccountId)
+            .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+
         var grouped = accounts
             .GroupBy(a => new { a.Currency.Code, a.Currency.Symbol, a.CurrencyId })
             .Select(g =>
@@ -59,6 +77,9 @@ public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReport
 
                     balance -= paymentsByAsset.GetValueOrDefault(account.Id);
                     balance -= paymentsByLiability.GetValueOrDefault(account.Id);
+
+                    balance += transfersInByAccount.GetValueOrDefault(account.Id);
+                    balance -= transfersOutByAccount.GetValueOrDefault(account.Id);
 
                     if (!isLiability)
                         assets += balance;

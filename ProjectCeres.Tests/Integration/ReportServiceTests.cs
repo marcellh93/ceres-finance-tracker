@@ -81,6 +81,19 @@ public class ReportServiceTests : IAsyncLifetime
         });
     }
 
+    private void AddTransfer(Guid sourceAccountId, Guid destAccountId, decimal amount, DateOnly? date = null)
+    {
+        _fixture.Db.Transfers.Add(new Transfer
+        {
+            Id              = Guid.NewGuid(),
+            Date            = date ?? DateOnly.FromDateTime(DateTime.Today),
+            Amount          = amount,
+            SourceAccountId = sourceAccountId,
+            DestAccountId   = destAccountId,
+            CreatedAt       = DateTime.UtcNow
+        });
+    }
+
     // -------------------------------------------------------------------------
     // GetNetWorthAsync
     // -------------------------------------------------------------------------
@@ -147,6 +160,28 @@ public class ReportServiceTests : IAsyncLifetime
 
         result.Should().Contain(e => e.CurrencyCode == "EUR");
         result.Should().Contain(e => e.CurrencyCode == "USD");
+    }
+
+    [Fact]
+    public async Task GetNetWorthAsync_IncludesLiabilityBalanceFundedEntirelyByATransfer()
+    {
+        // Real bug, 2026-09-28: a liability account whose entire balance comes from a
+        // Transfer (e.g. an opening-balance transfer from Checking, never a Transaction)
+        // contributed ZERO to the Liabilities total — GetNetWorthAsync summed
+        // account.Transactions and LiabilityPayments but never Transfers, unlike
+        // AccountService.GetBalanceAsync, which is why the Accounts list page showed the
+        // correct balance while the dashboard's Net Worth card silently dropped it.
+        var assetId     = await CreateAssetAccountAsync(openingBalance: 1000m);
+        var liabilityId = await CreateLiabilityAccountAsync(openingBalance: 0m);
+        AddTransfer(assetId, liabilityId, 608.03m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var result = await _service.GetNetWorthAsync();
+
+        var eur = result.First(e => e.CurrencyCode == "EUR");
+        eur.Assets.Should().Be(1000m - 608.03m, "the transferred-out amount must reduce the source asset's balance");
+        eur.Liabilities.Should().Be(608.03m, "the transferred-in amount is the liability's ENTIRE balance — it must not be zero");
+        eur.NetWorth.Should().Be(1000m - 608.03m - 608.03m);
     }
 
     // -------------------------------------------------------------------------

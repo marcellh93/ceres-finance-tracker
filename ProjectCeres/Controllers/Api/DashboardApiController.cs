@@ -169,6 +169,17 @@ public class DashboardApiController(
             .AsNoTracking()
             .ToListAsync();
 
+        // A Transfer moves money between two of the user's own accounts and never
+        // touches Transactions — an account funded entirely by a transfer (e.g. an
+        // opening-balance transfer into a new liability) would otherwise contribute
+        // nothing here, matching AccountService.GetBalanceAsync's own
+        // transfersIn/transfersOut terms.
+        var allTransfers = await db.Transfers
+            .Owned(user)
+            .Where(t => accountIds.Contains(t.SourceAccountId) || accountIds.Contains(t.DestAccountId))
+            .AsNoTracking()
+            .ToListAsync();
+
         var points = new List<NetWorthTrendPoint>();
 
         for (int i = 11; i >= 0; i--)
@@ -185,6 +196,14 @@ public class DashboardApiController(
             var paymentsByLiability = paymentsUpToMonth
                 .GroupBy(p => p.LiabilityAccountId)
                 .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+            var transfersUpToMonth = allTransfers.Where(t => t.Date <= monthEnd).ToList();
+            var transfersOutByAccount = transfersUpToMonth
+                .GroupBy(t => t.SourceAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+            var transfersInByAccount = transfersUpToMonth
+                .GroupBy(t => t.DestAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
 
             decimal assets = 0;
             decimal liabilities = 0;
@@ -205,6 +224,9 @@ public class DashboardApiController(
 
                 balance -= paymentsByAsset.GetValueOrDefault(account.Id);
                 balance -= paymentsByLiability.GetValueOrDefault(account.Id);
+
+                balance += transfersInByAccount.GetValueOrDefault(account.Id);
+                balance -= transfersOutByAccount.GetValueOrDefault(account.Id);
 
                 if (!isLiability) assets += balance;
                 else liabilities += balance;

@@ -35,6 +35,24 @@ public class NetWorthOverTimeReportGenerator(AppDbContext db, ICurrentUserAccess
                     .ThenInclude(c => c.CategoryType)
             .ToListAsync();
 
+        var accountIds = accounts.Select(a => a.Id).ToHashSet();
+        var liabilityPayments = await db.LiabilityPayments
+            .Owned(user)
+            .AsNoTracking()
+            .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
+            .ToListAsync();
+
+        // A Transfer moves money between two of the user's own accounts and never
+        // touches Transactions — an account funded entirely by a transfer (e.g. an
+        // opening-balance transfer into a new liability) would otherwise contribute
+        // nothing here, matching AccountService.GetBalanceAsync's own
+        // transfersIn/transfersOut terms.
+        var transfers = await db.Transfers
+            .Owned(user)
+            .AsNoTracking()
+            .Where(t => accountIds.Contains(t.SourceAccountId) || accountIds.Contains(t.DestAccountId))
+            .ToListAsync();
+
         // Build list of months to snapshot.
         var months = new List<(int Year, int Month)>();
         var cursor = new DateOnly(from.Year, from.Month, 1);
@@ -52,6 +70,22 @@ public class NetWorthOverTimeReportGenerator(AppDbContext db, ICurrentUserAccess
             decimal assets      = 0;
             decimal liabilities = 0;
 
+            var paymentsUpToMonth = liabilityPayments.Where(p => p.Date <= snapshotEnd).ToList();
+            var paymentsByAsset = paymentsUpToMonth
+                .GroupBy(p => p.AssetAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+            var paymentsByLiability = paymentsUpToMonth
+                .GroupBy(p => p.LiabilityAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+
+            var transfersUpToMonth = transfers.Where(t => t.Date <= snapshotEnd).ToList();
+            var transfersOutByAccount = transfersUpToMonth
+                .GroupBy(t => t.SourceAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+            var transfersInByAccount = transfersUpToMonth
+                .GroupBy(t => t.DestAccountId)
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+
             foreach (var account in accounts)
             {
                 bool isLiability = account.AccountType.Name == "Liability";
@@ -65,6 +99,12 @@ public class NetWorthOverTimeReportGenerator(AppDbContext db, ICurrentUserAccess
                         bool addsToBalance = isLiability ? !isIncome : isIncome;
                         return addsToBalance ? t.Amount : -t.Amount;
                     });
+
+                balance -= paymentsByAsset.GetValueOrDefault(account.Id);
+                balance -= paymentsByLiability.GetValueOrDefault(account.Id);
+
+                balance += transfersInByAccount.GetValueOrDefault(account.Id);
+                balance -= transfersOutByAccount.GetValueOrDefault(account.Id);
 
                 if (!isLiability)
                     assets += balance;
