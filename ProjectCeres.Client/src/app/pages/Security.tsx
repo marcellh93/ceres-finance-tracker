@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SettingsSectionCard } from '../components/SettingsSectionCard';
 import { useDocumentTitle } from '../lib/use-document-title';
 import { apiFetch } from '../lib/api-client';
 import { useStepUp, ReauthCancelledError } from '../auth/use-step-up';
@@ -120,27 +121,23 @@ export function Security() {
 
       <EmailAddressSection />
 
-      <section className="space-y-3 rounded-lg border border-border bg-card p-5">
-        <h2 className="text-base font-medium">
-          {enabled ? t('security.totp.enabledHeading') : t('security.totp.disabledHeading')}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {enabled ? t('security.totp.enabledBody') : t('security.totp.disabledBody')}
-        </p>
-
+      <SettingsSectionCard
+        title={enabled ? t('security.totp.enabledHeading') : t('security.totp.disabledHeading')}
+        description={enabled ? t('security.totp.enabledBody') : t('security.totp.disabledBody')}
+      >
         {enabled ? (
-          <div className="flex flex-wrap gap-3">
+          <>
             <RegenerateBackupCodesDialog />
             <Button type="button" variant="outline" onClick={() => setDisableDialogOpen(true)}>
               {t('security.totp.disableButton')}
             </Button>
-          </div>
+          </>
         ) : (
           <Button type="button" onClick={startEnrollment} disabled={enrollment.kind === 'starting'}>
             {t('security.totp.enableButton')}
           </Button>
         )}
-      </section>
+      </SettingsSectionCard>
 
       <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
         <AlertDialogContent>

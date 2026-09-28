@@ -1869,7 +1869,7 @@ Full data export:
 - [x] Synchronous fallback rejected — the whole flow is async (202 → cron worker → email); no synchronous path exists.
 - [x] SPA `/settings/account` page with the export action — `AccountPage`, reachable from `/settings`; reauth-gated action → Sonner toast. `AccountPage.test.tsx` 5/5 + `account-export.spec.ts` E2E 3/3.
 - [ ] **Audit-log the export request (follow-up from the 13.8 build).** The `Generation logs an AuditLog entry` item above was not implemented in the Stage-13.8 build. Wire `AuditLogAction.DataExportRequested` at the request (or ready) point. Small, and the enum value already exists.
-- [ ] **Extract `<SettingsSectionCard>` primitive (Phase 6, deferred by user 2026-09-25).** The heading+description+action card pattern now repeats in Settings' Security + Account cards and will be reused by 13.9's erasure section. Promote to a documented design-system recipe via the frontend-orchestrator's Phase 6 (extract-to-primitive) and propagate to all uses in the same pass.
+- [x] **Extract `<SettingsSectionCard>` primitive (Phase 6, deferred by user 2026-09-25; extracted 2026-09-28).** The heading+description+action card pattern had drifted into 3 independent copies — Account's export card and danger-zone/erasure card (both `Card`-based, per the original note) plus Security's MFA section, which the original note described as a third `Card`-based repeat but was in fact a hand-rolled `<section>` never built on the `Card` primitive at all. All 3 now consume `<SettingsSectionCard>` (`ProjectCeres.Client/src/app/components/SettingsSectionCard.tsx`), documented in `docs/design-system.md` "Layout primitives". `SettingsSectionCard.test.tsx` 4/4.
 
 Right-to-erasure:
 

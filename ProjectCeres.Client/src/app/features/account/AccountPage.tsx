@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SettingsSectionCard } from '../../components/SettingsSectionCard';
 import { useDocumentTitle } from '../../lib/use-document-title';
 import { useStepUp, ReauthCancelledError } from '../../auth/use-step-up';
 import { requestDataExport } from './account-api';
@@ -50,34 +50,23 @@ export function AccountPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium">Your data</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-sm">
-            Download a copy of all your data — accounts, transactions, categories,
-            budgets, and attachments. We&apos;ll email you a secure link when it&apos;s ready.
-          </p>
-          <Button onClick={() => void onExport()} disabled={busy}>
-            <Download aria-hidden="true" />
-            {busy ? 'Starting…' : 'Export my data'}
-          </Button>
-        </CardContent>
-      </Card>
+      <SettingsSectionCard
+        title="Your data"
+        description="Download a copy of all your data — accounts, transactions, categories, budgets, and attachments. We'll email you a secure link when it's ready."
+      >
+        <Button onClick={() => void onExport()} disabled={busy}>
+          <Download aria-hidden="true" />
+          {busy ? 'Starting…' : 'Export my data'}
+        </Button>
+      </SettingsSectionCard>
 
-      <Card className="border-destructive/30 bg-destructive/10">
-        <CardHeader>
-          <CardTitle className="text-base font-medium text-destructive">Danger zone</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-destructive/90">
-            Permanently erase your account and all its data. This cannot be undone once the
-            72-hour cancellation window has passed.
-          </p>
-          <ErasureDialog />
-        </CardContent>
-      </Card>
+      <SettingsSectionCard
+        title="Danger zone"
+        description="Permanently erase your account and all its data. This cannot be undone once the 72-hour cancellation window has passed."
+        tone="destructive"
+      >
+        <ErasureDialog />
+      </SettingsSectionCard>
     </div>
   );
 }

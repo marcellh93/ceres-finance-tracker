@@ -418,6 +418,33 @@ Muted background + rounded + padding. Use to visually group small numeric tiles 
 </Tile>
 ```
 
+### `<SettingsSectionCard>` — heading + description + action card
+
+`src/app/components/SettingsSectionCard.tsx`. The card pattern for a Settings surface's self-contained section: a title, one line of description, and an action area that can hold one button, several side by side, or a whole dialog-trigger component. Extracted Stage 13.9 close-out — three copies had already drifted (Account's export card, Account's danger-zone card, and Security's MFA section, which wasn't even `Card`-based before the extraction).
+
+```tsx
+<SettingsSectionCard title="Your data" description="Download a copy of all your data...">
+  <Button onClick={onExport}>Export my data</Button>
+</SettingsSectionCard>
+
+<SettingsSectionCard
+  title="Danger zone"
+  description="Permanently erase your account and all its data. This cannot be undone..."
+  tone="destructive"
+>
+  <ErasureDialog />
+</SettingsSectionCard>
+
+<SettingsSectionCard title={enabledHeading} description={enabledBody}>
+  <RegenerateBackupCodesDialog />
+  <Button variant="outline" onClick={onDisable}>Disable</Button>
+</SettingsSectionCard>
+```
+
+**Props:** `title: string`, `description: string`, `children: ReactNode` (the action area — wrapped in `flex flex-wrap gap-3`, so multiple children lay out side by side automatically), `tone?: 'default' | 'destructive'` (destructive tints the card border/background and the title, matching the destructive-surface pairing used elsewhere — border-destructive/30 + bg-destructive/10), `className?: string` for one-off overrides.
+
+Built on the existing `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardContent` primitives — use those directly only when a Settings section needs a structure this component doesn't cover (e.g. a footer, or content beyond one description paragraph).
+
 ---
 
 ## App Shell
