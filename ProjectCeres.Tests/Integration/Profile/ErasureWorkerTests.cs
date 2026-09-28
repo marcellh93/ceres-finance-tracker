@@ -88,7 +88,11 @@ public class ErasureWorkerTests : IAsyncLifetime
             Status = status,
             RequestedAt = DateTime.UtcNow.AddHours(-73),
             ExecuteAfter = executeAfter,
-            CancelTokenLookup = new byte[32],
+            // IX_ErasureRequests_CancelTokenLookup is a GLOBAL unique index — a fixed
+            // all-zero value here would collide against ANY other row (this class's
+            // own other tests, ErasureExecutorTests, or an abandoned prior run) that
+            // seeded the same constant. Random per call, matching a real token.
+            CancelTokenLookup = Guid.NewGuid().ToByteArray(),
             CancelTokenHash = "unused",
         });
         await admin.SaveChangesAsync();
@@ -146,5 +150,51 @@ public class ErasureWorkerTests : IAsyncLifetime
         await using var admin = _fixture.CreateAdminContext();
         var request = await admin.ErasureRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.UserId == _userId);
         request.Status.Should().Be(ErasureStatus.Cancelled, "status must be left exactly as seeded");
+    }
+
+    [Fact]
+    public async Task ProcessEligibleAsync_skips_a_request_cancelled_after_the_sweep_query_but_before_the_per_item_recheck()
+    {
+        // The genuine race Task 10 names: the sweep's outer query (line "eligible =
+        // ...ToListAsync") and the per-item re-check are two SEPARATE round-trips —
+        // a user can cancel in the gap between them. The sibling test above only
+        // proves a row Cancelled BEFORE the sweep starts is excluded by the outer
+        // WHERE clause; it never exercises the re-check at all. This test seeds
+        // Sealed (so the row genuinely enters the eligible set), waits for a
+        // separate connection to flip it to Cancelled, then calls
+        // ProcessEligibleAsync — proving the re-check (not the outer query) is what
+        // actually stops execution here.
+        await SeedRequestAsync(ErasureStatus.Sealed, DateTime.UtcNow.AddHours(-1));
+
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            var confirmedEligible = await admin.ErasureRequests.IgnoreQueryFilters()
+                .Where(r => r.UserId == _userId && r.Status == ErasureStatus.Sealed
+                    && r.ExecuteAfter <= DateTime.UtcNow)
+                .AnyAsync();
+            confirmedEligible.Should().BeTrue("the row must genuinely be in the eligible set for this test to prove anything");
+
+            // Race: cancel on a separate connection, simulating the user's cancel
+            // link landing between the sweep's outer query and this row's turn in
+            // the loop.
+            await admin.ErasureRequests.IgnoreQueryFilters()
+                .Where(r => r.UserId == _userId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, ErasureStatus.Cancelled)
+                    .SetProperty(r => r.CancelledAt, DateTime.UtcNow));
+        }
+
+        var touched = await ErasureWorker.ProcessEligibleAsync(
+            _fixture.CreateAdminContext(), _executor, TimeProvider.System,
+            NullLogger.Instance, CancellationToken.None);
+
+        touched.Should().Be(0, "the per-item re-check must catch the cancel that landed after the outer sweep query ran");
+
+        await using var check = _fixture.CreateAdminContext();
+        var request = await check.ErasureRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.UserId == _userId);
+        request.Status.Should().Be(ErasureStatus.Cancelled, "the row must be left exactly as the race left it, not re-flipped by the executor");
+
+        var user = await check.Users.IgnoreQueryFilters().AsNoTracking().SingleAsync(u => u.Id == _userId);
+        user.Email.Should().Be(RealEmail, "a cancel that races the sweep must still fully protect the user's data");
     }
 }

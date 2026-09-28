@@ -84,7 +84,12 @@ public class ErasureExecutorTests : IAsyncLifetime
                 Status = ErasureStatus.Sealed,
                 RequestedAt = DateTime.UtcNow,
                 ExecuteAfter = DateTime.UtcNow.AddHours(72),
-                CancelTokenLookup = new byte[32],
+                // IX_ErasureRequests_CancelTokenLookup is a GLOBAL unique index (not
+                // scoped per-user) — a fixed all-zero value here collides with any
+                // other test/run whose row wasn't cleaned up, blocking every future
+                // InitializeAsync with an unrelated-looking constraint violation.
+                // Random per test-instance, matching how a real token is generated.
+                CancelTokenLookup = Guid.NewGuid().ToByteArray(),
                 CancelTokenHash = "unused",
             });
 
@@ -235,7 +240,9 @@ public class ErasureExecutorTests : IAsyncLifetime
                 ReadyAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddHours(24),
                 StoredPath = Path.Combine("exports", exportRelPath),
-                TokenLookup = new byte[32],
+                // IX_ExportJobs_TokenLookup is also a GLOBAL unique index — same
+                // fragility as CancelTokenLookup above, same fix.
+                TokenLookup = Guid.NewGuid().ToByteArray(),
                 TokenHash = "unused",
             });
 
@@ -422,6 +429,71 @@ public class ErasureExecutorTests : IAsyncLifetime
 
         var request = await check.ErasureRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.UserId == _userId);
         request.Status.Should().Be(ErasureStatus.Completed);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_a_second_pass_after_a_simulated_crash_does_not_re_delete_already_gone_files()
+    {
+        // Distinct from ExecuteAsync_a_second_pass_after_a_simulated_crash_does_not_double_complete
+        // (which proves the audit-row/status guards): this proves the two physical
+        // File.Delete call sites (support attachment, export ZIP) are genuinely
+        // idempotent against a real "row already redacted, file already unlinked"
+        // state left by a first pass — not just theoretically guarded by File.Exists
+        // in code that's never actually exercised with the files already gone.
+        await _executor.ExecuteAsync(_userId, CancellationToken.None);
+
+        File.Exists(_supportAttachmentFullPath).Should().BeFalse("first pass already deleted it");
+        File.Exists(_exportZipFullPath).Should().BeFalse("first pass already deleted it");
+
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            await admin.ErasureRequests.IgnoreQueryFilters()
+                .Where(r => r.UserId == _userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, ErasureStatus.Sealed));
+        }
+
+        // The second pass's RedactSupportAsync/DeleteExportJobAsync lanes must not
+        // throw when File.Delete would otherwise target a path that no longer
+        // exists — this is exactly the "deleting an already-gone file is a no-op"
+        // requirement, proven against files this test itself already confirmed gone.
+        var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
+        await act.Should().NotThrowAsync("re-running the file-delete lanes against already-deleted files must be a no-op, not a crash");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_on_a_cancelled_request_is_a_no_op()
+    {
+        // The cancel-race defense named in Task 10's plan: "a job Cancelled after
+        // claim but before execute → executor skips it (re-check Status)". Simulates
+        // the user cancelling between ErasureWorker.ProcessEligibleAsync's own
+        // re-check and the moment ExecuteAsync actually runs, by seeding Cancelled
+        // directly and calling ExecuteAsync without going through the worker at all
+        // — ExecuteAsync's own top-of-method query (Status == Sealed) is the last
+        // line of defense regardless of which caller reaches it.
+        await using (var admin = _fixture.CreateAdminContext())
+        {
+            await admin.ErasureRequests.IgnoreQueryFilters()
+                .Where(r => r.UserId == _userId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, ErasureStatus.Cancelled)
+                    .SetProperty(r => r.CancelledAt, DateTime.UtcNow));
+        }
+
+        var act = async () => await _executor.ExecuteAsync(_userId, CancellationToken.None);
+        await act.Should().NotThrowAsync();
+
+        await using var check = _fixture.CreateAdminContext();
+        var request = await check.ErasureRequests.IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.UserId == _userId);
+        request.Status.Should().Be(ErasureStatus.Cancelled, "a cancelled request must never be executed, regardless of who calls ExecuteAsync");
+        request.CompletedAt.Should().BeNull();
+
+        var user = await check.Users.IgnoreQueryFilters().AsNoTracking().SingleAsync(u => u.Id == _userId);
+        user.Email.Should().Be(RealEmail, "a cancelled request's user data must be completely untouched");
+        user.ErasedAt.Should().BeNull();
+
+        (await check.AuditLogs.IgnoreQueryFilters()
+            .CountAsync(a => a.UserId == _userId && a.Action == AuditLogAction.GdprErasureCompleted))
+            .Should().Be(0, "no completion audit row for a request that never executed");
     }
 
     [Fact]

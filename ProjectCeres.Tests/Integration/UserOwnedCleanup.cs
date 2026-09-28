@@ -25,6 +25,8 @@ public static class UserOwnedCleanup
     /// </summary>
     public static async Task PurgeUserAsync(AppDbContext db, Guid userId, CancellationToken ct = default)
     {
+        await SeverTransactionBudgetFkAsync(db, [userId], ct);
+
         foreach (var table in DeletionOrder(db))
         {
             if (!await TableExistsAsync(db, table, ct)) continue; // creating migration not yet applied
@@ -36,6 +38,24 @@ public static class UserOwnedCleanup
     }
 
     /// <summary>
+    /// Transaction.BudgetId -> Budget is DeleteBehavior.Restrict, so deleting Budgets
+    /// while a live Transaction still points at one violates the FK — the exact same
+    /// constraint ErasureExecutor.PurgeAsync already severs before its own Budget
+    /// delete. Found 2026-09-28: a test that skips ErasureExecutor.ExecuteAsync
+    /// entirely (a Cancelled-request no-op) never gets that FK severed, so DisposeAsync's
+    /// PurgeUserAsync call hit the RESTRICT violation, threw, and silently skipped the
+    /// AspNetUsers delete that runs after it in the same using block — leaking a row
+    /// that then blocked every subsequent InitializeAsync on this suite's fixed test
+    /// email/username constants.
+    /// </summary>
+    private static async Task SeverTransactionBudgetFkAsync(AppDbContext db, Guid[] userIds, CancellationToken ct)
+    {
+        if (!await TableExistsAsync(db, "Transactions", ct)) return;
+        await db.Database.ExecuteSqlRawAsync(
+            "UPDATE \"Transactions\" SET \"BudgetId\" = NULL WHERE \"UserId\" = ANY({0})", [userIds], ct);
+    }
+
+    /// <summary>
     /// Deletes all rows owned by any of <paramref name="userIds"/>. Cheaper than
     /// calling <see cref="PurgeUserAsync"/> in a loop for multi-user fixtures.
     /// </summary>
@@ -44,6 +64,8 @@ public static class UserOwnedCleanup
     {
         var ids = userIds.Distinct().ToArray();
         if (ids.Length == 0) return;
+
+        await SeverTransactionBudgetFkAsync(db, ids, ct);
 
         foreach (var table in DeletionOrder(db))
         {
