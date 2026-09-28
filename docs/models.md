@@ -990,6 +990,8 @@ ASP.NET Core Identity user. Inherits `IdentityUser<Guid>` — the standard Ident
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | CreatedAt | timestamp with time zone | NOT NULL DEFAULT current_timestamp | Phase 3, Stage 6b.1. Audit-only — when the account was created. No behavioural role in the login flow per ADR-0069 (MFA opt-in, no grace cliff). Useful for analytics and the eventual user-list admin surface. |
+| SealedAt | timestamp with time zone | nullable | Phase 3, Stage 13.9 (GDPR right to erasure). Set the instant an erasure request is confirmed; cleared if the user cancels within the 72h window via the emailed link. Non-null blocks login and revokes the session on the next authenticated request — see `security-model.md` § Account Seal Enforcement. |
+| ErasedAt | timestamp with time zone | nullable | Phase 3, Stage 13.9. Set once the erasure worker completes the §8 three-lane sequence. Distinct from `SealedAt`: a sealed-but-not-yet-erased account is still within its 72h cancel window; an erased account is permanent — `Email`/`UserName`/`PhoneNumber` have already been anonymised by that point. |
 
 **Password storage:** `PasswordHash` is an Argon2id PHC string (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`) per `Argon2idPasswordHasher` registered as the default `IPasswordHasher<ApplicationUser>`. See `security-model.md` § Passwords.
 
@@ -1442,4 +1444,52 @@ A user's GDPR data-export request. User-owned (`IUserOwned`, RLS `user_isolation
 
 **Download token:** two-factor — the raw token exists only in the emailed URL (never persisted); the DB stores the HMAC `TokenLookup` (indexed) + the Argon2id `TokenHash`. The download endpoint requires **both** a logged-in session and a token that passes both factors.
 
-**Erasure interaction (Stage 13.9 `[ ]`):** because `ExportJob` is excluded from the erasure content loop, erasure must explicitly delete any live `ExportJob` ZIP at `StoredPath` + drop the row (a `Ready` job's ZIP is a full personal-data copy). Tracked in the roadmap § 13.9.
+**Erasure interaction (Stage 13.9, shipped).** Because `ExportJob` is excluded from the erasure content loop, `ErasureExecutor.DeleteExportJobAsync` explicitly deletes any live `ExportJob` ZIP at `StoredPath` + drops the row (a `Ready` job's ZIP is a full personal-data copy) — independent of the worker's own 24h TTL cleanup.
+
+---
+
+### ErasureRequest (Phase 3, Stage 13.9)
+
+A user's GDPR right-to-erasure request. User-owned (`IUserOwned`, RLS `user_isolation`). Confirming the request immediately seals the account (`ApplicationUser.SealedAt`) and starts a 72-hour, cancel-only, non-restorable hold — deliberately distinct from the churn archive's restorable `IsActive = false` pattern (ADR-0029 forbids mixing the two). An external-cron worker (`--run-erasure-jobs`, the `SweepSessions`/`ExportJobWorker` pattern) executes every `Sealed` request whose `ExecuteAfter` has passed.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | RLS discriminator |
+| Status | int | NOT NULL | Enum `ErasureStatus`: `Sealed`=0, `Cancelled`=1, `Completed`=2 |
+| RequestedAt | datetime | NOT NULL | UTC |
+| ExecuteAfter | datetime | NOT NULL | `RequestedAt + 72h`. The worker's eligibility filter. |
+| CancelTokenLookup | bytea | NOT NULL, unique (filtered, non-empty) | HMAC-SHA256 fingerprint of the raw cancel token — O(1) lookup for the anonymous `/api/profile/erasure/cancel` call. |
+| CancelTokenHash | varchar(512) | NOT NULL | Argon2id hash of the raw token — the second factor, verified after `CancelTokenLookup` narrows to one candidate (matches `ExportJob.TokenHash` and the sibling token tables). |
+| CancelledAt | datetime | nullable | Set on a successful cancel |
+| CompletedAt | datetime | nullable | Set when the worker finishes the §8 sequence |
+
+**Idempotency (Task 5/10):** a second request against an existing `Sealed` row is a no-op — same row returned, no new token minted, no re-sent email, `ExecuteAfter` untouched. `ErasureExecutor.ExecuteAsync` re-checks `Status == Sealed` at the top of the method (its own defense-in-depth on top of `ErasureWorker.ProcessEligibleAsync`'s per-item re-check), so a request cancelled between the worker's sweep query and execution is safely skipped, and a crash mid-run is safe to resume — each lane is check-then-act, and the whole DB portion of the run is one transaction.
+
+**Cancel token:** two-factor, identical shape to `ExportJob`'s download token — the raw value exists only in the emailed URL, never persisted.
+
+### ErasedEmailHold (Phase 3, Stage 13.9)
+
+The 30-day re-registration cooling-off period, tracked separately from `ApplicationUser.Email` because erasure anonymises that column (`erased-{token}@erased.invalid`) — the real email has to live somewhere else to be checked at registration time. User-owned (`IUserOwned`).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| Id | uuid | PK | |
+| UserId | uuid | NOT NULL | The erased user's original Id (row survives the user's own anonymisation) |
+| EmailFingerprint | bytea | NOT NULL, unique | HMAC-SHA256 of the normalized original email, via the same `TokenLookupHasher` the token tables use |
+| ErasedAt | datetime | NOT NULL | |
+| ExpiresAt | datetime | NOT NULL | `ErasedAt + 30d`. `AuthController.Register` refuses a matching, un-expired fingerprint. |
+
+**Upsert on re-erasure:** a second erasure of the same email (e.g. re-registration after the hold expires, immediately re-erased) upserts by fingerprint rather than colliding on the unique index.
+
+### The three erasure lanes (Stage 13.9)
+
+`ErasureExecutor` partitions every user-content table into exactly one of three lanes (`ErasureLanes.Classify`, `ErasureLaneCoverageTests` pins the partition is total and disjoint):
+
+| Lane | Tables | Treatment |
+|------|--------|-----------|
+| **Statutory** (`StatutoryRetentionSet`) | `Transactions`, `Transfers`, `LiabilityPayments`, `Accounts`, `TransactionAttachments`, `TransferAttachments`, `Categories` | Anonymise-and-retain — row count and FKs preserved, only user-authored identity text replaced with a deterministic pseudonym token. Required by `legal.md` § Financial Records (Código de Comercio 6yr / Ley General Tributaria 4-6yr). `Categories` is included for referential coherence, not itself a statutory record — it keeps the retained financial rows' category reference valid instead of a dangling FK. |
+| **Support** | `SupportTickets`, `SupportMessages`, `SupportTicketAttachments` | Redact-and-retain (the "B3a" design, resolved during Stage 13.9 brainstorming). Bodies/subjects are redacted via `IdentifierRedactor`; attachment files are deleted from disk (no legal duty to keep them), rows redacted not removed. The thread survives as de-identified support-knowledge on a legitimate-interest basis. |
+| **Purge** | Everything else in `UserContentEntities` not in the two lanes above (e.g. `Budgets`, `RecurringTransactions`, `CategoryBudgets`, import-staging tables) | Hard-deleted. `Transactions.BudgetId` (Restrict FK to the purge-lane `Budgets`) is nulled before the Budget delete. |
+
+Outside the three-lane content loop: the account identity (`ApplicationUser.Email`/`UserName`/`PhoneNumber` anonymised, `ErasedAt` set), the outstanding `ExportJob` (deleted, see above), the `ErasedEmailHold` (written), and historical `AuditLog.IpAddress` values for the user (rewritten to `"erased"`; the rows' `UserId` stays the real value, since RLS requires it — the pseudonym only appears in the completion audit row itself). The final `GdprErasureCompleted` audit row (Task 6) is the retained, pseudonymised statutory record of the erasure act: `EntityType` carries the deterministic HMAC pseudonym token (`ErasurePseudonym.Compute`), `EntityId` is the `ErasureRequest.Id`, and `UserId` stays the real value (RLS-required) until Stage 15's `UserRef` migration replaces it with the canonical masked identity everywhere.

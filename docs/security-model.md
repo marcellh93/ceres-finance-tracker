@@ -241,7 +241,7 @@ Files stored in `uploads/` are never served directly by the web server. Every fi
 - **Dual gate — login AND token.** The endpoint is `[Authorize]` (a valid session is required) *and* requires a token that passes two factors. The emailed token proves *which* export; the session proves *who is asking*. A valid token presented without a session returns `401`.
 - **Two-factor token.** The raw token exists only in the emailed URL (never persisted). The `ExportJob` row stores an HMAC `TokenLookup` (indexed, for O(1) location) and an Argon2id `TokenHash` (verified after the row is located). A matched lookup whose hash does not verify returns `404` — the same as an unknown token, so there is no existence oracle. Foreign-user tokens are invisible via RLS (`Owned()`-scoped read) → `404`, not `403`.
 - **Single-use + expiry.** `ConsumedAt` is stamped before the stream begins (a second GET → `410`); links expire 24h after `ReadyAt` (→ `410`). Reauth (`[RequireRecentAuth]`) gates the *request* endpoint (`POST /api/profile/export`), not the download — forcing reauth on an email-link click is hostile, and the token is the second factor.
-- **File handling.** The ZIP lives on the filesystem (never a DB blob), referenced by `ExportJob.StoredPath`; the worker deletes it on expiry/consumption. Erasure (Stage 13.9) must also delete any live export ZIP.
+- **File handling.** The ZIP lives on the filesystem (never a DB blob), referenced by `ExportJob.StoredPath`; the worker deletes it on expiry/consumption. Erasure (Stage 13.9, shipped) also deletes any live export ZIP — `ErasureExecutor.DeleteExportJobAsync`, independent of the worker's own TTL cleanup.
 
 ### List Endpoint Scoping
 
@@ -807,6 +807,15 @@ sequenceDiagram
 - The reauth grant is 5 minutes, scoped to a single sensitive action. `ReauthEndpointTests` and `ReauthGateTests` pin the window and the per-action scoping.
 - Persistent `__Host-Persist` cookie ("remember me") does NOT bypass the gate. `PersistentCookieRotationTests` + `ReauthEndpointTests.RefreshSignInAsync_after_reauth_does_not_disrupt_persistent_cookie` pin this.
 - Backup codes are NOT accepted at reauth. Same recovery-path-not-MFA-bypass rule as password reset.
+
+### Account Seal Enforcement (Stage 13.9, right to erasure)
+
+A confirmed erasure request seals the account immediately — before the 72h cancel window even starts counting. Sealing and erasure are deliberately two different moments: `SealedAt` (set at request time, cleared on cancel) blocks access during the reversible hold; `ErasedAt` (set once the worker completes) marks the permanent, post-hold state. Both are checked together everywhere access must be refused, since a sealed-but-not-yet-erased account must be locked out exactly as hard as an already-erased one.
+
+- **Session validation.** `SessionRevocationValidator.OnValidatePrincipal` (the same cookie-validation hook that already rejects a revoked `UserSession`) additionally rejects any principal whose `AspNetUsers.SealedAt IS NOT NULL` — same mechanism, same effect: `RejectPrincipal()` + sign-out on the very next authenticated request, not just at the next login.
+- **Login.** `AuthController` checks `SealedAt is not null || ErasedAt is not null` on all three branches that could otherwise issue a session (password-only, TOTP-app, backup-code) — placed *after* the credential check, so a sealed/erased account returns the same `401` shape a wrong password would, with no account-existence oracle. All three branches were audited for this check individually (Stage 13.9 fix-loop; the backup-code branch was the one initially missed).
+- **Cancel.** `POST /api/profile/erasure/cancel` is `[AllowAnonymous]` + `[PreAuthCallSite("Profile.ErasureCancel")]` — the sealed account cannot authenticate, so the emailed token IS the credential, identical shape to `LockoutUnlockController.Confirm`. Two-factor: HMAC `CancelTokenLookup` narrows to a candidate row, Argon2id `CancelTokenHash` verifies it. All three failure branches (empty token, no lookup match, hash-verify fails) collapse to the same `404`, with a dummy Argon2id hash run on the two no-candidate branches so wall-clock timing does not distinguish "no such token" from "wrong token" — matching `LockoutUnlockService.ConfirmAsync`'s enumeration-resistance shape. `410 Gone` only fires after a successful verify against an already-`Completed`/`Cancelled` row, so it only ever reveals state to a caller who has already proven possession of the raw token.
+- **Non-restorable, cancel-only hold (D4).** The 72h window is the *only* re-entry path — there is no admin override, no "reactivate" affordance, and the hold is explicitly not the same mechanism as the churn archive's restorable `IsActive = false` (ADR-0029 forbids mixing the two). Once the worker executes, `ErasedAt` is permanent.
 
 ### Email-address change
 
