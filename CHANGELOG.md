@@ -6,6 +6,11 @@
 
 #### Added
 
+**Privacy & data (Stage 13.9 — right to erasure, 2026-09-28)**
+- You can now permanently erase your account and all its data. A new "Danger zone" section on the **Account** page (under Settings) lets you request erasure — type "ERASE" to confirm, since this can't be undone. Your account is sealed immediately and you're emailed a link to cancel within 72 hours.
+- Changed your mind? Click the cancel link (no sign-in needed) and your account is restored right away.
+- If you don't cancel, a background job permanently erases your account after 72 hours. Financial records are anonymised rather than deleted outright (so tax/accounting obligations are still met), support conversations are stripped of anything identifying you but kept for troubleshooting history, and everything else — budgets, recurring transactions, saved reports — is permanently deleted. You can't sign in during the 72-hour hold or after erasure completes, and the email address is held for 30 days before it can be used to register a new account.
+
 **Privacy & data (Stage 13.8 — GDPR data export, 2026-09-25)**
 - You can now download a full copy of your own data. A new **Account** page (under Settings) has an "Export my data" button that packages your accounts, transactions, transfers, categories, budgets, saved reports, support messages, profile, and uploaded attachments into a ZIP. Because the archive can be large, it's built in the background and we email you a secure download link when it's ready — you're not left waiting on a spinner.
 - The download link is private and single-use: it works only while you're signed in, only once, and expires after 24 hours. You can request one export per day.
