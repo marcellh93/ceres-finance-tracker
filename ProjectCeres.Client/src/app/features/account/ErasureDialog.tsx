@@ -39,16 +39,16 @@ export function ErasureDialog() {
   const { requireStepUp } = useStepUp();
   const [state, setState] = useState<State>({ kind: 'idle' });
   const [confirmText, setConfirmText] = useState('');
+  // Set by the timer below, and only ever read while `matches` is still true
+  // (see `canConfirm`) -- so a stale `true` left over from a previous match
+  // streak can never leak into the current one; no reset-on-mismatch needed.
   const [matchedRecently, setMatchedRecently] = useState(false);
   const [pending, setPending] = useState(false);
 
   const matches = confirmText === CONFIRM_PHRASE;
 
   useEffect(() => {
-    if (!matches) {
-      setMatchedRecently(false);
-      return;
-    }
+    if (!matches) return;
     const timer = setTimeout(() => setMatchedRecently(true), CONFIRM_ENABLE_DELAY_MS);
     return () => clearTimeout(timer);
   }, [matches]);
