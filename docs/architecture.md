@@ -203,7 +203,6 @@ ProjectCeres/
     IRecurringTransactionService.cs / RecurringTransactionService.cs  ← Confirm + Dismiss (advances NextDueDate)
     IReportService.cs / ReportService.cs             ← net worth, income/expense summary, breakdown, history
     IDashboardService.cs / DashboardService.cs       ← MTD totals, savings rate, pending reminders count; GetHealthSnapshotAsync (spendable balance, runway, income vs. rolling avg, budget burn rate)
-    ILiabilityProjectionService.cs / LiabilityProjectionService.cs  ← amortisation schedule calculation; no DB access; pure math
     IFileAttachmentService.cs / FileAttachmentService.cs  ← magic-byte upload, safe path, serve, delete (transactions + transfers)
     IImportService.cs / ImportService.cs          ← import orchestration — format-blind; delegates parsing to ImportParserFactory
     IImportParser.cs                              ← parser abstraction — Format + ParseAsync
