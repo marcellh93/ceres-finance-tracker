@@ -372,11 +372,6 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
             .Where(p => accountIds.Contains(p.AssetAccountId) || accountIds.Contains(p.LiabilityAccountId))
             .ToListAsync();
 
-        var paymentsByAsset     = liabilityPayments.GroupBy(p => p.AssetAccountId)
-                                                    .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-        var paymentsByLiability = liabilityPayments.GroupBy(p => p.LiabilityAccountId)
-                                                    .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-
         // A Transfer moves money between two of the user's own accounts and never
         // touches Transactions — an account funded entirely by a transfer would
         // otherwise contribute nothing here, matching AccountService.GetBalanceAsync's
@@ -387,11 +382,6 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
             .Where(t => accountIds.Contains(t.SourceAccountId) || accountIds.Contains(t.DestAccountId))
             .ToListAsync();
 
-        var transfersOutByAccount = transfers.GroupBy(t => t.SourceAccountId)
-                                              .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
-        var transfersInByAccount  = transfers.GroupBy(t => t.DestAccountId)
-                                              .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
-
         decimal totalAssets      = 0m;
         decimal totalLiabilities = 0m;
 
@@ -399,19 +389,9 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         {
             bool isLiability = account.AccountType.Name == "Liability";
 
-            var balance = account.Transactions.Sum(t =>
-            {
-                if (t.Category.IsSystem) return t.Amount;
-                bool isIncome    = t.Category.CategoryType.Name == "Income";
-                bool addsBalance = isLiability ? !isIncome : isIncome;
-                return addsBalance ? t.Amount : -t.Amount;
-            });
-
-            balance -= paymentsByAsset.GetValueOrDefault(account.Id);
-            balance -= paymentsByLiability.GetValueOrDefault(account.Id);
-
-            balance += transfersInByAccount.GetValueOrDefault(account.Id);
-            balance -= transfersOutByAccount.GetValueOrDefault(account.Id);
+            var accountTransfers = transfers.Where(t => t.SourceAccountId == account.Id || t.DestAccountId == account.Id);
+            var accountPayments  = liabilityPayments.Where(p => p.AssetAccountId == account.Id || p.LiabilityAccountId == account.Id);
+            var balance = AccountBalanceCalculator.ComputeBalance(account, account.Transactions, accountTransfers, accountPayments);
 
             if (!isLiability)
                 totalAssets += balance;
