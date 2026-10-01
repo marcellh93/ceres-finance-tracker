@@ -137,9 +137,7 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user, TimeProv
             }
             else
             {
-                bool isIncome      = t.Category.CategoryType.Name == "Income";
-                bool addsToBalance = isLiability ? !isIncome : isIncome;
-                signed    = addsToBalance ? t.Amount : -t.Amount;
+                signed    = AccountBalanceCalculator.SignedAmount(t, isLiability);
                 entryType = "Transaction";
             }
 
