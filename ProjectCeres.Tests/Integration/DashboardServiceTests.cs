@@ -844,6 +844,60 @@ public class DashboardServiceTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Real bug, discovered in the AccountBalanceCalculator extraction's final review
+    /// (2026-10-02): GetFullMonthlyLiabilityBalanceAsync hand-rolled its own sign
+    /// formula and never summed Transfers at all, so a FullMonthly card funded by a
+    /// transfer (never a Transaction) contributed zero to its outstanding balance —
+    /// the exact bug class this stage exists to eliminate, on the one site its
+    /// research sweep missed.
+    /// </summary>
+    [Fact]
+    public async Task GetHealthSnapshotAsync_SafeToSpend_SubtractsFullMonthlyLiabilityBalanceFundedEntirelyByATransfer()
+    {
+        var baseline = await _service.GetHealthSnapshotAsync();
+        var baselineSafe = baseline.SafeToSpend ?? 0m;
+
+        var card = new Account
+        {
+            Id                     = Guid.NewGuid(),
+            Name                   = $"Card {Guid.NewGuid():N}",
+            AccountTypeId          = 2,
+            CurrencyId             = 1,
+            IsActive               = true,
+            LiabilityRepaymentType = "FullMonthly"
+        };
+        // Funding source is a second LIABILITY account (not the fixture's Asset
+        // _accountId), so the transfer doesn't also move GetSpendableBalanceAsync's
+        // "liquid" figure — isolating this test to the FullMonthly-debt leg only.
+        var otherLiability = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = $"Other Liability {Guid.NewGuid():N}",
+            AccountTypeId = 2,
+            CurrencyId    = 1,
+            IsActive      = true,
+        };
+        _fixture.Db.Accounts.AddRange(card, otherLiability);
+        await _fixture.Db.SaveChangesAsync();
+
+        _fixture.Db.Transfers.Add(new Transfer
+        {
+            Id              = Guid.NewGuid(),
+            Date            = DateOnly.FromDateTime(DateTime.Today),
+            Amount          = 150.25m,
+            SourceAccountId = otherLiability.Id,
+            DestAccountId   = card.Id,
+            CreatedAt       = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var snapshot = await _service.GetHealthSnapshotAsync();
+
+        (snapshot.SafeToSpend ?? 0m).Should().Be(baselineSafe - 150.25m,
+            "the transferred-in amount is the FullMonthly card's ENTIRE balance — it must not be zero");
+    }
+
+    /// <summary>
     /// An amortising loan is repaid by instalments, so subtracting its whole balance
     /// would make the figure permanently negative. Its instalment counts via its
     /// recurring reminder instead.

@@ -308,6 +308,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
                      && a.CurrencyId == currencyId
                      && a.AccountType.Name == "Liability"
                      && a.LiabilityRepaymentType == "FullMonthly")
+            .Include(a => a.AccountType)
             .Include(a => a.Transactions)
                 .ThenInclude(t => t.Category)
                     .ThenInclude(c => c.CategoryType)
@@ -322,20 +323,22 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
             .Where(p => cardIds.Contains(p.LiabilityAccountId))
             .ToListAsync();
 
-        var repaidByCard = repayments
-            .GroupBy(p => p.LiabilityAccountId)
-            .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
+        // A Transfer moves money between two of the user's own accounts and never
+        // touches Transactions — a FullMonthly card funded (even partially) by a
+        // transfer would otherwise contribute nothing here, matching
+        // AccountBalanceCalculator's other callers.
+        var transfers = await db.Transfers
+            .Owned(user)
+            .AsNoTracking()
+            .Where(t => cardIds.Contains(t.SourceAccountId) || cardIds.Contains(t.DestAccountId))
+            .ToListAsync();
 
         decimal owed = 0m;
         foreach (var card in cards)
         {
-            var balance = card.Transactions.Sum(t =>
-            {
-                if (t.Category.IsSystem) return t.Amount;
-                bool isIncome = t.Category.CategoryType.Name == "Income";
-                return isIncome ? -t.Amount : t.Amount;
-            });
-            balance -= repaidByCard.GetValueOrDefault(card.Id);
+            var cardTransfers = transfers.Where(t => t.SourceAccountId == card.Id || t.DestAccountId == card.Id);
+            var cardPayments  = repayments.Where(p => p.LiabilityAccountId == card.Id);
+            var balance = AccountBalanceCalculator.ComputeBalance(card, card.Transactions, cardTransfers, cardPayments);
             if (balance > 0m) owed += balance;
         }
 
