@@ -501,6 +501,31 @@ public class ReportGeneratorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task NetWorthOverTime_ExcludesAccountFlaggedExcludeFromReports_ButIncludesArchivedAccountNotSoFlagged()
+    {
+        // Real bug, 2026-09-28: this generator filtered accounts by IsActive while
+        // ReportService/NetWorthGenerator/DashboardApiController all filter by
+        // !ExcludeFromReports — an account archived WITHOUT excludeFromReports (the
+        // TryDeactivateAsync default) disappeared from this report while still
+        // showing on the dashboard's Net Worth card, disagreeing with it.
+        var includedId = await CreateAssetAccountAsync(currencyId: 1);
+        var excludedId = await CreateAssetAccountAsync(currencyId: 1);
+
+        AddTransaction(includedId, SalaryCategoryId, 1000m, new DateOnly(2026, 1, 1));
+        AddTransaction(excludedId, SalaryCategoryId, 5000m, new DateOnly(2026, 1, 1));
+        await _fixture.Db.SaveChangesAsync();
+
+        (await _accountService.TryDeactivateAsync(includedId, excludeFromReports: false)).IsSuccess.Should().BeTrue();
+        (await _accountService.TryDeactivateAsync(excludedId, excludeFromReports: true)).IsSuccess.Should().BeTrue();
+
+        var generator = new NetWorthOverTimeReportGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var result    = (List<NetWorthSnapshotRow>)await generator.GenerateAsync(
+            new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 1, 31)));
+
+        result.Single().Assets.Should().Be(1000m, "an archived-but-not-excluded account must still appear, matching the dashboard/saved-report/trend-chart filter");
+    }
+
+    [Fact]
     public async Task NetWorthOverTime_FiltersByCurrency()
     {
         var eurAccountId = await CreateAssetAccountAsync(currencyId: 1);
@@ -575,5 +600,27 @@ public class ReportGeneratorTests : IAsyncLifetime
         var eur = result.First(e => e.CurrencyCode == "EUR");
         eur.Assets.Should().Be(1000m - 608.03m);
         eur.Liabilities.Should().Be(608.03m, "the transferred-in amount is the liability's ENTIRE balance — it must not be zero");
+    }
+
+    [Fact]
+    public async Task NetWorth_ExcludesAccountFlaggedExcludeFromReports_ButIncludesArchivedAccountNotSoFlagged()
+    {
+        // Real bug, 2026-09-28: this generator's account filter changed from
+        // IsActive to !ExcludeFromReports in the same patch that fixed the Transfer
+        // gap, to match ReportService/DashboardApiController — but the filter change
+        // itself shipped with no test pinning it, so a future revert to IsActive
+        // would pass every existing test green.
+        var includedId = await CreateAssetAccountAsync(currencyId: 1, openingBalance: 1000m);
+        var excludedId = await CreateAssetAccountAsync(currencyId: 1, openingBalance: 5000m);
+        await _fixture.Db.SaveChangesAsync();
+
+        (await _accountService.TryDeactivateAsync(includedId, excludeFromReports: false)).IsSuccess.Should().BeTrue();
+        (await _accountService.TryDeactivateAsync(excludedId, excludeFromReports: true)).IsSuccess.Should().BeTrue();
+
+        var generator = new NetWorthGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var result    = (List<NetWorthEntry>)await generator.GenerateAsync(new ReportParameters());
+
+        var eur = result.First(e => e.CurrencyCode == "EUR");
+        eur.Assets.Should().Be(1000m, "an archived-but-not-excluded account must still appear, matching the other three net-worth implementations");
     }
 }

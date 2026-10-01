@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,7 @@ type State = { kind: 'idle' | 'confirming' | 'pending' };
  * network — the button stays disabled until the input matches exactly.
  */
 export function ErasureDialog() {
+  const { t } = useTranslation();
   const { requireStepUp } = useStepUp();
   const [state, setState] = useState<State>({ kind: 'idle' });
   const [confirmText, setConfirmText] = useState('');
@@ -62,16 +64,13 @@ export function ErasureDialog() {
     try {
       const result = await requireStepUp(() => requestErasure());
       if (result.ok) {
-        toast.success(
-          result.data?.message ??
-            'Erasure scheduled. Check your email for a link to cancel within 72 hours.',
-        );
+        toast.success(result.data?.message ?? t('account.erasure.scheduledDefault'));
         setPending(true);
         reset();
         return;
       }
       if (result.status === 429) {
-        toast.error('You can only request this once per day. Check your email for the link.');
+        toast.error(t('account.erasure.errorRateLimited'));
         setState({ kind: 'confirming' });
         return;
       }
@@ -79,18 +78,18 @@ export function ErasureDialog() {
         // The confirm gate got out of sync with the server's own check (e.g. a
         // stale build) — say so specifically rather than a generic failure
         // message, since a true server error (5xx) deserves different copy.
-        toast.error("Something's out of sync — please refresh the page and try again.");
+        toast.error(t('account.erasure.errorOutOfSync'));
         setState({ kind: 'confirming' });
         return;
       }
-      toast.error('Could not schedule erasure. Please try again.');
+      toast.error(t('account.erasure.errorGeneric'));
       setState({ kind: 'confirming' });
     } catch (err) {
       if (err instanceof ReauthCancelledError) {
         setState({ kind: 'confirming' });
         return;
       }
-      toast.error('Could not reach the server. Please try again.');
+      toast.error(t('account.erasure.errorNetwork'));
       setState({ kind: 'confirming' });
     }
   };
@@ -104,8 +103,7 @@ export function ErasureDialog() {
           role="status"
           className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground"
         >
-          Account erasure is scheduled. Check your email for a link if you want to cancel
-          within the next 72 hours.
+          {t('account.erasure.pendingBanner')}
         </div>
       )}
       <AlertDialog
@@ -118,26 +116,22 @@ export function ErasureDialog() {
         <AlertDialogTrigger
           render={
             <Button type="button" variant="destructive">
-              Erase my account
+              {t('account.erasure.trigger')}
             </Button>
           }
         />
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Erase your account permanently</AlertDialogTitle>
-            <AlertDialogDescription>
-              This seals your account immediately and emails you a link to cancel within 72
-              hours. After that window, everything — accounts, transactions, categories,
-              budgets, and attachments — is permanently deleted and cannot be recovered.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('account.erasure.dialogTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('account.erasure.dialogDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="px-4 pb-2">
             <Field
-              label={`Type "${CONFIRM_PHRASE}" to confirm`}
+              label={t('account.erasure.confirmLabel', { phrase: CONFIRM_PHRASE })}
               htmlFor="erasure-confirm"
               error={
                 confirmText.length > 0 && !matches
-                  ? 'Must match exactly, including capital letters — this stays in English regardless of your language setting.'
+                  ? t('account.erasure.confirmMismatch')
                   : undefined
               }
             >
@@ -161,13 +155,13 @@ export function ErasureDialog() {
                 the visually easier target for a rushed or emotional click,
                 not the irreversible one. Confirm stays default-sized; its
                 own friction comes from the typed gate + enable delay above. */}
-            <AlertDialogCancel size="lg">Cancel</AlertDialogCancel>
+            <AlertDialogCancel size="lg">{t('account.erasure.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={() => void onConfirm()}
               disabled={!canConfirm}
             >
-              {state.kind === 'pending' ? 'Scheduling…' : 'Erase my account'}
+              {state.kind === 'pending' ? t('account.erasure.confirmPending') : t('account.erasure.trigger')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

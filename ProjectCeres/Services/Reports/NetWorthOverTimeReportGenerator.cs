@@ -28,7 +28,7 @@ public class NetWorthOverTimeReportGenerator(AppDbContext db, ICurrentUserAccess
         // We need all history (not just within range) to compute cumulative balances.
         var accounts = await db.Accounts
             .Owned(user)
-            .Where(a => a.CurrencyId == currencyId && a.IsActive)
+            .Where(a => a.CurrencyId == currencyId && !a.ExcludeFromReports)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
                 .ThenInclude(t => t.Category)

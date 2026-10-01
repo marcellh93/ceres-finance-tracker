@@ -3,13 +3,33 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Data;
+using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration;
 
 [Collection("IntegrationParallel4")]
 public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
-    : IntegrationTestBase<Bucket4Factory>(factory, bucketDb)
+    : IntegrationTestBase<Bucket4Factory>(factory, bucketDb), IAsyncLifetime
 {
+    private readonly List<Guid> _seededAccountIds = [];
+    private readonly List<Guid> _seededTransferIds = [];
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (_seededTransferIds.Count > 0)
+            await db.Transfers.Where(t => _seededTransferIds.Contains(t.Id)).ExecuteDeleteAsync();
+
+        if (_seededAccountIds.Count > 0)
+            await db.Accounts.Where(a => _seededAccountIds.Contains(a.Id)).ExecuteDeleteAsync();
+    }
 
     [Fact]
     public async Task GetCategoryBudgets_Returns200_WithExpectedShape()
@@ -79,6 +99,52 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
             item.TryGetProperty("liabilities", out _).Should().BeTrue();
             item.TryGetProperty("netWorth", out _).Should().BeTrue();
         }
+    }
+
+    [Fact]
+    public async Task GetNetWorthTrend_IncludesLiabilityBalanceFundedEntirelyByATransfer()
+    {
+        // Real bug, 2026-09-28: identical gap to ReportService/NetWorthGenerator/
+        // NetWorthOverTimeReportGenerator — this was the 4th of 4 duplicated net-worth
+        // implementations, and the one the user actually hit: a liability account
+        // funded entirely by a Transfer (never a Transaction) contributed zero to
+        // this month's Liabilities figure on the dashboard's trend chart.
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var asset = new Account { Id = Guid.NewGuid(), Name = $"NwTrend-Asset-{Guid.NewGuid():N}", AccountTypeId = 1, CurrencyId = 1, IsActive = true };
+            var liability = new Account { Id = Guid.NewGuid(), Name = $"NwTrend-Liab-{Guid.NewGuid():N}", AccountTypeId = 2, CurrencyId = 1, IsActive = true };
+            db.Accounts.AddRange(asset, liability);
+            await db.SaveChangesAsync();
+            _seededAccountIds.AddRange([asset.Id, liability.Id]);
+
+            var transfer = new Transfer
+            {
+                Id = Guid.NewGuid(),
+                Date = DateOnly.FromDateTime(DateTime.Today),
+                Amount = 608.03m,
+                SourceAccountId = asset.Id,
+                DestAccountId = liability.Id,
+                IsCleared = true,
+                CreatedAt = DateTime.UtcNow,
+            };
+            db.Transfers.Add(transfer);
+            await db.SaveChangesAsync();
+            _seededTransferIds.Add(transfer.Id);
+        }
+
+        var response = await Client.GetAsync("/api/dashboard/net-worth-trend");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var currentMonth = DateTime.Today.ToString("yyyy-MM");
+        var point = body.GetProperty("points").EnumerateArray()
+            .FirstOrDefault(p => p.GetProperty("month").GetString() == currentMonth);
+
+        point.ValueKind.Should().NotBe(JsonValueKind.Undefined, "the current month must be in the 12-month window");
+        point.GetProperty("liabilities").GetDecimal().Should().Be(608.03m,
+            "the transferred-in amount is the liability's ENTIRE balance — it must not be zero");
     }
 
     [Fact]

@@ -1,7 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
+import { I18nextProvider } from 'react-i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import i18n from '../../i18n/i18n';
 import { ErasureDialog } from './ErasureDialog';
+
+function renderDialog() {
+  return render(
+    <I18nextProvider i18n={i18n}>
+      <ErasureDialog />
+    </I18nextProvider>,
+  );
+}
 
 const { toastError, toastSuccess } = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -46,7 +56,7 @@ describe('ErasureDialog', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('opens on trigger click with the confirm action disabled', async () => {
-    render(<ErasureDialog />);
+    renderDialog();
 
     await openDialog();
 
@@ -56,7 +66,7 @@ describe('ErasureDialog', () => {
 
   it('keeps the confirm action disabled for anything other than the exact phrase', async () => {
     const user = userEvent.setup();
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     const input = screen.getByLabelText(/type "erase" to confirm/i);
@@ -71,7 +81,7 @@ describe('ErasureDialog', () => {
 
   it('shows a case-sensitivity hint once text is typed but does not yet match', async () => {
     const user = userEvent.setup();
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await user.type(screen.getByLabelText(/type "erase" to confirm/i), 'erase');
@@ -81,7 +91,7 @@ describe('ErasureDialog', () => {
 
   it('associates the mismatch hint with the input via aria-describedby, and marks it aria-invalid', async () => {
     const user = userEvent.setup();
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     const input = screen.getByLabelText(/type "erase" to confirm/i);
@@ -96,7 +106,7 @@ describe('ErasureDialog', () => {
 
   it('does not enable the confirm action immediately on a matching keystroke — a deliberate beat is required', async () => {
     const user = userEvent.setup();
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await user.type(screen.getByLabelText(/type "erase" to confirm/i), 'ERASE');
@@ -108,7 +118,7 @@ describe('ErasureDialog', () => {
   it('enables the confirm action after the beat, then requests erasure', async () => {
     const user = userEvent.setup();
     requestErasure.mockResolvedValue({ ok: true, status: 202, data: { message: 'Erasure scheduled.' } });
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -122,7 +132,7 @@ describe('ErasureDialog', () => {
   it('shows a persistent pending banner after a successful request', async () => {
     const user = userEvent.setup();
     requestErasure.mockResolvedValue({ ok: true, status: 202, data: { message: 'Erasure scheduled.' } });
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -134,7 +144,7 @@ describe('ErasureDialog', () => {
   it('closes and clears the typed text after a successful request', async () => {
     const user = userEvent.setup();
     requestErasure.mockResolvedValue({ ok: true, status: 202, data: { message: 'Erasure scheduled.' } });
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -149,7 +159,7 @@ describe('ErasureDialog', () => {
   it('shows the daily-limit toast on 429 and keeps the dialog open', async () => {
     const user = userEvent.setup();
     requestErasure.mockResolvedValue({ ok: false, status: 429, code: 'RATE_LIMITED', message: '' });
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -163,7 +173,7 @@ describe('ErasureDialog', () => {
   it('distinguishes a 422 confirm-gate desync from a generic failure', async () => {
     const user = userEvent.setup();
     requestErasure.mockResolvedValue({ ok: false, status: 422, code: 'VALIDATION_ERROR', message: '' });
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -178,7 +188,7 @@ describe('ErasureDialog', () => {
     // the page" would mislead the user about what actually failed.
     const user = userEvent.setup();
     requestErasure.mockResolvedValue({ ok: false, status: 500, code: 'ERROR', message: '' });
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -192,7 +202,7 @@ describe('ErasureDialog', () => {
     const user = userEvent.setup();
     const { ReauthCancelledError } = await import('../../auth/use-step-up');
     requireStepUp.mockRejectedValueOnce(new ReauthCancelledError());
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await typePhraseAndWaitForEnable(user);
@@ -206,7 +216,7 @@ describe('ErasureDialog', () => {
 
   it('resets the typed confirmation text when the dialog is cancelled', async () => {
     const user = userEvent.setup();
-    render(<ErasureDialog />);
+    renderDialog();
     await openDialog();
 
     await user.type(screen.getByLabelText(/type "erase" to confirm/i), 'ERASE');

@@ -184,7 +184,7 @@
       "cancelledBody": "Your account is no longer scheduled for erasure. Nothing was deleted, and you can sign in as usual.",
       "signInLink": "Go to sign in",
       "goneTitle": "This link has already been used",
-      "goneBody": "Your erasure request was already cancelled, or has already been completed. If your account was erased, this link cannot bring it back — you're welcome to register a new account with the same email address at any time.",
+      "goneBody": "Your erasure request was already cancelled, or has already been completed. If your account was erased, this link cannot bring it back — you can register a new account with the same email address 30 days after the erasure completed.",
       "invalidTitle": "This cancellation link is invalid",
       "invalidBody": "The link may be incomplete, or it may not match an erasure request we have on file. If you're trying to cancel account erasure, check the email again for the exact link."
     }
@@ -305,6 +305,23 @@
         "invalidEmail": "Enter a valid email address.",
         "network": "Couldn't reach the server. Try again."
       }
+    }
+  },
+  "account": {
+    "erasure": {
+      "trigger": "Erase my account",
+      "dialogTitle": "Erase your account permanently",
+      "dialogDescription": "This seals your account immediately and emails you a link to cancel within 72 hours. After that window, everything — accounts, transactions, categories, budgets, and attachments — is permanently deleted and cannot be recovered.",
+      "confirmLabel": "Type \"{{phrase}}\" to confirm",
+      "confirmMismatch": "Must match exactly, including capital letters — this stays in English regardless of your language setting.",
+      "cancel": "Cancel",
+      "confirmPending": "Scheduling…",
+      "scheduledDefault": "Erasure scheduled. Check your email for a link to cancel within 72 hours.",
+      "pendingBanner": "Account erasure is scheduled. Check your email for a link if you want to cancel within the next 72 hours.",
+      "errorRateLimited": "You can only request this once per day. Check your email for the link.",
+      "errorOutOfSync": "Something's out of sync — please refresh the page and try again.",
+      "errorGeneric": "Could not schedule erasure. Please try again.",
+      "errorNetwork": "Could not reach the server. Please try again."
     }
   },
   "dashboard": {

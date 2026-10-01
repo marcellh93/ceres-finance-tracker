@@ -184,7 +184,7 @@
       "cancelledBody": "Tu cuenta ya no está programada para el borrado. No se ha eliminado nada y puedes iniciar sesión con normalidad.",
       "signInLink": "Ir a iniciar sesión",
       "goneTitle": "Este enlace ya se ha utilizado",
-      "goneBody": "Tu solicitud de borrado ya se canceló, o ya se completó. Si tu cuenta fue borrada, este enlace no puede recuperarla — puedes registrar una cuenta nueva con el mismo correo electrónico cuando quieras.",
+      "goneBody": "Tu solicitud de borrado ya se canceló, o ya se completó. Si tu cuenta fue borrada, este enlace no puede recuperarla — puedes registrar una cuenta nueva con el mismo correo electrónico 30 días después de que se completó el borrado.",
       "invalidTitle": "Este enlace de cancelación no es válido",
       "invalidBody": "El enlace puede estar incompleto, o puede que no coincida con ninguna solicitud de borrado que tengamos registrada. Si intentas cancelar el borrado de tu cuenta, revisa el correo de nuevo para el enlace exacto."
     }
@@ -305,6 +305,23 @@
         "invalidEmail": "Introduce una dirección de correo válida.",
         "network": "No se pudo contactar con el servidor. Inténtalo de nuevo."
       }
+    }
+  },
+  "account": {
+    "erasure": {
+      "trigger": "Borrar mi cuenta",
+      "dialogTitle": "Borrar tu cuenta de forma permanente",
+      "dialogDescription": "Esto sella tu cuenta de inmediato y te envía por correo un enlace para cancelar en un plazo de 72 horas. Pasado ese plazo, todo — cuentas, transacciones, categorías, presupuestos y archivos adjuntos — se elimina de forma permanente y no se puede recuperar.",
+      "confirmLabel": "Escribe \"{{phrase}}\" para confirmar",
+      "confirmMismatch": "Debe coincidir exactamente, incluidas las mayúsculas — esto se mantiene en inglés sin importar tu idioma.",
+      "cancel": "Cancelar",
+      "confirmPending": "Programando…",
+      "scheduledDefault": "Borrado programado. Revisa tu correo para ver el enlace de cancelación, válido durante 72 horas.",
+      "pendingBanner": "El borrado de la cuenta está programado. Revisa tu correo si quieres cancelarlo en las próximas 72 horas.",
+      "errorRateLimited": "Solo puedes solicitar esto una vez al día. Revisa tu correo para ver el enlace.",
+      "errorOutOfSync": "Algo se desincronizó — actualiza la página e inténtalo de nuevo.",
+      "errorGeneric": "No se pudo programar el borrado. Inténtalo de nuevo.",
+      "errorNetwork": "No se pudo contactar con el servidor. Inténtalo de nuevo."
     }
   },
   "dashboard": {
