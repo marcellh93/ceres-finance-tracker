@@ -2,9 +2,11 @@
 
 > **Diataxis type:** Explanation — architectural decision record.
 
-**Status:** Accepted — 2026-08-10; re-pinned 2026-09-10 (Stage 12.16); `postcss-selector-parser` added 2026-09-12 (Dependabot #68). Fifteen overrides live in `ProjectCeres.Client/package.json`, two in `ProjectCeres/package.json`.
+**Status:** Accepted — 2026-08-10; re-pinned 2026-09-10 (Stage 12.16); `postcss-selector-parser` added 2026-09-12 (Dependabot #68); re-pinned 2026-10-01. Fifteen overrides live in `ProjectCeres.Client/package.json`, two in `ProjectCeres/package.json`.
 
 > **Update 2026-09-10 (Stage 12.16).** A fresh advisory wave (16 alerts, 7 high) outran several existing pins and added new transitive targets. Re-pinned to the newest in-range patched floor (condition 3 re-verified against each parent's registry manifest): `fast-uri` `^3.1.5→^3.1.7`, `js-yaml` `^4.3.1→^4.3.2`, `qs` `^6.15.2→^6.16.0`, `hono` `^4.12.34→^4.13.7`. Added three new overrides — `@hono/node-server` `^1.19.17`, `browserslist` `^4.28.9`, `postcss-selector-parser` `^7.1.6` — and bumped the direct devDependency `vitest` `^4.1.6→^4.1.11` (which also cleared its transitive `@vitest/mocker`). `@hono/node-server` is no longer *left open*: this wave's advisory is fixed in the **1.x** line (`>=1.19.15`, inside the SDK's `^1.19.9` range), unlike the earlier one that needed a 2.x major. Result: **`pnpm audit` fully clean (0 at every severity)**. All four required commands below pass (lint's 5 pre-existing `setState-in-effect` errors are unrelated and tracked separately).
+
+> **Update 2026-10-01.** Dependabot alert #81 (`ip-address` GHSA-2vr4-cq9g-pvrc, moderate — an SSRF-classifier gap in the NAT64 local-use range, CWE-918) landed against the then-current `^10.3.1` pin. Re-pinned to `^10.5.1` (resolves 10.7.2, inside `express-rate-limit`'s declared `^10.2.0` — condition 3). Running `pnpm audit` to verify the fix surfaced three more pins that had drifted below their newest patched floor since the 2026-09-10 wave — none newly introduced, all pre-existing drift: `undici` `^7.29.0→^7.29.1` (10 advisories: WebSocket DoS, TLS-validation bypass via BalancedPool, cross-user cookie disclosure, response splitting/truncation, unsafe-method-response caching — all inside jsdom's `^7.25.0`), `fast-uri` `^3.1.7→^3.1.8` (host-case-normalization bypass, inside ajv's `^3.0.1`), `brace-expansion` `^5.0.7→^5.0.12` (3 stack-exhaustion DoS advisories, inside minimatch's `^5.0.8`). All four re-pinned in the same commit as the `ip-address` fix. Result: **`pnpm audit` fully clean (0 at every severity)**. All four required commands below pass.
 
 **Phase:** Phase 3 (Hosted Beta) — post-publication hardening, after the repository went public 2026-08-09.
 
@@ -45,12 +47,12 @@ If an override would violate condition 3, it is not an override — it is an unv
 | Override | Pinned | Resolves to | Cleared | Reached the tree via |
 | --- | --- | --- | --- | --- |
 | `hono` | `^4.13.7` | 4.13.7 | 16 | shadcn → @modelcontextprotocol/sdk |
-| `undici` | `^7.29.0` | 7.29.0 | 12 | jsdom (test DOM environment) |
+| `undici` | `^7.29.1` | 7.29.1+ | 12 | jsdom (test DOM environment) |
 | `postcss` | `^8.5.23` | 8.5.26 | 4 | shadcn; vite |
-| `brace-expansion` | `^5.0.7` | 5.0.9 | 3 | eslint → minimatch |
-| `ip-address` | `^10.3.1` | 10.4.0 | 3 | shadcn → @modelcontextprotocol/sdk → express-rate-limit |
+| `brace-expansion` | `^5.0.12` | 5.0.12+ | 3 | eslint → minimatch |
+| `ip-address` | `^10.5.1` | 10.7.2 | 3 | shadcn → @modelcontextprotocol/sdk → express-rate-limit |
 | `js-yaml` | `^4.3.2` | 4.3.2 | 3 | shadcn → cosmiconfig |
-| `fast-uri` | `^3.1.7` | 3.1.7 | 3 | shadcn → @modelcontextprotocol/sdk → ajv |
+| `fast-uri` | `^3.1.8` | 3.1.8+ | 3 | shadcn → @modelcontextprotocol/sdk → ajv |
 | `nanoid` | `^3.3.18` | 3.3.18 | 2 | postcss (under both shadcn and vite) |
 | `qs` | `^6.16.0` | 6.16.0 | 1 | shadcn → @modelcontextprotocol/sdk → express |
 | `body-parser` | `^2.3.0` | 2.3.0 | 1 | shadcn → @modelcontextprotocol/sdk → express |
