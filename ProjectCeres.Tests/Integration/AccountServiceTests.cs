@@ -135,4 +135,32 @@ public class AccountServiceTests : IAsyncLifetime
     {
         (await _service.GetBalanceAsync(Guid.NewGuid())).Should().Be(0m);
     }
+
+    // -------------------------------------------------------------------------
+    // GetLedgerAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetLedgerAsync_ComputesRunningBalanceAcrossTransactionsTransfersAndPayments()
+    {
+        var assetId = await CreateAssetAccountAsync();
+        var liabilityId = await CreateLiabilityAccountAsync();
+        AddTransaction(assetId, SalaryCategoryId, 1000m);
+        AddTransfer(assetId, liabilityId, 300m);
+        AddLiabilityPayment(assetId, liabilityId, 50m);
+        await _fixture.Db.SaveChangesAsync();
+
+        var ledger = await _service.GetLedgerAsync(assetId);
+
+        ledger.Should().NotBeNull();
+        ledger!.Entries.Should().HaveCount(3);
+        ledger.Entries.Sum(e => e.SignedAmount).Should().Be(1000m - 300m - 50m);
+        ledger.Entries.OrderBy(e => e.CreatedAt).Last().RunningBalance.Should().Be(1000m - 300m - 50m);
+    }
+
+    [Fact]
+    public async Task GetLedgerAsync_UnknownAccountId_ReturnsNull()
+    {
+        (await _service.GetLedgerAsync(Guid.NewGuid())).Should().BeNull();
+    }
 }
