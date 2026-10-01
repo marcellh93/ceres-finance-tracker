@@ -478,6 +478,67 @@ public class DashboardServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetHealthSnapshotAsync_Runway_IncludesLiabilityBalanceFundedEntirelyByATransfer()
+    {
+        // Real bug, 2026-09-28 (fixed here 2026-10-01): identical gap to
+        // ReportService.GetNetWorthAsync and friends — GetRunwayAsync summed only
+        // Transactions and LiabilityPayments into totalAssets/totalLiabilities, never
+        // Transfers, so a liability account funded entirely by a Transfer (never a
+        // Transaction) contributed zero to the net-worth figure runway divides by.
+        // 6 months of expenses so avgMonthlyExpense is non-null (required for a runway).
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        for (var i = 1; i <= 6; i++)
+        {
+            var pastDate = new DateOnly(today.Year, today.Month, 1).AddMonths(-i);
+            _fixture.Db.Transactions.Add(new Transaction
+            {
+                Id         = Guid.NewGuid(),
+                Date       = pastDate,
+                Amount     = 100m,
+                AccountId  = _accountId,
+                CategoryId = HousingCategoryId,
+                CreatedAt  = DateTime.UtcNow
+            });
+        }
+        await _fixture.Db.SaveChangesAsync();
+
+        var before = await _service.GetHealthSnapshotAsync();
+
+        var liabilityAccount = new Account
+        {
+            Id            = Guid.NewGuid(),
+            Name          = $"Transfer-Funded Liability {Guid.NewGuid():N}",
+            AccountTypeId = 2,
+            CurrencyId    = 1,
+            IsActive      = true
+        };
+        _fixture.Db.Accounts.Add(liabilityAccount);
+        _fixture.Db.Transfers.Add(new Transfer
+        {
+            Id              = Guid.NewGuid(),
+            Date            = today,
+            Amount          = 608.03m,
+            SourceAccountId = _accountId,
+            DestAccountId   = liabilityAccount.Id,
+            CreatedAt       = DateTime.UtcNow
+        });
+        await _fixture.Db.SaveChangesAsync();
+
+        var after = await _service.GetHealthSnapshotAsync();
+
+        // The transfer nets to zero on the asset side (608.03 out of _accountId) but
+        // the liability's ENTIRE balance (608.03) must still show up — net worth
+        // (and therefore runway) must drop by exactly the liability's balance, not
+        // stay unchanged as it would if the Transfer were silently dropped.
+        before.RunwayMonths.Should().NotBeNull();
+        after.RunwayMonths.Should().NotBeNull();
+        var avgMonthlyExpense = before.AvgMonthlyExpense!.Value;
+        (before.RunwayMonths!.Value - after.RunwayMonths!.Value).Should().Be(
+            608.03m * 2 / avgMonthlyExpense,
+            "net worth must drop by 608.03 (lost asset cash) + 608.03 (new liability), not by 608.03 alone or zero");
+    }
+
+    [Fact]
     public async Task GetHealthSnapshotAsync_Runway_ReturnsNull_WhenNoExpensesInLast6Months()
     {
         // No past-month expense transactions seeded

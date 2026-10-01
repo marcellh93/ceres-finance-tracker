@@ -353,10 +353,12 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         var sixStart = new DateOnly(today.Year, today.Month, 1).AddMonths(-6);
         var sixEnd   = new DateOnly(today.Year, today.Month, 1).AddDays(-1); // last day of month -1
 
-        // Load all active accounts for this currency with transactions and category types.
+        // Load accounts for this currency with transactions and category types.
+        // Filter matches GetNetWorthAsync/NetWorthGenerator/NetWorthOverTimeReportGenerator:
+        // archived accounts still count toward net worth unless explicitly excluded.
         var accounts = await db.Accounts
             .Owned(user)
-            .Where(a => a.IsActive && a.CurrencyId == currencyId)
+            .Where(a => !a.ExcludeFromReports && a.CurrencyId == currencyId)
             .Include(a => a.AccountType)
             .Include(a => a.Transactions)
                 .ThenInclude(t => t.Category)
@@ -375,6 +377,21 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         var paymentsByLiability = liabilityPayments.GroupBy(p => p.LiabilityAccountId)
                                                     .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
 
+        // A Transfer moves money between two of the user's own accounts and never
+        // touches Transactions — an account funded entirely by a transfer would
+        // otherwise contribute nothing here, matching AccountService.GetBalanceAsync's
+        // own transfersIn/transfersOut terms.
+        var transfers = await db.Transfers
+            .Owned(user)
+            .AsNoTracking()
+            .Where(t => accountIds.Contains(t.SourceAccountId) || accountIds.Contains(t.DestAccountId))
+            .ToListAsync();
+
+        var transfersOutByAccount = transfers.GroupBy(t => t.SourceAccountId)
+                                              .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+        var transfersInByAccount  = transfers.GroupBy(t => t.DestAccountId)
+                                              .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
+
         decimal totalAssets      = 0m;
         decimal totalLiabilities = 0m;
 
@@ -392,6 +409,9 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
 
             balance -= paymentsByAsset.GetValueOrDefault(account.Id);
             balance -= paymentsByLiability.GetValueOrDefault(account.Id);
+
+            balance += transfersInByAccount.GetValueOrDefault(account.Id);
+            balance -= transfersOutByAccount.GetValueOrDefault(account.Id);
 
             if (!isLiability)
                 totalAssets += balance;
