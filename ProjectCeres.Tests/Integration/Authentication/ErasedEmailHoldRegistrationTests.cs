@@ -30,12 +30,33 @@ public class ErasedEmailHoldRegistrationTests : IntegrationTestBase<Bucket3AuthF
 
     public Task InitializeAsync() => Task.CompletedTask;
 
+    // This file's tests seed ErasedEmailHolds against fixed, hardcoded emails (not
+    // per-test-unique ones), so EmailFingerprint is identical every run. Cleaning up
+    // only by _holderUserId (a fresh Guid per test INSTANCE) leaves an orphaned row
+    // whenever a run is interrupted before DisposeAsync executes — that row's fixed
+    // fingerprint then collides with the next run's INSERT (unique constraint
+    // IX_ErasedEmailHolds_EmailFingerprint), failing a test this file never touched.
+    // Sweeping by fingerprint instead (every email ANY test in this file seeds) means
+    // a crashed run self-heals on the next run, regardless of which test crashed.
+    private static readonly string[] SeededEmails =
+    [
+        "held@erased-hold-test.local",
+        "expired-held@erased-hold-test.local",
+        "held-shape@erased-hold-test.local",
+    ];
+
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();
         var admin = scope.ServiceProvider.GetRequiredService<AdminDbContext>();
+        var hasher = scope.ServiceProvider.GetRequiredService<TokenLookupHasher>();
+        var normalizer = scope.ServiceProvider.GetRequiredService<ILookupNormalizer>();
+
+        var fingerprints = SeededEmails
+            .Select(email => hasher.ComputeLookup(normalizer.NormalizeEmail(email) ?? email))
+            .ToArray();
         await admin.ErasedEmailHolds.IgnoreQueryFilters()
-            .Where(h => h.UserId == _holderUserId)
+            .Where(h => fingerprints.Contains(h.EmailFingerprint))
             .ExecuteDeleteAsync();
 
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
