@@ -172,6 +172,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
                      && a.CurrencyId == currencyId
                      && a.AccountType.Name == "Asset"
                      && !a.ExcludeFromSpendable)
+            .Include(a => a.AccountType)
             .Include(a => a.Transactions)
                 .ThenInclude(t => t.Category)
                     .ThenInclude(c => c.CategoryType)
@@ -180,38 +181,32 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         if (accounts.Count == 0)
             return (null, null, null, null, null);
 
-        // Derive liquid balance per account (same sign logic as AccountService).
-        decimal liquid = 0m;
-        foreach (var account in accounts)
-        {
-            liquid += account.Transactions.Sum(t =>
-            {
-                if (t.Category.IsSystem) return t.Amount;
-                bool isIncome = t.Category.CategoryType.Name == "Income";
-                return isIncome ? t.Amount : -t.Amount;
-            });
-        }
-
-        // Subtract liability payments that source from these asset accounts.
+        // These accounts are all Asset accounts (filtered above), so isLiability is
+        // always false here — ComputeBalance's liability-leg handling is a no-op for
+        // every row in this loop, which matches this method's pre-existing behavior of
+        // only subtracting LiabilityPayments on the ASSET side (never crediting the
+        // liability side back into "liquid cash").
         var accountIds = accounts.Select(a => a.Id).ToHashSet();
+
         var liabilityPayments = await db.LiabilityPayments
             .Owned(user)
             .AsNoTracking()
             .Where(p => accountIds.Contains(p.AssetAccountId))
             .ToListAsync();
-        liquid -= liabilityPayments.Sum(p => p.Amount);
 
-        // Include transfers (cross-boundary transfers must be counted to match displayed balances).
-        var transfersIn = await db.Transfers
+        var transfers = await db.Transfers
             .Owned(user)
-            .Where(t => accountIds.Contains(t.DestAccountId))
-            .SumAsync(t => (decimal?)t.Amount) ?? 0m;
-        var transfersOut = await db.Transfers
-            .Owned(user)
-            .Where(t => accountIds.Contains(t.SourceAccountId))
-            .SumAsync(t => (decimal?)t.Amount) ?? 0m;
-        liquid += transfersIn;
-        liquid -= transfersOut;
+            .AsNoTracking()
+            .Where(t => accountIds.Contains(t.SourceAccountId) || accountIds.Contains(t.DestAccountId))
+            .ToListAsync();
+
+        decimal liquid = 0m;
+        foreach (var account in accounts)
+        {
+            var accountTransfers = transfers.Where(t => t.SourceAccountId == account.Id || t.DestAccountId == account.Id);
+            var accountPayments  = liabilityPayments.Where(p => p.AssetAccountId == account.Id);
+            liquid += AccountBalanceCalculator.ComputeBalance(account, account.Transactions, accountTransfers, accountPayments);
+        }
 
         // Imminent: due between start of this month (catches overdue) and today+7, inclusive.
         // The +7 window intentionally crosses calendar month boundaries so a bill due May 1
