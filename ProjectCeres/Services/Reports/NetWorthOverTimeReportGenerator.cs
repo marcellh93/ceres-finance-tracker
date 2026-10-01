@@ -71,42 +71,16 @@ public class NetWorthOverTimeReportGenerator(AppDbContext db, ICurrentUserAccess
             decimal liabilities = 0;
 
             var paymentsUpToMonth = liabilityPayments.Where(p => p.Date <= snapshotEnd).ToList();
-            var paymentsByAsset = paymentsUpToMonth
-                .GroupBy(p => p.AssetAccountId)
-                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-            var paymentsByLiability = paymentsUpToMonth
-                .GroupBy(p => p.LiabilityAccountId)
-                .ToDictionary(g => g.Key, g => g.Sum(p => p.Amount));
-
             var transfersUpToMonth = transfers.Where(t => t.Date <= snapshotEnd).ToList();
-            var transfersOutByAccount = transfersUpToMonth
-                .GroupBy(t => t.SourceAccountId)
-                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
-            var transfersInByAccount = transfersUpToMonth
-                .GroupBy(t => t.DestAccountId)
-                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
 
             foreach (var account in accounts)
             {
-                bool isLiability = account.AccountType.Name == "Liability";
+                var transactionsUpToMonth = account.Transactions.Where(t => t.Date <= snapshotEnd);
+                var accountTransfers = transfersUpToMonth.Where(t => t.SourceAccountId == account.Id || t.DestAccountId == account.Id);
+                var accountPayments  = paymentsUpToMonth.Where(p => p.AssetAccountId == account.Id || p.LiabilityAccountId == account.Id);
+                var balance = AccountBalanceCalculator.ComputeBalance(account, transactionsUpToMonth, accountTransfers, accountPayments);
 
-                var balance = account.Transactions
-                    .Where(t => t.Date <= snapshotEnd)
-                    .Sum(t =>
-                    {
-                        if (t.Category.IsSystem) return t.Amount;
-                        bool isIncome = t.Category.CategoryType.Name == "Income";
-                        bool addsToBalance = isLiability ? !isIncome : isIncome;
-                        return addsToBalance ? t.Amount : -t.Amount;
-                    });
-
-                balance -= paymentsByAsset.GetValueOrDefault(account.Id);
-                balance -= paymentsByLiability.GetValueOrDefault(account.Id);
-
-                balance += transfersInByAccount.GetValueOrDefault(account.Id);
-                balance -= transfersOutByAccount.GetValueOrDefault(account.Id);
-
-                if (!isLiability)
+                if (account.AccountType.Name != "Liability")
                     assets += balance;
                 else
                     liabilities += balance;
