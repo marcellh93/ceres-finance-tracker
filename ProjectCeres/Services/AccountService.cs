@@ -93,50 +93,17 @@ public class AccountService(AppDbContext db, ICurrentUserAccessor user, TimeProv
                 .ThenInclude(c => c.CategoryType)
             .ToListAsync();
 
-        bool isLiability = account.AccountType.Name == "Liability";
-
-        // System categories (e.g. Opening Balance) are a neutral starting point — always add.
-        // For regular transactions:
-        //   Assets:      income adds, expense subtracts.
-        //   Liabilities: expense adds (increases what you owe), income subtracts (e.g. refund).
-        decimal balance = transactions.Sum(t =>
-        {
-            if (t.Category.IsSystem) return t.Amount;
-            bool isIncome = t.Category.CategoryType.Name == "Income";
-            bool addsToBalance = isLiability ? !isIncome : isIncome;
-            return addsToBalance ? t.Amount : -t.Amount;
-        });
-
-        // Liability payments reduce the balance on both sides:
-        //   Asset account:     money leaves  → subtract the payment amount
-        //   Liability account: debt reduces  → subtract the payment amount
-        var paymentsOut = await db.LiabilityPayments
+        var transfers = await db.Transfers
             .Owned(user)
-            .Where(p => p.AssetAccountId == id)
-            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+            .Where(t => t.SourceAccountId == id || t.DestAccountId == id)
+            .ToListAsync();
 
-        var paymentsIn = await db.LiabilityPayments
+        var liabilityPayments = await db.LiabilityPayments
             .Owned(user)
-            .Where(p => p.LiabilityAccountId == id)
-            .SumAsync(p => (decimal?)p.Amount) ?? 0;
+            .Where(p => p.AssetAccountId == id || p.LiabilityAccountId == id)
+            .ToListAsync();
 
-        balance -= paymentsOut;
-        balance -= paymentsIn;
-
-        var transfersOut = await db.Transfers
-            .Owned(user)
-            .Where(t => t.SourceAccountId == id)
-            .SumAsync(t => (decimal?)t.Amount) ?? 0;
-
-        var transfersIn = await db.Transfers
-            .Owned(user)
-            .Where(t => t.DestAccountId == id)
-            .SumAsync(t => (decimal?)t.Amount) ?? 0;
-
-        balance += transfersIn;
-        balance -= transfersOut;
-
-        return balance;
+        return AccountBalanceCalculator.ComputeBalance(account, transactions, transfers, liabilityPayments);
     }
 
     public async Task<AccountLedgerViewModel?> GetLedgerAsync(Guid id)
