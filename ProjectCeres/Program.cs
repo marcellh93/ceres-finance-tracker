@@ -21,6 +21,7 @@ using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Services.Reports;
 using Resend;
+using Scrutor;
 using Vite.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -60,6 +61,211 @@ builder.Services.AddControllersWithViews()
 var importAndReviewEnabled = builder.Environment.IsDevelopment()
     || builder.Environment.IsEnvironment("E2E")
     || builder.Environment.IsEnvironment("Testing");
+
+// Stage 13.a — Scrutor assembly scanning. Two rules:
+//   (a) any class implementing at least one interface (declared or inherited,
+//       project-defined or framework) EXCEPT the two named EF-Core-interceptor
+//       exclusions below -> AsImplementedInterfaces()
+//   (b) any class implementing no interface, PLUS the two named exclusions
+//       -> AsSelf()
+// Default lifetime Scoped (spec D4); [RegisterAsSingleton] overrides to Singleton.
+// See docs/superpowers/specs/2026-09-27-stage-13a-scrutor-di-scanning-design.md §3b
+// for why the namespace list below is NOT a single InNamespaces("ProjectCeres.Common")
+// prefix, and why UserOwnershipInterceptor/RowLevelSecurityInterceptor are excluded
+// from rule (a) despite implementing EF-Core interfaces.
+//
+// API-surface deviation from the original plan (confirmed via dotnet build + live
+// reflection against the installed Scrutor 7.0.0 DLL, not assumed): `RegistrationStrategy`
+// lives in the `Scrutor` namespace, which this file didn't previously `using` — added
+// above. `UsingLifetimeFactory` does not exist anywhere on Scrutor 7.0.0's
+// ILifetimeSelector; the only members are the three fixed-lifetime terminals
+// WithSingletonLifetime()/WithScopedLifetime()/WithTransientLifetime() (confirmed via
+// Assembly.LoadFrom + reflection over Scrutor.dll — no overload takes a Func<Type,
+// ServiceLifetime>). Since a single AddClasses(...) batch can only pick one fixed
+// lifetime, [RegisterAsSingleton] is applied as a second `.Where(...)` split instead
+// of a per-type factory: each rule below is two AddClasses blocks (singleton-attributed
+// classes, then everything else) rather than one.
+//
+// Second, third, and fourth deviations found by the Step 6 completeness test, not
+// assumed: Scrutor's default AddClasses() filter does not exclude Exception-derived
+// types, record DTOs, or Attribute subclasses — all three are ordinary concrete,
+// non-abstract, public classes as far as reflection is concerned (confirmed in spec §3b
+// for the ProjectCeres.Common.Exceptions sub-namespace, excluded there only because that
+// sub-namespace isn't in the scanned list at all; it does not help the cases below, which
+// live directly IN a scanned namespace rather than in an excludable sub-namespace):
+//   - ProjectCeres.Services.DuplicateBudgetException: a thrown exception type, not a
+//     service. Its constructor (Guid existingBudgetId, bool existingIsActive) can never
+//     resolve from DI.
+//   - ProjectCeres.Services.DashboardData / HealthSnapshotData (and other record DTOs
+//     found the same way across every scanned namespace, e.g.
+//     ProjectCeres.Common.Authentication.EmailChangeOutcomes,
+//     ProjectCeres.Common.Email.EmailMessage/EmailRecipient,
+//     ProjectCeres.Common.UserOwnedModel/ErasureLanes): positional-record data carriers,
+//     not services. Their constructors take domain data, not injectable dependencies.
+//   - ProjectCeres.Common.PreAuthCallSiteAttribute / RegisterAsSingletonAttribute,
+//     ProjectCeres.Common.Authentication.ApplyEmailIpRateLimitAttribute: custom
+//     [Attribute] subclasses, instantiated by the runtime when applied to a
+//     method/class, never resolved through DI.
+//   - ProjectCeres.Common.Authentication.PersistentCookieRotationMiddleware /
+//     UserBlockedIpMiddleware: conventional ASP.NET Core middleware, registered via
+//     app.UseMiddleware&lt;T&gt;() (a different call shape entirely — see spec §3b's
+//     identical treatment of LanguagePreferenceMiddleware, excluded there only because
+//     its sub-namespace isn't scanned at all). ActivatorUtilities constructs these
+//     directly from the pipeline, ignoring any DI registration of the concrete type, so
+//     a Scan(...) registration would be inert, but registering them anyway pollutes the
+//     container with a self-registered-concrete entry nothing ever resolves.
+// All four classes of false positive are excluded via IsExceptionType/IsRecordType/
+// IsAttributeType/IsConventionalMiddleware below, rather than named one-by-one, so a
+// future record DTO, exception, attribute, or middleware added to a scanned namespace
+// is excluded automatically instead of silently repeating this bug. IsRecordType's
+// "<Clone>$" check is the compiler-synthesized method every C# record (class or struct)
+// emits and ordinary classes never do — confirmed via reflection against the compiled
+// ProjectCeres.dll (DashboardData has it, UserJobRunner and DuplicateBudgetException do
+// not), not assumed from general record-compilation lore.
+//
+// Fifth and sixth deviations, found by the Step 7 full-suite run (NOT Step 6's
+// completeness test — see below for why), not assumed:
+//   - ProjectCeres.Common.Authentication.PreAuthUserScope (PreAuthRlsScope.cs):
+//     implements IAsyncDisposable, so rule (a) scanned it via AsImplementedInterfaces(),
+//     but BOTH its constructors are non-public (`internal PreAuthUserScope(...)` and a
+//     private parameterless one) — it is only ever constructed internally by
+//     PreAuthRlsScope.BeginPreAuthUserScopeAsync, never by DI. Scrutor's AddClasses()
+//     does not check constructor accessibility at scan time, so the registration
+//     succeeds silently; ASP.NET Core's ServiceProvider.ValidateOnBuild (Development-only,
+//     confirmed via Microsoft Learn: "ValidateScopes and ValidateOnBuild are enabled by
+//     default in the Development environment but disabled in other environments" —
+//     aspnetcore.docs/fundamentals/minimal-apis.md) is what caught this: it eagerly
+//     validates every REGISTERED descriptor's constructability at builder.Build() time,
+//     not just the ones a test resolves, and failed with "A suitable constructor...
+//     could not be located." Testing-environment tests (Step 6, DiCompletenessTests)
+//     never saw this because ValidateOnBuild defaults to false outside Development.
+//   - ProjectCeres.Common.Email.FileSinkEmailService: same ValidateOnBuild mechanism,
+//     different cause — rule (a) registers it for IEmailService (implements it, and
+//     nothing else had registered IEmailService yet when the scan runs, since the scan
+//     runs before the manual conditional branches in file order), and ValidateOnBuild
+//     eagerly validates that descriptor's constructor (string directory, ...) even
+//     though the active manual branch (LogOnlyEmailService under Development) is what
+//     actually resolves IEmailService at runtime. Found via
+//     E2eEnvironmentRegistrationTests.Under_Development_* (WebApplicationFactory boots
+//     under "Development", which enables ValidateOnBuild).
+// Unlike the four classes above, these two are not systematic reflection predicates —
+// PreAuthUserScope is excluded via a general "has at least one public constructor"
+// check (IsConstructibleByDi), since any future DI-internal helper with only
+// non-public constructors would hit the identical bug. FileSinkEmailService is excluded
+// by name (ConditionallyConstructedExclusions, shared with DiCompletenessCheck) because
+// it IS a legitimate, publicly-constructible service — just one whose constructor
+// parameter (a config-supplied directory path) is never meant to come from DI; excluding
+// it from rule (a) only prevents the scan from registering it against IEmailService at
+// all, which is correct since the manual conditional branch already owns that
+// registration and the scan copy added nothing (RegistrationStrategy.Skip would have
+// been a no-op for interface resolution purposes) but made the service provider validate
+// a descriptor that didn't need to exist.
+var interceptorExclusions = new HashSet<Type>
+{
+    typeof(ProjectCeres.Common.UserOwnershipInterceptor),
+    typeof(ProjectCeres.Common.RowLevelSecurityInterceptor),
+};
+
+// Spec §3's named non-scannable IEmailService conditional-branch classes (see the
+// Fifth/sixth-deviation comment above and DiCompletenessCheck's matching exclusion
+// set). FileSinkEmailService's constructor takes a config-supplied `string directory`
+// that is never DI-resolvable; excluding it here stops the scan from adding an
+// IEmailService registration for it that ValidateOnBuild then eagerly validates and
+// fails on, even though that registration is never the one that actually resolves
+// at runtime (the manual conditional branch always wins by file order).
+var conditionallyConstructedExclusions = new HashSet<Type>
+{
+    typeof(ProjectCeres.Common.Email.FileSinkEmailService),
+};
+
+static bool IsExceptionType(Type type) => typeof(Exception).IsAssignableFrom(type);
+
+static bool IsRecordType(Type type) => type.GetMethod("<Clone>$") is not null;
+
+static bool IsAttributeType(Type type) => typeof(Attribute).IsAssignableFrom(type);
+
+static bool IsConventionalMiddleware(Type type) =>
+    type.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(RequestDelegate)));
+
+static bool IsConstructibleByDi(Type type) => type.GetConstructors().Length > 0;
+
+bool IsScannableServiceType(Type type) =>
+    !IsExceptionType(type) && !IsRecordType(type) && !IsAttributeType(type)
+    && !IsConventionalMiddleware(type) && IsConstructibleByDi(type)
+    && !conditionallyConstructedExclusions.Contains(type);
+
+static bool IsRegisteredAsSingleton(Type type) =>
+    type.IsDefined(typeof(ProjectCeres.Common.RegisterAsSingletonAttribute), inherit: false);
+
+builder.Services.Scan(scan => scan
+    .FromAssemblyOf<Program>()
+    .AddClasses(classes => classes
+        .InNamespaces("ProjectCeres.Services")
+        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsImplementedInterfaces()
+    .WithSingletonLifetime()
+    .AddClasses(classes => classes
+        .InNamespaces("ProjectCeres.Services")
+        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsImplementedInterfaces()
+    .WithScopedLifetime()
+    .AddClasses(classes => classes
+        .InNamespaces("ProjectCeres.Services")
+        .Where(t => (t.GetInterfaces().Length == 0 || interceptorExclusions.Contains(t)) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelf()
+    .WithSingletonLifetime()
+    .AddClasses(classes => classes
+        .InNamespaces("ProjectCeres.Services")
+        .Where(t => (t.GetInterfaces().Length == 0 || interceptorExclusions.Contains(t)) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelf()
+    .WithScopedLifetime());
+
+builder.Services.Scan(scan => scan
+    .FromAssemblyOf<Program>()
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsImplementedInterfaces()
+    .WithSingletonLifetime()
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsImplementedInterfaces()
+    .WithScopedLifetime()
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => (t.GetInterfaces().Length == 0 || interceptorExclusions.Contains(t)) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelf()
+    .WithSingletonLifetime()
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => (t.GetInterfaces().Length == 0 || interceptorExclusions.Contains(t)) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelf()
+    .WithScopedLifetime());
 
 // Phase 3 Stage 7: background-job scope primitive. Singleton — the AsyncLocal inside
 // does the per-flow isolation; the holder is process-wide. IUserJobRunner is scoped
@@ -872,6 +1078,18 @@ app.MapFallbackToFile("dist/app.html").AllowAnonymous();
 // Stage 6a: removed startup EnsureExistsAsync hook. With HttpContextCurrentUserAccessor,
 // no HttpContext exists at startup so the call would throw. Stage 7's data remap
 // creates the per-user Settings row on first registration.
+
+// Stage 13.a (spec D5) — fail fast at boot if the scan missed anything, rather
+// than a scattered runtime failure far from the actual miswiring.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    var unresolvable = ProjectCeres.Common.DiCompletenessCheck.FindUnresolvable(app.Services);
+    if (unresolvable.Count > 0)
+    {
+        var details = string.Join("\n", unresolvable.Select(f => $"  {f.Type.FullName} needs {f.MissingDependency.FullName}"));
+        throw new InvalidOperationException($"DI completeness check failed. Unresolvable dependencies:\n{details}");
+    }
+}
 
 app.Run();
 

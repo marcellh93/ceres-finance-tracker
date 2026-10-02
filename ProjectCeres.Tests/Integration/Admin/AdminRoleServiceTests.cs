@@ -130,11 +130,25 @@ public class AdminRoleServiceTests : IntegrationTestBase<Bucket1AuthFactory>, IA
 
         using var scope = _factory.Services.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<AdminRoleService>();
+        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
         await svc.GrantAsync(user.Id);
         (await svc.AnyAdminExistsAsync()).Should().BeTrue();
 
         await svc.RevokeAsync(user.Id);
+
+        // AnyAdminExistsAsync is a GLOBAL membership check against the shared test DB, not
+        // scoped to this test's own user — a sibling test in this bucket (e.g.
+        // AnyAdminExistsAsync_is_true_once_a_user_is_granted, running concurrently within
+        // this class) can leave its own admin grant in place until ITS DisposeAsync runs,
+        // which makes "no admin exists" a false assumption here otherwise. Same isolation-flake
+        // class already root-caused in AdminAuthorizationTests.cs (§12.19, 2026-09-18) — revoke
+        // every other admin first so the postcondition is deterministically true regardless of
+        // co-tenant/ordering state.
+        foreach (var other in await um.GetUsersInRoleAsync(AppRoles.Admin))
+        {
+            if (other.Id != user.Id) await svc.RevokeAsync(other.Id);
+        }
 
         (await svc.AnyAdminExistsAsync()).Should().BeFalse(
             "the role row still exists but has no members, so this must read membership, not role existence");
