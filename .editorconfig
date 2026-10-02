@@ -42,8 +42,10 @@ dotnet_diagnostic.CER007.severity = suggestion
 # No per-file suppression entries required.
 
 # Stage 9.1.6 — IDE0001 (redundant namespace prefix) promoted to warning.
-# Tripwire is `dotnet format style --verify-no-changes --diagnostics IDE0001`
-# (IDE0001 is a format/IDE-only analyzer — it does NOT surface at dotnet build).
+# IDE0001 is a format/IDE-only analyzer — it does NOT surface at dotnet build.
+# Enforced in CI by the repo-hygiene job's "Code-style check (IDE0001 ...)" step:
+# `dotnet format style --verify-no-changes --diagnostics IDE0001`. Run that
+# locally (drop --verify-no-changes) to auto-fix before pushing.
 dotnet_diagnostic.IDE0001.severity = warning
 
 # EF Core auto-generated migration files — never hand-edited.

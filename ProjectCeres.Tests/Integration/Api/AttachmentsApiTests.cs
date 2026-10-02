@@ -281,7 +281,7 @@ public class AttachmentsApiTests : IntegrationTestBase<Bucket4Factory>, IAsyncLi
             using var content = new MultipartFormDataContent();
             var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
             var file = new ByteArrayContent(png);
-            file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            file.Headers.ContentType = new MediaTypeHeaderValue("image/png");
             content.Add(file, "file", "probe.png");
 
             var res = await _client.PostAsync($"/api/transactions/{intruderTxId}/attachments", content);

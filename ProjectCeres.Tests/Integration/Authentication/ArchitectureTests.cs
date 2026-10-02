@@ -197,7 +197,7 @@ public class ArchitectureTests
         // The action method is named RequestReset (not Request) to avoid collision with
         // ControllerBase.Request property. Confirm and RequestReset must both carry
         // [AllowAnonymous] and [EnableRateLimiting].
-        var type = typeof(Controllers.Api.PasswordResetController);
+        var type = typeof(PasswordResetController);
         foreach (var methodName in new[] { "RequestReset", "Confirm" })
         {
             var mi = type.GetMethod(methodName);
@@ -220,7 +220,7 @@ public class ArchitectureTests
     {
         // The controller should depend only on PasswordResetService, never on
         // Argon2idPasswordHasher directly — hashing is the service's responsibility.
-        var type = typeof(Controllers.Api.PasswordResetController);
+        var type = typeof(PasswordResetController);
         var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
         fields.Select(f => f.FieldType)
             .Should().NotContain(typeof(Argon2idPasswordHasher),
@@ -419,7 +419,7 @@ public class ArchitectureTests
     [Fact]
     public void Three_existing_MFA_endpoints_carry_RequireRecentAuth_attribute()
     {
-        var t = typeof(Controllers.Api.MfaController);
+        var t = typeof(MfaController);
         foreach (var name in new[] { "Enroll", "EnrollVerify", "RegenerateBackupCodes" })
         {
             var m = t.GetMethod(name);
@@ -451,7 +451,7 @@ public class ArchitectureTests
     [Fact]
     public void EmailChangeController_has_correct_attribute_matrix()
     {
-        var type = typeof(Controllers.Api.EmailChangeController);
+        var type = typeof(EmailChangeController);
 
         // /request: [RequireRecentAuth] (which inherits AuthorizeAttribute and
         // registers the "RecentAuth" policy = RequireAuthenticatedUser + freshness gate).
@@ -486,7 +486,7 @@ public class ArchitectureTests
     {
         // The controller depends only on EmailChangeService — never on Argon2idPasswordHasher
         // directly; hashing is the service's responsibility.
-        var type = typeof(Controllers.Api.EmailChangeController);
+        var type = typeof(EmailChangeController);
         var fields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance);
         fields.Select(f => f.FieldType)
             .Should().NotContain(typeof(Argon2idPasswordHasher),
@@ -522,7 +522,7 @@ public class ArchitectureTests
     {
         // Class-level [AllowAnonymous] would defeat the [Authorize] + [RequireRecentAuth]
         // gate on /request. Pin: every action declares its own auth intent.
-        var type = typeof(Controllers.Api.EmailChangeController);
+        var type = typeof(EmailChangeController);
         type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().BeEmpty("EmailChangeController must NOT carry class-level [AllowAnonymous]");
     }
@@ -632,7 +632,7 @@ public class ArchitectureTests
     [Fact]
     public void LockoutUnlockController_action_has_AllowAnonymous()
     {
-        var action = typeof(Controllers.Api.LockoutUnlockController)
+        var action = typeof(LockoutUnlockController)
             .GetMethod("Confirm")!;
         action.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().NotBeEmpty(
@@ -643,7 +643,7 @@ public class ArchitectureTests
     [Fact]
     public void LockoutUnlockController_action_has_AuthLoginByIp_rate_limit()
     {
-        var action = typeof(Controllers.Api.LockoutUnlockController)
+        var action = typeof(LockoutUnlockController)
             .GetMethod("Confirm")!;
         var rateLimit = action.GetCustomAttributes(typeof(EnableRateLimitingAttribute), inherit: false)
             .Cast<EnableRateLimitingAttribute>()
@@ -656,7 +656,7 @@ public class ArchitectureTests
     [Fact]
     public void LockoutUnlockController_does_not_have_class_level_AllowAnonymous()
     {
-        var type = typeof(Controllers.Api.LockoutUnlockController);
+        var type = typeof(LockoutUnlockController);
         type.GetCustomAttributes(typeof(AllowAnonymousAttribute), inherit: false)
             .Should().BeEmpty("Anonymity must be declared on the action, not the class");
     }

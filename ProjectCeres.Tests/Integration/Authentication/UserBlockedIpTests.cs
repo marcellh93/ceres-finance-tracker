@@ -151,7 +151,7 @@ public class UserBlockedIpTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyn
         var userScope = scope.ServiceProvider.GetRequiredService<ProjectCeres.Common.IUserScope>().EnterAs(user.Id);
         try
         {
-            var sessions = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.ISessionService>();
+            var sessions = scope.ServiceProvider.GetRequiredService<Services.ISessionService>();
 
             // callerIp differs from the target, so the self-lockout guard does not refuse the block.
             (await sessions.TryBlockIpAsync(ip, "203.0.113.9")).IsSuccess.Should().BeTrue();
@@ -174,7 +174,7 @@ public class UserBlockedIpTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyn
         var userScope = scope.ServiceProvider.GetRequiredService<ProjectCeres.Common.IUserScope>().EnterAs(user.Id);
         try
         {
-            var sessions = scope.ServiceProvider.GetRequiredService<ProjectCeres.Services.ISessionService>();
+            var sessions = scope.ServiceProvider.GetRequiredService<Services.ISessionService>();
             var result = await sessions.TryUnblockIpAsync("198.51.100.7");
             result.IsSuccess.Should().BeFalse();
             result.Error!.Value.Code.Should().Be("NOT_FOUND");

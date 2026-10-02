@@ -44,8 +44,8 @@ public static class DiCompletenessCheck
     // Found by this check during Stage 13.a Task 2.
     private static readonly HashSet<Type> ConditionallyConstructedExclusions =
     [
-        typeof(ProjectCeres.Common.Email.FileSinkEmailService),
-        typeof(ProjectCeres.Common.Email.ResendEmailService),
+        typeof(Email.FileSinkEmailService),
+        typeof(Email.ResendEmailService),
     ];
 
     /// <summary>

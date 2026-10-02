@@ -164,8 +164,8 @@ var importAndReviewEnabled = builder.Environment.IsDevelopment()
 // a descriptor that didn't need to exist.
 var interceptorExclusions = new HashSet<Type>
 {
-    typeof(ProjectCeres.Common.UserOwnershipInterceptor),
-    typeof(ProjectCeres.Common.RowLevelSecurityInterceptor),
+    typeof(UserOwnershipInterceptor),
+    typeof(RowLevelSecurityInterceptor),
 };
 
 // Found by Task 5's full-suite run, not assumed: a third shape neither
@@ -187,7 +187,7 @@ var interceptorExclusions = new HashSet<Type>
 // interface consumers and the concrete-type consumers with one registration.
 var selfWithInterfacesTargets = new HashSet<Type>
 {
-    typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+    typeof(Argon2idPasswordHasher),
 
     // Found by Task 7's implementer BEFORE touching any code, same shape as
     // Argon2idPasswordHasher above: all 8 classes implement IReportGenerator (so
@@ -200,14 +200,14 @@ var selfWithInterfacesTargets = new HashSet<Type>
     // All 8 added in one pass (4 land in this task's batch, 4 are registered
     // outside it) rather than discovering the remaining 4 piecemeal when a later
     // batch's manual-line removal hits the identical wall.
-    typeof(ProjectCeres.Services.Reports.NetWorthGenerator),
-    typeof(ProjectCeres.Services.Reports.IncomeExpenseGenerator),
-    typeof(ProjectCeres.Services.Reports.ExpenseBreakdownGenerator),
-    typeof(ProjectCeres.Services.Reports.TransactionHistoryGenerator),
-    typeof(ProjectCeres.Services.Reports.BudgetVsActualReportGenerator),
-    typeof(ProjectCeres.Services.Reports.LargestExpensesReportGenerator),
-    typeof(ProjectCeres.Services.Reports.MonthlyCashFlowReportGenerator),
-    typeof(ProjectCeres.Services.Reports.NetWorthOverTimeReportGenerator),
+    typeof(NetWorthGenerator),
+    typeof(IncomeExpenseGenerator),
+    typeof(ExpenseBreakdownGenerator),
+    typeof(TransactionHistoryGenerator),
+    typeof(BudgetVsActualReportGenerator),
+    typeof(LargestExpensesReportGenerator),
+    typeof(MonthlyCashFlowReportGenerator),
+    typeof(NetWorthOverTimeReportGenerator),
 
     // Found by Task 9's implementer BEFORE touching any code, same shape again:
     // CsvImportParser and ExcelImportParser both implement IImportParser (rule (a)
@@ -218,8 +218,8 @@ var selfWithInterfacesTargets = new HashSet<Type>
     // `: IImportParser`. AsImplementedInterfaces() does not self-register the
     // concrete type, so removing either class's manual self-registration line would
     // leave ImportParserFactory unable to resolve that constructor parameter.
-    typeof(ProjectCeres.Services.CsvImportParser),
-    typeof(ProjectCeres.Services.ExcelImportParser),
+    typeof(CsvImportParser),
+    typeof(ExcelImportParser),
 };
 
 // Spec §3's named non-scannable IEmailService conditional-branch classes (see the
@@ -231,7 +231,7 @@ var selfWithInterfacesTargets = new HashSet<Type>
 // at runtime (the manual conditional branch always wins by file order).
 var conditionallyConstructedExclusions = new HashSet<Type>
 {
-    typeof(ProjectCeres.Common.Email.FileSinkEmailService),
+    typeof(FileSinkEmailService),
 };
 
 // Found by Task 6's implementer BEFORE touching any code (reproduced against the real
@@ -252,8 +252,8 @@ var conditionallyConstructedExclusions = new HashSet<Type>
 // for an interface deliberately meant to carry multiple registrations.
 var multiRegistrationInterfaceTargets = new HashSet<Type>
 {
-    typeof(ProjectCeres.Common.Authentication.RecentAuthRequirementHandler),
-    typeof(ProjectCeres.Admin.AdminLiveRequirementHandler),
+    typeof(RecentAuthRequirementHandler),
+    typeof(AdminLiveRequirementHandler),
 };
 
 // Found by the controller via a live reflection probe against the running DI container
@@ -273,7 +273,7 @@ var multiRegistrationInterfaceTargets = new HashSet<Type>
 // "last one wins" being a guaranteed, documented behavior rather than an implementation detail.
 var replaceTargets = new HashSet<Type>
 {
-    typeof(ProjectCeres.Common.Authentication.RecentAuthMiddlewareResultHandler),
+    typeof(RecentAuthMiddlewareResultHandler),
 };
 
 static bool IsConstructibleByDi(Type type) => type.GetConstructors().Length > 0;
@@ -284,7 +284,7 @@ bool IsScannableServiceType(Type type) =>
     && IsConstructibleByDi(type) && !conditionallyConstructedExclusions.Contains(type);
 
 static bool IsRegisteredAsSingleton(Type type) =>
-    type.IsDefined(typeof(ProjectCeres.Common.RegisterAsSingletonAttribute), inherit: false);
+    type.IsDefined(typeof(RegisterAsSingletonAttribute), inherit: false);
 
 builder.Services.Scan(scan => scan
     .FromAssemblyOf<Program>()

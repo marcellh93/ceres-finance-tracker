@@ -27,5 +27,5 @@ public static class ScanExclusionPredicates
     // sub-namespace); these two live directly in a scanned namespace instead, so they
     // need this type-shape check rather than a namespace exclusion.
     public static bool IsConventionalMiddleware(Type type) =>
-        type.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(Microsoft.AspNetCore.Http.RequestDelegate)));
+        type.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(RequestDelegate)));
 }

@@ -102,7 +102,7 @@ public static class SeedDevUser
         var bgJobScope     = sp.GetRequiredService<IBackgroundJobScope>();
         var logger         = sp.GetRequiredService<ILogger<Program>>();
 
-        var adminRoles = sp.GetRequiredService<ProjectCeres.Admin.AdminRoleService>();
+        var adminRoles = sp.GetRequiredService<Admin.AdminRoleService>();
 
         if (!isDevelopment && parsed.Admin && await adminRoles.AnyAdminExistsAsync())
         {

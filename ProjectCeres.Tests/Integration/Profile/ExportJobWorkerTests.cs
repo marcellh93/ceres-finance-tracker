@@ -82,9 +82,9 @@ public class ExportJobWorkerTests : IAsyncLifetime
 
     private IEmailComposer Composer() => new EmailComposer(_localizer);
 
-    private IEmailRecipientResolver Recipients(ProjectCeres.Data.AdminDbContext db) => new EmailRecipientResolver(db);
+    private IEmailRecipientResolver Recipients(Data.AdminDbContext db) => new EmailRecipientResolver(db);
 
-    private ILanguageResolver Languages(ProjectCeres.Data.AdminDbContext db) => new LanguageResolver(db);
+    private ILanguageResolver Languages(Data.AdminDbContext db) => new LanguageResolver(db);
 
     private static IOptions<FileAttachmentOptions> AttachmentOptions(string root) =>
         Options.Create(new FileAttachmentOptions { RootPath = root });
@@ -250,7 +250,7 @@ public class ExportJobWorkerTests : IAsyncLifetime
         await SeedJobAsync(ExportJobStatus.Ready, expiresAt: DateTime.UtcNow.AddHours(-1), storedPath: zipPath, emailedAt: DateTime.UtcNow.AddHours(-25));
 
         await using var db = _fixture.CreateAdminContext();
-        var builder = new ProjectCeres.Services.DataExportBuilder(_fixture.CreateAdminContext(), Env(_contentRoot).Object, AttachmentOptions(_contentRoot));
+        var builder = new DataExportBuilder(_fixture.CreateAdminContext(), Env(_contentRoot).Object, AttachmentOptions(_contentRoot));
 
         await ExportJobWorker.ProcessPendingAsync(
             db, builder, TokenGenerator(), LookupHasher(), Composer(), new CapturingEmailService([]),
