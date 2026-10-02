@@ -81,6 +81,29 @@ Scrutor's `AsImplementedInterfaces()` registers a class against **every** interf
 
 This is a standing constraint for future work, not a defect to fix now: any class added later to a scan namespace that implements more than its one intended project interface (most commonly by adding `IDisposable`, or by inheriting a base class that implements something incidental — §3b's interceptor exclusion is exactly this case, just severe enough to need a named exclusion rather than just a documented risk) needs a deliberate look before assuming the scan does the right thing — the §8 D5 completeness check proves every dependency CAN resolve; it does NOT prove a service wasn't ALSO registered against an interface nobody wanted it registered against. If this ever becomes a real problem, Scrutor's `AsImplementedInterfaces(Func<Type, bool> predicate)` overload (confirmed via the same research pass, §4) filters which interfaces get registered — the fix is available if needed, just not applied preemptively here since nothing in the codebase needs it today beyond the two named exclusions.
 
+## 3d. The dual-consumer exclusion (added during plan execution, Task 5, 2026-10-02 — READ before implementation)
+
+**A third scan-rule shape neither §3b's interceptor exclusion nor the plain interface-pair rule handles: a class that BOTH implements a project interface AND is depended on by its concrete type elsewhere in the codebase.**
+
+`Argon2idPasswordHasher` implements `IPasswordHasher<ApplicationUser>` (the §2/§6 closed-generic-BCL-interface case — this part works exactly as designed, confirmed by `IPasswordHasher<ApplicationUser>` resolving correctly in isolation). Rule (a) correctly registers it via `AsImplementedInterfaces()` for that interface. But at least 13 other classes across `ProjectCeres.Common.Authentication` and `ProjectCeres.Services` (`PersistentTokenService`, `PasswordResetTokenGenerator`, `PasswordResetService`, `EmailConfirmationTokenGenerator`, `EmailConfirmationService`, `EmailChangeTokenGenerator`, `EmailChangeService`, `LockoutUnlockTokenGenerator`, `LockoutUnlockService`, `ExportTokenGenerator`, `ErasureTokenGenerator`, `TotpReplayGuard`, `MfaBackupCodeService`, `ErasureService`) inject the **concrete** `Argon2idPasswordHasher` type directly in their constructors, not the interface.
+
+**Why this breaks:** `AsImplementedInterfaces()` does not also self-register the concrete type. Confirmed against Scrutor 7.0.0's real source (`src/Scrutor/IServiceTypeSelector.cs`, fetched via `gh api repos/khellang/Scrutor/contents/...` at tag `v7.0.0`) — `AsImplementedInterfaces()` and `AsSelfWithInterfaces()` are two distinct methods on `IServiceTypeSelector`:
+
+```csharp
+/// Registers each matching concrete type as all of its implemented interfaces.
+ILifetimeSelector AsImplementedInterfaces();
+
+/// Registers each matching concrete type as all of its implemented interfaces,
+/// by returning an instance of the main type
+ILifetimeSelector AsSelfWithInterfaces();
+```
+
+The project's original manual registrations carried BOTH lines (`AddScoped<IPasswordHasher<ApplicationUser>, Argon2idPasswordHasher>()` and the separate `AddScoped<Argon2idPasswordHasher>()`), which is why this gap was invisible before the scan replaced them — removing the second line during Task 5's batch (per this plan's own removal instructions) is what surfaced it. The Step 6 `DiCompletenessCheck` test correctly caught it (`ErasureService → ErasureTokenGenerator` chain failing to resolve `Argon2idPasswordHasher`), but only once the 17-line batch that removed the manual self-registration actually ran — it could not have been found by static analysis of the scan rules alone, since the original manual lines masked it.
+
+**Fix:** a named, single-class exclusion — `selfWithInterfacesTargets` (same `HashSet<Type>` shape as `interceptorExclusions`) containing only `typeof(Argon2idPasswordHasher)`, routed through `AsSelfWithInterfaces()` instead of `AsImplementedInterfaces()` in the `ProjectCeres.Common.Authentication` scan block. `AsSelfWithInterfaces()` registers the concrete type as itself and resolves each implemented interface through that same instance, satisfying both the interface consumer (`IPasswordHasher<ApplicationUser>`) and the 13 concrete-type consumers with one registration. Confirmed via grep that `Argon2idPasswordHasher` is the **only** interface-implementing class across both scanned namespaces with a concrete-type dependent elsewhere — a narrow, named exclusion is the right fit, not a blanket `AsSelfWithInterfaces()` swap for the whole interface-pair rule.
+
+**Standing lesson for future scan-namespace additions:** before removing a manual registration pair where one line registers an interface and a second, separate line registers the bare concrete type for the same class, check whether anything in the codebase depends on the concrete type directly (`grep` for the class name as a constructor parameter type, not just the interface). If so, that class needs this `selfWithInterfacesTargets`-style exclusion, not a plain interface-pair removal.
+
 ## 4. What Scrutor is (verified, not assumed)
 
 Confirmed via web search 2026-09-27 (not merely general model familiarity, per this project's research-before-confident-claims rule):
