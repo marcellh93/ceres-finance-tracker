@@ -114,11 +114,13 @@ var importAndReviewEnabled = builder.Environment.IsDevelopment()
 //     directly from the pipeline, ignoring any DI registration of the concrete type, so
 //     a Scan(...) registration would be inert, but registering them anyway pollutes the
 //     container with a self-registered-concrete entry nothing ever resolves.
-// All four classes of false positive are excluded via IsExceptionType/IsRecordType/
-// IsAttributeType/IsConventionalMiddleware below, rather than named one-by-one, so a
-// future record DTO, exception, attribute, or middleware added to a scanned namespace
-// is excluded automatically instead of silently repeating this bug. IsRecordType's
-// "<Clone>$" check is the compiler-synthesized method every C# record (class or struct)
+// All four classes of false positive are excluded via ScanExclusionPredicates'
+// IsExceptionType/IsRecordType/IsAttributeType/IsConventionalMiddleware (shared with
+// DiCompletenessCheck.cs so a fix to one can never silently diverge from the other),
+// rather than named one-by-one, so a future record DTO, exception, attribute, or
+// middleware added to a scanned namespace is excluded automatically instead of silently
+// repeating this bug. IsRecordType's "<Clone>$" check is the compiler-synthesized method
+// every C# record (class or struct)
 // emits and ordinary classes never do — confirmed via reflection against the compiled
 // ProjectCeres.dll (DashboardData has it, UserJobRunner and DuplicateBudgetException do
 // not), not assumed from general record-compilation lore.
@@ -178,21 +180,12 @@ var conditionallyConstructedExclusions = new HashSet<Type>
     typeof(ProjectCeres.Common.Email.FileSinkEmailService),
 };
 
-static bool IsExceptionType(Type type) => typeof(Exception).IsAssignableFrom(type);
-
-static bool IsRecordType(Type type) => type.GetMethod("<Clone>$") is not null;
-
-static bool IsAttributeType(Type type) => typeof(Attribute).IsAssignableFrom(type);
-
-static bool IsConventionalMiddleware(Type type) =>
-    type.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(RequestDelegate)));
-
 static bool IsConstructibleByDi(Type type) => type.GetConstructors().Length > 0;
 
 bool IsScannableServiceType(Type type) =>
-    !IsExceptionType(type) && !IsRecordType(type) && !IsAttributeType(type)
-    && !IsConventionalMiddleware(type) && IsConstructibleByDi(type)
-    && !conditionallyConstructedExclusions.Contains(type);
+    !ScanExclusionPredicates.IsExceptionType(type) && !ScanExclusionPredicates.IsRecordType(type)
+    && !ScanExclusionPredicates.IsAttributeType(type) && !ScanExclusionPredicates.IsConventionalMiddleware(type)
+    && IsConstructibleByDi(type) && !conditionallyConstructedExclusions.Contains(type);
 
 static bool IsRegisteredAsSingleton(Type type) =>
     type.IsDefined(typeof(ProjectCeres.Common.RegisterAsSingletonAttribute), inherit: false);

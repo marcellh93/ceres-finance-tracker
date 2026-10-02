@@ -60,18 +60,16 @@ public static class DiCompletenessCheck
         // Exception-derived types (e.g. ProjectCeres.Services.DuplicateBudgetException),
         // record DTOs (e.g. ProjectCeres.Services.DashboardData), and Attribute subclasses
         // (e.g. ProjectCeres.Common.PreAuthCallSiteAttribute) live inside scanned namespaces
-        // but are never DI services — Program.cs's Scan(...) rules exclude all three
-        // explicitly for the same reason (found by this check during Stage 13.a Task 2; see
-        // Program.cs's IsExceptionType/IsRecordType/IsAttributeType comment for the full
-        // story). The "<Clone>$" check is the compiler-synthesized method every C# record
-        // emits and ordinary classes never do.
+        // but are never DI services — Program.cs's Scan(...) rules exclude all three via
+        // the same ScanExclusionPredicates this check uses (found by this check during
+        // Stage 13.a Task 2), so a fix to one can never silently diverge from the other.
         var scannedTypes = typeof(Program).Assembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract && t.IsPublic
-                     && !typeof(Exception).IsAssignableFrom(t)
-                     && !typeof(Attribute).IsAssignableFrom(t)
-                     && t.GetMethod("<Clone>$") is null
+                     && !ScanExclusionPredicates.IsExceptionType(t)
+                     && !ScanExclusionPredicates.IsAttributeType(t)
+                     && !ScanExclusionPredicates.IsRecordType(t)
                      && !ConditionallyConstructedExclusions.Contains(t)
-                     && !IsConventionalMiddleware(t))
+                     && !ScanExclusionPredicates.IsConventionalMiddleware(t))
             .Where(t => (t.Namespace != null && ScannedNamespacePrefixes.Any(p => t.Namespace == p || t.Namespace.StartsWith(p + ".", StringComparison.Ordinal)))
                      || (t.Namespace != null && ScannedExactNamespaces.Contains(t.Namespace)));
 
@@ -112,16 +110,4 @@ public static class DiCompletenessCheck
 
     private static bool IsOptionalDependency(ParameterInfo param) =>
         param.HasDefaultValue || Nullable.GetUnderlyingType(param.ParameterType) is not null;
-
-    // Conventional ASP.NET Core middleware (registered via app.UseMiddleware&lt;T&gt;(),
-    // e.g. ProjectCeres.Common.Authentication.PersistentCookieRotationMiddleware and
-    // UserBlockedIpMiddleware) takes a RequestDelegate constructor parameter that the
-    // middleware pipeline's own activator supplies — never the general DI container.
-    // Spec §3 already treats this as "a different registration shape entirely" for
-    // LanguagePreferenceMiddleware (excluded there by living in an unscanned
-    // sub-namespace); these two live directly in a scanned namespace instead, so they
-    // need this type-shape check rather than a namespace exclusion. Found by this check
-    // during Stage 13.a Task 2.
-    private static bool IsConventionalMiddleware(Type type) =>
-        type.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(RequestDelegate)));
 }
