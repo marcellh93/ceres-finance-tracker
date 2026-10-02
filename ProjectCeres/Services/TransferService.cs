@@ -83,9 +83,13 @@ public class TransferService(AppDbContext db, IAccountService accountService, IC
         await db.SaveChangesAsync();
     }
 
-    public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null, string? currency = null)
+    public async Task<int> BulkMarkClearedAsync(DateOnly? from, DateOnly? to, Guid? accountId = null, string? currency = null)
     {
-        var query = db.Transfers.Owned(user).Where(t => !t.IsCleared && t.Date >= from && t.Date <= to);
+        var query = db.Transfers.Owned(user).Where(t => !t.IsCleared);
+        if (from.HasValue)
+            query = query.Where(t => t.Date >= from.Value);
+        if (to.HasValue)
+            query = query.Where(t => t.Date <= to.Value);
         if (accountId.HasValue)
             query = query.Where(t => t.SourceAccountId == accountId.Value || t.DestAccountId == accountId.Value);
         if (!string.IsNullOrWhiteSpace(currency))

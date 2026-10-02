@@ -72,9 +72,13 @@ public class LiabilityPaymentService(AppDbContext db, IAccountService accountSer
         await db.SaveChangesAsync();
     }
 
-    public async Task<int> BulkMarkClearedAsync(DateOnly from, DateOnly to, Guid? accountId = null, string? currency = null)
+    public async Task<int> BulkMarkClearedAsync(DateOnly? from, DateOnly? to, Guid? accountId = null, string? currency = null)
     {
-        var query = db.LiabilityPayments.Owned(user).Where(p => !p.IsCleared && p.Date >= from && p.Date <= to);
+        var query = db.LiabilityPayments.Owned(user).Where(p => !p.IsCleared);
+        if (from.HasValue)
+            query = query.Where(p => p.Date >= from.Value);
+        if (to.HasValue)
+            query = query.Where(p => p.Date <= to.Value);
         if (accountId.HasValue)
             query = query.Where(p => p.AssetAccountId == accountId.Value || p.LiabilityAccountId == accountId.Value);
         if (!string.IsNullOrWhiteSpace(currency))

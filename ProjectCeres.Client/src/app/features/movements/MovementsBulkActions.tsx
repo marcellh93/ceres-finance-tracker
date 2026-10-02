@@ -57,8 +57,8 @@ export function MovementsBulkActions({ totalCount, onAfterBulk }: MovementsBulkA
 
   async function handleConfirm() {
     const body: BulkClearedRequest = {
-      from,
-      to,
+      from: from || null,
+      to: to || null,
       accountId: accountId ?? null,
       type: type ?? null,
       currency: currency ?? null,

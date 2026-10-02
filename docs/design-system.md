@@ -267,6 +267,15 @@ The Sonner toaster is themed via `index.css` so each toast type carries an appro
 
 If you add a new toast type or restyle Sonner, edit only this block — never override the toast surface or text colour at the call site.
 
+### Actionable errors — say what's needed, don't just fail
+
+When an action is blocked because a **required input is missing or a precondition is unmet**, the message must tell the user *what to do to make it work* — never a bare "Couldn't do X." This applies to both the toast copy and any server validation message that surfaces to the user.
+
+- ❌ `Couldn't mark as cleared.`
+- ✅ `Pick a date range first, then mark as cleared.` (when the operation needs a date filter the user hasn't set)
+
+Rule of thumb: a generic failure toast is only acceptable for genuinely unexpected errors (network, 500). Anything the user can fix by changing an input gets a message naming the fix. Prefer surfacing the server's `error.message` (see `docs/api-contract.md` § Error Shape) when it already carries the actionable text, rather than a hard-coded client string that can drift from the real cause.
+
 ### base-ui vs. Radix
 
 The `base-nova` style uses `@base-ui/react` primitives, not Radix. The two have different APIs in places (e.g., the base-ui `Tooltip.Trigger` does not take an `asChild` prop). When porting shadcn snippets from elsewhere, check the primitive source under `src/components/ui/` to confirm the local API.

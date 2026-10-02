@@ -193,8 +193,8 @@ export const MOVEMENTS_EXPORT_CSV_URL   = (search: string) =>
   search ? `/api/movements/export.csv?${search}` : '/api/movements/export.csv';
 
 export type BulkClearedRequest = {
-  from: string;            // "yyyy-MM-dd"
-  to: string;              // "yyyy-MM-dd"
+  from: string | null;     // "yyyy-MM-dd", or null for no lower date bound
+  to: string | null;       // "yyyy-MM-dd", or null for no upper date bound
   accountId?: string | null;
   type?: 'transaction' | 'transfer' | 'liabilitypayment' | null;
   currency?: string | null;

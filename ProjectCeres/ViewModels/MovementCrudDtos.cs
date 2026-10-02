@@ -116,8 +116,10 @@ public class UpdateLiabilityPaymentRequest
 
 public class BulkClearedRequest
 {
-    [Required] public DateOnly From { get; set; }
-    [Required] public DateOnly To   { get; set; }
+    /// <summary>Null = no lower date bound (mark every matching movement).</summary>
+    public DateOnly? From { get; set; }
+    /// <summary>Null = no upper date bound (mark every matching movement).</summary>
+    public DateOnly? To   { get; set; }
     public Guid?  AccountId { get; set; }
     /// <summary>"transaction" | "transfer" | "liabilitypayment" | null (all).</summary>
     public string? Type { get; set; }

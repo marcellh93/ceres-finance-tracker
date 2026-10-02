@@ -89,6 +89,25 @@ describe('MovementsBulkActions', () => {
     await waitFor(() => expect(onAfterBulk).toHaveBeenCalled());
   });
 
+  it('sends from/to as null (not empty strings) when no date filter is set', async () => {
+    // Regression: empty strings bound to the server's DateOnly? fields fail
+    // model binding → 422. The no-date path must serialize to null.
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ cleared: 9 }) });
+    renderAt('?type=transaction');
+
+    fireEvent.click(screen.getByRole('button', { name: /mark visible cleared/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^mark cleared$/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^mark cleared$/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
+    const init = mockFetch.appCalls()[0][1] as RequestInit;
+    const body = JSON.parse((init?.body as string) ?? '{}');
+    expect(body.from).toBeNull();
+    expect(body.to).toBeNull();
+  });
+
   it('includes currency in the bulk POST body when ?currency is in URL params', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ cleared: 1 }) });
     renderAt('?from=2026-01-01&to=2026-01-31&currency=EUR');
