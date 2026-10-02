@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 
@@ -19,6 +20,7 @@ namespace ProjectCeres.Common.Authentication;
 /// Single-host. Multi-host migration is tracked under Stage 16 alongside the
 /// _loginLocks semaphore (see planning-phase3.md Stage 16 entry).
 /// </summary>
+[RegisterAsSingleton]
 public sealed class LockoutCache
 {
     private const string EntryKeyPrefix = "lockout:";

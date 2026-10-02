@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 
@@ -15,6 +16,7 @@ namespace ProjectCeres.Common.Authentication;
 /// in production). Rotation invalidates every active password-reset and
 /// email-change token — see security-model.md § Secrets Rotation Procedures.
 /// </summary>
+[RegisterAsSingleton]
 public sealed class TokenLookupHasher
 {
     /// <summary>The unconfigured value shipped in appsettings.json. Reaching the hasher means

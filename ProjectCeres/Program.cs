@@ -168,6 +168,28 @@ var interceptorExclusions = new HashSet<Type>
     typeof(ProjectCeres.Common.RowLevelSecurityInterceptor),
 };
 
+// Found by Task 5's full-suite run, not assumed: a third shape neither
+// interceptorExclusions nor the plain interface-pair rule handles.
+// Argon2idPasswordHasher implements IPasswordHasher<ApplicationUser> (the spec's
+// closed-generic-BCL-interface case), so rule (a) correctly registers it via
+// AsImplementedInterfaces() for that interface -- but at least 13 classes across
+// ProjectCeres.Common.Authentication (PersistentTokenService, PasswordResetService,
+// EmailConfirmationService, EmailChangeService, LockoutUnlockService, ErasureService,
+// and their token-generator siblings) and AuthController inject the CONCRETE type
+// Argon2idPasswordHasher directly, not the interface. AsImplementedInterfaces() does
+// NOT also self-register the concrete type (confirmed via Scrutor's own source,
+// IServiceTypeSelector.cs: AsImplementedInterfaces and AsSelfWithInterfaces are two
+// distinct methods) -- so removing this stage's manual AddScoped<Argon2idPasswordHasher>()
+// line left the concrete type unregistered, breaking every one of those 13 call sites.
+// Fix: route this one class through AsSelfWithInterfaces() instead of
+// AsImplementedInterfaces() -- it registers the concrete type as itself AND resolves
+// each implemented interface through that same instance, satisfying both the
+// interface consumers and the concrete-type consumers with one registration.
+var selfWithInterfacesTargets = new HashSet<Type>
+{
+    typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+};
+
 // Spec §3's named non-scannable IEmailService conditional-branch classes (see the
 // Fifth/sixth-deviation comment above and DiCompletenessCheck's matching exclusion
 // set). FileSinkEmailService's constructor takes a config-supplied `string directory`
@@ -235,9 +257,20 @@ builder.Services.Scan(scan => scan
             "ProjectCeres.Common.Authentication",
             "ProjectCeres.Common",
             "ProjectCeres.Common.Email")
-        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+        .Where(t => !interceptorExclusions.Contains(t) && !selfWithInterfacesTargets.Contains(t)
+                 && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
     .AsImplementedInterfaces()
+    .WithScopedLifetime()
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => selfWithInterfacesTargets.Contains(t) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelfWithInterfaces()
     .WithScopedLifetime()
     .AddClasses(classes => classes
         .InExactNamespaces(
@@ -302,8 +335,6 @@ builder.Services.Configure<Argon2idOptions>(
 // DoS on those endpoints (verify cost is O(1) regardless of token table size).
 builder.Services.Configure<TokenLookupOptions>(
     builder.Configuration.GetSection("Authentication:TokenLookupSecret"));
-builder.Services.AddSingleton<TokenLookupHasher>();
-builder.Services.AddSingleton<ErasurePseudonym>();
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -336,7 +367,6 @@ builder.Services
 // choice preserves the prior FailedLoginRecorder.TruncateAndNormalize semantics
 // (which existing tests assert against). Registered AFTER AddIdentity so this
 // registration overrides Identity's default.
-builder.Services.AddSingleton<ILookupNormalizer, LowercaseLookupNormalizer>();
 
 builder.Services.Configure<SecurityStampValidatorOptions>(o =>
 {
@@ -344,23 +374,9 @@ builder.Services.Configure<SecurityStampValidatorOptions>(o =>
 });
 
 // Replace Identity's PBKDF2 hasher with Argon2id (pinned m=19456 t=2 p=1).
-builder.Services.AddScoped<IPasswordHasher<ApplicationUser>, Argon2idPasswordHasher>();
-builder.Services.AddScoped<Argon2idPasswordHasher>();
-builder.Services.AddScoped<PersistentTokenService>();
-builder.Services.AddScoped<PasswordResetTokenGenerator>();
-builder.Services.AddScoped<PasswordResetService>();
-builder.Services.AddScoped<EmailConfirmationTokenGenerator>();
-builder.Services.AddScoped<EmailConfirmationService>();
-builder.Services.AddScoped<EmailChangeTokenGenerator>();
-builder.Services.AddScoped<EmailChangeService>();
-builder.Services.AddScoped<LockoutUnlockTokenGenerator>();
-builder.Services.AddScoped<LockoutUnlockService>();
-builder.Services.AddScoped<ExportTokenGenerator>();
-builder.Services.AddScoped<ErasureTokenGenerator>();
 builder.Services.AddMemoryCache();
 builder.Services.AddOptions<LockoutCacheOptions>()
     .Validate(o => o.IpPointerTtl > TimeSpan.Zero, "LockoutCacheOptions.IpPointerTtl must be positive.");
-builder.Services.AddSingleton<LockoutCache>();
 
 // === Email service registration (Stage 8c) ===
 // Production must fail loud if Email:Resend:ApiKey is unbound — silently

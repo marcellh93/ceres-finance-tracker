@@ -1,3 +1,5 @@
+using ProjectCeres.Common;
+
 namespace ProjectCeres.Common.Authentication;
 
 /// <summary>
@@ -5,6 +7,7 @@ namespace ProjectCeres.Common.Authentication;
 /// the same keyed HMAC-SHA256 as <see cref="TokenLookupHasher"/>. One-way only —
 /// never store a reverse lookup table. Stage 13.9 Task 7.
 /// </summary>
+[RegisterAsSingleton]
 public sealed class ErasurePseudonym
 {
     private readonly TokenLookupHasher _hasher;
