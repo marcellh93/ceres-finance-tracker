@@ -263,13 +263,10 @@ builder.Services.Scan(scan => scan
 // Phase 3 Stage 7: background-job scope primitive. Singleton — the AsyncLocal inside
 // does the per-flow isolation; the holder is process-wide. IUserJobRunner is scoped
 // because it depends on the scoped AppDbContext.
-builder.Services.AddSingleton<IUserScope, UserScope>();
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<IBackgroundJobScope, BackgroundJobScope>();
-builder.Services.AddScoped<IUserJobRunner, UserJobRunner>();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
+builder.Services.AddScoped<UserOwnershipInterceptor>();
 builder.Services.AddScoped<UserOwnershipInterceptor>();
 
 // Stage 7.5 / ADR-0068 — PostgreSQL Row-Level Security defence in depth.
