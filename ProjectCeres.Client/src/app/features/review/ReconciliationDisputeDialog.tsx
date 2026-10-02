@@ -31,7 +31,9 @@ export function ReconciliationDisputeDialog({ open, stagedId, onOpenChange, onDi
         onDisputed();
         onOpenChange(false);
       } else {
-        toast.error("Couldn't dispute. Try again.");
+        // Surface the server's actionable message (e.g. opening-balance-date
+        // violation from creating the disputed transaction); fall back to generic.
+        toast.error(res.message || "Couldn't dispute. Try again.");
       }
     } catch {
       toast.error("Couldn't dispute. Try again.");

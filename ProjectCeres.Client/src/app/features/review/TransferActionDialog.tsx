@@ -79,7 +79,9 @@ export function TransferActionDialog({
         onOpenChange(false);
         return;
       }
-      toast.error(genericError);
+      // Surface the server's actionable message (e.g. INVALID_ACCOUNT, or a
+      // cross-currency / opening-balance-date VALIDATION_ERROR); fall back to generic.
+      toast.error(res.message || genericError);
     } catch {
       toast.error(genericError);
     } finally {

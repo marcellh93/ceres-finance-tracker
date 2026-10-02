@@ -184,11 +184,12 @@ describe('TransferActionDialog', () => {
     expect(onOpenChange.mock.calls.some((args) => args[0] === false)).toBe(true);
   });
 
-  it('422 keeps dialog open with generic error toast', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+  it('422 keeps dialog open and surfaces the server message', async () => {
+    const serverMsg = 'The other account does not exist.';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({
       ok: false, status: 422,
-      json: async () => ({ error: { code: 'VALIDATION_ERROR', message: 'oops', details: [] } }),
-    }) as typeof fetch);
+      json: async () => ({ error: { code: 'INVALID_ACCOUNT', message: serverMsg, details: [] } }),
+    })) as typeof fetch);
     const onOpenChange = vi.fn();
     render(
       <>
@@ -205,8 +206,31 @@ describe('TransferActionDialog', () => {
     await waitFor(() => expect(screen.getByText('Savings')).toBeInTheDocument());
     fireEvent.click(screen.getByText('Savings'));
     await userEvent.click(screen.getByRole('button', { name: /^Link transfer$/i }));
-    await waitFor(() => expect(screen.getByText(/Couldn't link/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(serverMsg)).toBeInTheDocument());
     expect(onOpenChange.mock.calls.some((args) => args[0] === false)).toBe(false);
+  });
+
+  it('422 without a server message falls back to the generic toast', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: 'VALIDATION_ERROR', message: '', details: [] } }),
+    })) as typeof fetch);
+    render(
+      <>
+        <Toaster />
+        <TransferActionDialog
+          open mode="link" stagedId={STAGED_ID}
+          ownAccountId="aa" ownAccountCurrencyCode="EUR"
+          accounts={accounts}
+          onOpenChange={vi.fn()} onActioned={() => {}}
+        />
+      </>,
+    );
+    fireEvent.click(screen.getByRole('combobox'));
+    await waitFor(() => expect(screen.getByText('Savings')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Savings'));
+    await userEvent.click(screen.getByRole('button', { name: /^Link transfer$/i }));
+    await waitFor(() => expect(screen.getByText(/Couldn't link/i)).toBeInTheDocument());
   });
 
   it('Cancel closes without firing fetch', async () => {

@@ -77,8 +77,12 @@ describe('ReconciliationDisputeDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('422 keeps dialog open with generic error toast', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({ ok: false, status: 422 })) as typeof fetch);
+  it('422 keeps dialog open and surfaces the server message', async () => {
+    const serverMsg = "This transaction cannot be dated before the opening balance date.";
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: 'VALIDATION_ERROR', message: serverMsg, details: [] } }),
+    })) as typeof fetch);
     const onOpenChange = vi.fn();
     render(
       <>
@@ -90,7 +94,25 @@ describe('ReconciliationDisputeDialog', () => {
       </>,
     );
     await userEvent.click(screen.getByRole('button', { name: /Dispute match/i }));
-    await waitFor(() => expect(screen.getByText(/Couldn't dispute/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(serverMsg)).toBeInTheDocument());
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it('422 without a server message falls back to the generic toast', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(stubResponse({
+      ok: false, status: 422,
+      json: async () => ({ error: { code: 'VALIDATION_ERROR', message: '', details: [] } }),
+    })) as typeof fetch);
+    render(
+      <>
+        <Toaster />
+        <ReconciliationDisputeDialog
+          open stagedId={STAGED_ID}
+          onOpenChange={vi.fn()} onDisputed={() => {}}
+        />
+      </>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Dispute match/i }));
+    await waitFor(() => expect(screen.getByText(/Couldn't dispute/i)).toBeInTheDocument());
   });
 });
