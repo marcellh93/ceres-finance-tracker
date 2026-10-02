@@ -188,6 +188,26 @@ var interceptorExclusions = new HashSet<Type>
 var selfWithInterfacesTargets = new HashSet<Type>
 {
     typeof(ProjectCeres.Common.Authentication.Argon2idPasswordHasher),
+
+    // Found by Task 7's implementer BEFORE touching any code, same shape as
+    // Argon2idPasswordHasher above: all 8 classes implement IReportGenerator (so
+    // rule (a) would correctly register each via AsImplementedInterfaces() for that
+    // interface) but ReportGeneratorFactory's constructor injects all 8 by CONCRETE
+    // TYPE (ProjectCeres/Services/Reports/ReportGeneratorFactory.cs), not by
+    // IReportGenerator. AsImplementedInterfaces() does not self-register the
+    // concrete type, so removing any of these 8 classes' manual self-registration
+    // lines would leave ReportGeneratorFactory unable to resolve that dependency.
+    // All 8 added in one pass (4 land in this task's batch, 4 are registered
+    // outside it) rather than discovering the remaining 4 piecemeal when a later
+    // batch's manual-line removal hits the identical wall.
+    typeof(ProjectCeres.Services.Reports.NetWorthGenerator),
+    typeof(ProjectCeres.Services.Reports.IncomeExpenseGenerator),
+    typeof(ProjectCeres.Services.Reports.ExpenseBreakdownGenerator),
+    typeof(ProjectCeres.Services.Reports.TransactionHistoryGenerator),
+    typeof(ProjectCeres.Services.Reports.BudgetVsActualReportGenerator),
+    typeof(ProjectCeres.Services.Reports.LargestExpensesReportGenerator),
+    typeof(ProjectCeres.Services.Reports.MonthlyCashFlowReportGenerator),
+    typeof(ProjectCeres.Services.Reports.NetWorthOverTimeReportGenerator),
 };
 
 // Spec §3's named non-scannable IEmailService conditional-branch classes (see the
@@ -258,15 +278,37 @@ builder.Services.Scan(scan => scan
     .FromAssemblyOf<Program>()
     .AddClasses(classes => classes
         .InNamespaces("ProjectCeres.Services")
-        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+        .Where(t => !interceptorExclusions.Contains(t) && !selfWithInterfacesTargets.Contains(t)
+                 && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
     .AsImplementedInterfaces()
     .WithSingletonLifetime()
     .AddClasses(classes => classes
         .InNamespaces("ProjectCeres.Services")
-        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+        .Where(t => !interceptorExclusions.Contains(t) && !selfWithInterfacesTargets.Contains(t)
+                 && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
     .AsImplementedInterfaces()
+    .WithScopedLifetime()
+    // selfWithInterfacesTargets: see the full explanation where the set is declared.
+    // Singleton/Scoped pair for the same reason the Authentication-block pair exists
+    // (Task 5's review finding) -- do not assume one lifetime covers every member.
+    // All 8 IReportGenerator classes here are AddScoped (confirmed by reading each
+    // manual registration line before this stage's removal), so only the Scoped
+    // branch is live today; the Singleton branch exists so a future member needing
+    // that lifetime doesn't silently fall through to the plain AsImplementedInterfaces
+    // branch above.
+    .AddClasses(classes => classes
+        .InNamespaces("ProjectCeres.Services")
+        .Where(t => selfWithInterfacesTargets.Contains(t) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelfWithInterfaces()
+    .WithSingletonLifetime()
+    .AddClasses(classes => classes
+        .InNamespaces("ProjectCeres.Services")
+        .Where(t => selfWithInterfacesTargets.Contains(t) && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelfWithInterfaces()
     .WithScopedLifetime()
     .AddClasses(classes => classes
         .InNamespaces("ProjectCeres.Services")
@@ -864,20 +906,6 @@ builder.Services.AddRateLimiter(options =>
 
 // === End Stage 6a wiring ===
 
-builder.Services.AddScoped<ISettingsService, SettingsService>();
-builder.Services.AddScoped<IAccountService, AccountService>();
-builder.Services.AddScoped<ICategoryService, CategoryService>();
-builder.Services.AddScoped<CategorySeedService>();
-builder.Services.AddScoped<ILiabilityPaymentService, LiabilityPaymentService>();
-builder.Services.AddScoped<ITransactionService, TransactionService>();
-builder.Services.AddScoped<ITransactionExportService, TransactionExportService>();
-builder.Services.AddScoped<ITransferService, TransferService>();
-builder.Services.AddScoped<IExportJobService, ExportJobService>();
-builder.Services.AddScoped<IErasureService, ErasureService>();
-builder.Services.AddScoped<DataExportBuilder>();
-builder.Services.AddScoped<ErasureExecutor>();
-builder.Services.AddScoped<IRecurringTransactionService, RecurringTransactionService>();
-builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NetWorthGenerator>();
 builder.Services.AddScoped<IncomeExpenseGenerator>();
 builder.Services.AddScoped<ExpenseBreakdownGenerator>();
