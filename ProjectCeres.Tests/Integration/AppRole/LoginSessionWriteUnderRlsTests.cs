@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common.Exceptions;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.AppRole;
 

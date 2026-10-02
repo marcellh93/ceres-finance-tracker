@@ -1,5 +1,3 @@
-using ProjectCeres.Common;
-
 namespace ProjectCeres.Common.Authentication;
 
 /// <summary>

@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Configuration;
 

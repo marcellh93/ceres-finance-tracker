@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Exceptions;
-using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Common;
 

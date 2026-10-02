@@ -1,7 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
 using ProjectCeres.Common.Email;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Email;
 

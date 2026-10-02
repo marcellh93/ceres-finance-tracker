@@ -283,12 +283,13 @@ jobs:
             node -e "const fs=require('fs');const {scan}=require('./.claude/hooks/roadmap-consistency-check.js');const g=scan(fs.readFileSync(process.argv[1],'utf8'));if(g.length){console.error(process.argv[1]+':');g.forEach(x=>console.error('  '+x));process.exit(1)}" "$f"
           done
           echo "roadmaps consistent"
-      # IDE0001 (redundant namespace prefix) is .editorconfig-severity=warning but
-      # is a format/IDE-only analyzer — it does NOT surface at `dotnet build`, so it
-      # accumulated 38 silent violations before this gate. This is the tripwire the
-      # .editorconfig comment names; --no-restore reuses the vuln-scan restore above.
-      - name: Code-style check (IDE0001 redundant-name)
-        run: dotnet format style ProjectCeres.sln --verify-no-changes --diagnostics IDE0001 --no-restore
+      # IDE0001 (redundant namespace prefix) and IDE0005 (unnecessary using) are
+      # .editorconfig-severity=warning but are format/IDE-only here — neither surfaces
+      # at `dotnet build` (IDE0005 would need GenerateDocumentationFile=true; see
+      # .editorconfig). dotnet format catches both with only the severity bump, so
+      # this is the single gate for both. --no-restore reuses the vuln-scan restore.
+      - name: Code-style check (IDE0001 redundant-name, IDE0005 unused-using)
+        run: dotnet format style ProjectCeres.sln --verify-no-changes --diagnostics IDE0001 IDE0005 --no-restore
       # Runs LAST: the JS advisory set (17 open, tracked for a dedicated triage
       # pass — pnpm overrides per ADR-0079 + bumps) is a known red today. Keeping
       # it last means gitleaks, the hook self-tests, and the roadmap check all run

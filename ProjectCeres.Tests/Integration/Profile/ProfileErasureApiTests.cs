@@ -3,11 +3,9 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
-using ProjectCeres.Services;
 using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Integration.Profile;

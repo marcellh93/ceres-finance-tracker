@@ -2,7 +2,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
-using Xunit;
 
 namespace ProjectCeres.Tests.Unit;
 

@@ -2,8 +2,6 @@ using System.Globalization;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Email;
-using ProjectCeres.Tests.Integration;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Email;
 

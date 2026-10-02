@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis.Testing;
-using ProjectCeres.Analyzers.Tests.TestHelpers;
 using Xunit;
 using Verifier = ProjectCeres.Analyzers.Tests.TestHelpers.CSharpAnalyzerVerifier<ProjectCeres.Analyzers.PreAuthScopeTransactionAnalyzer>;
 

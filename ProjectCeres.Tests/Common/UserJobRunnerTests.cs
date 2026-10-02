@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
-using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration;
 using ProjectCeres.Tests.Integration.Authentication;
 

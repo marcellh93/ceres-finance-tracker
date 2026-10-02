@@ -2,7 +2,6 @@ using System.Net;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 

@@ -1,5 +1,3 @@
-using ProjectCeres.Models;
-
 namespace ProjectCeres.Services.Reports;
 
 public record ReportParameters(

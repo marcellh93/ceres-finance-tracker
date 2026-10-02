@@ -1,6 +1,5 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
-using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 

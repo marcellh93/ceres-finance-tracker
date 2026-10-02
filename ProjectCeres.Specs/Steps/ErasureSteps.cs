@@ -13,7 +13,6 @@ using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Specs.Support;
-using ProjectCeres.Tests.Integration;
 using ProjectCeres.Tests.Integration.Authentication;
 using ProjectCeres.Tools;
 using Reqnroll;

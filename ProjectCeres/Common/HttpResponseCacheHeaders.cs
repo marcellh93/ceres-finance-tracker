@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-
 namespace ProjectCeres.Common;
 
 /// <summary>

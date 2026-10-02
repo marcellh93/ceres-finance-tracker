@@ -1,7 +1,6 @@
 using System.Linq.Expressions;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.AppRole;
 

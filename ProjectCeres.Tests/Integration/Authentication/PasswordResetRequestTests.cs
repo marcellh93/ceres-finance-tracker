@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -9,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
-using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 

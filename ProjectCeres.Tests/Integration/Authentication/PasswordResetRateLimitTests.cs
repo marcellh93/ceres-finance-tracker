@@ -1,7 +1,5 @@
 using System.Net;
 using FluentAssertions;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using ProjectCeres.Common.Email;
 

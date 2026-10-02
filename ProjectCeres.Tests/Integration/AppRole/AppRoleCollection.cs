@@ -1,5 +1,4 @@
 using Npgsql;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.AppRole;
 

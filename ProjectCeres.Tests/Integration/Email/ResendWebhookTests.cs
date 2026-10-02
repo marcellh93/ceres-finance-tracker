@@ -8,7 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Email;
 

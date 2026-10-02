@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Data;
 using ProjectCeres.Models;

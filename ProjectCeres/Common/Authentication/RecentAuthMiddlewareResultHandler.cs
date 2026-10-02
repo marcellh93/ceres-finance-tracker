@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
-using Microsoft.AspNetCore.Http;
-using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 

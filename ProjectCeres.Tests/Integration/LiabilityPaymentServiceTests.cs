@@ -1,7 +1,5 @@
 using FluentAssertions;
-using ProjectCeres.Common;
 using ProjectCeres.Tests.Common;
-using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.ViewModels;
 

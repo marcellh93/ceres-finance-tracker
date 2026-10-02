@@ -1,6 +1,5 @@
 using FluentAssertions;
 using ProjectCeres.Common;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Configuration;
 

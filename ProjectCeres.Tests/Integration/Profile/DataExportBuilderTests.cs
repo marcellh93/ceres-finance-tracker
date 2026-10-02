@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
-using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Integration.Profile;
 

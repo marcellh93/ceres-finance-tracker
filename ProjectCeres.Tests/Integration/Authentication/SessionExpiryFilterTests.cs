@@ -1,12 +1,10 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Tests.Common;
 using ProjectCeres.Tests.Integration.AppRole;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 

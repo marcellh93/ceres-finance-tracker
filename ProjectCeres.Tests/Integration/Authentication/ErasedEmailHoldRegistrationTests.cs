@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
-using ProjectCeres.Tests.Common;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 

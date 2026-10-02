@@ -1,5 +1,4 @@
 using System.Net;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Resend;
 using ResendEmailMessage = Resend.EmailMessage;

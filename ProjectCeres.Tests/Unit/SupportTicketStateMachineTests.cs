@@ -1,7 +1,6 @@
 using FluentAssertions;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
-using Xunit;
 
 namespace ProjectCeres.Tests.Unit;
 

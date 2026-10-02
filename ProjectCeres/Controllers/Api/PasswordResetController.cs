@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.ViewModels.Auth;
-using System.Linq;
 
 namespace ProjectCeres.Controllers.Api;
 

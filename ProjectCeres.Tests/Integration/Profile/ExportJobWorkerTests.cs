@@ -1,4 +1,3 @@
-using System.Globalization;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +9,6 @@ using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
-using ProjectCeres.Tests.Common;
 using ProjectCeres.Tools;
 
 namespace ProjectCeres.Tests.Integration.Profile;

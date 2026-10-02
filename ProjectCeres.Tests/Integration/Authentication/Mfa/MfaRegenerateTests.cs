@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
-using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication.Mfa;
 

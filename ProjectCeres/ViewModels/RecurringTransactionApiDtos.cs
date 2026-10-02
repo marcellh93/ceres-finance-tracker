@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using ProjectCeres.Models;
 
 namespace ProjectCeres.ViewModels;
 

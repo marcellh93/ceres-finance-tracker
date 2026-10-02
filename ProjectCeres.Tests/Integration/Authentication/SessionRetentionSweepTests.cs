@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.AppRole;
 using ProjectCeres.Tools;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 

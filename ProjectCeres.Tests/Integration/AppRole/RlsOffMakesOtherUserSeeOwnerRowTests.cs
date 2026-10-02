@@ -2,7 +2,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using ProjectCeres.Models;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.AppRole;
 

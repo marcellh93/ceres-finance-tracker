@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
-using Xunit;
 
 namespace ProjectCeres.Tests.Unit;
 

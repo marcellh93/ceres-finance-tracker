@@ -8,7 +8,6 @@ using Moq;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
-using ProjectCeres.Tests.Common;
 using ProjectCeres.Tools;
 
 namespace ProjectCeres.Tests.Integration.Profile;

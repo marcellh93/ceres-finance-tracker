@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Email;
 

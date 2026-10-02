@@ -3,7 +3,6 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 
 namespace ProjectCeres.Tests.Integration;

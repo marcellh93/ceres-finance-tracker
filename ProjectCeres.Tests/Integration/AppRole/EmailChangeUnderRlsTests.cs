@@ -11,7 +11,6 @@ using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.AppRole;
 

@@ -5,7 +5,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
-using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration.Api;
 

@@ -1,7 +1,5 @@
 using MimeDetective;
 using MimeDetective.Definitions;
-using MimeDetective.Engine;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Common;

@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +9,6 @@ using Microsoft.Extensions.Options;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
-using ProjectCeres.Models;
 using ProjectCeres.Services;
 using ProjectCeres.Specs.Support;
 using ProjectCeres.Tests.Integration;

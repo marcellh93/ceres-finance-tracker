@@ -1,4 +1,3 @@
-using System.IO;
 using System.Reflection;
 using FluentAssertions;
 using ProjectCeres.Admin;
@@ -16,7 +15,6 @@ using ProjectCeres.Common.Authentication;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
-using ProjectCeres.Tests.Integration;
 
 namespace ProjectCeres.Tests.Integration.Authentication;
 

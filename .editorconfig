@@ -48,6 +48,14 @@ dotnet_diagnostic.CER007.severity = suggestion
 # locally (drop --verify-no-changes) to auto-fix before pushing.
 dotnet_diagnostic.IDE0001.severity = warning
 
+# IDE0005 (unnecessary using directive) promoted to warning. Like IDE0001 it is
+# gated by the repo-hygiene "Code-style check" dotnet format step, NOT the build:
+# the dotnet build path needs GenerateDocumentationFile=true to detect it (its
+# unused-using pass piggybacks on doc-comment binding — dotnet/roslyn#53720),
+# whereas dotnet format detects it with only this severity bump. Gating via
+# format keeps GenerateDocumentationFile off and avoids muting CS1591.
+dotnet_diagnostic.IDE0005.severity = warning
+
 # EF Core auto-generated migration files — never hand-edited.
 [ProjectCeres/Migrations/*.cs]
 dotnet_diagnostic.CA1861.severity = none

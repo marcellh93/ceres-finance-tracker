@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common.Email;
 using ProjectCeres.Data;

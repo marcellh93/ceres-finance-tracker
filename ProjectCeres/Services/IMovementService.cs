@@ -1,4 +1,3 @@
-using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;

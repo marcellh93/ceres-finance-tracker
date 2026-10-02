@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
-using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 

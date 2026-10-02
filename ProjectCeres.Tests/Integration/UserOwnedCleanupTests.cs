@@ -2,7 +2,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using ProjectCeres.Common;
 using ProjectCeres.Data;
 using ProjectCeres.Models;
 using ProjectCeres.Tests.Integration.Authentication;

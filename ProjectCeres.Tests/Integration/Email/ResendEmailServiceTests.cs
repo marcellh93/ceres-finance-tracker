@@ -7,7 +7,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using ProjectCeres.Common.Email;
 using Resend;
-using Xunit;
 using ResendEmailMessage = Resend.EmailMessage;
 
 namespace ProjectCeres.Tests.Integration.Email;

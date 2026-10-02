@@ -1,10 +1,8 @@
-using System.Net;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
-using ProjectCeres.Models;
 
 namespace ProjectCeres.Tests.Integration;
 

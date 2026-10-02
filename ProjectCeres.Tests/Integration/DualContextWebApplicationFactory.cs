@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common;
 using ProjectCeres.Data;
-using ProjectCeres.Tests.Integration.Authentication;
 
 namespace ProjectCeres.Tests.Integration;
 
