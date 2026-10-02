@@ -334,10 +334,21 @@ builder.Services.Scan(scan => scan
             "ProjectCeres.Common",
             "ProjectCeres.Common.Email")
         .Where(t => !interceptorExclusions.Contains(t) && !selfWithInterfacesTargets.Contains(t)
+                 && !multiRegistrationInterfaceTargets.Contains(t) && !replaceTargets.Contains(t)
                  && IsScannableServiceType(t) && !IsRegisteredAsSingleton(t)))
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
     .AsImplementedInterfaces()
     .WithScopedLifetime()
+    // Found by two independent reviewers (the normal task reviewer and
+    // reviewer-security) on this diff: this branch did not exclude
+    // multiRegistrationInterfaceTargets/replaceTargets the way the singleton Skip
+    // branch above does. Inert today -- all three members of both sets are
+    // [RegisterAsSingleton] -- but if a future Scoped class were added to either
+    // set without this exclusion, it would land in BOTH this plain Skip branch AND
+    // its own Append/Replace scoped branch (once one exists), with Scan()'s
+    // internal ordering silently deciding which wins. Closed now rather than left
+    // as a latent gap, per the exact lesson this diff's own §3e/§3f already
+    // generalize.
     // selfWithInterfacesTargets has only one member today (Argon2idPasswordHasher,
     // AddScoped) -- these two branches exist in a pair so a future member needing
     // Singleton lifetime lands correctly instead of silently falling through to the

@@ -76,11 +76,20 @@ public class DiCompletenessTests : IntegrationTestBase<Bucket3Factory>
 
         var handlers = scope.ServiceProvider.GetServices<IAuthorizationHandler>().ToList();
 
-        handlers.Should().Contain(h => h is RecentAuthRequirementHandler,
+        // Minor strengthening per reviewer-playwright-test-audit: two independent Contain()
+        // checks catch the regression this test targets (TryAdd dropping the
+        // second-enumerated handler -- either Contain throws on a zero-of-that-type
+        // scenario) but would not catch a pure-duplication regression (Append somehow
+        // registering one handler twice and the other zero times). Both classes flow
+        // through the same single Where(multiRegistrationInterfaceTargets.Contains(t))
+        // clause today, so no live bug produces that shape -- the exact-count checks below
+        // close the gap anyway, cheaply, rather than leaving it merely argued-safe.
+        handlers.Count(h => h is RecentAuthRequirementHandler).Should().Be(1,
             because: "RecentAuthRequirementHandler gates the [RequireRecentAuth] policy; " +
                      "a RegistrationStrategy.Skip regression would silently drop whichever " +
-                     "of the two handlers is enumerated second");
-        handlers.Should().Contain(h => h is AdminLiveRequirementHandler,
+                     "of the two handlers is enumerated second, and an Append " +
+                     "misconfiguration could as easily duplicate one instead");
+        handlers.Count(h => h is AdminLiveRequirementHandler).Should().Be(1,
             because: "AdminLiveRequirementHandler gates the AdminLive policy via a live " +
                      "DB role check -- losing this handler silently disables that check " +
                      "with no error, not merely a DI-wiring inconvenience");
@@ -102,14 +111,31 @@ public class DiCompletenessTests : IntegrationTestBase<Bucket3Factory>
         // implements the interface and also "resolves" a non-null instance. The original
         // manual registration (plain AddSingleton, never TryAdd) always won unconditionally;
         // the scan must use RegistrationStrategy.Replace() to replicate that.
+        //
+        // Found by reviewer-playwright-test-audit (Condition E2, RULE_CLASS
+        // last-registered-wins-masks-duplicate-registration): GetRequiredService<T>()
+        // returns the LAST-registered descriptor for T regardless of how many earlier
+        // descriptors for T still exist in the container -- asserting only the resolved
+        // TYPE proves "the last one happens to be right," not "Replace() actually removed
+        // the framework default." A Replace() regression that left the framework default
+        // registered-but-superseded (not last) would pass a type-only assertion while
+        // silently violating §3f's claim -- same structural blindness class as the
+        // Argon2idPasswordHasher dual-consumer gap from Task 5. The count assertion below
+        // closes it: exactly one descriptor for the interface, and it is the project's own.
         using var scope = Factory.Services.CreateScope();
 
-        var handler = scope.ServiceProvider.GetRequiredService<IAuthorizationMiddlewareResultHandler>();
+        var handlers = scope.ServiceProvider.GetServices<IAuthorizationMiddlewareResultHandler>().ToList();
 
-        handler.Should().BeOfType<RecentAuthMiddlewareResultHandler>(
-            because: "the framework's own AuthorizationMiddlewareResultHandler default " +
-                     "returns 403 Forbidden on a failed policy, silently reverting the " +
-                     "custom 401 REAUTH_REQUIRED envelope every [RequireRecentAuth] " +
-                     "endpoint depends on");
+        handlers.Should().ContainSingle(
+            because: "RegistrationStrategy.Replace() must remove the framework's own " +
+                     "AuthorizationMiddlewareResultHandler default, not merely be " +
+                     "superseded by a later registration -- two surviving descriptors " +
+                     "would mean Replace() silently failed to evict the one it was " +
+                     "supposed to displace")
+            .Which.Should().BeOfType<RecentAuthMiddlewareResultHandler>(
+                because: "the framework's own AuthorizationMiddlewareResultHandler default " +
+                         "returns 403 Forbidden on a failed policy, silently reverting the " +
+                         "custom 401 REAUTH_REQUIRED envelope every [RequireRecentAuth] " +
+                         "endpoint depends on");
     }
 }
