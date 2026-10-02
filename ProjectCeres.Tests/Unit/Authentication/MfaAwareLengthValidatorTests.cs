@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.AspNetCore.Identity;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
 

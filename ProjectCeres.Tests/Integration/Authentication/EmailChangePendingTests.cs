@@ -2,7 +2,6 @@ using System.Net;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;

@@ -1,6 +1,5 @@
 using FluentAssertions;
 using ProjectCeres.Tests.Common;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
