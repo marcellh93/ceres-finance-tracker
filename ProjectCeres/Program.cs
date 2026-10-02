@@ -267,7 +267,6 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<UserOwnershipInterceptor>();
-builder.Services.AddScoped<UserOwnershipInterceptor>();
 
 // Stage 7.5 / ADR-0068 — PostgreSQL Row-Level Security defence in depth.
 // Stage 7.6.7 / ADR-0073: IPreAuthCallSiteTagger registry deleted; pre-auth call sites
