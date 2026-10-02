@@ -15,7 +15,7 @@ The project has FIVE+ "single source of truth" registries that every new entity 
 | 2 | `AppDbContext.OnModelCreating` configuration block | EF Core schema mapping |
 | 3 | model-derived membership via `UserOwnedModel.RlsTables` (`ProjectCeres/Common/UserOwnedModel.cs`) — automatic for any concrete `IUserOwned` entity with a table; the hand-typed `UserOwnedTables.All` was deleted in Stage 9.5b | EF query-filter loop + RLS migration loop + ParityTests |
 | 4 | RLS migration installing `CREATE POLICY user_isolation` | Postgres at runtime |
-| 5 | `Program.cs` DI registration | ASP.NET DI container |
+| 5 | Scan-convention naming (Stage 13.a, 2026-10-02) — name the class/interface per `docs/architecture.md` § Service Registration; Scrutor's `Scan(...)` rules in `Program.cs` + the `DiCompletenessTests` check cover registration automatically. A manual `Program.cs` line is needed ONLY for the 5-line non-scannable boundary (an instance registration or an environment-conditional branch — see that doc section) | ASP.NET DI container |
 | 6 | `IgnoreQueryFilters()` allow-list (`ArchitectureTests.cs`) — IF the service calls `IgnoreQueryFilters()` | Architecture test |
 | 7 | `EmailsResource.en.resx` + `EmailsResource.es.resx` — IF a new email template ships | `IEmailComposer` at runtime |
 | 8 | `EmailTemplateKey` enum — IF a new email template ships | `IEmailComposer.Compose` |
@@ -47,7 +47,7 @@ The hook at `.claude/skills/verify-stage-completeness/hooks/stage-completeness-c
 ### 3.2 — For every `Service.cs` under `ProjectCeres/Common/Authentication/` or `ProjectCeres/Services/`
 
 - Parse the class name.
-- **Check S1:** is there an `AddScoped<ClassName>()` or `AddSingleton<ClassName>()` in `Program.cs`? If no → gap.
+- **Check S1 (updated Stage 13.a, 2026-10-02):** does the class live in one of the scanned namespaces (`ProjectCeres.Services` prefix-inclusive; `ProjectCeres.Admin` / `ProjectCeres.Common.Authentication` / `ProjectCeres.Common` / `ProjectCeres.Common.Email` exact-match — see `docs/architecture.md` § Service Registration) and implement at least one interface or qualify as a self-registered concrete? If so, Scrutor's `Scan(...)` rules register it automatically — no `Program.cs` line needed, and `DiCompletenessTests` fails loudly if the registration doesn't actually resolve. If no (the class sits outside every scanned namespace, or needs an environment-conditional branch the scan can't express) → is there an `AddScoped<ClassName>()` / `AddSingleton<ClassName>()` line in `Program.cs`'s 5-line non-scannable boundary? If neither applies → gap.
 - **Check S2:** does the service file contain `IgnoreQueryFilters(`? If yes:
   - is the relative file path in the `allowed` set inside `ArchitectureTests.cs § IgnoreQueryFilters_only_appears_in_documented_exception_paths`? If no → gap.
 

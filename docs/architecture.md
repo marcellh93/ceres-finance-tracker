@@ -9,6 +9,7 @@
 3. [Architecture Evolution by Phase](#architecture-evolution-by-phase)
 4. [Layer Boundaries](#layer-boundaries)
 5. [What Lives Where](#what-lives-where)
+6. [Service Registration — Scrutor Assembly Scanning](#service-registration--scrutor-assembly-scanning)
 
 ---
 
@@ -260,3 +261,69 @@ wwwroot/css/site.css  (minified, generated output — served as a static file)
 | CI / production | `dotnet publish` triggers the pre-build target, CSS is included in the published output |
 
 **Phase 2 transition:** When React is introduced, the Tailwind CLI will be replaced by Vite (which includes Tailwind as a PostCSS plugin). The `@apply`-based component classes in `app.css` will be replaced by shadcn/ui React components using inline Tailwind utilities.
+
+---
+
+## Service Registration — Scrutor Assembly Scanning
+
+**Shipped Stage 13.a (2026-10-02).** Previously undocumented — `Program.cs` DI registration had no written convention; this section is that convention, written down for the first time rather than resolving a prior contradiction.
+
+Before Stage 13.a, every service needing DI was a hand-written `builder.Services.AddScoped<IFoo, Foo>()` (or `AddSingleton`) line in `Program.cs` — 84 such lines at the stage's start. 79 of them followed one of two purely structural shapes and are now registered automatically by [Scrutor](https://github.com/khellang/Scrutor) assembly scanning instead. 5 stay manual because they sit inside environment-conditional branches a structural scan cannot express (see below).
+
+### The scan rule
+
+The rule is **structural, never a naming pattern** (e.g. no "classes ending in `Service`"):
+
+- A class that implements **at least one interface** (declared or inherited, project-defined or framework) → registered via `AsImplementedInterfaces()`.
+- A class that implements **no interface** → registered via `AsSelf()` (a self-registered concrete type, e.g. a factory or a job runner consumed by its own type, not an interface).
+- Default lifetime is **Scoped**. The `[RegisterAsSingleton]` marker attribute (`ProjectCeres/Common/RegisterAsSingletonAttribute.cs`) overrides a class to Singleton. Because Scrutor's `AddClasses(...)` call can only terminate in one fixed lifetime (`WithScopedLifetime()` / `WithSingletonLifetime()` / `WithTransientLifetime()` — there is no per-type lifetime factory on Scrutor 7.0.0's `ILifetimeSelector`), every rule below is actually **two** `AddClasses(...)` batches: one filtered to `[RegisterAsSingleton]` classes terminating in `WithSingletonLifetime()`, one filtered to everything else terminating in `WithScopedLifetime()`.
+
+### The namespace list
+
+Two separate `Scan(...)` calls, chosen deliberately per namespace rather than one call across a shared parent:
+
+| Namespace | Match mode | Why |
+|---|---|---|
+| `ProjectCeres.Services` | `InNamespaces` (prefix-inclusive) | Sub-namespaces like `ProjectCeres.Services.Reports` are meant to be swept in too. |
+| `ProjectCeres.Admin` | `InExactNamespaces` | Exact-match only. |
+| `ProjectCeres.Common.Authentication` | `InExactNamespaces` | Exact-match only. |
+| `ProjectCeres.Common` | `InExactNamespaces` | **Must be exact-match, not prefix.** A prefix match (`InNamespaces("ProjectCeres.Common")`) would also sweep in the sibling namespace `ProjectCeres.Common.Exceptions` — exception types are not DI services, and a thrown exception type being registered in the container is a correctness bug, not a no-op. `InExactNamespaces` matches only classes declared directly in `ProjectCeres.Common`, never a sub-namespace. |
+| `ProjectCeres.Common.Email` | `InExactNamespaces` | Exact-match only. |
+
+`ScrutorNamespaceBoundaryTests` (`ProjectCeres.Tests/Unit/ScrutorNamespaceBoundaryTests.cs`) pins both boundary behaviors directly: a class outside every scanned namespace is never swept in, and `InExactNamespaces("ProjectCeres.Common")` does not accidentally match a `ProjectCeres.Common.*` sub-namespace.
+
+### False positives the structural rule does not exclude on its own
+
+A bare "implements an interface, or doesn't" rule over-matches several ordinary C# shapes that are not services: exception types, positional-record DTOs, custom `Attribute` subclasses, and conventional ASP.NET Core middleware (constructed by `ActivatorUtilities` via `app.UseMiddleware<T>()`, never resolved through DI). These are excluded via shared reflection predicates in `ScanExclusionPredicates` (`IsExceptionType` / `IsRecordType` / `IsAttributeType` / `IsConventionalMiddleware`) — the same predicates `DiCompletenessCheck` uses, so a fix to one can never silently diverge from the other. A class with only non-public constructors (`IsConstructibleByDi`) is excluded for the same reason: Scrutor registers it without checking constructor accessibility, which only fails at `ServiceProvider.ValidateOnBuild` (Development-only) or at first resolution.
+
+### Dual-consumer / multi-registration / framework-preemption exclusions
+
+Three further exclusion sets exist because "a class implements an interface" is not the same claim as "every consumer of that class resolves it through that interface." A future engineer who deletes a manual registration line and hits one of these walls needs to know these sets exist and what each one is for:
+
+- **`selfWithInterfacesTargets`** — classes some consumers inject by **interface** and other consumers inject by **concrete type**. `AsImplementedInterfaces()` alone does not also self-register the concrete type, so a plain interface scan would leave the concrete-type consumers unable to resolve their dependency. These classes route through `AsSelfWithInterfaces()` instead, which registers the concrete type as itself *and* resolves every implemented interface through that same shared instance. Current members: `Argon2idPasswordHasher` (interface consumers via ASP.NET Identity's `IPasswordHasher<ApplicationUser>`, 13+ concrete-type consumers across `ProjectCeres.Common.Authentication` and `AuthController`); the 8 `IReportGenerator` classes under `ProjectCeres.Services.Reports` (`ReportGeneratorFactory` injects all 8 by concrete type); `CsvImportParser` / `ExcelImportParser` (`ImportParserFactory` injects both by concrete type, despite both declaring `: IImportParser`).
+- **`multiRegistrationInterfaceTargets`** — interfaces that ASP.NET Core resolves as `IEnumerable<T>` and runs **every** registered implementation, by design (not last-registration-wins). The default scan strategy, `RegistrationStrategy.Skip` (= `TryAdd`, keyed purely by `ServiceType`), would silently register only the first-enumerated implementation and drop the rest — no error, no warning, just a check that quietly stops running. These classes use `RegistrationStrategy.Append` (= plain `Add`, no dedup) instead. Current members: `RecentAuthRequirementHandler` and `AdminLiveRequirementHandler`, both `IAuthorizationHandler`.
+- **`replaceTargets`** — a service whose interface slot a **framework default already claims** before the scan runs. `AddControllersWithViews()` (called before either `Scan(...)`) internally registers a framework default for `IAuthorizationMiddlewareResultHandler` via `TryAddTransient`, so `RegistrationStrategy.Skip`'s `TryAdd` is a guaranteed no-op for that interface regardless of scan ordering. These classes use `RegistrationStrategy.Replace()`, which removes any existing registration for the `ServiceType` before adding — replicating what the original manual `AddSingleton` line (never `TryAdd`) always did unconditionally. Current member: `RecentAuthMiddlewareResultHandler`.
+
+All three sets are asserted directly by `DiCompletenessTests` (`ProjectCeres.Tests/Integration/DiCompletenessTests.cs`), not just by "a dependency resolves to something" — e.g. an identity check that the interface and concrete-type resolutions of `Argon2idPasswordHasher` are the *same* instance, and exact-count checks that both `IAuthorizationHandler` implementations and exactly one `IAuthorizationMiddlewareResultHandler` descriptor survive.
+
+### The `[RegisterAsSingleton]` escape hatch
+
+`ProjectCeres/Common/RegisterAsSingletonAttribute.cs` is a marker attribute with no members. A class carrying it is registered `Singleton`; every other scanned class defaults to `Scoped`. `ScrutorNamespaceBoundaryTests.RegisterAsSingleton_attribute_changes_lifetime_from_the_Scoped_default` confirms the attribute actually changes the resolved lifetime, using `TokenLookupHasher` as the real example.
+
+### Two-class interceptor exclusion
+
+`UserOwnershipInterceptor` and `RowLevelSecurityInterceptor` (`ProjectCeres.Common`) both implement EF Core interceptor interfaces but are excluded from the interface-pair scan rule entirely (`interceptorExclusions`). EF Core interceptors are wired via `DbContextOptionsBuilder.AddInterceptors(...)` inside the `AddDbContext<AppDbContext>` configuration, not via `builder.Services.Add*<TInterface, TImpl>()` — a DI registration for either class would be inert (nothing resolves an EF interceptor interface through the container) and would pollute it with a self-registered-concrete entry nothing ever uses.
+
+### The 5-line non-scannable boundary
+
+A structural scan cannot express "only register this under condition X." Five registrations stay manual by design, all inside environment- or configuration-conditional branches in `Program.cs`:
+
+1. `TimeProvider.System` — an instance registration (`AddSingleton(TimeProvider.System)`), not a type registration; Scrutor scans types, not pre-built instances.
+2. `IEmailService` → a provider chosen by configuration (`AddSingleton<IEmailService>(sp => ...)` for a configured sender, `AddSingleton<IEmailService, LogOnlyEmailService>()` in Development, or `AddScoped<IEmailService, ResendEmailService>()` when Resend is configured) — three mutually-exclusive branches resolving the same interface.
+3. `IBreachedPasswordChecker` → `AddSingleton<IBreachedPasswordChecker, AlwaysAllowBreachedPasswordChecker>()` in one environment branch, or `AddHttpClient<IBreachedPasswordChecker, HaveIBeenPwnedPasswordChecker>()` in another — `AddHttpClient` is a distinct registration shape a plain `AddClasses(...)` scan cannot replicate.
+
+These, plus a separate, non-overlapping family of `AddDbContext<T>`, `Configure<TOptions>`, and `AddHttpClient<...>` calls (option binders and infrastructure registrations, never part of the scanned 84), are the complete non-scannable set. `grep -cE "builder\.Services\.Add(Scoped|Singleton|Transient)" ProjectCeres/Program.cs` returns exactly 5 — the stable verification command for this boundary.
+
+### Verification
+
+`DiCompletenessCheck.FindUnresolvable(IServiceProvider)` walks every scanned class's constructor dependencies and confirms each resolves, both as a fast automated test (`DiCompletenessTests`, boots the real DI graph via `TestWebApplicationFactory`) and implicitly at real app boot via ASP.NET Core's `ServiceProvider.ValidateOnBuild` (Development-only). Full design history, the 7 scan-mechanism gaps found during implementation, and the arithmetic reconciliation of the 84-registration figure: `docs/superpowers/specs/2026-09-27-stage-13a-scrutor-di-scanning-design.md`.
