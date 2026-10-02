@@ -39,7 +39,11 @@
        database update`, which only needs the assembly to compile) build
        without the Tailwind CLI. Normal builds still produce site.css. -->
   <Target Name="BuildTailwind" BeforeTargets="Build" Condition="'$(SkipTailwind)' != 'true'">
-    <Exec Command="pnpm run build:css" WorkingDirectory="$(ProjectDir)" />
+    <!-- Tailwind v3.4 vendors caniuse-lite inside peers/index.js; it cannot be
+         refreshed via an external package bump, so it always warns "outdated".
+         Suppress with browserslist's documented switch. See ADR/runbook. -->
+    <Exec Command="pnpm run build:css" WorkingDirectory="$(ProjectDir)"
+          EnvironmentVariables="BROWSERSLIST_IGNORE_OLD_DATA=1" />
   </Target>
 
   <!-- Stage 11 Task 5: build + stage the SPA for Release only.
