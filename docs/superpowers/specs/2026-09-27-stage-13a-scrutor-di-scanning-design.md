@@ -104,6 +104,82 @@ The project's original manual registrations carried BOTH lines (`AddScoped<IPass
 
 **Standing lesson for future scan-namespace additions:** before removing a manual registration pair where one line registers an interface and a second, separate line registers the bare concrete type for the same class, check whether anything in the codebase depends on the concrete type directly (`grep` for the class name as a constructor parameter type, not just the interface). If so, that class needs this `selfWithInterfacesTargets`-style exclusion, not a plain interface-pair removal.
 
+## 3e. The multi-registration-interface exclusion (added during plan execution, Task 6, 2026-10-02 — READ before implementation)
+
+**A fourth scan-rule shape: an interface deliberately meant to carry MULTIPLE registrations, where ASP.NET Core runs every one of them rather than picking the last-registered.**
+
+`RecentAuthRequirementHandler` and `AdminLiveRequirementHandler` both implement `IAuthorizationHandler` — the second via inheriting `AuthorizationHandler<TRequirement>`, the spec's base-class-inherited-interface case from §3b. ASP.NET Core's authorization pipeline resolves `IEnumerable<IAuthorizationHandler>` and runs **every** registered handler by design; this is explicitly not a last-registration-wins interface like every other interface this stage scans.
+
+**Why this breaks:** every scan rule in this stage uses `RegistrationStrategy.Skip`. Confirmed against Scrutor's real source (`src/Scrutor/RegistrationStrategy.cs` at `v7.0.0`):
+
+```csharp
+private sealed class SkipRegistrationStrategy : RegistrationStrategy
+{
+    public override void Apply(IServiceCollection services, ServiceDescriptor descriptor) => services.TryAdd(descriptor);
+}
+```
+
+`IServiceCollection.TryAdd` is keyed purely by `ServiceType` — it ignores `ImplementationType` and inheritance shape entirely. The Task 6 implementer proved this empirically, **before touching any code**, in a throwaway project reproducing the exact shape (one directly-implementing class, one via base-class inheritance) scanned under `Skip` + `AsImplementedInterfaces()`: only the first-enumerated type registers; the second is silently dropped from the service collection, never shadowed, never added. `IEnumerable<IAuthorizationHandler>` resolves to exactly 1 instance, never 2 — regardless of which of the two is enumerated first, which itself is an undocumented reflection-ordering detail, making the failure non-deterministic across builds/runtimes.
+
+The consequence is security-relevant, not merely a DI technicality: `AdminLiveRequirementHandler`'s `AdminLive` policy gates admin-only actions via a live database role check. If it is the one silently dropped, that authorization check simply stops running — no error, no warning, no test failure anywhere short of a human noticing an admin-only action is no longer gated.
+
+**Fix:** a named exclusion — `multiRegistrationInterfaceTargets` (same `HashSet<Type>` shape as `interceptorExclusions`/`selfWithInterfacesTargets`) containing both handler classes, routed through `RegistrationStrategy.Append` instead of `Skip`:
+
+```csharp
+private sealed class AppendRegistrationStrategy : RegistrationStrategy
+{
+    public override void Apply(IServiceCollection services, ServiceDescriptor descriptor) => services.Add(descriptor);
+}
+```
+
+`Append` calls `IServiceCollection.Add` directly, with no dedup check of any kind — the correct mechanism for an interface deliberately designed to carry multiple registrations. Both classes are `[RegisterAsSingleton]`-attributed today; the fix is implemented as a matched Singleton/Scoped pair of `Append`-strategy branches (mirroring the `selfWithInterfacesTargets` lesson from §3d — a reusable exclusion set must not assume every future member shares one lifetime).
+
+**Standing lesson:** before removing a manual registration for a class whose interface is resolved as `IEnumerable<TInterface>` anywhere in the consuming code (grep for `IEnumerable<TInterface>` or `GetServices<TInterface>`), confirm the scan uses `RegistrationStrategy.Append` for that interface, not the default `Skip` — `Skip`'s `TryAdd` silently drops every registration after the first for a given `ServiceType`, with no exception, no log line, nothing short of an explicit count/identity assertion catching it.
+
+## 3f. The framework-default-preemption exclusion (added during plan execution, Task 6, 2026-10-02 — READ before implementation)
+
+**A fifth scan-rule shape: a project class overriding a framework-provided default for a single-consumer interface, where the framework claims the interface slot BEFORE the scan ever runs.**
+
+`RecentAuthMiddlewareResultHandler` implements `IAuthorizationMiddlewareResultHandler` and is meant to replace ASP.NET Core's own `AuthorizationMiddlewareResultHandler` default, translating a failed `RecentAuthRequirement` policy check into a custom `401 REAUTH_REQUIRED` response instead of the framework's generic `403 Forbidden`.
+
+**Why this breaks:** `Program.cs` calls `AddControllersWithViews()` (line ~32) **before** either `Scan(...)` call (lines ~237, ~284). Confirmed against ASP.NET Core's real source (`dotnet/aspnetcore`, `src/Security/Authorization/Policy/src/PolicyServiceCollectionExtensions.cs`):
+
+```csharp
+public static IServiceCollection AddAuthorizationPolicyEvaluator(this IServiceCollection services)
+{
+    services.TryAddSingleton<AuthorizationPolicyMarkerService>();
+    services.TryAddTransient<IPolicyEvaluator, PolicyEvaluator>();
+    services.TryAddTransient<IAuthorizationMiddlewareResultHandler, AuthorizationMiddlewareResultHandler>();
+    return services;
+}
+```
+
+`AddControllersWithViews()` internally invokes `AddAuthorization()`, which calls `AddAuthorizationPolicyEvaluator()`, which does `TryAddTransient<IAuthorizationMiddlewareResultHandler, AuthorizationMiddlewareResultHandler>()` — the framework default **wins the `IAuthorizationMiddlewareResultHandler` slot before the scan ever executes**. The scan's `RegistrationStrategy.Skip` (`TryAdd`, keyed by `ServiceType`) is therefore a **guaranteed no-op** for this specific interface, regardless of which of the two `Scan(...)` blocks runs first or in what order within a block — the framework claimed the slot at line ~32, long before line ~237.
+
+This was found the hard way: a Stop-hook full-suite run failed 50 tests across 6 test classes, every one expecting `401 REAUTH_REQUIRED` and receiving `403 Forbidden` instead — the exact behavior of the framework's own default handler on a failed policy. Root-caused via a disposable diagnostic probe (added, used to confirm `GetServices<IAuthorizationMiddlewareResultHandler>()` returned only the framework type, then deleted) plus the ASP.NET Core source above — not assumed from the symptom alone.
+
+The original manual registration (`builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, RecentAuthMiddlewareResultHandler>()`, a plain `AddSingleton`, never `TryAdd`) always won unconditionally regardless of `AddControllersWithViews()` running first — that unconditional-overwrite behavior is exactly what the scan must replicate for this one class.
+
+**Fix:** a named exclusion — `replaceTargets` containing `RecentAuthMiddlewareResultHandler`, routed through `RegistrationStrategy.Replace()`:
+
+```csharp
+private sealed class ReplaceRegistrationStrategy : RegistrationStrategy
+{
+    public override void Apply(IServiceCollection services, ServiceDescriptor descriptor)
+    {
+        // (default behavior: ReplacementBehavior.ServiceType)
+        for (var i = services.Count - 1; i >= 0; i--)
+            if (services[i].ServiceType == descriptor.ServiceType)
+                services.RemoveAt(i);
+        services.Add(descriptor);
+    }
+}
+```
+
+`Replace()` removes any existing registration for the `ServiceType`, then adds — the only strategy that forcibly displaces an already-claimed slot. `Append` was deliberately not used here: `IAuthorizationMiddlewareResultHandler` is a single-consumer interface (ASP.NET Core resolves exactly one, not an `IEnumerable`), so two registrations would rely on undocumented "last one wins" container behavior rather than a guaranteed contract.
+
+**Standing lesson:** before removing a manual registration for an interface the ASP.NET Core framework itself provides a default implementation for (searchable via the framework's own `Add*` extension method source — `AddControllersWithViews`, `AddAuthorization`, `AddIdentity`, etc. all register defaults via `TryAdd*`), check whether any framework `Add*` call that runs BEFORE the scan already claims that interface. If so, `RegistrationStrategy.Skip` cannot win that race under any ordering of the scan calls themselves — only `Replace()` (or moving the scan before the framework call, which risks other ordering regressions) can.
+
 ## 4. What Scrutor is (verified, not assumed)
 
 Confirmed via web search 2026-09-27 (not merely general model familiarity, per this project's research-before-confident-claims rule):
