@@ -906,24 +906,8 @@ builder.Services.AddRateLimiter(options =>
 
 // === End Stage 6a wiring ===
 
-builder.Services.AddScoped<NetWorthGenerator>();
-builder.Services.AddScoped<IncomeExpenseGenerator>();
-builder.Services.AddScoped<ExpenseBreakdownGenerator>();
-builder.Services.AddScoped<TransactionHistoryGenerator>();
-builder.Services.AddScoped<BudgetVsActualReportGenerator>();
-builder.Services.AddScoped<LargestExpensesReportGenerator>();
-builder.Services.AddScoped<MonthlyCashFlowReportGenerator>();
-builder.Services.AddScoped<NetWorthOverTimeReportGenerator>();
-builder.Services.AddScoped<ReportGeneratorFactory>();
-builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.Configure<FileAttachmentOptions>(
     builder.Configuration.GetSection("FileAttachments"));
-builder.Services.AddScoped<IFileAttachmentService, FileAttachmentService>();
-builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
-builder.Services.AddScoped<ISupportMessageService, SupportMessageService>();
-builder.Services.AddScoped<ISupportRecipientResolver, SupportRecipientResolver>();
-builder.Services.AddScoped<ISupportNotificationService, SupportNotificationService>();
-builder.Services.AddScoped<INewSessionNotificationService, NewSessionNotificationService>();
 
 // Stage 12.5 — support-ticket notifications have nowhere to go without this.
 // Production fails to boot rather than accept tickets nobody will read; other
