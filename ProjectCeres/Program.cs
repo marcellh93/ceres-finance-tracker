@@ -247,7 +247,8 @@ builder.Services.Scan(scan => scan
             "ProjectCeres.Common.Authentication",
             "ProjectCeres.Common",
             "ProjectCeres.Common.Email")
-        .Where(t => !interceptorExclusions.Contains(t) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+        .Where(t => !interceptorExclusions.Contains(t) && !selfWithInterfacesTargets.Contains(t)
+                 && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
     .AsImplementedInterfaces()
     .WithSingletonLifetime()
@@ -262,6 +263,23 @@ builder.Services.Scan(scan => scan
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
     .AsImplementedInterfaces()
     .WithScopedLifetime()
+    // selfWithInterfacesTargets has only one member today (Argon2idPasswordHasher,
+    // AddScoped) -- these two branches exist in a pair so a future member needing
+    // Singleton lifetime lands correctly instead of silently falling through to the
+    // AsImplementedInterfaces branch above and reintroducing the exact
+    // concrete-type-unregistered bug this exclusion set exists to close. Found by
+    // Task 5's task review, not assumed: the original single-branch version only
+    // handled the Scoped case.
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => selfWithInterfacesTargets.Contains(t) && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsSelfWithInterfaces()
+    .WithSingletonLifetime()
     .AddClasses(classes => classes
         .InExactNamespaces(
             "ProjectCeres.Admin",
