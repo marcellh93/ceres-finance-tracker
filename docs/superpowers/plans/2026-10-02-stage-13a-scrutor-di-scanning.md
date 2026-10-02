@@ -561,14 +561,20 @@ InNamespaces prefix-inclusive rule, not a separate namespace entry)."
 
 ---
 
-## Task 8: Remove manual lines — Services block, part 2 (12 lines)
+## Task 8: Remove manual lines — Services block, part 2 (16 lines)
 
 **Files:**
 - Modify: `ProjectCeres/Program.cs`
 
+**Note (added after Task 7's execution):** Task 7 originally planned 18 lines but narrowed to 14 after its implementer found a real scan-mechanism gap pre-emptively: all 8 `IReportGenerator` implementations are injected by concrete type in `ReportGeneratorFactory`'s constructor, not by the interface, so `AsImplementedInterfaces()` alone would leave the concrete types unresolvable. The fix (extending `selfWithInterfacesTargets` to all 8 generator classes, landed in Task 7's commit) is already in place and covers both this task's 4 generators AND the 4 Task 7 held back (`NetWorthGenerator`, `IncomeExpenseGenerator`, `ExpenseBreakdownGenerator`, `TransactionHistoryGenerator`). Both sets of 4 are equally safe to remove now — this task's line list below has grown from 12 to 16 to absorb Task 7's 4 held-back lines, since they're the same mechanism, same file region, and would otherwise have no receiving task.
+
 - [ ] **Step 1: Remove the following lines**
 
 ```csharp
+builder.Services.AddScoped<NetWorthGenerator>();
+builder.Services.AddScoped<IncomeExpenseGenerator>();
+builder.Services.AddScoped<ExpenseBreakdownGenerator>();
+builder.Services.AddScoped<TransactionHistoryGenerator>();
 builder.Services.AddScoped<BudgetVsActualReportGenerator>();
 builder.Services.AddScoped<LargestExpensesReportGenerator>();
 builder.Services.AddScoped<MonthlyCashFlowReportGenerator>();
@@ -583,6 +589,8 @@ builder.Services.AddScoped<ISupportNotificationService, SupportNotificationServi
 builder.Services.AddScoped<INewSessionNotificationService, NewSessionNotificationService>();
 ```
 
+Note: `NetWorthGenerator`/`IncomeExpenseGenerator`/`ExpenseBreakdownGenerator`/`TransactionHistoryGenerator` are no longer present in `Program.cs` as of Task 9's start if Task 7 already removed them in a prior pass — check the file first; if they're already gone, remove only the remaining 12 named above. `ReportGeneratorFactory` itself has no interface (self-registered-concrete, handled by the plain `AsSelf()` rule, not `selfWithInterfacesTargets` — it's the consumer of the 8 generators, not one of them).
+
 Leave `builder.Services.Configure<FileAttachmentOptions>(...)` (the line immediately preceding `IFileAttachmentService` in the current file) untouched — it is one of the separate, never-part-of-84 `Configure<T>` family.
 
 - [ ] **Step 2: Run the full suite**
@@ -594,10 +602,12 @@ Expected: all green, same pass count as Task 7's baseline.
 
 ```bash
 git add ProjectCeres/Program.cs
-git commit -m "refactor(13.a): remove 12 manual lines, Services block part 2
+git commit -m "refactor(13.a): remove 16 manual lines, Services block part 2
 
-Batch 6/N: remaining report generators, dashboard, file attachments,
-support-ticket services (3 of which -- SupportRecipientResolver,
+Batch 6/N: all 8 IReportGenerator implementations (4 held back from
+Task 7 pending the selfWithInterfacesTargets fix, now safe + the 4
+originally planned here), dashboard, file attachments, support-ticket
+services (3 of which -- SupportRecipientResolver,
 SupportNotificationService, NewSessionNotificationService -- live in
 ProjectCeres.Common.Email, scanned via the InExactNamespaces rule)."
 ```
