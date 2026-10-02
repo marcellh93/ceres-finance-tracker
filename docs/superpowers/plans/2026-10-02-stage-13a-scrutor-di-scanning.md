@@ -730,17 +730,33 @@ public class ScrutorNamespaceBoundaryTests
     public void RegisterAsSingleton_attribute_changes_lifetime_from_the_Scoped_default()
     {
         // Spec §8's last bullet: confirm the attribute actually changes lifetime for a
-        // real case, using the same LifetimeFor logic Program.cs's Scan(...) calls use.
-        // TokenLookupHasher carries [RegisterAsSingleton] as of Task 5.
+        // real case. TokenLookupHasher carries [RegisterAsSingleton] as of Task 5.
+        //
+        // CORRECTION (discovered during Task 2, confirmed via reflection against the
+        // real installed Scrutor 7.0.0 DLL -- not assumed): UsingLifetimeFactory does
+        // not exist anywhere on Scrutor 7.0.0's ILifetimeSelector. The only members are
+        // the three fixed-lifetime terminals WithSingletonLifetime()/WithScopedLifetime()/
+        // WithTransientLifetime() -- no overload takes a Func<Type, ServiceLifetime>.
+        // Program.cs's real Scan(...) calls (since Task 2) use two separate AddClasses
+        // batches instead -- one filtered to [RegisterAsSingleton] classes terminating in
+        // WithSingletonLifetime(), one filtered to everything else terminating in
+        // WithScopedLifetime(). This test reproduces that exact real shape instead of the
+        // nonexistent single-call API the original brief draft assumed.
         var services = new ServiceCollection();
         services.Scan(scan => scan
             .FromAssemblyOf<Program>()
-            .AddClasses(classes => classes.InExactNamespaces("ProjectCeres.Common.Authentication"))
+            .AddClasses(classes => classes
+                .InExactNamespaces("ProjectCeres.Common.Authentication")
+                .Where(t => t.IsDefined(typeof(RegisterAsSingletonAttribute), inherit: false)))
             .UsingRegistrationStrategy(RegistrationStrategy.Skip)
             .AsSelf()
-            .UsingLifetimeFactory(t => t.IsDefined(typeof(RegisterAsSingletonAttribute), inherit: false)
-                ? ServiceLifetime.Singleton
-                : ServiceLifetime.Scoped));
+            .WithSingletonLifetime()
+            .AddClasses(classes => classes
+                .InExactNamespaces("ProjectCeres.Common.Authentication")
+                .Where(t => !t.IsDefined(typeof(RegisterAsSingletonAttribute), inherit: false)))
+            .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+            .AsSelf()
+            .WithScopedLifetime());
 
         var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ProjectCeres.Common.Authentication.TokenLookupHasher));
         descriptor.Should().NotBeNull("TokenLookupHasher must be scanned as a self-registered concrete");
