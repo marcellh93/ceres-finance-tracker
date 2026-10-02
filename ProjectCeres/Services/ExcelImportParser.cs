@@ -1,11 +1,13 @@
 using System.Globalization;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Services;
 
+[RegisterAsSingleton]
 public class ExcelImportParser : IImportParser
 {
     // XLSX files are ZIP archives — magic bytes are PK (0x50 0x4B 0x03 0x04)

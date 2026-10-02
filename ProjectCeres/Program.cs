@@ -208,6 +208,18 @@ var selfWithInterfacesTargets = new HashSet<Type>
     typeof(ProjectCeres.Services.Reports.LargestExpensesReportGenerator),
     typeof(ProjectCeres.Services.Reports.MonthlyCashFlowReportGenerator),
     typeof(ProjectCeres.Services.Reports.NetWorthOverTimeReportGenerator),
+
+    // Found by Task 9's implementer BEFORE touching any code, same shape again:
+    // CsvImportParser and ExcelImportParser both implement IImportParser (rule (a)
+    // would register each via AsImplementedInterfaces() for that interface), but
+    // ImportParserFactory's constructor (ProjectCeres/Services/ImportParserFactory.cs)
+    // injects both by CONCRETE TYPE, not by IImportParser. The brief for this task
+    // described them as having "no interface" -- that was wrong; both declare
+    // `: IImportParser`. AsImplementedInterfaces() does not self-register the
+    // concrete type, so removing either class's manual self-registration line would
+    // leave ImportParserFactory unable to resolve that constructor parameter.
+    typeof(ProjectCeres.Services.CsvImportParser),
+    typeof(ProjectCeres.Services.ExcelImportParser),
 };
 
 // Spec §3's named non-scannable IEmailService conditional-branch classes (see the
@@ -951,21 +963,6 @@ if (builder.Environment.IsProduction()
         "origin (e.g. https://app.example.com) so links in outgoing email are " +
         "not built from the request Host header.");
 }
-builder.Services.AddScoped<IBudgetService, BudgetService>();
-builder.Services.AddScoped<ISessionService, SessionService>();
-builder.Services.AddScoped<ICategoryBudgetService, CategoryBudgetService>();
-builder.Services.AddScoped<IMovementService, MovementService>();
-builder.Services.AddScoped<IMovementExportService, MovementExportService>();
-builder.Services.AddScoped<IImportProfileService, ImportProfileService>();
-builder.Services.AddSingleton<CsvImportParser>();
-builder.Services.AddSingleton<ExcelImportParser>();
-builder.Services.AddSingleton<ImportParserFactory>();
-builder.Services.AddScoped<IImportService, ImportService>();
-builder.Services.AddScoped<ITransferDetectionService, TransferDetectionService>();
-builder.Services.AddScoped<ITransferReviewService, TransferReviewService>();
-builder.Services.AddScoped<IImportStagedTransactionService, ImportStagedTransactionService>();
-builder.Services.AddScoped<IHeaderDetectionService, HeaderDetectionService>();
-builder.Services.AddScoped<AdminRoleService>();
 builder.Services.AddViteServices();
 
 // Development-only bootstrap tool: creates the first user + remaps sentinel-tagged data.

@@ -1,7 +1,9 @@
+using ProjectCeres.Common;
 using ProjectCeres.Models;
 
 namespace ProjectCeres.Services;
 
+[RegisterAsSingleton]
 public class ImportParserFactory(CsvImportParser csvParser, ExcelImportParser excelParser)
 {
     public IImportParser GetParser(ImportFormat format) => format switch
