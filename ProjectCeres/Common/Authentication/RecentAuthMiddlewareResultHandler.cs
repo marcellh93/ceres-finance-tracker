@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Http;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 
@@ -11,6 +12,7 @@ namespace ProjectCeres.Common.Authentication;
 /// the global RequireAuthenticatedUser fallback) delegate to the default handler so the
 /// existing OnRedirectToLogin → 401 path is preserved.
 /// </summary>
+[RegisterAsSingleton]
 public sealed class RecentAuthMiddlewareResultHandler : IAuthorizationMiddlewareResultHandler
 {
     private readonly AuthorizationMiddlewareResultHandler _default = new();

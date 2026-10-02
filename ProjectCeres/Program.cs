@@ -202,6 +202,48 @@ var conditionallyConstructedExclusions = new HashSet<Type>
     typeof(ProjectCeres.Common.Email.FileSinkEmailService),
 };
 
+// Found by Task 6's implementer BEFORE touching any code (reproduced against the real
+// installed Scrutor 7.0.0 DLL in a throwaway project, not assumed): RegistrationStrategy
+// .Skip calls IServiceCollection.TryAdd(descriptor) (confirmed via Scrutor's own source,
+// RegistrationStrategy.cs), and TryAdd is keyed purely by ServiceType -- it ignores
+// ImplementationType entirely. ASP.NET Core's authorization pipeline resolves
+// IEnumerable<IAuthorizationHandler> and runs EVERY registered handler by design (not
+// last-registration-wins) -- RecentAuthRequirementHandler and AdminLiveRequirementHandler
+// both implement IAuthorizationHandler (the second via inheriting
+// AuthorizationHandler<TRequirement>, the spec's base-class-inherited-interface case) and
+// BOTH must resolve. Under the plain Skip-strategy interface-pair rule, the scan would
+// register only the first-enumerated of the two and silently drop the second --
+// AdminLiveRequirementHandler's AdminLive policy (gating admin-only actions via a live DB
+// role check) would simply stop running, with no error, no warning, nothing short of the
+// gate it was protecting silently not firing. RegistrationStrategy.Append calls
+// IServiceCollection.Add(descriptor) with no dedup check at all -- the correct mechanism
+// for an interface deliberately meant to carry multiple registrations.
+var multiRegistrationInterfaceTargets = new HashSet<Type>
+{
+    typeof(ProjectCeres.Common.Authentication.RecentAuthRequirementHandler),
+    typeof(ProjectCeres.Admin.AdminLiveRequirementHandler),
+};
+
+// Found by the controller via a live reflection probe against the running DI container
+// (not assumed): RecentAuthMiddlewareResultHandler implements IAuthorizationMiddlewareResultHandler
+// -- a single-consumer interface, unlike IAuthorizationHandler -- but AddControllersWithViews()
+// (line ~32, BEFORE either Scan(...) call) internally calls AddAuthorization(), whose
+// AddAuthorizationPolicyEvaluator() does services.TryAddTransient<IAuthorizationMiddlewareResultHandler,
+// AuthorizationMiddlewareResultHandler>() (confirmed via dotnet/aspnetcore's real source,
+// PolicyServiceCollectionExtensions.cs) -- the FRAMEWORK DEFAULT wins that interface slot before
+// the scan ever runs, so the scan's RegistrationStrategy.Skip (TryAdd, keyed by ServiceType) is a
+// guaranteed no-op for this specific interface, regardless of scan ordering. The original manual
+// line (plain AddSingleton, never TryAdd) always won unconditionally regardless of
+// AddControllersWithViews() running first -- that unconditional-overwrite behavior is exactly
+// what the scan must replicate for this one class. RegistrationStrategy.Replace() (removes any
+// existing registration for the ServiceType, then adds) is the correct mechanism -- Append would
+// leave two registrations for a non-collection interface, which is fragile and relies on
+// "last one wins" being a guaranteed, documented behavior rather than an implementation detail.
+var replaceTargets = new HashSet<Type>
+{
+    typeof(ProjectCeres.Common.Authentication.RecentAuthMiddlewareResultHandler),
+};
+
 static bool IsConstructibleByDi(Type type) => type.GetConstructors().Length > 0;
 
 bool IsScannableServiceType(Type type) =>
@@ -248,8 +290,41 @@ builder.Services.Scan(scan => scan
             "ProjectCeres.Common",
             "ProjectCeres.Common.Email")
         .Where(t => !interceptorExclusions.Contains(t) && !selfWithInterfacesTargets.Contains(t)
+                 && !multiRegistrationInterfaceTargets.Contains(t) && !replaceTargets.Contains(t)
                  && IsScannableServiceType(t) && IsRegisteredAsSingleton(t)))
     .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+    .AsImplementedInterfaces()
+    .WithSingletonLifetime()
+    // multiRegistrationInterfaceTargets: RegistrationStrategy.Append (IServiceCollection
+    // .Add, no dedup) instead of Skip (TryAdd, keyed by ServiceType only -- would drop
+    // the second IAuthorizationHandler registration silently). Both classes are
+    // singleton today; if a future member of this set needs Scoped lifetime, it needs
+    // its own Append+Scoped branch (same lesson as selfWithInterfacesTargets' earlier
+    // singleton/scoped split -- do not assume one lifetime covers a reusable set).
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => multiRegistrationInterfaceTargets.Contains(t) && IsScannableServiceType(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Append)
+    .AsImplementedInterfaces()
+    .WithSingletonLifetime()
+    // replaceTargets: RegistrationStrategy.Replace() (removes any existing registration
+    // for the ServiceType, then adds) instead of Skip. AddControllersWithViews() (called
+    // before either Scan(...)) already claims IAuthorizationMiddlewareResultHandler via
+    // AddAuthorization()'s TryAddTransient, so Skip's TryAdd is a guaranteed no-op here --
+    // the scan must forcibly replace the framework default, which is exactly what the
+    // original manual AddSingleton line (never TryAdd) always did unconditionally.
+    .AddClasses(classes => classes
+        .InExactNamespaces(
+            "ProjectCeres.Admin",
+            "ProjectCeres.Common.Authentication",
+            "ProjectCeres.Common",
+            "ProjectCeres.Common.Email")
+        .Where(t => replaceTargets.Contains(t) && IsScannableServiceType(t)))
+    .UsingRegistrationStrategy(RegistrationStrategy.Replace())
     .AsImplementedInterfaces()
     .WithSingletonLifetime()
     .AddClasses(classes => classes
@@ -439,7 +514,6 @@ else
     builder.Services.AddScoped<IEmailService, ResendEmailService>();
 }
 
-builder.Services.AddScoped<IEmailRecipientResolver, EmailRecipientResolver>();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Resources");
 
 // Default the app-wide culture to en so resource lookups resolve even off the
@@ -453,19 +527,7 @@ var defaultCulture = CultureInfo.GetCultureInfo("en");
 CultureInfo.DefaultThreadCurrentCulture = defaultCulture;
 CultureInfo.DefaultThreadCurrentUICulture = defaultCulture;
 
-builder.Services.AddScoped<IEmailComposer, EmailComposer>();
-builder.Services.AddScoped<ILanguageResolver, LanguageResolver>();
-
 // Stage 8e: Svix HMAC verifier for the Resend webhook controller. Stateless — singleton.
-builder.Services.AddSingleton<IResendSignatureVerifier, ResendSignatureVerifier>();
-
-builder.Services.AddScoped<MfaBackupCodeService>();
-builder.Services.AddScoped<TotpReplayGuard>();
-builder.Services.AddScoped<FailedLoginRecorder>();
-builder.Services.AddScoped<IAuditLogWriter, AuditLogWriter>();
-builder.Services.AddSingleton<IAuthorizationHandler, RecentAuthRequirementHandler>();
-builder.Services.AddSingleton<IAuthorizationHandler, AdminLiveRequirementHandler>();
-builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, RecentAuthMiddlewareResultHandler>();
 
 if (builder.Environment.IsEnvironment("E2E"))
 {

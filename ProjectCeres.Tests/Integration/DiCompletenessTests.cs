@@ -1,6 +1,9 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using ProjectCeres.Admin;
 using ProjectCeres.Common;
 using ProjectCeres.Common.Authentication;
 using ProjectCeres.Models;
@@ -51,5 +54,62 @@ public class DiCompletenessTests : IntegrationTestBase<Bucket3Factory>
                      "instance -- two separate instances would mean two registrations " +
                      "silently coexist, which Every_scanned_class_constructor_dependency_" +
                      "resolves cannot detect");
+    }
+
+    [Fact]
+    public void Both_RecentAuth_and_AdminLive_authorization_handlers_are_registered()
+    {
+        // RecentAuthRequirementHandler and AdminLiveRequirementHandler both implement
+        // IAuthorizationHandler (the second via inheriting AuthorizationHandler<TRequirement>)
+        // and ASP.NET Core resolves IEnumerable<IAuthorizationHandler> to run EVERY
+        // registered handler, by design -- this is not a last-registration-wins
+        // interface, unlike every other scanned interface in this project. Found by
+        // Task 6's implementer BEFORE any removal was attempted (reproduced against the
+        // real Scrutor 7.0.0 DLL): RegistrationStrategy.Skip calls IServiceCollection
+        // .TryAdd, keyed purely by ServiceType, so a plain interface-pair scan rule
+        // would silently drop the second-enumerated handler entirely -- no error, no
+        // warning, just a security check that stops firing. Neither
+        // Every_scanned_class_constructor_dependency_resolves (proves A dependency
+        // resolves, not a COUNT) nor a hypothetical single-instance assertion can catch
+        // this regression; only an explicit count/identity check on the IEnumerable can.
+        using var scope = Factory.Services.CreateScope();
+
+        var handlers = scope.ServiceProvider.GetServices<IAuthorizationHandler>().ToList();
+
+        handlers.Should().Contain(h => h is RecentAuthRequirementHandler,
+            because: "RecentAuthRequirementHandler gates the [RequireRecentAuth] policy; " +
+                     "a RegistrationStrategy.Skip regression would silently drop whichever " +
+                     "of the two handlers is enumerated second");
+        handlers.Should().Contain(h => h is AdminLiveRequirementHandler,
+            because: "AdminLiveRequirementHandler gates the AdminLive policy via a live " +
+                     "DB role check -- losing this handler silently disables that check " +
+                     "with no error, not merely a DI-wiring inconvenience");
+    }
+
+    [Fact]
+    public void RecentAuthMiddlewareResultHandler_wins_over_the_framework_default()
+    {
+        // Found by the controller via a live reflection probe during Task 6, not assumed:
+        // AddControllersWithViews() (Program.cs, called BEFORE either Scan(...) call)
+        // internally calls AddAuthorization(), whose AddAuthorizationPolicyEvaluator() does
+        // services.TryAddTransient<IAuthorizationMiddlewareResultHandler,
+        // AuthorizationMiddlewareResultHandler>() (confirmed against dotnet/aspnetcore's real
+        // source, PolicyServiceCollectionExtensions.cs) -- the FRAMEWORK DEFAULT claims this
+        // interface slot before the scan ever runs. RegistrationStrategy.Skip (TryAdd, keyed
+        // by ServiceType) is therefore a guaranteed no-op for RecentAuthMiddlewareResultHandler
+        // specifically, regardless of scan ordering -- a regression Every_scanned_class_
+        // constructor_dependency_resolves cannot catch, since the framework default also
+        // implements the interface and also "resolves" a non-null instance. The original
+        // manual registration (plain AddSingleton, never TryAdd) always won unconditionally;
+        // the scan must use RegistrationStrategy.Replace() to replicate that.
+        using var scope = Factory.Services.CreateScope();
+
+        var handler = scope.ServiceProvider.GetRequiredService<IAuthorizationMiddlewareResultHandler>();
+
+        handler.Should().BeOfType<RecentAuthMiddlewareResultHandler>(
+            because: "the framework's own AuthorizationMiddlewareResultHandler default " +
+                     "returns 403 Forbidden on a failed policy, silently reverting the " +
+                     "custom 401 REAUTH_REQUIRED envelope every [RequireRecentAuth] " +
+                     "endpoint depends on");
     }
 }

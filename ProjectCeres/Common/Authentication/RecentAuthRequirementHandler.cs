@@ -1,8 +1,10 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Authentication;
 
+[RegisterAsSingleton]
 public sealed class RecentAuthRequirementHandler : AuthorizationHandler<RecentAuthRequirement>
 {
     protected override Task HandleRequirementAsync(

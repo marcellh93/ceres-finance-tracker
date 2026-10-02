@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using System.Security.Claims;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Admin;
 
@@ -31,6 +32,7 @@ public sealed class AdminLiveRequirement : IAuthorizationRequirement;
 /// Admin right now. Registered as a singleton, so the scoped AdminRoleService is
 /// resolved from the current request scope.
 /// </summary>
+[RegisterAsSingleton]
 public sealed class AdminLiveRequirementHandler(IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<AdminLiveRequirement>
 {

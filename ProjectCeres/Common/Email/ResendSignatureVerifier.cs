@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using ProjectCeres.Common;
 
 namespace ProjectCeres.Common.Email;
 
@@ -25,6 +26,7 @@ public interface IResendSignatureVerifier
     bool Verify(string svixId, string svixTimestamp, string rawBody, string signatureHeader, string secret);
 }
 
+[RegisterAsSingleton]
 public sealed class ResendSignatureVerifier : IResendSignatureVerifier
 {
     private const int ToleranceSeconds = 300; // 5 minutes
