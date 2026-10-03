@@ -945,6 +945,8 @@ public class ArchitectureTests
             // AuthController.Csrf issues an antiforgery cookie — IAntiforgery.GetAndStoreTokens
             // doesn't open a DB connection.
             "ProjectCeres.Controllers.Api.AuthController.Csrf",
+            // CspReportApiController.Report only logs CSP violations — no DB access.
+            "ProjectCeres.Controllers.Api.CspReportApiController.Report",
         };
 
         var controllers = App.GetTypes()
