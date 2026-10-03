@@ -942,6 +942,8 @@ public class ArchitectureTests
         {
             "ProjectCeres.Controllers.Api.HealthApiController.Get",
             "ProjectCeres.Controllers.Api.HealthApiController.Validate",
+            // RemoteIp only reads Connection.RemoteIpAddress — no DB access.
+            "ProjectCeres.Controllers.Api.HealthApiController.RemoteIp",
             // AuthController.Csrf issues an antiforgery cookie — IAntiforgery.GetAndStoreTokens
             // doesn't open a DB connection.
             "ProjectCeres.Controllers.Api.AuthController.Csrf",

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -1007,6 +1008,28 @@ if (args.Length > 0 && args[0] == "--run-erasure-jobs")
 }
 
 var app = builder.Build();
+
+// Forwarded-headers (Stage 14.7): MUST be first so every downstream component
+// sees the real client IP, once Stage 16 wires a real proxy in front of us.
+// FIXME(Stage 16): populate ForwardedHeaders:KnownProxies with the chosen proxy.
+// Only wired when KnownProxies is non-empty: an empty KnownProxies+KnownNetworks
+// pair disables the middleware's own allow-list check (checkKnownIps = false),
+// which trusts every peer — fail-OPEN, not closed. See commit message for the
+// framework-source citation. Omitting registration is the actual fail-closed state.
+var knownProxyIps = builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+if (knownProxyIps.Length > 0)
+{
+    var fhOptions = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+    };
+    fhOptions.KnownNetworks.Clear();
+    fhOptions.KnownProxies.Clear();
+    foreach (var ip in knownProxyIps)
+        fhOptions.KnownProxies.Add(System.Net.IPAddress.Parse(ip));
+    app.UseForwardedHeaders(fhOptions);
+}
 
 // Stage 9.11 — under E2E, refuse to start unless pointed at a recognized e2e DB.
 // The wrapper script never sets E2E:SkipDatabaseGuard, so production E2E runs are
