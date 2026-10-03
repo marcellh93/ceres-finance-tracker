@@ -55,6 +55,27 @@ public class ArchitectureTests
             "explicit [Authorize] or [AllowAnonymous] required on every action — global fallback hides the intent");
     }
 
+    // Regression guard (Stage 14): the CSP-report endpoint receives tokenless POSTs
+    // from the BROWSER's own reporting mechanism, so it must carry
+    // [IgnoreAntiforgeryToken] — otherwise the global AutoValidateAntiforgeryToken
+    // filter 400s every real report. The integration WAF removes that global filter
+    // (WafCollection), so a live POST is the only thing that exercises it — this
+    // attribute assertion is the regression guard the WAF cannot provide. Verified
+    // live 2026-10-03: without the attribute the running app returns 400 to a real
+    // application/csp-report POST; with it, 204.
+    [Fact]
+    public void Csp_report_endpoint_ignores_antiforgery()
+    {
+        var method = App.GetTypes()
+            .Single(t => t.Name == "CspReportApiController")
+            .GetMethod("Report");
+
+        method!.GetCustomAttribute<Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute>()
+            .Should().NotBeNull(
+                "the CSP-report endpoint receives tokenless browser POSTs; without " +
+                "[IgnoreAntiforgeryToken] the global antiforgery filter 400s every real report");
+    }
+
     [Fact]
     public void HttpGet_actions_must_not_have_write_verb_names()
     {

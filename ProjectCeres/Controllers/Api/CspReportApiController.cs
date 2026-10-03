@@ -13,7 +13,13 @@ public class CspReportApiController(ILogger<CspReportApiController> logger) : Co
     // (report-uri) or application/reports+json (report-to), neither of which
     // MVC's default formatters accept — forcing formatter negotiation here
     // would 415 every real report. Reading the raw body accepts any content-type.
-    [HttpPost, AllowAnonymous, EnableRateLimiting(AuthRateLimitPolicies.CspReportByIp)]
+    //
+    // [IgnoreAntiforgeryToken]: the app registers a global AutoValidateAntiforgeryToken
+    // filter (Program.cs). A browser sends CSP violation reports via its own reporting
+    // mechanism with NO antiforgery token, so without this the global filter 400s every
+    // real report before it reaches this action. Safe: the endpoint is anonymous and
+    // only logs — it mutates no state, so CSRF protection is meaningless here.
+    [HttpPost, AllowAnonymous, IgnoreAntiforgeryToken, EnableRateLimiting(AuthRateLimitPolicies.CspReportByIp)]
     public async Task<IActionResult> Report()
     {
         using var reader = new StreamReader(Request.Body);
