@@ -49,4 +49,8 @@ public static class AuthRateLimitPolicies
     /// Applied to POST /api/profile/erasure. Mirrors ProfileExportByUser's limit — an
     /// irreversible, rarely-repeated action. Stage 13.9 Task 9.</summary>
     public const string ProfileErasureByUser = "profile-erasure-by-user";
+
+    /// <summary>By-IP limiter for the unauthenticated public /api/csp-report ingest.
+    /// Stage 14 Task 4.</summary>
+    public const string CspReportByIp = "csp-report-by-ip";
 }

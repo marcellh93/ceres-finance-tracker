@@ -759,6 +759,18 @@ builder.Services.AddRateLimiter(options =>
         });
     });
 
+    options.AddPolicy(AuthRateLimitPolicies.CspReportByIp, httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromSeconds(60),
+            SegmentsPerWindow = 4,
+            QueueLimit = 0,
+        });
+    });
+
     options.AddPolicy<string, TotpByUserPartitioner>(AuthRateLimitPolicies.AuthTotpByUser);
 
     options.AddPolicy(AuthRateLimitPolicies.AuthMfaByUser, httpContext =>
