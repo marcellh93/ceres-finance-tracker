@@ -1939,9 +1939,11 @@ depend on production hosting and are deferred to Stage 16 (HSTS preload, populat
 `KnownProxies`, a real CORS origin); one browser-only check and one lint-infra follow-up
 remain. The stage is NOT fully `[x]` — see the marker legend below.
 
-> **Checklist markers:** `[x]` = done + test-covered · `[~]` = deferred to Stage 16
-> (hosting-dependent) · `[–]` = not applicable under the current same-origin deployment ·
-> `[ ]` = genuinely still open (browser-manual or follow-up).
+> **Checklist markers:** `[x]` = done + test-covered. Everything not done stays an
+> empty `[ ]` box with an explicit text prefix so it never reads as complete:
+> `⏳ DEFERRED → Stage 16` (hosting-dependent), `➖ N/A today` (not applicable under
+> the current same-origin deployment), or a `🚧 TODO` follow-up. Nothing deferred or
+> N/A is marked `[x]`.
 
 > **Goal:** every response carries the standard hardening headers, CORS is configured to allow only the SPA origin, and reverse-proxy forwarding is hardened against IP spoofing.
 
@@ -1974,22 +1976,22 @@ Other security headers:
 - [x] `X-Frame-Options: DENY` on every response (`SecurityHeadersTests`)
 - [x] `Referrer-Policy: strict-origin-when-cross-origin` (`SecurityHeadersTests`)
 - [x] `Permissions-Policy` configured (camera/microphone/geolocation denied)
-- [~] HSTS: `max-age=31536000; includeSubDomains; preload` — **deferred to Stage 16** (once HTTPS enforced; see Stage 16 HTTPS checklist `[← Stage 14 deferral]`)
-- [~] Verified with `securityheaders.com`: A+ rating — **deferred to Stage 16** (requires the live hosted site)
+- [ ] ⏳ **DEFERRED → Stage 16** — HSTS: `max-age=31536000; includeSubDomains; preload` (once HTTPS enforced; see Stage 16 HTTPS checklist `[← Stage 14 deferral]`)
+- [ ] ⏳ **DEFERRED → Stage 16** — Verified with `securityheaders.com`: A+ rating (requires the live hosted site)
 
 CORS: (wired, inert under the current same-origin deployment)
 
-- [–] In dev: allowed origin — **N/A today**: dev runs Vite proxied *through* Kestrel (same origin), not a separate `:5173` origin. CORS stays inert unless Stage 16 introduces a separate SPA origin (`[← Stage 14 deferral]`)
-- [~] In prod: allowed origin is the production frontend origin only — **deferred to Stage 16** (only if a separate origin exists)
+- [ ] ➖ **N/A today** — In dev: allowed origin: dev runs Vite proxied *through* Kestrel (same origin), not a separate `:5173` origin. CORS stays inert unless Stage 16 introduces a separate SPA origin (`[← Stage 14 deferral]`)
+- [ ] ⏳ **DEFERRED → Stage 16** — In prod: allowed origin is the production frontend origin only (only if a separate origin exists)
 - [x] `AllowAnyOrigin()` NEVER combined with `AllowCredentials()` — the policy only calls `WithOrigins(...).AllowCredentials()` when `AllowedOrigins` is non-empty; `AllowAnyOrigin` is never used
-- [~] CORS preflight (`OPTIONS`) correct for all API routes — **deferred to Stage 16** (meaningful only with a real cross-origin)
-- [~] Test: a non-whitelisted origin is rejected — **deferred to Stage 16** (inert same-origin today)
+- [ ] ⏳ **DEFERRED → Stage 16** — CORS preflight (`OPTIONS`) correct for all API routes (meaningful only with a real cross-origin)
+- [ ] ⏳ **DEFERRED → Stage 16** — Test: a non-whitelisted origin is rejected (inert same-origin today)
 
 Forwarded-headers:
 
 - [x] `app.UseForwardedHeaders()` registration is FIRST in the pipeline (when enabled) — gated on non-empty `KnownProxies` (`Program.cs`)
 - [x] `ForwardedHeadersOptions` configured: `XForwardedFor | XForwardedProto`
-- [~] `KnownProxies` populated with the actual reverse-proxy IP(s) — **deferred to Stage 16** (`[← Stage 14 deferral]`; empty list fails OPEN on .NET 10, so Stage 14 omits registration entirely rather than register with an empty list)
+- [ ] ⏳ **DEFERRED → Stage 16** — `KnownProxies` populated with the actual reverse-proxy IP(s) (`[← Stage 14 deferral]`; empty list fails OPEN on .NET 10, so Stage 14 omits registration entirely rather than register with an empty list)
 - [x] Test: a spoofed `X-Forwarded-For` does NOT update `RemoteIpAddress` (`ForwardedHeadersTests`)
 
 Cache headers:
@@ -2000,7 +2002,7 @@ Cache headers:
 
 ### Stage 14 follow-ups (deferred, discovered during implementation)
 
-- [ ] **Wire `eslint-plugin-react` + `react/no-danger` in the client ESLint config.** `security-model.md` listed `dangerouslySetInnerHTML` prohibition "enforced via ESLint `react/no-danger`" as a Required control, but Stage 14 found the rule was **never wired** (`ProjectCeres.Client/eslint.config.js` registers only `react-hooks` + `react-refresh`). Deferred out of Stage 14 because wiring it is a lint-infrastructure change needing a full audit of every `dangerouslySetInnerHTML` use plus a documented scoped exception for `chart.tsx` (shadcn's chart primitive, a verified-safe static-CSS use) — beyond this stage's security-headers scope. **Reason:** out-of-scope infra change, not part of Stage 14's declared security-headers deliverable. **Tripwire:** `security-model.md` control-table row is marked "Follow-up" (not "Required/done") and names this gap, so a security-model audit re-surfaces it. Until wired, the convention is unenforced and relies on review.
+- [ ] 🚧 **TODO (not done) — Wire `eslint-plugin-react` + `react/no-danger` in the client ESLint config.** `security-model.md` listed `dangerouslySetInnerHTML` prohibition "enforced via ESLint `react/no-danger`" as a Required control, but Stage 14 found the rule was **never wired** (`ProjectCeres.Client/eslint.config.js` registers only `react-hooks` + `react-refresh`). Deferred out of Stage 14 because wiring it is a lint-infrastructure change needing a full audit of every `dangerouslySetInnerHTML` use plus a documented scoped exception for `chart.tsx` (shadcn's chart primitive, a verified-safe static-CSS use) — beyond this stage's security-headers scope. **Reason:** out-of-scope infra change, not part of Stage 14's declared security-headers deliverable. **Tripwire:** `security-model.md` control-table row is marked "Follow-up" (not "Required/done") and names this gap, so a security-model audit re-surfaces it. Until wired, the convention is unenforced and relies on review.
 
 ---
 
