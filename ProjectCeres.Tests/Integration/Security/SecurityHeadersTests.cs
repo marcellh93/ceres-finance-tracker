@@ -43,4 +43,21 @@ public class SecurityHeadersTests : IntegrationTestBase<Bucket1Factory>
         var cc = string.Join(" ", res.Headers.TryGetValues("Cache-Control", out var v) ? v : new[] { "" });
         cc.Should().Contain("no-store");
     }
+
+    [Fact]
+    public async Task Csp_script_hashes_match_the_served_shell()
+    {
+        var shell = await _client.GetStringAsync("/");
+        var res = await _client.GetAsync("/api/health");
+        var csp = string.Join(" ", res.Headers.GetValues("Content-Security-Policy"));
+        // Every inline <script> in the served shell must have its hash present in script-src.
+        var re = new System.Text.RegularExpressions.Regex(@"<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>");
+        foreach (System.Text.RegularExpressions.Match m in re.Matches(shell))
+        {
+            var body = m.Groups[1].Value;
+            var hash = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(body)));
+            csp.Should().Contain(hash, "every inline shell script must be blessed by its CSP hash");
+        }
+    }
 }

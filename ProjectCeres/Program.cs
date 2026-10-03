@@ -455,6 +455,14 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddHttpContextAccessor();
 
+// CORS (Stage 14.6): inert today — same-origin deployment, empty AllowedOrigins.
+// FIXME(Stage 16): populate Cors:AllowedOrigins IFF a separate SPA origin is introduced.
+builder.Services.AddCors(options => options.AddDefaultPolicy(p =>
+{
+    var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    if (origins.Length > 0) p.WithOrigins(origins).AllowCredentials().AllowAnyHeader().AllowAnyMethod();
+}));
+
 // Stage 7.5 / ADR-0068 — PostgreSQL Row-Level Security defence in depth.
 // Stage 7.6.7 / ADR-0073: IPreAuthCallSiteTagger registry deleted; pre-auth call sites
 // are tagged by the [PreAuthCallSite] attribute on the action method itself.
@@ -1174,6 +1182,8 @@ app.UseRewriter(new RewriteOptions()
     .AddRedirect("^app/(.*)", "$1", statusCode: StatusCodes.Status301MovedPermanently));
 
 app.UseRouting();
+
+app.UseCors();
 
 app.UseRateLimiter();
 
