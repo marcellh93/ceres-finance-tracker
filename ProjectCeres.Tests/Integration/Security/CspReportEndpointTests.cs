@@ -19,4 +19,16 @@ public class CspReportEndpointTests : IntegrationTestBase<Bucket1Factory>
         var res = await _client.PostAsJsonAsync("/api/csp-report", body);
         res.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
+
+    [Fact]
+    public async Task Browser_report_uri_content_type_is_accepted_with_204()
+    {
+        const string json = """{"csp-report":{"violated-directive":"script-src"}}""";
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/csp-report")
+        {
+            Content = new StringContent(json, System.Text.Encoding.UTF8, "application/csp-report")
+        };
+        var res = await _client.SendAsync(request);
+        res.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
 }

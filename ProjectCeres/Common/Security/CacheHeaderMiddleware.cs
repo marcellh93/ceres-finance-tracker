@@ -12,14 +12,11 @@ public sealed class CacheHeaderMiddleware(RequestDelegate next)
         {
             var path = ctx.Request.Path;
             if (path.StartsWithSegments("/dist"))
-                return Task.CompletedTask; // hashed assets: leave the static-files cache header
+                return Task.CompletedTask; // defensive no-op: UseStaticFiles normally handles /dist first
 
             if ((path.StartsWithSegments("/api") || ctx.User.Identity?.IsAuthenticated == true)
                 && !ctx.Response.Headers.ContainsKey("Cache-Control"))
                 ctx.Response.Headers.CacheControl = "private, no-store";
-
-            if (path.StartsWithSegments("/health") && !ctx.Response.Headers.ContainsKey("Cache-Control"))
-                ctx.Response.Headers.CacheControl = "no-store";
 
             if (path.Equals("/api/auth/logout", StringComparison.OrdinalIgnoreCase))
                 ctx.Response.Headers["Clear-Site-Data"] = new StringValues("\"cache\", \"cookies\", \"storage\"");
