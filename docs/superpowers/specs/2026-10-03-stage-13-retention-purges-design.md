@@ -27,6 +27,16 @@ shape (`ProjectCeres/Tools/SweepSessions.cs`):
 | Soft-deleted reports | `SavedReport` (`Models/SavedReport.cs`, `IUserOwned`) | `SavedReports` | `DeletedAt != null && DeletedAt < now − 90d` | 90 days | roadmap 13.5 |
 | Soft-deleted import profiles | `ImportProfile` (class in `Models/CsvImportProfile.cs`, `IUserOwned`) | `ImportProfiles` | `DeletedAt != null && DeletedAt < now − 90d` | 90 days | roadmap 13.5 |
 
+> **Note — the ImportProfile purge already covers every format (CSV and Excel).**
+> `ImportProfile` is format-*agnostic* despite the `CsvImportProfile.cs` filename: it
+> carries a `Format` column (`ImportFormat.Csv`/`.Excel`) + a `SheetName` field, so an
+> Excel profile is just an `ImportProfile` row with `Format = Excel` — the same table,
+> same `DeletedAt` column. There is no separate `ExcelImportProfile` entity and none is
+> needed; this single purge sweeps all formats, present and future. (Aside, not in scope
+> here: the `ImportProfile` entity is shelved-import machinery per ADR-0078 and may become
+> dead when the template import in Stage 15.10 ships — the template approach drops saved
+> column-mapping profiles. The purge stays correct regardless as long as the table exists.)
+
 The periods are fixed by prior decision (`planning-resolved.md` 2026-09-19,
 `security-model.md` § Data Retention, `legal.md` § Data Retention Policy) — this
 spec does not revisit them.
