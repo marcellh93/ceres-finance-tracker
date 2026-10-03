@@ -35,4 +35,12 @@ public class SecurityHeadersTests : IntegrationTestBase<Bucket1Factory>
         scriptSrc.Should().NotContain("'unsafe-inline'");
         csp.Should().Contain("object-src 'none'");
     }
+
+    [Fact]
+    public async Task Api_response_is_not_cacheable()
+    {
+        var res = await _client.GetAsync("/api/health");
+        var cc = string.Join(" ", res.Headers.TryGetValues("Cache-Control", out var v) ? v : new[] { "" });
+        cc.Should().Contain("no-store");
+    }
 }

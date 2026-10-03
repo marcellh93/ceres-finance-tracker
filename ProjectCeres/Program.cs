@@ -1165,6 +1165,10 @@ app.UseMiddleware<PersistentCookieRotationMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<UserBlockedIpMiddleware>();
 
+// Stage 14 Task 5: must run AFTER UseAuthorization so ctx.User.Identity.IsAuthenticated
+// is populated, and before MapControllers so it still wraps the endpoint response.
+app.UseMiddleware<ProjectCeres.Common.Security.CacheHeaderMiddleware>();
+
 app.MapControllers();
 
 // API fallthrough (MUST precede the SPA fallback). A /api/* path that matched
