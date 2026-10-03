@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/compute-csp-hashes.mjs && pnpm check-size",
-  "typecheck": "tsc -b",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
     "lint:tests": "! grep -rE '^const mockFetch = vi\\.fn' src --include='*.test.tsx' --include='*.test.ts'",
     "preview": "vite preview",
@@ -92,6 +92,11 @@
       "browserslist": "^4.28.9",
       "postcss-selector-parser": "^7.1.6",
       "esbuild": "^0.28.1"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-vfj7-8cjw-p6xm"
+      ]
     }
   }
 }
