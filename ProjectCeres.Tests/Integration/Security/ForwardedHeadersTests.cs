@@ -1,8 +1,5 @@
 using System.Net;
-using System.Net.Http;
 using FluentAssertions;
-using ProjectCeres.Tests.Common;
-using Xunit;
 
 namespace ProjectCeres.Tests.Integration.Security;
 

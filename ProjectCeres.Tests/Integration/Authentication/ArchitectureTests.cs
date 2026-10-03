@@ -70,7 +70,7 @@ public class ArchitectureTests
             .Single(t => t.Name == "CspReportApiController")
             .GetMethod("Report");
 
-        method!.GetCustomAttribute<Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute>()
+        method!.GetCustomAttribute<IgnoreAntiforgeryTokenAttribute>()
             .Should().NotBeNull(
                 "the CSP-report endpoint receives tokenless browser POSTs; without " +
                 "[IgnoreAntiforgeryToken] the global antiforgery filter 400s every real report");

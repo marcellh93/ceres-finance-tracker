@@ -1,5 +1,4 @@
 using System.Text.Json;
-using NetEscapades.AspNetCore.SecurityHeaders;
 
 namespace ProjectCeres.Common.Security;
 
