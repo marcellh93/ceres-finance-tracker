@@ -6,6 +6,13 @@
 
 #### Added
 
+**Security (Stage 14 — HTTP security headers + CORS, 2026-10-03)**
+- Every response now carries a strict set of browser-hardening headers: a Content-Security-Policy that only allows scripts and resources from the app itself (blocking injected/malicious scripts — the main defense against cross-site scripting), plus `X-Content-Type-Options`, `X-Frame-Options: DENY` (no embedding in iframes), `Referrer-Policy`, a `Permissions-Policy` that denies camera/microphone/geolocation, and cross-origin isolation headers.
+- The CSP is hash-based, suited to the app's static-file single-page-app model; the two inline startup scripts (theme + sidebar state) are allowed by a fingerprint computed automatically at build time, so they can't silently break or be bypassed.
+- Browsers that detect a policy violation now report it to a new `/api/csp-report` endpoint (rate-limited), giving early warning of an attempted attack or a misconfiguration.
+- Authenticated and API responses are now marked uncacheable (`no-store`), so user data can't linger in shared caches; static assets keep their long cache. Signing out now also tells the browser to clear cached data, cookies, and local storage for the site.
+- Reverse-proxy forwarded-headers handling is in place and hardened against client-IP spoofing; CORS is wired but inert under the current single-origin setup. The parts that depend on production hosting (HSTS preload, the real proxy address, any separate front-end origin) are deferred to the hosting stage.
+
 **Privacy & data (Stage 13.9 — right to erasure, 2026-09-28)**
 - You can now permanently erase your account and all its data. A new "Danger zone" section on the **Account** page (under Settings) lets you request erasure — type "ERASE" to confirm, since this can't be undone. Your account is sealed immediately and you're emailed a link to cancel within 72 hours.
 - Changed your mind? Click the cancel link (no sign-in needed) and your account is restored right away.
@@ -283,6 +290,9 @@
 - `ProjectCeres/Common/UserOwnedTables.cs` (the hand-typed `UserOwnedTables.All` list) — superseded by the model-derived `UserOwnedModel`
 
 #### Fixed
+
+**Security (Stage 14 follow-on fixes, 2026-10-03)**
+- Fixed the MFA-enrollment responses so they keep their stricter `no-store, no-cache` caching directive (the new site-wide cache header no longer overrides a stricter one an endpoint already set).
 
 **Tests (Stage 12.19 — flake root-causes, 2026-09-18)**
 - Fixed the recurring `window is not defined` client-test crash at its source — an upstream missing-cleanup bug in `input-otp` — by upgrading to 1.5.0 (two earlier local-only fixes didn't hold on CI).

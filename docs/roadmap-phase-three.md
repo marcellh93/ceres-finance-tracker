@@ -1950,43 +1950,47 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ### Verification checklist
 
-CSP:
+CSP: (hash-based — see `security-model.md` § Phase 3 CSP)
 
-- [ ] `Content-Security-Policy` header present on every HTML response
-- [ ] No inline scripts (`'unsafe-inline'`) — Phase 2 React build is bundled
-- [ ] Sources whitelisted: `'self'`, the email provider domain (if it serves images in emails clicked through), the analytics provider (if any, after consent)
-- [ ] `report-uri` or `report-to` directive configured to a logging endpoint (catches violations early)
-- [ ] CSP tested in browser DevTools: violations log nothing on a clean page render
+- [x] `Content-Security-Policy` header present on every response (`SecurityHeadersTests`)
+- [x] `script-src` strict: no `'unsafe-inline'` — inline bootstrap scripts blessed by build-time sha256 hashes; pinned by `SecurityHeadersTests` + the drift-guard test
+- [x] Sources whitelisted to `'self'` (+ `data:` img, self-hosted fonts); no CDN/analytics origins needed today
+- [x] `report-uri /api/csp-report` configured to a logging endpoint (`CspReportApiController`, `CspReportEndpointTests`)
+- [ ] CSP tested in browser DevTools: violations log nothing on a clean page render (**browser-only — manual**, see Task 9 Step 4)
 
 Other security headers:
 
-- [ ] `X-Content-Type-Options: nosniff` on every response
-- [ ] `X-Frame-Options: DENY` on every response (no iframe embedding)
-- [ ] `Referrer-Policy: strict-origin-when-cross-origin`
-- [ ] `Permissions-Policy` configured (e.g., `camera=(), microphone=(), geolocation=()`)
-- [ ] HSTS: `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` (once HTTPS is enforced; not before)
-- [ ] Verified with `securityheaders.com` or equivalent: A+ rating
+- [x] `X-Content-Type-Options: nosniff` on every response (`SecurityHeadersTests`)
+- [x] `X-Frame-Options: DENY` on every response (`SecurityHeadersTests`)
+- [x] `Referrer-Policy: strict-origin-when-cross-origin` (`SecurityHeadersTests`)
+- [x] `Permissions-Policy` configured (camera/microphone/geolocation denied)
+- [ ] HSTS: `max-age=31536000; includeSubDomains; preload` — **deferred to Stage 16** (once HTTPS enforced; see Stage 16 HTTPS checklist `[← Stage 14 deferral]`)
+- [ ] Verified with `securityheaders.com`: A+ rating (**requires the live hosted site — Stage 16**)
 
-CORS:
+CORS: (wired, inert under the current same-origin deployment)
 
-- [ ] In dev: allowed origin `http://localhost:5173`
-- [ ] In prod: allowed origin is the production frontend origin only
-- [ ] `AllowAnyOrigin()` NEVER combined with `AllowCredentials()` — verified
-- [ ] CORS preflight (`OPTIONS`) handled correctly for all API routes
-- [ ] Test: a request from a non-whitelisted origin is rejected at the CORS layer
+- [ ] In dev: allowed origin — **N/A today**: dev runs Vite proxied *through* Kestrel (same origin), not a separate `:5173` origin. CORS stays inert unless Stage 16 introduces a separate SPA origin (`[← Stage 14 deferral]`)
+- [ ] In prod: allowed origin is the production frontend origin only — **Stage 16** (only if a separate origin exists)
+- [x] `AllowAnyOrigin()` NEVER combined with `AllowCredentials()` — the policy only calls `WithOrigins(...).AllowCredentials()` when `AllowedOrigins` is non-empty; `AllowAnyOrigin` is never used
+- [ ] CORS preflight (`OPTIONS`) correct for all API routes — **Stage 16** (meaningful only with a real cross-origin)
+- [ ] Test: a non-whitelisted origin is rejected — **Stage 16** (inert same-origin today)
 
 Forwarded-headers:
 
-- [ ] `app.UseForwardedHeaders()` registered BEFORE all other middleware
-- [ ] `ForwardedHeadersOptions` configured: `XForwardedFor | XForwardedProto`
-- [ ] `KnownProxies` populated with the actual reverse-proxy IP(s); empty list rejected (security-model warning: "restrict trusted proxy addresses to prevent IP spoofing")
-- [ ] Test: a request with a spoofed `X-Forwarded-For` from a non-trusted source does NOT update `HttpContext.Connection.RemoteIpAddress`
+- [x] `app.UseForwardedHeaders()` registration is FIRST in the pipeline (when enabled) — gated on non-empty `KnownProxies` (`Program.cs`)
+- [x] `ForwardedHeadersOptions` configured: `XForwardedFor | XForwardedProto`
+- [ ] `KnownProxies` populated with the actual reverse-proxy IP(s) — **deferred to Stage 16** (`[← Stage 14 deferral]`; empty list fails OPEN on .NET 10, so Stage 14 omits registration entirely rather than register with an empty list)
+- [x] Test: a spoofed `X-Forwarded-For` does NOT update `RemoteIpAddress` (`ForwardedHeadersTests`)
 
 Cache headers:
 
-- [ ] Authenticated API responses: `Cache-Control: no-store` (per `security-model.md` § Authenticated Response Cache Headers)
-- [ ] Static SPA assets: `Cache-Control: public, max-age=...` with content-hashed filenames for invalidation
-- [ ] No authenticated endpoints leak into shared caches (test by hitting the same endpoint with two different sessions and confirming distinct responses)
+- [x] Authenticated / `/api/*` responses: `Cache-Control: private, no-store` — endpoint-set headers (e.g. MFA `no-store, no-cache`) preserved (`SecurityHeadersTests`, `MfaEnrollmentTests`)
+- [x] Static `/dist/*` assets keep `public, max-age=...` with content-hashed filenames (middleware leaves them untouched)
+- [x] No authenticated endpoint leaks into shared caches — `no-store` on `/api/*`; logout additionally sends `Clear-Site-Data`
+
+### Stage 14 follow-ups (deferred, discovered during implementation)
+
+- [ ] **Wire `eslint-plugin-react` + `react/no-danger` in the client ESLint config.** `security-model.md` listed `dangerouslySetInnerHTML` prohibition "enforced via ESLint `react/no-danger`" as a Required control, but Stage 14 found the rule was **never wired** (`ProjectCeres.Client/eslint.config.js` registers only `react-hooks` + `react-refresh`). Deferred out of Stage 14 because wiring it is a lint-infrastructure change needing a full audit of every `dangerouslySetInnerHTML` use plus a documented scoped exception for `chart.tsx` (shadcn's chart primitive, a verified-safe static-CSS use) — beyond this stage's security-headers scope. **Reason:** out-of-scope infra change, not part of Stage 14's declared security-headers deliverable. **Tripwire:** `security-model.md` control-table row is marked "Follow-up" (not "Required/done") and names this gap, so a security-model audit re-surfaces it. Until wired, the convention is unenforced and relies on review.
 
 ---
 
@@ -2284,7 +2288,7 @@ Reverse proxy:
 - [ ] Forwards to .NET app via loopback or unix socket
 - [ ] Forwards `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`
 - [ ] Application's `ForwardedHeadersOptions.KnownProxies` matches the proxy's actual IP
-- [ ] **[← Stage 14 deferral]** Populate the `ForwardedHeaders:KnownProxies` config (empty since Stage 14, which fails closed — forwarded headers ignored — on .NET 10) with the chosen proxy's IP/network. Until this lands, the rate limiter partitions every proxied request into one bucket. Tripwire: the Stage 14 integration test that asserts a spoofed `X-Forwarded-For` does NOT change `RemoteIpAddress` must be updated when real proxies are trusted; `// FIXME(Stage 16):` at the `UseForwardedHeaders` site.
+- [ ] **[← Stage 14 deferral]** Populate the `ForwardedHeaders:KnownProxies` config (empty since Stage 14) with the chosen proxy's IP/network, which **registers** `UseForwardedHeaders` (Stage 14 gated it OFF while the list is empty — see below). Until this lands, forwarded headers are not honored and the rate limiter partitions every proxied request into one bucket. **Correction to an earlier claim:** an empty `KnownProxies` does NOT "fail closed" on .NET 10 — with both `KnownProxies` and `KnownNetworks` empty the middleware trusts every peer and honors spoofed `X-Forwarded-For` (fails OPEN; verified against framework source in Stage 14). That is exactly why Stage 14 omits the registration entirely until a real proxy IP exists, rather than registering it with an empty list. Tripwire: the `ForwardedHeadersTests` spoof-rejection test must be updated when real proxies are trusted; `// FIXME(Stage 16):` at the `UseForwardedHeaders` site in `Program.cs`.
 - [ ] **[← Stage 14 deferral]** Populate `Cors:AllowedOrigins` (empty/inert since Stage 14 — same-origin deployment) ONLY IF Stage 16 introduces a separate SPA origin. If hosting keeps the SPA same-origin with the API, CORS stays inert and this item is closed as "not applicable." Tripwire: `// FIXME(Stage 16):` at the `UseCors` site.
 
 Backups:

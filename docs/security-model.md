@@ -1016,6 +1016,8 @@ Host=db.example.com;SslMode=VerifyFull;RootCertificate=/path/to/ca.crt
 
 When the app runs behind a reverse proxy (nginx, Caddy, or a hosting platform load balancer), register `app.UseForwardedHeaders()` with `ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto` **before all other middleware**. Without this, `Request.IsHttps` returns false, HSTS does not activate, and redirect-to-HTTPS logic fails silently. Restrict trusted proxy addresses via `KnownProxies` or `KnownNetworks`.
 
+> **⚠️ Empty `KnownProxies` fails OPEN, not closed (verified Stage 14 against the ASP.NET Core 10 framework source).** `ForwardedHeadersMiddleware` computes `checkKnownIps = KnownIPNetworks.Count > 0 || KnownProxies.Count > 0`; when **both are empty the allow-list check is skipped entirely and every peer is trusted** — a spoofed `X-Forwarded-For` is honored. So you must NOT register `UseForwardedHeaders` with an empty `KnownProxies` as a "safe interim" state. Stage 14 ships the middleware **gated on `KnownProxies` being non-empty** (`Program.cs`): until Stage 16 populates the real proxy IPs, the middleware is simply not in the pipeline, so `RemoteIpAddress` stays the true transport peer. Stage 16 populates `ForwardedHeaders:KnownProxies` with the chosen proxy's address (see the `// FIXME(Stage 16)` marker at the registration site). A spoof-rejection test (`ForwardedHeadersTests`) pins that an unconfigured proxy cannot change `RemoteIpAddress`.
+
 ### HTTP Security Headers
 
 Every response must include:
@@ -1044,32 +1046,60 @@ Explicitly deny every feature the application does not use. This limits damage f
 
 **CSP must be defined before any React routes go live** — not after. Even with HttpOnly cookies (which block cookie theft), a XSS payload can call authenticated API endpoints using the session cookie automatically. CSP is the primary control against this.
 
-**Phase 3 CSP skeleton:**
+**Phase 3 CSP (shipped Stage 14 — hash-based, not nonce-based):**
 ```
-default-src 'none';
-script-src 'self' 'nonce-{NONCE}' 'strict-dynamic';
-style-src 'self' 'nonce-{NONCE}';
+default-src 'self';
+script-src 'self' 'sha256-<hash of each inline bootstrap script>';
+style-src 'self' 'unsafe-inline';
 img-src 'self' data:;
 font-src 'self';
 connect-src 'self';
 object-src 'none';
 frame-ancestors 'none';
-form-action 'self';
 base-uri 'self';
-upgrade-insecure-requests;
-report-to csp-endpoint;
-report-uri /csp-report;
+report-uri /api/csp-report;
 ```
 
+**Why hash-based, not nonce-based (corrected Stage 14):** an earlier draft of this
+section specified a nonce + `'strict-dynamic'` CSP. That is wrong for this app's
+architecture. The SPA shell (`dist/app.html`) is served as a **static file** via
+`app.MapFallbackToFile`, not server-rendered — so there is no per-request render in
+which to inject a fresh nonce. Industry guidance (Google web.dev, OWASP, MDN) is
+explicit: nonce-based CSP is for server-rendered HTML; **hash-based CSP is the
+recommended, cache-compatible form for statically-served SPA HTML**. A nonce baked
+into a static file is a constant shipped to every visitor — it defeats the mechanism.
+See the Stage 14 spec (`docs/superpowers/specs/2026-10-03-stage-14-...`).
+
 Notes:
-- `'strict-dynamic'` allows a server-nonced script to load further scripts without requiring additional domain allowlists. Host-allowlist CSPs (e.g. `script-src 'self' cdn.example.com`) are bypassable in the majority of real-world deployments; nonces + `strict-dynamic` are the current recommendation.
-- **Inline pre-paint theme-init script** (`ProjectCeres.Client/index.html`, added in Stage 9.1.5.c-revised) — must receive the server-injected nonce when CSP middleware lands. Without a nonce, the script will be blocked, causing a first-paint flash of incorrect theme for OS-dark users. See `docs/superpowers/specs/2026-05-17-stage-9-1-5-c-revised-theme-provider-design.md` §4.11.
-- `'unsafe-inline'` and `'unsafe-eval'` are prohibited for `script-src`. Modern Vite/webpack outputs are eval-free.
-- `'unsafe-inline'` for `style-src` may be required by Tailwind v4 — evaluate at implementation time; replace with a nonce if possible.
-- `frame-ancestors 'none'` supersedes `X-Frame-Options: DENY` in modern browsers — both must be present for full coverage.
-- `report-to` (paired with a `Reporting-Endpoints` response header) is the successor to `report-uri`; emit both for now. CSP violation reports are a source of real-time XSS detection.
-- `dangerouslySetInnerHTML` is prohibited in React components. Enforce via ESLint `react/no-danger` rule. If rich text rendering is ever needed, use a sanitized markdown renderer (DOMPurify + marked).
-- Any CDN, web font provider, or analytics service requires additional `src` directives — add only what is needed.
+- **Inline bootstrap scripts** (theme-init + sidebar-collapsed state in `app.html`) are
+  blessed by their `sha256` hashes, computed at build time by
+  `ProjectCeres.Client/scripts/compute-csp-hashes.mjs` (runs after `vite build`, writes
+  `wwwroot/dist/csp-hashes.json`, read by `SecurityHeadersConfig`). A drift-guard test
+  (`SecurityHeadersTests.Csp_script_hashes_match_the_served_shell`) fails CI if the
+  served shell's inline scripts stop matching the CSP hashes.
+- `'unsafe-inline'` and `'unsafe-eval'` are prohibited for `script-src` — the strict
+  property, pinned by test (`script-src` must never contain `'unsafe-inline'`).
+- `style-src` carries `'unsafe-inline'` deliberately: shadcn's chart primitive
+  (`src/components/ui/chart.tsx`) injects a per-chart `<style>` element at runtime, and
+  Tailwind-generated inline styles also require it. Inline *styles* are a far lower XSS
+  risk than inline scripts; `script-src` stays strict.
+- `frame-ancestors 'none'` supersedes `X-Frame-Options: DENY` in modern browsers — both
+  are present for full coverage.
+- Violation reports POST to `/api/csp-report` (`CspReportApiController`, `[AllowAnonymous]`,
+  dedicated by-IP rate-limit policy `AuthRateLimitPolicies.CspReportByIp`).
+- **`dangerouslySetInnerHTML`**: the project convention is to avoid it, but note that
+  `react/no-danger` is **not currently wired** in the client ESLint config
+  (`eslint.config.js` registers only `react-hooks` + `react-refresh`) — so it is not
+  actively enforced. The one in-tree use, shadcn's `chart.tsx`, is a verified-safe case:
+  the injected content is static CSS generated from a typed `ChartConfig`, with no
+  user/network input. Actually wiring `eslint-plugin-react` + `react/no-danger` (which
+  would need a full audit of every `dangerouslySetInnerHTML` use plus a scoped exception
+  for `chart.tsx`) is tracked as a frontend-hardening follow-up (see Stage 14 follow-ups
+  in the roadmap). If rich text rendering is ever added, use a sanitized renderer
+  (DOMPurify + marked).
+- Any CDN, web font provider, or analytics service requires additional `src` directives —
+  add only what is needed. Fonts are self-hosted (`@fontsource`), so `font-src 'self'`
+  suffices today.
 
 ### Authenticated Response Cache Headers
 
@@ -1647,7 +1677,7 @@ Document all rotation procedures before Phase 3 launch:
 | Refresh token reuse detection: revoke token family on old token presented | — | — | Phase 4 (when JWT introduced) |
 | HTTP security headers | — | Required (CSP when JS added) | Required |
 | CSP defined before first React route goes live | — | — | Required |
-| CSP with `'strict-dynamic'` and nonces (not host allowlists) | — | — | Required |
+| CSP hash-based for the static SPA shell (not nonces; not host allowlists) — shipped Stage 14 | — | — | Required |
 | `frame-ancestors 'none'` in CSP (supplements X-Frame-Options) | — | — | Required |
 | Permissions-Policy header | — | — | Required |
 | Cross-Origin-Opener-Policy: same-origin | — | — | Required |
@@ -1655,7 +1685,7 @@ Document all rotation procedures before Phase 3 launch:
 | Cross-Origin-Embedder-Policy: require-corp | — | — | Intentionally not set (re-evaluate if Phase 4 needs cross-origin isolation) |
 | `Cache-Control: private, no-store` on authenticated responses | — | — | Required |
 | `Clear-Site-Data` header on logout | — | — | Required |
-| `dangerouslySetInnerHTML` prohibited; ESLint `react/no-danger` enforced | — | — | Required |
+| `dangerouslySetInnerHTML` avoided (ESLint `react/no-danger` NOT yet wired — frontend-hardening follow-up; one verified-safe use in `chart.tsx`) | — | — | Follow-up |
 | CSRF double-submit XSRF-TOKEN pattern (not replaced by CORS) | Required | Required | Required |
 | Global fallback authorization policy (`RequireAuthenticatedUser`) | — | — | Required |
 | UUID primary keys | Required | Required | Required |
