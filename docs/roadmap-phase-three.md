@@ -2270,6 +2270,7 @@ HTTPS + TLS:
 - [ ] Cipher suites: only modern ones — no RC4, 3DES, MD5
 - [ ] Server tested with ssllabs.com: A or A+ rating
 - [ ] HSTS header present once HTTPS verified clean
+- [ ] **[← Stage 14 deferral]** Harden HSTS beyond the framework default: `max-age=31536000; includeSubDomains` and add `preload` once the cert/domain is stable (preload is slow to undo, so it waits for a stable HTTPS surface). Stage 14 left `UseHsts()` at framework defaults deliberately. Tripwire: `// FIXME(Stage 16):` at the `UseHsts` site in `Program.cs`.
 
 Database TLS:
 
@@ -2283,6 +2284,8 @@ Reverse proxy:
 - [ ] Forwards to .NET app via loopback or unix socket
 - [ ] Forwards `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`
 - [ ] Application's `ForwardedHeadersOptions.KnownProxies` matches the proxy's actual IP
+- [ ] **[← Stage 14 deferral]** Populate the `ForwardedHeaders:KnownProxies` config (empty since Stage 14, which fails closed — forwarded headers ignored — on .NET 10) with the chosen proxy's IP/network. Until this lands, the rate limiter partitions every proxied request into one bucket. Tripwire: the Stage 14 integration test that asserts a spoofed `X-Forwarded-For` does NOT change `RemoteIpAddress` must be updated when real proxies are trusted; `// FIXME(Stage 16):` at the `UseForwardedHeaders` site.
+- [ ] **[← Stage 14 deferral]** Populate `Cors:AllowedOrigins` (empty/inert since Stage 14 — same-origin deployment) ONLY IF Stage 16 introduces a separate SPA origin. If hosting keeps the SPA same-origin with the API, CORS stays inert and this item is closed as "not applicable." Tripwire: `// FIXME(Stage 16):` at the `UseCors` site.
 
 Backups:
 
