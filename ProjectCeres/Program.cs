@@ -1046,6 +1046,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Security headers (Stage 14): hash-based CSP + hardening headers. Placed before
+// UseStaticFiles so static responses are covered too.
+var distDir = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "dist");
+app.UseSecurityHeaders(ProjectCeres.Common.Security.SecurityHeadersConfig.Build(app.Environment, distDir));
+
 app.UseStaticFiles();
 
 // Vite dev middleware runs BEFORE the auth pipeline. The global authorization
