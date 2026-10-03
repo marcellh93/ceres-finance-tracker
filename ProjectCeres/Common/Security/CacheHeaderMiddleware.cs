@@ -14,10 +14,11 @@ public sealed class CacheHeaderMiddleware(RequestDelegate next)
             if (path.StartsWithSegments("/dist"))
                 return Task.CompletedTask; // hashed assets: leave the static-files cache header
 
-            if (path.StartsWithSegments("/api") || ctx.User.Identity?.IsAuthenticated == true)
+            if ((path.StartsWithSegments("/api") || ctx.User.Identity?.IsAuthenticated == true)
+                && !ctx.Response.Headers.ContainsKey("Cache-Control"))
                 ctx.Response.Headers.CacheControl = "private, no-store";
 
-            if (path.StartsWithSegments("/health"))
+            if (path.StartsWithSegments("/health") && !ctx.Response.Headers.ContainsKey("Cache-Control"))
                 ctx.Response.Headers.CacheControl = "no-store";
 
             if (path.Equals("/api/auth/logout", StringComparison.OrdinalIgnoreCase))
