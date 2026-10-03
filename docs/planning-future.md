@@ -224,6 +224,14 @@ Upload a receipt image (or scan via phone) → an LLM parses it → the transact
 
 **Gate:** Only worth considering after Phase 3 (auth + multi-user) is stable, and only if the app is in consistent daily use.
 
+### Direct Google Sheets import integration
+
+Let a user connect a Google Sheet directly as an import source (OAuth + Sheets API), instead of exporting it to a file and uploading. Raised during the Stage 15.10 (template import) brainstorm.
+
+**Why not now:** the Stage 15.10 template import accepts both `.csv` and `.xlsx`, and Google Sheets (like Numbers and Excel) exports to either in two clicks — so the file-upload path already covers Sheets users. A direct integration adds a Google OAuth app registration, token storage, API quota management, Google's consent-screen review, and ongoing breakage risk when the API changes — a whole external-service dependency for near-zero added coverage. The user also flagged a real architectural concern: **the system today has no clean abstraction for swapping third-party integrations** (e.g. Resend for email is a hard dependency), so adding another OAuth-class integration before that seam exists would deepen the coupling. Address the integration-abstraction concern first (or alongside) before taking on direct cloud-provider connections.
+
+**Adopt when:** file-upload friction proves to be a real barrier in practice (support signal), AND an integration-abstraction layer exists so a cloud connector can be added/replaced without touching core import logic.
+
 ### TanStack Query (server-data caching layer)
 
 A drop-in `useQuery`/`useMutation` library that wraps `fetch` and adds: cross-component cache by key, stale-while-revalidate, refetch on tab focus, retry with exponential backoff, request deduplication, and mutation-driven cache invalidation. Industry standard for React data fetching; ~13KB gzipped + a `QueryClientProvider` at the root.

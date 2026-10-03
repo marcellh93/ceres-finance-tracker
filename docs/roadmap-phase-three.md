@@ -2242,6 +2242,106 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 
 ---
 
+## Stage 15.9 — Itemized installment plans (Batch 5)
+
+**Status: ❌ Pending — brainstormed 2026-10-03, spec not yet written.** Feature work; lands before the Stage 16 deploy gate. Builds before 15.10 (the template import's debt-payment flag targets an installment plan).
+
+> **Goal:** record a purchase/debt paid on a fixed, known installment schedule, see how much is still owed and how many payments remain, and have the next-due installment feed into Safe-to-Spend like a bill. Distinct from a pay-in-full credit card (that stays a plain Liability account) and from a self-imposed payoff plan over a revolving balance (Stage 15.12, locked).
+
+### Design decisions (settled in brainstorm; the spec elaborates)
+
+- **Two new `IUserOwned` entities:** `InstallmentPlan` (name/description, optional plainly-labeled "Who do you owe?" field, `IsActive`, currency — **no stored total/balance**) and `Installment` (belongs to a plan; amount; due date; status Scheduled/Paid; link to the movement that settled it). Names/labels avoid finance jargon (no "creditor"/"principal").
+- **Schedule entry:** the user enters **each installment's amount and due date individually** (uneven schedules supported). An even-split helper may pre-fill the rows, but the installments are the source of truth.
+- **Derived, never stored:** total = SUM(installments); remaining owed = SUM(unpaid); payments left = count(unpaid); payoff date = max(due date of unpaid). Honors the derived-values rule.
+- **Paying an installment** records a real movement from an **account the user is prompted to choose at payment time**, and marks that installment Paid (linked to the movement). Reuses the existing "pay from a chosen account" flow; no new money-movement type.
+- **Surfacing:** a dedicated "Debts" view (per-plan: remaining owed, payments left, next due, payoff date; drill-in to the schedule with a "Record payment" action on the next-due installment). The next-due installment is **surfaced into the existing dashboard forecast view** (the `Installment` rows are read alongside `RecurringTransaction` bills — NOT turned into RecurringTransaction rows).
+- **Spendable:** the next-due installment folds into Safe-to-Spend's imminent-bills bucket, exactly as a recurring bill does today. No new calc model; future installments beyond the imminent window don't suppress today's spendable.
+- **Out of v1:** interest/amortization math (installment amounts are entered as-is), auto-posting, receivables (Phase 4), full-remaining-balance deduction from spendable.
+
+### Convention obligations (build requirements, not design choices)
+
+- New `IUserOwned` entities → `DbSet` + `OnModelCreating` + **RLS policy migration** + `UserOwnedModel.RlsTables` membership (DI is auto via Scrutor since Stage 13.a). **Integration tests run as BYPASSRLS and will NOT catch a missing RLS policy** — the spec must require an explicit RLS test.
+- Plans **deactivate** (`IsActive=false`); the movements that paid installments follow the existing hard-delete-with-confirmation rule.
+- Service returns `Result<T>`; 422 for validation; 404-not-403 for IDOR.
+
+### Verification checklist (to be expanded at spec time)
+
+- [ ] Create a plan with per-installment amounts/dates; total/remaining/payments-left/payoff-date all derive correctly
+- [ ] Record a payment from a prompted account → real movement created, installment flips to Paid, linked to the movement
+- [ ] Next-due installment appears in the dashboard forecast and reduces Safe-to-Spend like an imminent bill
+- [ ] RLS policy test proves cross-user isolation for `InstallmentPlan` + `Installment` (not caught by the BYPASSRLS integration suite)
+- [ ] Full `dotnet test` green
+
+---
+
+## Stage 15.10 — Template-based CSV/Excel import (Batch 5)
+
+**Status: ❌ Pending — brainstormed 2026-10-03, spec not yet written. Some template details still OPEN (see below).** Depends on Stage 15.9 (debt-payment rows target an installment plan). Re-adds import as a *different* feature from the auto-mapping import shelved by [ADR-0078](decisions/ADR-0078-import-shelved-from-phase-3-beta.md) — the spec carries a new ADR clarifying this does not un-shelve ADR-0078's surfaces.
+
+> **Goal:** a non-expert can download a template, fill in their historical movements, and upload it. Designed for people who don't know financial concepts — minimize friction and jargon.
+
+### Design decisions (settled by the user in brainstorm)
+
+- **Accept both `.csv` and `.xlsx`** on upload (CsvHelper + ClosedXML, both already dependencies); one normalization step turns either into the same internal rows so downstream logic is format-agnostic. Template offered as both. Direct Google Sheets integration **deferred** to `planning-future.md` (file export already covers Sheets users; OAuth integration not worth the coupling before an integration-abstraction seam exists).
+- **Target account is pre-selected at upload, not a column** — a real bank export is one account per file. The whole file imports into the chosen account; removes the account column and a class of errors.
+- **Money Out / Money In columns** (bank-statement-familiar) rather than a jargon "Type" + signed amount. Expense = money out, income = money in.
+- **Constrained dropdowns of ONLY the user's own entities** for the "scary" columns (Category; "Moved to / Paid toward" = another of your accounts, i.e. a transfer, or a debt, i.e. a debt payment). The downloaded `.xlsx` template pre-loads data-validation dropdowns populated with the user's own categories/accounts/debts — no free typing. Resolves both the usability problem (no empty-cell guesswork) and the user's cross-user-safety worry (structurally can't reference another user's data; a `.csv` template lists valid values in instructions instead, since CSV can't carry dropdowns).
+- **Server-side re-validation under the user's scope** on import (defense in depth): every referenced entity resolved via `.Owned(user)` + RLS; anything unresolved is a per-row error, never a cross-user match.
+- **No silent creates:** unmatched names → validation error; the user fixes the file or creates the entity first, then re-uploads.
+- **Flow:** download template → fill → upload (account pre-selected) → in-memory validate-preview (valid rows + per-row errors; no DB staging) → **all-or-nothing confirm** (every row must be valid before import). Leaves the shelved auto-mapping/detection/review machinery (`IImportParser`, `HeaderDetectionService`, `ImportProfile`, `ImportStaged*`, `TransferDetectionService`, Review page) shelved — the explicit-column design is why none is needed.
+
+### OPEN — still to decide before/at spec time (NOT yet settled)
+
+- [ ] The **full column set** as a confirmed whole (date, description, money out, money in, category, moved-to/paid-toward — exact names + order + which are required).
+- [ ] The exact **dropdown / data-validation mechanics** in the generated `.xlsx` (and the CSV fallback's instruction format).
+- [ ] How the single "Moved to / Paid toward" column disambiguates **transfer vs debt payment** (it was proposed as one column where the picked entity's kind decides; not yet ratified).
+- [ ] **File-size / row cap** and the cross-currency-transfer validation rule surfacing.
+
+### Verification checklist (to be expanded at spec time)
+
+- [ ] Download template in both `.csv` and `.xlsx`; `.xlsx` carries the user's own dropdowns
+- [ ] Upload either format into a pre-selected account → identical normalized rows
+- [ ] Validate-preview lists valid rows + per-row errors; unmatched names error (no silent create)
+- [ ] All-or-nothing confirm commits every row to the correct movement type; a file with any error cannot be confirmed
+- [ ] Referenced entities resolve only within the uploader's own data (cross-user safety test)
+- [ ] Full `dotnet test` green
+
+---
+
+## Stage 15.11 — Duplicate a movement (Batch 5)
+
+**Status: ❌ Pending — brainstormed 2026-10-03, spec not yet written.** Independent of 15.9/15.10; small, client-only (no backend change — the create page already pre-fills and the router already carries state across routes).
+
+> **Goal:** a "Duplicate" action that opens the create page pre-filled from an existing movement, so the user tweaks and saves instead of re-entering every field.
+
+### Design decisions (settled by the user in brainstorm)
+
+- **"Duplicate" action** in the movement row menu (`MovementRowMenu.tsx`); reads the source movement's type and opens the correct create form pre-filled via router state.
+- **Field-copy defaults:** date → **today** (blanked); cleared → **reset to not-cleared**; needs-review → **reset**; budget link → **copied**; attachments → **not copied**. Works for all three movement types (Transaction / Transfer / LiabilityPayment). The duplicate is a brand-new movement with no link to the original; the user can edit anything before saving.
+
+### Verification checklist (to be expanded at spec time)
+
+- [ ] Duplicate action present on each movement type; opens the correct pre-filled create form
+- [ ] Date blanks to today; cleared/needs-review reset; budget copied; attachments not copied
+- [ ] Saving creates an independent new movement
+- [ ] Full `pnpm test` green (client-only)
+
+---
+
+## Stage 15.12 — Self-imposed payoff plans 🔒 LOCKED (Batch 5)
+
+**Status: 🔒 Locked — captured 2026-10-03, NOT yet brainstormed.** Placeholder so the idea isn't lost; design happens in a dedicated future brainstorm before any spec.
+
+> **Goal (as described, to be refined):** let a user set their own payoff schedule over a **revolving / unknown balance** (e.g. "I owe ~$3,000 on a card and want to pay $X/month to clear it"). Distinct from Stage 15.9 installment plans, which model a **fixed, contractual** schedule over a **known** amount. The user explicitly flagged this as a different feature ("Type 3") worth its own stage.
+
+### Open questions for the future brainstorm (do not design yet)
+
+- How a payoff plan relates to a revolving Liability account whose future balance is not knowable in advance.
+- Whether it reuses 15.9's installment machinery or needs a distinct "target + chosen cadence → progress" model.
+- How (or whether) it feeds into Safe-to-Spend given the balance is an estimate, not a fixed obligation.
+
+---
+
 ## Stage 16 — Hosting + ops (Batch 5)
 
 **Status: ❌ Pending.** Final stage before public beta. Operational, not application-code.
