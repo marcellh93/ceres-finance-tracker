@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.33.2+sha512.qQ+vb+6rca1sblf5Tg/hoS9dzCLNdU20CulZPraj4LaxLjVAIYuzeuCDQEsfLObbKkEh6XmCm0r/lLmfSdoc+A==",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && pnpm check-size",
+    "build": "tsc -b && vite build && node scripts/compute-csp-hashes.mjs && pnpm check-size",
   "typecheck": "tsc -b",
     "lint": "eslint .",
     "lint:tests": "! grep -rE '^const mockFetch = vi\\.fn' src --include='*.test.tsx' --include='*.test.ts'",
