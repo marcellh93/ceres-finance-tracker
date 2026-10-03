@@ -1931,7 +1931,17 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ## Stage 14 — HTTP security headers + CORS (Batch 5)
 
-**Status: ❌ Pending.** Operational security; can land anytime after Stage 6.
+**Status: 🟡 Shipped, with hosting-dependent items deferred to Stage 16.** The security
+headers (CSP hash-based, nosniff, frame-options, referrer-policy, permissions-policy,
+COOP/CORP), the `/api/csp-report` endpoint, path-aware cache headers, forwarded-headers
+hardening, and CORS wiring are all shipped and test-covered (2026-10-03). Three items
+depend on production hosting and are deferred to Stage 16 (HSTS preload, populated
+`KnownProxies`, a real CORS origin); one browser-only check and one lint-infra follow-up
+remain. The stage is NOT fully `[x]` — see the marker legend below.
+
+> **Checklist markers:** `[x]` = done + test-covered · `[~]` = deferred to Stage 16
+> (hosting-dependent) · `[–]` = not applicable under the current same-origin deployment ·
+> `[ ]` = genuinely still open (browser-manual or follow-up).
 
 > **Goal:** every response carries the standard hardening headers, CORS is configured to allow only the SPA origin, and reverse-proxy forwarding is hardened against IP spoofing.
 
@@ -1964,22 +1974,22 @@ Other security headers:
 - [x] `X-Frame-Options: DENY` on every response (`SecurityHeadersTests`)
 - [x] `Referrer-Policy: strict-origin-when-cross-origin` (`SecurityHeadersTests`)
 - [x] `Permissions-Policy` configured (camera/microphone/geolocation denied)
-- [ ] HSTS: `max-age=31536000; includeSubDomains; preload` — **deferred to Stage 16** (once HTTPS enforced; see Stage 16 HTTPS checklist `[← Stage 14 deferral]`)
-- [ ] Verified with `securityheaders.com`: A+ rating (**requires the live hosted site — Stage 16**)
+- [~] HSTS: `max-age=31536000; includeSubDomains; preload` — **deferred to Stage 16** (once HTTPS enforced; see Stage 16 HTTPS checklist `[← Stage 14 deferral]`)
+- [~] Verified with `securityheaders.com`: A+ rating — **deferred to Stage 16** (requires the live hosted site)
 
 CORS: (wired, inert under the current same-origin deployment)
 
-- [ ] In dev: allowed origin — **N/A today**: dev runs Vite proxied *through* Kestrel (same origin), not a separate `:5173` origin. CORS stays inert unless Stage 16 introduces a separate SPA origin (`[← Stage 14 deferral]`)
-- [ ] In prod: allowed origin is the production frontend origin only — **Stage 16** (only if a separate origin exists)
+- [–] In dev: allowed origin — **N/A today**: dev runs Vite proxied *through* Kestrel (same origin), not a separate `:5173` origin. CORS stays inert unless Stage 16 introduces a separate SPA origin (`[← Stage 14 deferral]`)
+- [~] In prod: allowed origin is the production frontend origin only — **deferred to Stage 16** (only if a separate origin exists)
 - [x] `AllowAnyOrigin()` NEVER combined with `AllowCredentials()` — the policy only calls `WithOrigins(...).AllowCredentials()` when `AllowedOrigins` is non-empty; `AllowAnyOrigin` is never used
-- [ ] CORS preflight (`OPTIONS`) correct for all API routes — **Stage 16** (meaningful only with a real cross-origin)
-- [ ] Test: a non-whitelisted origin is rejected — **Stage 16** (inert same-origin today)
+- [~] CORS preflight (`OPTIONS`) correct for all API routes — **deferred to Stage 16** (meaningful only with a real cross-origin)
+- [~] Test: a non-whitelisted origin is rejected — **deferred to Stage 16** (inert same-origin today)
 
 Forwarded-headers:
 
 - [x] `app.UseForwardedHeaders()` registration is FIRST in the pipeline (when enabled) — gated on non-empty `KnownProxies` (`Program.cs`)
 - [x] `ForwardedHeadersOptions` configured: `XForwardedFor | XForwardedProto`
-- [ ] `KnownProxies` populated with the actual reverse-proxy IP(s) — **deferred to Stage 16** (`[← Stage 14 deferral]`; empty list fails OPEN on .NET 10, so Stage 14 omits registration entirely rather than register with an empty list)
+- [~] `KnownProxies` populated with the actual reverse-proxy IP(s) — **deferred to Stage 16** (`[← Stage 14 deferral]`; empty list fails OPEN on .NET 10, so Stage 14 omits registration entirely rather than register with an empty list)
 - [x] Test: a spoofed `X-Forwarded-For` does NOT update `RemoteIpAddress` (`ForwardedHeadersTests`)
 
 Cache headers:
