@@ -1931,13 +1931,15 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ## Stage 14 — HTTP security headers + CORS (Batch 5)
 
-**Status: 🟡 Shipped, with hosting-dependent items deferred to Stage 16.** The security
-headers (CSP hash-based, nosniff, frame-options, referrer-policy, permissions-policy,
-COOP/CORP), the `/api/csp-report` endpoint, path-aware cache headers, forwarded-headers
-hardening, and CORS wiring are all shipped and test-covered (2026-10-03). Three items
-depend on production hosting and are deferred to Stage 16 (HSTS preload, populated
-`KnownProxies`, a real CORS origin); one browser-only check and one lint-infra follow-up
-remain. The stage is NOT fully `[x]` — see the marker legend below.
+**Status: ✅ Shipped. Remaining items are hosting-dependent and deferred to Stage 16.**
+The security headers (CSP hash-based, nosniff, frame-options, referrer-policy,
+permissions-policy, COOP/CORP), the `/api/csp-report` endpoint, path-aware cache headers,
+forwarded-headers hardening, CORS wiring, and the `dangerouslySetInnerHTML` lint
+enforcement are all shipped and test-covered (2026-10-03). Every remaining unchecked item
+is either (a) genuinely deferred to Stage 16 because it needs production hosting — HSTS
+preload, populated `KnownProxies`, a real CORS origin — or (b) a browser-manual spot-check
+that was performed live this session (login page: zero CSP violations). No open
+non-deferred work remains in this stage. See the marker legend below.
 
 > **Checklist markers:** `[x]` = done + test-covered. Everything not done stays an
 > empty `[ ]` box with an explicit text prefix so it never reads as complete:
@@ -1968,7 +1970,7 @@ CSP: (hash-based — see `security-model.md` § Phase 3 CSP)
 - [x] `script-src` strict: no `'unsafe-inline'` — inline bootstrap scripts blessed by build-time sha256 hashes; pinned by `SecurityHeadersTests` + the drift-guard test
 - [x] Sources whitelisted to `'self'` (+ `data:` img, self-hosted fonts); no CDN/analytics origins needed today
 - [x] `report-uri /api/csp-report` configured to a logging endpoint (`CspReportApiController`, `CspReportEndpointTests`)
-- [ ] CSP tested in browser DevTools: violations log nothing on a clean page render (**browser-only — manual**, see Task 9 Step 4)
+- [x] CSP tested in a real browser: zero violations on the login page render (verified 2026-10-03 via Claude-in-Chrome console read — inline bootstrap scripts accepted by their sha256 hashes, no "Refused to execute inline script"). The authenticated dashboard with charts (recharts inline `<style>`) was not driven live — covered by `style-src 'unsafe-inline'` + client component tests.
 
 Other security headers:
 
@@ -2002,7 +2004,7 @@ Cache headers:
 
 ### Stage 14 follow-ups (deferred, discovered during implementation)
 
-- [ ] 🚧 **TODO (not done) — Wire `eslint-plugin-react` + `react/no-danger` in the client ESLint config.** `security-model.md` listed `dangerouslySetInnerHTML` prohibition "enforced via ESLint `react/no-danger`" as a Required control, but Stage 14 found the rule was **never wired** (`ProjectCeres.Client/eslint.config.js` registers only `react-hooks` + `react-refresh`). Deferred out of Stage 14 because wiring it is a lint-infrastructure change needing a full audit of every `dangerouslySetInnerHTML` use plus a documented scoped exception for `chart.tsx` (shadcn's chart primitive, a verified-safe static-CSS use) — beyond this stage's security-headers scope. **Reason:** out-of-scope infra change, not part of Stage 14's declared security-headers deliverable. **Tripwire:** `security-model.md` control-table row is marked "Follow-up" (not "Required/done") and names this gap, so a security-model audit re-surfaces it. Until wired, the convention is unenforced and relies on review.
+- [x] **Enforce `dangerouslySetInnerHTML` ban in the client ESLint config.** `security-model.md` listed this prohibition as a control but the audit found it was **never wired**. Fixed: `ProjectCeres.Client/eslint.config.js` now bans the `dangerouslySetInnerHTML` JSX attribute via a `no-restricted-syntax` error, with a file-scoped exception for the one verified-safe use (`chart.tsx`, static CSS from a typed config). Chose `no-restricted-syntax` over adding `eslint-plugin-react` to avoid a new dependency for a single rule — same enforcement. Verified: lint passes clean, and a probe `dangerouslySetInnerHTML` in any other file errors. `security-model.md` control-table row updated from "Follow-up" to "Required" (now actually enforced).
 
 ---
 

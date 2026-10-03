@@ -1087,16 +1087,15 @@ Notes:
   are present for full coverage.
 - Violation reports POST to `/api/csp-report` (`CspReportApiController`, `[AllowAnonymous]`,
   dedicated by-IP rate-limit policy `AuthRateLimitPolicies.CspReportByIp`).
-- **`dangerouslySetInnerHTML`**: the project convention is to avoid it, but note that
-  `react/no-danger` is **not currently wired** in the client ESLint config
-  (`eslint.config.js` registers only `react-hooks` + `react-refresh`) — so it is not
-  actively enforced. The one in-tree use, shadcn's `chart.tsx`, is a verified-safe case:
-  the injected content is static CSS generated from a typed `ChartConfig`, with no
-  user/network input. Actually wiring `eslint-plugin-react` + `react/no-danger` (which
-  would need a full audit of every `dangerouslySetInnerHTML` use plus a scoped exception
-  for `chart.tsx`) is tracked as a frontend-hardening follow-up (see Stage 14 follow-ups
-  in the roadmap). If rich text rendering is ever added, use a sanitized renderer
-  (DOMPurify + marked).
+- **`dangerouslySetInnerHTML` is lint-enforced.** `ProjectCeres.Client/eslint.config.js`
+  bans the `dangerouslySetInnerHTML` JSX attribute via a `no-restricted-syntax` rule
+  (`error`). This uses the built-in rule rather than `eslint-plugin-react`'s `react/no-danger`
+  to avoid pulling a large plugin in for a single rule — same enforcement, no new dependency.
+  The one legitimate in-tree use, shadcn's `chart.tsx`, is allowed via a file-scoped override:
+  its injected content is static CSS generated from a typed `ChartConfig`, with no user/network
+  input (covered by CSP `style-src`). Any NEW use fails lint with a message pointing here. If
+  rich text rendering is ever added, use a sanitized renderer (DOMPurify + marked) and add a
+  reviewed file-scoped exception.
 - Any CDN, web font provider, or analytics service requires additional `src` directives —
   add only what is needed. Fonts are self-hosted (`@fontsource`), so `font-src 'self'`
   suffices today.
@@ -1685,7 +1684,7 @@ Document all rotation procedures before Phase 3 launch:
 | Cross-Origin-Embedder-Policy: require-corp | — | — | Intentionally not set (re-evaluate if Phase 4 needs cross-origin isolation) |
 | `Cache-Control: private, no-store` on authenticated responses | — | — | Required |
 | `Clear-Site-Data` header on logout | — | — | Required |
-| `dangerouslySetInnerHTML` avoided (ESLint `react/no-danger` NOT yet wired — frontend-hardening follow-up; one verified-safe use in `chart.tsx`) | — | — | Follow-up |
+| `dangerouslySetInnerHTML` lint-enforced (`no-restricted-syntax` error in `eslint.config.js`; one verified-safe file-scoped exception for `chart.tsx`) | — | — | Required |
 | CSRF double-submit XSRF-TOKEN pattern (not replaced by CORS) | Required | Required | Required |
 | Global fallback authorization policy (`RequireAuthenticatedUser`) | — | — | Required |
 | UUID primary keys | Required | Required | Required |
