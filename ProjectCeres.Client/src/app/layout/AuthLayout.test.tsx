@@ -32,7 +32,7 @@ describe('AuthLayout', () => {
     expect(pageDiv).not.toHaveClass('bg-muted');
   });
 
-  it('mounts both LanguageToggle and ThemeToggle in the footer', () => {
+  it('mounts the shared Footer (legal links + manage-cookies + language toggle) and ThemeToggle', () => {
     const { container } = render(
       <ThemeProvider>
         <I18nextProvider i18n={i18n}>
@@ -48,8 +48,16 @@ describe('AuthLayout', () => {
     );
     const footer = container.querySelector('[data-slot="auth-footer"]');
     expect(footer).not.toBeNull();
-    const buttons = within(footer as HTMLElement).getAllByRole('button');
-    // LanguageToggle trigger + ThemeToggle trigger = 2 buttons
-    expect(buttons).toHaveLength(2);
+    const scope = within(footer as HTMLElement);
+    // Stage 13: AuthLayout now mounts the shared <Footer/> (legal links +
+    // manage-cookies button + language-toggle trigger) alongside ThemeToggle,
+    // replacing the old bare 2-button footer. 3 buttons total: manage-cookies,
+    // LanguageToggle trigger, ThemeToggle trigger.
+    const buttons = scope.getAllByRole('button');
+    expect(buttons).toHaveLength(3);
+    expect(scope.getByRole('button', { name: i18n.t('legal.footer.manageCookies') })).toBeInTheDocument();
+    expect(scope.getByRole('link', { name: i18n.t('legal.footer.privacy') })).toBeInTheDocument();
+    expect(scope.getByRole('link', { name: i18n.t('legal.footer.avisoLegal') })).toBeInTheDocument();
+    expect(scope.getByRole('link', { name: i18n.t('legal.footer.cookiePolicy') })).toBeInTheDocument();
   });
 });

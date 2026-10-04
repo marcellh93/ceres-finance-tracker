@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { AppLayout } from './layout/AppLayout';
 import { AuthLayout } from './layout/AuthLayout';
+import { LegalLayout } from './layout/LegalLayout';
+import { ConsentBanner } from './components/ConsentBanner';
 import { RequireAuth } from './auth/RequireAuth';
 import { Accounts } from './pages/Accounts';
 import { Budgets } from './pages/Budgets';
@@ -52,6 +54,8 @@ import { PasswordReset } from './pages/auth/PasswordReset';
 import { Register } from './pages/auth/Register';
 import { AccountUnlock } from './pages/auth/AccountUnlock';
 import { ErasureCancel } from './pages/auth/ErasureCancel';
+import { Privacy } from './pages/legal/Privacy';
+import { Legal } from './pages/legal/Legal';
 
 function RecurringCreateBridge() {
   const ctx = useRecurringLayoutCtx();
@@ -74,6 +78,7 @@ export function App() {
         sonner without duplicating the component or racing on navigation.
       */}
       <Toaster />
+      <ConsentBanner />
     <Routes>
       {/* Public branch — auth pages with the centered-card layout, no app shell. */}
       <Route element={<AuthLayout />}>
@@ -94,6 +99,13 @@ export function App() {
             design: the whole point of a sealed account's cancel link is that
             the account itself can no longer authenticate. */}
         <Route path="erasure/cancel" element={<ErasureCancel />} />
+      </Route>
+
+      {/* Stage 13. Minimal public layout (brand header + prose + shared footer)
+          for the long-form legal pages — not AuthLayout's 420px card. */}
+      <Route element={<LegalLayout />}>
+        <Route path="privacy" element={<Privacy />} />
+        <Route path="legal" element={<Legal />} />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}
