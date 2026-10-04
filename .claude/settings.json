@@ -40,6 +40,15 @@
   ],
   "PreToolUse": [
    {
+    "matcher": "Edit|Write|MultiEdit",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-gate-integrity-guard.js\""
+     }
+    ]
+   },
+   {
     "matcher": "Bash|Edit|Write|MultiEdit",
     "hooks": [
      {

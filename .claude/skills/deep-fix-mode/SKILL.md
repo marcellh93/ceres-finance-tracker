@@ -18,6 +18,34 @@ This skill is **rigid**. Do not adapt steps away. Do not skip step 4 because the
 5. **External research at the documented authority bar is non-negotiable** (see `references/research-quality-bar.md`). "I think I remember" is not research.
 6. **One-shot rule:** if the proposal in step 5 also fails, this skill re-fires on the next message. You do not slide back into incremental patching.
 
+## Mandatory entry: two Stop-hook failures on the same gate
+
+If the SAME Stop hook (or the same gate's check) blocks you **twice in a row**, you
+are circling on it — enter this procedure before any third attempt. This is not
+optional and it fires even when no loop-detection hook did.
+
+The failure this prevents (observed 2026-10-04, Stage 13): the evidence-bundle Stop
+hook blocked an i18n-locale commit, demanding a browser walk. First response —
+rewrite the evidence artifact to satisfy the hook. Second response — edit the hook
+predicate to exclude `.json` so the check would stop firing. **Both were attempts to
+silence the gate, not to produce the evidence it asks for.** The gate was correct:
+a locale change re-renders every page, so it IS walkable surface. The fix was to run
+the walk the recovery text named — the thing never tried.
+
+The rule:
+1. A Stop hook that re-fires is asking a question, not emitting noise. Before a
+   second attempt, read the hook's own recovery instructions and **do the first
+   thing it says**, literally, unless you have researched why it does not apply.
+2. After two failures: STOP. Write the failed-attempts table (Step 2). The research
+   bar (Step 5) now includes reading the hook's source AND the tool its recovery text
+   names (e.g. `agent-walk.ts`, `up.sh`) to learn what evidence it actually collects
+   — before forming any "this is a false positive" claim.
+3. "Edit the gate so the check passes" and "write the artifact the schema wants
+   without producing the underlying evidence" are **reward-hacking** (Opus 4.5 System
+   Card: 18.2%). A gate is weakened only after research proves a false positive AND
+   with explicit user approval — never to end a loop. A verified false positive is
+   narrowed with the user, documented with a dated reason; it is never the first move.
+
 ## Step 1 — Stop and read the relevant memory
 
 Read in this order (the entries are short):
