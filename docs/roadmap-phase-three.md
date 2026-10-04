@@ -1831,14 +1831,14 @@ Stage 12.3 (2026-08-23) added `Block IP` + a `SELF_LOCKOUT` guard but no way to 
 
 Privacy policy + cookie consent:
 
-- [ ] `/privacy` and `/legal` routes render the policy in EN + ES
-- [ ] Policy describes every data type collected, legal basis, retention period, sharing (subprocessors), user rights
-- [ ] Cookie consent banner appears on first visit; choice persists in a non-tracking cookie
-- [ ] Banner offers granular choice: necessary (always on), analytics (opt-in), preferences (opt-in) — per AEPD 2024
-- [ ] Reject-all is as easy as accept-all (single click, equally prominent)
-- [ ] No tracking / analytics scripts load before consent
-- [ ] Consent is revocable from a footer link on every page
-- [ ] AEPD compliance verified against the 2024 guidelines
+- [~] `/privacy` and `/legal` routes render the policy in EN + ES — **EN covered**: `legal-pages.test.tsx` (heading, retention text, `#aviso-legal`/`#cookies`, DRAFT banner) + `consent-legal.spec.ts` E2E (both routes reachable signed-out, chromium+firefox+webkit). **ES not automated** — `privacy.es.tsx`/`legal.es.tsx` exist and `Privacy.tsx`/`Legal.tsx` branch on `i18n.language`, but no test renders with the ES branch selected; leaving `[~]` rather than `[x]` until an ES-rendering assertion exists.
+- [ ] Policy describes every data type collected, legal basis, retention period, sharing (subprocessors), user rights — content-completeness judgment call; not mechanically testable, manual/counsel review only.
+- [x] Cookie consent banner appears on first visit; choice persists in a non-tracking cookie — `ConsentBanner.test.tsx` ("shows when no consent cookie is present", "accept-all persists consent and hides the banner") + `consent-cookie.test.ts` + `consent-legal.spec.ts` E2E leg 1 (first visit → Accept all → reload → hidden).
+- [x] Banner offers granular choice: necessary (always on), analytics (opt-in), preferences (opt-in) — per AEPD 2024 — `ConsentBanner.test.tsx` "manage preferences reveals the analytics + preferences toggles" (necessary switch rendered checked+disabled).
+- [x] Reject-all is as easy as accept-all (single click, equally prominent) — `ConsentBanner.test.tsx` "accept-all and reject-all use the same button variant (equal prominence)" + E2E asserts both visible with one click each.
+- [ ] No tracking / analytics scripts load before consent — true by inspection (no analytics/tracking scripts exist in the codebase today) but not asserted by any test (nothing injects or polls for a script tag); manual/architectural verification only.
+- [x] Consent is revocable from a footer link on every page — `Footer.test.tsx` "manage-cookies button fires openConsentManager" + Settings re-entry covered by `consent-legal.spec.ts` E2E leg 4 (authed Settings → "Manage cookie preferences" re-opens the banner).
+- [ ] AEPD compliance verified against the 2024 guidelines — legal/regulatory sign-off, not a test assertion; manual only.
 
 RoPA + DPA:
 
@@ -1901,9 +1901,9 @@ Localization:
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)):
 
-- [ ] Cookie consent banner mobile: "accept all" and "reject all" buttons equally prominent, side-by-side or stacked, each ≥ 44×44px on mobile per the AEPD-2024 equal-prominence requirement
-- [ ] Cookie consent banner does not obscure critical content at any breakpoint; granular-choice controls reachable without horizontal scroll
-- [ ] `/privacy` and `/legal` pages render readably on 375px (no horizontal overflow; line length comfortable on mobile)
+- [x] Cookie consent banner mobile: "accept all" and "reject all" buttons equally prominent, side-by-side or stacked, each ≥ 44×44px on mobile per the AEPD-2024 equal-prominence requirement — `consent-legal.spec.ts` E2E 375px test measures both buttons' `boundingBox().height` ≥43.5px (chromium+firefox+webkit), same equal-prominence class assertion as `ConsentBanner.test.tsx`.
+- [ ] Cookie consent banner does not obscure critical content at any breakpoint; granular-choice controls reachable without horizontal scroll — no-overflow asserted only for the default (non-managing) banner state at 375px; the expanded "manage preferences" panel's own overflow/reachability isn't exercised by any test. Leaving `[ ]`.
+- [x] `/privacy` and `/legal` pages render readably on 375px (no horizontal overflow; line length comfortable on mobile) — `consent-legal.spec.ts` E2E dedicated 375px test visiting `/privacy` and `/legal` directly (chromium+firefox+webkit), asserting the heading/`#cookies` anchor is visible/attached and `scrollWidth <= innerWidth+1` on each.
 - [x] Erasure confirmation dialog touch targets: confirm + cancel buttons ≥ 44×44px on mobile (verified via `account-erasure.spec.ts`'s dedicated mobile test, incl. waiting out the dialog's own open-animation before measuring); destructive button visually distinct without relying on color alone — `AlertDialogCancel size="lg"` outranks the default-sized destructive `AlertDialogAction` in visual weight (the safe path gets the size, not the dangerous one), plus a case-sensitive typed-confirm gate and a deliberate enable-delay as the primary distinguishing friction.
 - [ ] Data export request flow on mobile: `/settings/account` export button ≥ 44×44px; the post-202 confirmation message wraps cleanly
 

@@ -5,7 +5,9 @@ export function openConsentManager() {
   listeners.forEach((cb) => cb());
 }
 
-export function onOpenConsentManager(cb: Cb) {
+export function onOpenConsentManager(cb: Cb): () => void {
   listeners.add(cb);
-  return () => listeners.delete(cb);
+  return () => {
+    listeners.delete(cb);
+  };
 }

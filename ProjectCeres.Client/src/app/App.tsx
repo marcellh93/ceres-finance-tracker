@@ -54,8 +54,12 @@ import { PasswordReset } from './pages/auth/PasswordReset';
 import { Register } from './pages/auth/Register';
 import { AccountUnlock } from './pages/auth/AccountUnlock';
 import { ErasureCancel } from './pages/auth/ErasureCancel';
-import { Privacy } from './pages/legal/Privacy';
-import { Legal } from './pages/legal/Legal';
+// Legal pages lazy-loaded: long-form prose content + per-language draft text
+// is read rarely relative to the authed app, and was pushing razorAppEntry
+// over its bundle-size budget (Stage 13 build gate, 2026-10-04). Same pattern
+// as Security above.
+const Privacy = lazy(() => import('./pages/legal/Privacy').then((m) => ({ default: m.Privacy })));
+const Legal = lazy(() => import('./pages/legal/Legal').then((m) => ({ default: m.Legal })));
 
 function RecurringCreateBridge() {
   const ctx = useRecurringLayoutCtx();
@@ -104,8 +108,22 @@ export function App() {
       {/* Stage 13. Minimal public layout (brand header + prose + shared footer)
           for the long-form legal pages — not AuthLayout's 420px card. */}
       <Route element={<LegalLayout />}>
-        <Route path="privacy" element={<Privacy />} />
-        <Route path="legal" element={<Legal />} />
+        <Route
+          path="privacy"
+          element={
+            <Suspense fallback={null}>
+              <Privacy />
+            </Suspense>
+          }
+        />
+        <Route
+          path="legal"
+          element={
+            <Suspense fallback={null}>
+              <Legal />
+            </Suspense>
+          }
+        />
       </Route>
 
       {/* Protected branch — everything that exists today, gated by RequireAuth. */}
