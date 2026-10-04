@@ -338,5 +338,36 @@
         "cta": "Regenerar códigos de respaldo"
       }
     }
+  },
+  "legal": {
+    "footer": {
+      "avisoLegal": "Aviso legal",
+      "privacy": "Privacidad",
+      "cookiePolicy": "Política de cookies",
+      "manageCookies": "Gestionar cookies"
+    },
+    "banner": {
+      "title": "Utilizamos cookies",
+      "body": "Utilizamos cookies para entender cómo usas el sitio y mejorar tu experiencia.",
+      "acceptAll": "Aceptar todo",
+      "rejectAll": "Rechazar todo",
+      "managePreferences": "Gestionar preferencias",
+      "save": "Guardar preferencias",
+      "categories": {
+        "necessary": "Necesarias",
+        "necessaryDesc": "Esenciales para que el sitio funcione correctamente.",
+        "analytics": "Analítica",
+        "analyticsDesc": "Nos ayuda a entender cómo usas el sitio.",
+        "preferences": "Preferencias",
+        "preferencesDesc": "Recuerda tus opciones para una mejor experiencia."
+      }
+    },
+    "settings": {
+      "title": "Privacidad y cookies",
+      "description": "Gestiona cómo usamos cookies y datos en tu cuenta.",
+      "managePreferences": "Gestionar preferencias de cookies",
+      "viewPrivacy": "Política de privacidad",
+      "viewLegal": "Aviso legal"
+    }
   }
 }

@@ -338,5 +338,36 @@
         "cta": "Regenerate backup codes"
       }
     }
+  },
+  "legal": {
+    "footer": {
+      "avisoLegal": "Legal notice",
+      "privacy": "Privacy",
+      "cookiePolicy": "Cookie policy",
+      "manageCookies": "Manage cookies"
+    },
+    "banner": {
+      "title": "We use cookies",
+      "body": "We use cookies to understand how you use the site and improve your experience.",
+      "acceptAll": "Accept all",
+      "rejectAll": "Reject all",
+      "managePreferences": "Manage preferences",
+      "save": "Save preferences",
+      "categories": {
+        "necessary": "Necessary",
+        "necessaryDesc": "Essential for the site to function properly.",
+        "analytics": "Analytics",
+        "analyticsDesc": "Help us understand how you use the site.",
+        "preferences": "Preferences",
+        "preferencesDesc": "Remember your choices for a better experience."
+      }
+    },
+    "settings": {
+      "title": "Privacy & cookies",
+      "description": "Manage how we use cookies and data on your account.",
+      "managePreferences": "Manage cookie preferences",
+      "viewPrivacy": "Privacy Policy",
+      "viewLegal": "Legal"
+    }
   }
 }
