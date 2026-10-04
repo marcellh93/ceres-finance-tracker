@@ -1014,6 +1014,14 @@ if (args.Length > 0 && args[0] == "--run-erasure-jobs")
     Environment.Exit(await ProjectCeres.Tools.ErasureWorker.RunAsync(builder));
 }
 
+// Cron-invokable GDPR retention purge: four flat cross-tenant deletes
+// (AuditLog, FailedLoginAttempt, SavedReport, ImportProfile) past their horizons.
+// Invocation: dotnet run --project ProjectCeres -- --run-retention-purge
+if (args.Length > 0 && args[0] == "--run-retention-purge")
+{
+    Environment.Exit(await ProjectCeres.Tools.RetentionPurge.RunAsync(builder));
+}
+
 var app = builder.Build();
 
 // Forwarded-headers (Stage 14.7): MUST be first so every downstream component

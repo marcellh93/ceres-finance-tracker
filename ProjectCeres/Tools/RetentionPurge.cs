@@ -60,4 +60,25 @@ public static class RetentionPurge
             .Where(p => p.DeletedAt != null && p.DeletedAt < cutoff)
             .ExecuteDeleteAsync(ct);
     }
+
+    public static async Task<int> RunAsync(WebApplicationBuilder builder)
+    {
+        var app = builder.Build();
+        using var scope = app.Services.CreateScope();
+        var sp = scope.ServiceProvider;
+        var db = sp.GetRequiredService<AdminDbContext>();
+        var clock = sp.GetRequiredService<TimeProvider>();
+        var logger = sp.GetRequiredService<ILogger<Program>>();
+        var ct = CancellationToken.None;
+
+        var audit = await PurgeAuditLogAsync(db, clock, ct);
+        var failed = await PurgeFailedLoginsAsync(db, clock, ct);
+        var reports = await PurgeSavedReportsAsync(db, clock, ct);
+        var profiles = await PurgeImportProfilesAsync(db, clock, ct);
+
+        logger.LogInformation(
+            "Retention purge: deleted {Audit} audit-log, {Failed} failed-login, {Reports} saved-report, {Profiles} import-profile rows.",
+            audit, failed, reports, profiles);
+        return 0;
+    }
 }
