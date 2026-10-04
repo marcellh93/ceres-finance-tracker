@@ -2,16 +2,21 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { MemoryRouter } from 'react-router-dom';
+import { I18nextProvider } from 'react-i18next';
+import i18n from '../../i18n/i18n';
 import { SettingsPage } from './SettingsPage';
 
 // SettingsPage links to /settings/sessions, so it needs router context.
 // The link is the page's only routing concern; these tests assert settings
-// behaviour, not navigation.
+// behaviour, not navigation. It also renders the Privacy & cookies card via
+// useTranslation(), so it needs the real i18n instance in context.
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <SettingsPage />
-    </MemoryRouter>,
+    <I18nextProvider i18n={i18n}>
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    </I18nextProvider>,
   );
 }
 import { refetchSettings } from '../../lib/use-settings';
@@ -165,5 +170,12 @@ describe('SettingsPage', () => {
     );
     expect(refetchSettings).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /save/i })).toBeEnabled();
+  });
+
+  it('shows a Privacy & cookies section with a manage-preferences action', async () => {
+    renderPage();
+    expect(await screen.findByRole('heading', { name: /privacy & cookies/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /manage cookie preferences/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute('href', '/privacy');
   });
 });

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '../../lib/use-document-title';
@@ -19,8 +20,10 @@ import {
   type UpdateSettingsRequest,
 } from './settings-api';
 import { apiFetch } from '../../lib/api-client';
+import { openConsentManager } from '../../i18n/consent-events';
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   useDocumentTitle('Settings');
   const settings = useApi<SettingsDto>(SETTINGS_URL);
   const currencies = useApi<CurrencyOptionDto[]>(CURRENCIES_URL);
@@ -147,6 +150,28 @@ export function SettingsPage() {
           >
             Manage account
           </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('legal.settings.title')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-muted-foreground text-sm">
+            {t('legal.settings.description')}
+          </p>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" onClick={openConsentManager}>
+              {t('legal.settings.managePreferences')}
+            </Button>
+            <Link to="/privacy" className={cn(buttonVariants({ variant: 'outline' }))}>
+              {t('legal.settings.viewPrivacy')}
+            </Link>
+            <Link to="/legal" className={cn(buttonVariants({ variant: 'outline' }))}>
+              {t('legal.settings.viewLegal')}
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </PageShell>
