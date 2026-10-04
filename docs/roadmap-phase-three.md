@@ -1907,6 +1907,11 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [x] Erasure confirmation dialog touch targets: confirm + cancel buttons ≥ 44×44px on mobile (verified via `account-erasure.spec.ts`'s dedicated mobile test, incl. waiting out the dialog's own open-animation before measuring); destructive button visually distinct without relying on color alone — `AlertDialogCancel size="lg"` outranks the default-sized destructive `AlertDialogAction` in visual weight (the safe path gets the size, not the dangerous one), plus a case-sensitive typed-confirm gate and a deliberate enable-delay as the primary distinguishing friction.
 - [ ] Data export request flow on mobile: `/settings/account` export button ≥ 44×44px; the post-202 confirmation message wraps cleanly
 
+### Deferred out of the cookie-consent / legal-pages slice (2026-10-04)
+
+- [ ] **`/accesibilidad` — EAA accessibility statement page (EN+ES).** A legally-required (European Accessibility Act) statement, flagged in `legal.md` as a Tier-1 item with a global-footer link, but NOT in the original Stage 13 checklist — surfaced during the cookie-consent/legal-pages brainstorm. **Reason:** out of this slice's declared scope (`/privacy` + `/legal`); it is its own page with its own (legal) content. **Tripwire:** once the public footer ships with legal links, a missing `/accesibilidad` link is visible; `legal.md` Tier-1 list names it. Build as a sibling of the `/privacy` + `/legal` pages (same public layout + per-language content-file pattern) when its content is ready.
+- [ ] **Server-side consent ledger (GDPR Art. 7(1) demonstrability) — only if a non-essential tracker is ever added.** The cookie-consent slice stores the choice client-side (cookie), which suffices while only strictly-necessary cookies are set. **Reason:** not required today — a consent *record* for audit is only needed once a real tracker (analytics/preferences) is gated by consent, which per `planning-resolved.md` (no Phase-3 analytics) does not exist. **Tripwire:** this is the same trigger as `planning-resolved.md`'s "upgrade the banner to a real gate if a tracker is added" clause — adding any non-essential tracker re-surfaces both this ledger and the banner upgrade together.
+
 ---
 
 ## Stage 13.a — Scrutor assembly-scanning DI registration ✅ Done (2026-10-02)
