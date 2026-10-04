@@ -348,7 +348,7 @@
     },
     "banner": {
       "title": "We use cookies",
-      "body": "We use cookies to understand how you use the site and improve your experience.",
+      "body": "We use only strictly-necessary cookies to keep the site working. You can review your options below.",
       "acceptAll": "Accept all",
       "rejectAll": "Reject all",
       "managePreferences": "Manage preferences",
@@ -357,9 +357,9 @@
         "necessary": "Necessary",
         "necessaryDesc": "Essential for the site to function properly.",
         "analytics": "Analytics",
-        "analyticsDesc": "Help us understand how you use the site.",
+        "analyticsDesc": "Not used today. Reserved for future analytics, off unless you allow it.",
         "preferences": "Preferences",
-        "preferencesDesc": "Remember your choices for a better experience."
+        "preferencesDesc": "Not used today. Reserved for future preference cookies, off unless you allow it."
       }
     },
     "settings": {

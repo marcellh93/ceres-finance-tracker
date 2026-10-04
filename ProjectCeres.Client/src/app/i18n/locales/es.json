@@ -348,7 +348,7 @@
     },
     "banner": {
       "title": "Utilizamos cookies",
-      "body": "Utilizamos cookies para entender cómo usas el sitio y mejorar tu experiencia.",
+      "body": "Utilizamos solo cookies estrictamente necesarias para que el sitio funcione. Puedes revisar tus opciones a continuación.",
       "acceptAll": "Aceptar todo",
       "rejectAll": "Rechazar todo",
       "managePreferences": "Gestionar preferencias",
@@ -357,9 +357,9 @@
         "necessary": "Necesarias",
         "necessaryDesc": "Esenciales para que el sitio funcione correctamente.",
         "analytics": "Analítica",
-        "analyticsDesc": "Nos ayuda a entender cómo usas el sitio.",
+        "analyticsDesc": "No se utilizan hoy. Reservado para analítica futura, desactivado salvo que lo permitas.",
         "preferences": "Preferencias",
-        "preferencesDesc": "Recuerda tus opciones para una mejor experiencia."
+        "preferencesDesc": "No se utilizan hoy. Reservado para futuras cookies de preferencias, desactivadas salvo que lo permitas."
       }
     },
     "settings": {
