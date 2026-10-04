@@ -4,7 +4,7 @@
 
 **Goal:** Ship the EU-beta legal-gate UI — `/privacy` + `/legal` public pages (EN+ES), a granular AEPD cookie-consent banner, and a reachable consent-revocation affordance — as a client-only change.
 
-**Architecture:** React SPA (`ProjectCeres.Client/`), client-only. Two new public routes added to `App.tsx`'s existing public branch, wrapped in a new minimal public layout (`LegalLayout`). A consent banner mounted at `App` root (sibling of `<Toaster>`) so it shows pre-auth and authed. A `consent-cookie.ts` utility mirroring `lang-cookie.ts`. A `<Footer>` on public layouts only. A "Privacy & cookies" section added to the authed Settings page as the revocation re-entry. Legal text is **placeholder**, stored in per-language content files. No backend, no entity, no migration.
+**Architecture:** React SPA (`ProjectCeres.Client/`), client-only. Two new public routes added to `App.tsx`'s existing public branch, wrapped in a new minimal public layout (`LegalLayout`). A consent banner mounted at `App` root (sibling of `<Toaster>`) so it shows pre-auth and authed. A `consent-cookie.ts` utility mirroring `lang-cookie.ts`. A `<Footer>` on public layouts only. A "Privacy & cookies" section added to the authed Settings page as the revocation re-entry. Legal text is a **codebase-grounded draft with `[CONFIRM WITH COUNSEL]` markers** (verified facts stated; unverifiable business/legal facts marked), stored in per-language content files — not live until a human reviews it. No backend, no entity, no migration.
 
 **Tech Stack:** React 19 + Vite + TypeScript, react-router-dom (relative routes under the SPA root), react-i18next, Tailwind CSS v4 (`@theme inline` / `@layer`), base-ui shadcn primitives, Vitest + React Testing Library, Playwright E2E.
 
@@ -19,7 +19,7 @@
 - **EN/ES parity is a ship gate.** Every new short-copy key exists in BOTH `en.json` and `es.json`; the files stay at equal line count (currently 342/342). Both policy content files (EN + ES) present.
 - **Routes are relative, no leading slash** in route *definitions* (`path="privacy"`), matching the existing public branch; `<Link>`/`navigate` targets use a leading slash (`to="/privacy"`), matching existing usage.
 - **No trailing ellipsis** in any button, menu item, or AlertDialog action label (`feedback_no_trailing_ellipsis_in_labels`).
-- **Placeholder legal text only.** Every policy content file is clearly marked PLACEHOLDER. Do NOT author binding legal wording. Structure placeholders on the mandated Art. 13/14 headings + the retention windows so counsel text drops into the right slots.
+- **Codebase-grounded legal draft, NOT final text.** Each content file opens with a `[DRAFT — NOT legally reviewed; do not publish until counsel reviews]` banner. State codebase-verified facts truthfully (cookies, data categories, retention windows, the 6-year financial-retention-overrides-erasure point, the real rights-exercise path); wrap every business-fact (legal name/NIF/address, subprocessor names, contact) and legal judgment (per-purpose legal basis) as an inline `[CONFIRM WITH COUNSEL: …]` marker. NEVER fill a marker with a guess. Full rules: spec § "Grounded-draft content rules". `docs/legal.md` is read-only.
 - **24-month consent cookie**, first-party, `SameSite=Lax; Secure; Path=/`, NOT HttpOnly, no identifier (AEPD re-consent window).
 - **Show-then-approval + UX checklist.** Show the rendered result; wait for explicit approval before the final commit. Run the UX checklist (golden / empty / error / 375px / all-nav); prefer Playwright E2E as verification over a manual handoff.
 - **Toolchain:** `pnpm --dir ProjectCeres.Client …`, never `cd`-then-`pnpm`, never `npm`. `pnpm build` and `pnpm test` must exit 0 before the stage is reported done.
@@ -37,8 +37,8 @@ New files:
 - `ProjectCeres.Client/src/app/pages/legal/Privacy.tsx` — privacy page (renders privacy content file).
 - `ProjectCeres.Client/src/app/pages/legal/Legal.tsx` — Aviso Legal + Cookie Policy anchored sections.
 - `ProjectCeres.Client/src/app/pages/legal/legal-pages.test.tsx` — render + anchor tests.
-- `ProjectCeres.Client/src/app/pages/legal/content/privacy.en.tsx` + `privacy.es.tsx` — placeholder privacy content.
-- `ProjectCeres.Client/src/app/pages/legal/content/legal.en.tsx` + `legal.es.tsx` — placeholder aviso-legal + cookie-policy content.
+- `ProjectCeres.Client/src/app/pages/legal/content/privacy.en.tsx` + `privacy.es.tsx` — codebase-grounded privacy draft (counsel markers).
+- `ProjectCeres.Client/src/app/pages/legal/content/legal.en.tsx` + `legal.es.tsx` — codebase-grounded aviso-legal + cookie-policy draft (counsel markers).
 - `ProjectCeres.Client/e2e/consent-legal.spec.ts` — Playwright E2E (path matches existing e2e dir convention; confirm at Task 9).
 
 Modified files:
@@ -236,7 +236,7 @@ git commit -m "feat(13): prose-legal design-system recipe for long-form pages"
 
 ---
 
-### Task 3: Placeholder legal content components
+### Task 3: Codebase-grounded legal content components
 
 **Files:**
 - Create: `ProjectCeres.Client/src/app/pages/legal/content/privacy.en.tsx`
@@ -245,38 +245,49 @@ git commit -m "feat(13): prose-legal design-system recipe for long-form pages"
 - Create: `ProjectCeres.Client/src/app/pages/legal/content/legal.es.tsx`
 
 **Interfaces:**
-- Produces, from each file, a default-exported React component rendering the placeholder prose as semantic JSX (`<h2>`, `<p>`, `<ul>`), NOT a string and NOT `dangerouslySetInnerHTML`:
+- Produces, from each file, a default-exported React component rendering semantic JSX (`<h2>`, `<p>`, `<ul>`), NOT a string and NOT `dangerouslySetInnerHTML`:
   - `privacy.en.tsx` / `privacy.es.tsx` → `PrivacyContentEn` / `PrivacyContentEs`
   - `legal.en.tsx` / `legal.es.tsx` → `LegalContentEn` / `LegalContentEs`, each rendering two `<section>`s with `id="aviso-legal"` and `id="cookies"` so the anchors resolve.
 
+**This is a codebase-grounded DRAFT, not a bare placeholder.** Follow the spec's
+"Grounded-draft content rules" section exactly. The rule: state every fact I can
+verify from the code / `legal.md` truthfully; wrap every business-fact or
+legal-judgment I cannot verify as an inline `[CONFIRM WITH COUNSEL: …]` marker.
+NEVER fill a `[CONFIRM …]` with a guess. `docs/legal.md` is read-only — read facts
+from it, do not edit it.
+
 - [ ] **Step 1: Write the four content components**
 
-Each is static placeholder JSX. **Every file opens with a clearly-marked placeholder banner paragraph** (e.g. `<p><strong>[PLACEHOLDER — not legally reviewed. Counsel supplies the binding wording.]</strong></p>`). Structure headings on the mandated fields so counsel text drops into the right slots:
+**Every file opens with a banner paragraph:**
+`<p><strong>[DRAFT — generated from the codebase, NOT legally reviewed. Do not publish as the live policy until counsel has reviewed it.]</strong></p>`
 
-`privacy.*` headings (from `security-model.md` Art. 13/14 + `legal.md` retention):
-- What data we collect
-- Why we process it (legal basis)
-- How long we keep it — **state the 30-day grace / 180-day archive windows** (from `legal.md`)
-- Who we share it with (subprocessors)
-- Your rights (access, rectification, erasure, portability, objection)
-- How to contact us / exercise rights
+`privacy.*` headings + grounded content (state as FACT — these are verified):
+- **What data we collect** — account email; IP address + user-agent (security logs: `FailedLoginAttempt`, `UserSession`, `AuditLog`, `UserBlockedIp`); uploaded attachment file names + financial attachment files; your financial data (accounts, transactions, budgets, categories).
+- **Why we process it (legal basis)** — propose per purpose, each wrapped: `[CONFIRM WITH COUNSEL: legal basis — service delivery = contract]`, `[CONFIRM WITH COUNSEL: legal basis — financial retention = legal obligation]`, `[CONFIRM WITH COUNSEL: legal basis — security logs = legitimate interest]`.
+- **How long we keep it** — state as fact: soft-deleted saved reports 90 days; audit logs 12 months; failed-login logs 1 year; account closure 30-day grace → 150-day sealed archive → permanent deletion at day 180. **AND** the critical correctness point: financial/accounting records retained 6 years (Código de Comercio Art. 30) / tax 4–6 years, which **overrides the right to erasure** (GDPR Art. 17(3)(b)) — on erasure, identifiers are anonymised but anonymised financial records are retained for the legal period.
+- **Who we share it with** — `[CONFIRM: hosting provider — name + DPA signed]`, `[CONFIRM: email service — name + DPA signed]`. (`legal.md` names these as TBD; do not guess vendor names.) State plainly: no third-party behavioural analytics in Phase 3.
+- **Your rights** — access, rectification, erasure, portability, objection. Describe the real user path: data export via Settings → Account → "download a copy"; erasure via Settings → Account, with a 72-hour emailed cancel link. (Describe the path, not the endpoint names.)
+- **How to contact us / exercise rights** — `[CONFIRM WITH COUNSEL: contact email + DPO/supervisory-authority details]`.
+- Effective date: `[CONFIRM: effective date]`.
 
 `legal.*` — two `<section>`s:
-- `<section id="aviso-legal">` — Aviso Legal: legal name, NIF, registered address, contact (LSSI-CE Art. 10). Placeholder values clearly marked.
-- `<section id="cookies">` — Cookie Policy: the cookies actually set (session, CSRF, `lang`, `cookie_consent`), each strictly-necessary, none consent-gated today; how to withdraw.
+- `<section id="aviso-legal">` — Aviso Legal (LSSI-CE Art. 10): `[CONFIRM: legal entity name]`, `[CONFIRM: NIF]`, `[CONFIRM: registered address]`, `[CONFIRM: contact email]`. These are business-identity facts — ALL markers, never invented.
+- `<section id="cookies">` — Cookie Policy: state as fact the cookies actually set — `__Host-Session` (session), `__Host-Persist` (remember-me), `__Host-XSRF` (CSRF), `lang` (language), `cookie_consent` (this banner's own record) — each strictly-necessary, none consent-gated today; how to withdraw (the banner's Manage preferences / Settings re-entry).
 
-EN and ES files carry the SAME heading structure and section ids (parity).
+EN and ES files carry the SAME structure, section ids, and the SAME set of
+`[CONFIRM …]` markers (translate the prose; keep the markers identical). Parity.
 
-- [ ] **Step 2: No unit test at this task** — these are static content; their rendering + anchors are asserted in Task 7's page tests (where they're mounted). Verify they compile:
+- [ ] **Step 2: Verify compile + marker parity** — static content; rendering + anchors asserted in Task 7. Verify:
 
-Run: `pnpm --dir ProjectCeres.Client exec tsc --noEmit`
-Expected: exit 0.
+Run: `pnpm --dir ProjectCeres.Client exec tsc --noEmit` (expect exit 0).
+Then confirm EN and ES carry the same `[CONFIRM` marker count:
+`grep -c "\[CONFIRM" ProjectCeres.Client/src/app/pages/legal/content/privacy.en.tsx ProjectCeres.Client/src/app/pages/legal/content/privacy.es.tsx` (counts must match; same for legal.en/es).
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add ProjectCeres.Client/src/app/pages/legal/content/
-git commit -m "feat(13): placeholder EN/ES privacy + legal content components"
+git commit -m "feat(13): codebase-grounded EN/ES privacy + legal draft with counsel markers"
 ```
 
 ---
@@ -509,15 +520,27 @@ describe('legal pages', () => {
     expect(screen.getByText(/180[- ]day/i)).toBeInTheDocument();
   });
 
+  it('Privacy states the 6-year financial-record retention that limits erasure', () => {
+    // The correctness point a generic template misses (Art. 17(3)(b) exemption).
+    render(<MemoryRouter><Privacy /></MemoryRouter>);
+    expect(screen.getByText(/6[- ]year/i)).toBeInTheDocument();
+    expect(screen.getByText(/erasure/i)).toBeInTheDocument();
+  });
+
   it('Legal renders both anchored sections', () => {
     const { container } = render(<MemoryRouter><Legal /></MemoryRouter>);
     expect(container.querySelector('#aviso-legal')).not.toBeNull();
     expect(container.querySelector('#cookies')).not.toBeNull();
   });
 
-  it('legal content is marked placeholder', () => {
+  it('legal content carries the not-legally-reviewed DRAFT banner', () => {
     render(<MemoryRouter><Legal /></MemoryRouter>);
-    expect(screen.getByText(/placeholder/i)).toBeInTheDocument();
+    expect(screen.getByText(/not legally reviewed/i)).toBeInTheDocument();
+  });
+
+  it('Aviso Legal leaves business-identity facts as CONFIRM markers (never guessed)', () => {
+    render(<MemoryRouter><Legal /></MemoryRouter>);
+    expect(screen.getByText(/\[CONFIRM/i)).toBeInTheDocument();
   });
 });
 ```
@@ -817,7 +840,7 @@ git commit -m "test(13): E2E consent/legal golden path; tick covered Stage 13 it
 - Testing (Vitest + E2E) → every task's tests + Task 10
 - Deferrals (`/accesibilidad`, consent-ledger) → already homed in the roadmap (commit `f0c17f70`); nothing to build.
 
-**2. Placeholder scan** — the only intentional "placeholder" is the legal *content* (a hard requirement). No TBD/TODO steps; every code step has real code.
+**2. Placeholder scan** — the only intentional unfilled content is the legal draft's `[CONFIRM WITH COUNSEL: …]` markers (a hard requirement — unverifiable business/legal facts must stay unfilled, never guessed). No TBD/TODO steps; every code step has real code.
 
 **3. Type consistency** — `ConsentCategories`/`ConsentRecord` defined in Task 1 and consumed with the same shape in Task 8; `openConsentManager`/`onOpenConsentManager` defined in Task 5 and consumed in Tasks 8, 9; content-component default exports named in Task 3 and imported in Task 7.
 
