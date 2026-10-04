@@ -1849,12 +1849,12 @@ RoPA + DPA:
 
 Retention policy:
 
-- [ ] Audit log: 12-month auto-purge cron job (external-cron trigger, flat cross-tenant `ExecuteDeleteAsync` via `AdminDbContext`, `SweepSessions` pattern); runs daily, deletes `AuditLog` rows older than 12 months
-- [ ] Failed-login records: same external-cron cross-tenant auto-purge, 1 year
-- [ ] Soft-deleted SavedReports: hard-deleted after 90 days
-- [ ] Soft-deleted CsvImportProfiles: hard-deleted after 90 days (already implemented; verify)
+- [x] Audit log: 12-month auto-purge — `RetentionPurge.PurgeAuditLogAsync` (flat cross-tenant `ExecuteDeleteAsync` via `AdminDbContext`, `SweepSessions` pattern), bundled in `--run-retention-purge`. Logic + test shipped; the **daily cron registration is deferred to Stage 16** (see § Scheduled jobs row), same split as `--sweep-sessions`.
+- [x] Failed-login records: 1-year cross-tenant auto-purge — `RetentionPurge.PurgeFailedLoginsAsync`. Logic + test shipped; cron at Stage 16.
+- [x] Soft-deleted SavedReports: hard-deleted after 90 days — `RetentionPurge.PurgeSavedReportsAsync`. Logic + test shipped; cron at Stage 16.
+- [x] Soft-deleted import profiles: hard-deleted after 90 days — `RetentionPurge.PurgeImportProfilesAsync` (covers all formats incl. Excel — `ImportProfile` is format-agnostic). **Correction (2026-10-04): this was NOT "already implemented" as this line previously claimed** — verified no purge existed (only a 90-day *display window* for the restore UI, the inverse); built new in this slice. Logic + test shipped; cron at Stage 16.
 - [ ] Inactive user records: archived after defined period — **split out to Stage 13.b (🔒 locked)**: underspecified + `security-model.md`-vs-`legal.md` policy conflict must be resolved before it can be built; not a flat retention purge. See § Stage 13.b.
-- [ ] Each retention rule documented in the policy + verifiable in code (test that runs the purge against fixture data)
+- [x] Each retention rule verifiable in code — `RetentionPurgeTests` runs each purge against fixture data with boundary coverage (just-past-horizon deleted, just-inside kept) + soft-delete-null negative assertions. (Policy-doc wording of each rule is tracked under the privacy-policy items, separate slice.)
 
 Full data export:
 
@@ -2453,6 +2453,7 @@ CI/CD:
 Scheduled jobs (cron):
 
 - [ ] **Register the `SweepSessions` daily cron.** A daily host cron (or provider scheduler) runs `dotnet run --project ProjectCeres -- --sweep-sessions` (or the deployed equivalent) so revoked/expired `UserSession` rows are purged at the 90-day horizon per `security-model.md` § Retention. The sweep tool + its `SessionRetentionSweepTests` coverage shipped in Stage 12.10; only the host-side cron entry remains, which needs a deployment target to exist. Carried in from Stage 12.10 on 2026-09-07. The Stage 13.6 audit-log auto-purge cron reuses this same cron-command mechanism.
+- [ ] **[← Stage 13 deferral] Register the `--run-retention-purge` daily cron.** A daily host cron runs `dotnet run --project ProjectCeres -- --run-retention-purge` (deployed equivalent), executing all four Stage 13 retention purges (audit-log 12mo, failed-login 1yr, soft-deleted SavedReport + ImportProfile 90d). The `RetentionPurge` tool + `RetentionPurgeTests` shipped in Stage 13; only the host-side cron entry remains — same split + mechanism as `--sweep-sessions` above. Carried in from Stage 13 on 2026-10-04.
 
 Container / runtime hardening (per `security-model.md` § Container / Runtime Hardening):
 
