@@ -1929,6 +1929,26 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ---
 
+## Stage 13.b — Inactive-user archival 🔒 LOCKED (Batch 5)
+
+**Status: 🔒 Locked — split out of the Stage 13 retention slice 2026-10-03, NOT yet brainstormed.** Deferred here because it cannot be built correctly until a documented-policy conflict is resolved (a user/counsel decision), and it is a materially larger build than the Stage 13 flat retention purges.
+
+> **Goal (as described in two conflicting docs — must be reconciled before design):** automatically handle accounts that have gone inactive, per a defined retention period. This is distinct from the user-*requested* GDPR erasure flow already shipped in Stage 13.9 — this one is *inactivity-triggered*.
+
+### Why it's locked (the blocker to resolve first)
+
+- [ ] **Resolve the policy conflict.** `security-model.md` § Data Retention says: 12 months no login → retention-warning email; 18 months → anonymize profile + delete non-statutory data. `legal.md` § Data Retention Policy says something *different*: 30-day grace → 150-day sealed archive → permanent deletion at day 180, tied to an **ADR-0029 `CustomerArchive` entity that does not exist in code**. These are two different mechanisms with different numbers. Decide which is authoritative (ask-before-deviating-from-docs — this is the user's/counsel's call), reconcile the two docs, and only then design.
+
+### Open questions for the future brainstorm (do not design yet)
+
+- What "archived" means concretely: the ADR-0029 filesystem `CustomerArchive` (a larger build — new entity + registry landing + archive writer + a 180-day deletion job) vs. a simpler profile-anonymisation sweep.
+- The statutory-override interaction: the Ley General Tributaria carve-out (`security-model.md`, `StatutoryRetentionSet`) means financial rows must be reduced-to-minimum / anonymise-retained, never hard-deleted, even for an inactive user.
+- Whether it reuses any of the Stage 13 `RetentionPurge` / SweepSessions cron machinery or needs its own.
+
+> **Back-reference:** the Stage 13 retention checklist line "Inactive user records: archived after defined period" points here; a stage-close audit of Stage 13 re-surfaces this stub.
+
+---
+
 ## Stage 14 — HTTP security headers + CORS (Batch 5)
 
 **Status: ✅ Shipped. Remaining items are hosting-dependent and deferred to Stage 16.**
@@ -2339,26 +2359,6 @@ Each item below was found by the Stage 15.6 security review and deferred with a 
 - How a payoff plan relates to a revolving Liability account whose future balance is not knowable in advance.
 - Whether it reuses 15.9's installment machinery or needs a distinct "target + chosen cadence → progress" model.
 - How (or whether) it feeds into Safe-to-Spend given the balance is an estimate, not a fixed obligation.
-
----
-
-## Stage 13.b — Inactive-user archival 🔒 LOCKED (Batch 5)
-
-**Status: 🔒 Locked — split out of the Stage 13 retention slice 2026-10-03, NOT yet brainstormed.** Deferred here because it cannot be built correctly until a documented-policy conflict is resolved (a user/counsel decision), and it is a materially larger build than the Stage 13 flat retention purges.
-
-> **Goal (as described in two conflicting docs — must be reconciled before design):** automatically handle accounts that have gone inactive, per a defined retention period. This is distinct from the user-*requested* GDPR erasure flow already shipped in Stage 13.9 — this one is *inactivity-triggered*.
-
-### Why it's locked (the blocker to resolve first)
-
-- [ ] **Resolve the policy conflict.** `security-model.md` § Data Retention says: 12 months no login → retention-warning email; 18 months → anonymize profile + delete non-statutory data. `legal.md` § Data Retention Policy says something *different*: 30-day grace → 150-day sealed archive → permanent deletion at day 180, tied to an **ADR-0029 `CustomerArchive` entity that does not exist in code**. These are two different mechanisms with different numbers. Decide which is authoritative (ask-before-deviating-from-docs — this is the user's/counsel's call), reconcile the two docs, and only then design.
-
-### Open questions for the future brainstorm (do not design yet)
-
-- What "archived" means concretely: the ADR-0029 filesystem `CustomerArchive` (a larger build — new entity + registry landing + archive writer + a 180-day deletion job) vs. a simpler profile-anonymisation sweep.
-- The statutory-override interaction: the Ley General Tributaria carve-out (`security-model.md`, `StatutoryRetentionSet`) means financial rows must be reduced-to-minimum / anonymise-retained, never hard-deleted, even for an inactive user.
-- Whether it reuses any of the Stage 13 `RetentionPurge` / SweepSessions cron machinery or needs its own.
-
-> **Back-reference:** the Stage 13 retention checklist line "Inactive user records: archived after defined period" points here; a stage-close audit of Stage 13 re-surfaces this stub.
 
 ---
 
