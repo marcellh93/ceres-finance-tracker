@@ -1897,7 +1897,7 @@ Localization:
 
 - [ ] Privacy policy + cookie consent banner translated EN + ES
 - [x] Erasure confirmation email template EN + ES — see "Right-to-erasure → Confirmation email sent" above (Task 8, commit `812bc276`).
-- [ ] Data export ready email template EN + ES — see "Full data export → When done, sends email" above; the resx keys are added in this stage (deferred from Stage 8 because the call site is here).
+- [x] Data export ready email template EN + ES — **shipped in 13.8, not owed (corrected 2026-10-04).** `GdprExportReady.{Subject,BodyHtml,BodyText}` exist in both `EmailsResource.en.resx` and `EmailsResource.es.resx` (plus `GdprExportFailed`), composed by `EmailComposer` and pinned by `EmailComposerTests`. Same 13.8 work recorded in the "When done, sends email" line above; this line was a stale duplicate.
 
 Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)):
 
