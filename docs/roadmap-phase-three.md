@@ -1842,7 +1842,7 @@ Privacy policy + cookie consent:
 
 RoPA + DPA:
 
-- [ ] `legal.md` § RoPA fully populated for every data type
+- [~] `legal.md` § RoPA fully populated for every data type — **scaffold drafted (2026-10-05)**: 7 processing activities (account/auth, finance data, security logging, transactional email, support, export, erasure) grounded in the data model, with international-transfers + no-special-category statements. `[~]` not `[x]`: each `[CONFIRM]` (controller identity, subprocessors, per-activity legal-basis wording) needs counsel before it's "fully populated".
 - [ ] Subprocessor list includes: hosting provider, email provider, any analytics, any monitoring (Sentry / similar)
 - [ ] DPA signed with each subprocessor; copies stored in secrets/legal repo
 - [ ] DPA terms reflect GDPR Art. 28 requirements (subprocessor controls, breach notification, data return on termination)
@@ -1889,7 +1889,7 @@ Right-to-erasure:
 
 Breach notification + DPIA:
 
-- [ ] `legal.md` or `security-model.md` § Breach Notification Runbook documents: who decides, who notifies (DPA + affected users), what content, what timeline (72 hours under GDPR)
+- [~] `legal.md` or `security-model.md` § Breach Notification Runbook documents: who decides, who notifies (DPA + affected users), what content, what timeline (72 hours under GDPR) — **runbook scaffold drafted (2026-10-05)** in `legal.md` § Data Breach Notification — Response Runbook: fixed legal spine (72h/AEPD/Art. 33–34), 7-step procedure, pre-launch readiness checklist. `[~]` not `[x]`: roles/contacts/AEPD channel are `[CONFIRM]` and a tabletop walkthrough is still owed before launch.
 - [ ] DPIA completed for Phase 3 launch — covers high-risk processing (financial data + identity data + EU residents)
 - [ ] DPIA outcome filed with DPO if appointed
 

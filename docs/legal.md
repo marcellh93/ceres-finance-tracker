@@ -58,11 +58,61 @@ Only collect data that is necessary for the stated purpose. Do not add data fiel
 - All state-changing forms must use CSRF anti-forgery tokens — ASP.NET Core's built-in anti-forgery middleware handles this via `[ValidateAntiForgeryToken]` on controllers and tag helper `<form>` elements
 - HTTP security headers must be set on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and HSTS once HTTPS is enforced. A Content Security Policy header must be defined before any JavaScript is introduced.
 
-### Data Breach Notification
-- GDPR requires notifying the relevant supervisory authority within **72 hours** of becoming aware of a breach
-- In Spain the authority is **AEPD** (Agencia Española de Protección de Datos) — aepd.es
-- Affected users must also be notified without undue delay if the breach poses high risk to their rights
-- A breach response procedure must be documented before Phase 3 launch
+### Record of Processing Activities (RoPA) — GDPR Art. 30
+
+> **Status: DRAFT scaffold (2026-10-05) — NOT legally reviewed.** The processing facts below are grounded in the codebase as of this date; `[CONFIRM]` marks a fact only the controller/counsel can supply (identity, subprocessors, legal-basis wording). Review and complete before Phase 3 launch. Keep this current: a new data field, a new subprocessor, or a new purpose means a new/updated row here in the same change.
+
+**Controller.** `[CONFIRM: legal entity name]`, `[CONFIRM: NIF]`, `[CONFIRM: registered address]`, `[CONFIRM: controller contact email]`. DPO: `[CONFIRM: DPO name + contact, or a documented statement that no DPO is appointed and why]`.
+
+**Scope note.** Single application, single controller. No special-category data (GDPR Art. 9) is collected — verified: no health, biometric, ethnic, religious, political, genetic, or sexual-orientation fields exist in the data model. No automated decision-making or profiling with legal/similarly-significant effect (Art. 22). No children's data is knowingly processed — `[CONFIRM: age gate / terms position]`.
+
+Each processing activity below is one Art. 30(1) record: purpose, data categories, data subjects, legal basis, retention, recipients.
+
+| # | Processing activity | Purpose | Personal data categories (grounded in the data model) | Data subjects | Legal basis (Art. 6) | Retention | Recipients / subprocessors |
+|---|---|---|---|---|---|---|---|
+| P1 | Account + authentication | Create and secure a user account | Email (`AspNetUsers`), password hash (Argon2id), TOTP secret (encrypted), pending email change (`EmailChangeToken.NewEmail`) | Registered users | `[CONFIRM: contract — service delivery]` | Until erasure / natural-churn schedule (see Retention Policy) | None today (self-hosted). `[CONFIRM: hosting provider]` |
+| P2 | Core finance data | The product's purpose — track accounts, transactions, budgets, categories, transfers, recurring, saved reports, imported data | User-entered financial data; attachment file names + files on the filesystem (`StoredPath`) | Registered users | `[CONFIRM: contract — core purpose]` | Financial records 6 years (Código de Comercio) — survives erasure (Art. 17(3)(b)); other app data per Retention Policy | None today. `[CONFIRM: hosting provider]` |
+| P3 | Security + abuse logging | Detect/prevent unauthorised access, rate-limit, audit | IP address + user-agent (`UserSession`, `FailedLoginAttempt`, `AuditLog`, `UserBlockedIp`), attempted email on failed login | Users + anonymous visitors hitting auth endpoints | `[CONFIRM: legitimate interest — security; document the Art. 6(1)(f) balancing test]` | Failed-login logs 1 year; audit logs 12 months (auto-purge) | None today |
+| P4 | Transactional email | Send verification, password-reset, email-change, export-ready, erasure, security notices | Email address, the message content (contains name/links) | Registered users | `[CONFIRM: contract — service-related messages]` | Not retained by us beyond send (delivery is stateless); `EmailDeliveryEvent` metadata per its own retention | **No external email processor wired today** (`NoopEmailService`). `[CONFIRM: email service provider + DPA]` before enabling real send |
+| P5 | Support correspondence | Handle user support tickets | Ticket subject/body (may contain PII the user types), attachment file names + files, email for notifications | Users who open tickets | `[CONFIRM: contract + legitimate interest]` | Redact-retained after erasure (identifiers scrubbed, conversation kept on Art. 6(1)(f)); otherwise `[CONFIRM: active-ticket retention]` | None today. `[CONFIRM: hosting provider]` |
+| P6 | Data export (portability) | Fulfil GDPR Art. 20 / Art. 15 requests | A ZIP of the user's own content + profile, delivered via time-limited single-use link | Registered users who request it | `[CONFIRM: legal obligation — Art. 15/20]` | Export ZIP deleted at 24h TTL (or on erasure); request logged in audit | None today |
+| P7 | Erasure processing | Fulfil GDPR Art. 17 requests | Identity fields (anonymised), pseudonymised erasure audit record | Registered users who request it | `[CONFIRM: legal obligation — Art. 17]` | Pseudonymised erasure record 3 years (accountability); financial records retained per legal minimum | None today |
+
+**International transfers.** None today — all data is stored on the controller's own infrastructure (`[CONFIRM: hosting region — must be EU/EEA, or document the Art. 44–49 transfer mechanism`]). Once a hosting provider or email subprocessor is engaged, add its location + transfer safeguard here. No third-party analytics or tracking (confirmed: none in the codebase; `planning-resolved.md` records no Phase-3 analytics).
+
+**Technical & organisational measures (Art. 32)** are documented in `security-model.md` and summarised under § Security above (Argon2id, encrypted TOTP secrets, least-privilege DB role, TLS, CSRF, security headers, RLS multi-tenant isolation, filesystem-not-BLOB attachments).
+
+### Data Breach Notification — Response Runbook
+
+> **Status: DRAFT scaffold (2026-10-05) — NOT legally reviewed.** The GDPR timeline + AEPD facts are correct; roles, contacts, and tooling are `[CONFIRM]`. Complete and rehearse before Phase 3 launch. This runbook satisfies the "Data Breach Response Procedure" Required Document.
+
+**Legal spine (fixed facts):**
+- Notify the supervisory authority within **72 hours** of becoming aware of a breach (GDPR Art. 33). In Spain the authority is **AEPD** (Agencia Española de Protección de Datos) — aepd.es; notification is filed through the AEPD electronic registry (`[CONFIRM: exact AEPD notification channel/URL at launch]`).
+- Notify **affected users** without undue delay if the breach poses a **high risk** to their rights/freedoms (Art. 34). The high-risk assessment decides whether user notice is required — document it either way.
+- Breach = any accidental/unlawful destruction, loss, alteration, unauthorised disclosure of, or access to personal data (not only "data leaked externally").
+
+**Roles (`[CONFIRM]` — assign real people before launch):**
+- **Incident lead** — `[CONFIRM]`: owns the response, makes the notify/don't-notify call, single point of coordination.
+- **Technical responder** — `[CONFIRM]`: contains the breach, preserves evidence/logs, scopes affected data.
+- **Notifier** — `[CONFIRM]`: files the AEPD notification and drafts user notices (the incident lead may be the same person at this scale).
+- **DPO** — `[CONFIRM: DPO or "no DPO; incident lead holds the decision"]`.
+
+**The procedure:**
+
+1. **Detect & record (clock starts here).** The 72-hour clock starts at *awareness*, not at breach occurrence. Immediately log: timestamp of awareness, who reported it, one-line description. Open an incident record (`[CONFIRM: where — ticket/issue tracker/secure doc]`).
+2. **Contain.** Technical responder stops ongoing exposure — revoke compromised credentials/sessions (the app has session revocation + `SealedAt`; use it), rotate secrets, block the vector, take the affected component offline if needed. Preserve logs (`AuditLog`, `FailedLoginAttempt`, host/access logs) before anything is cleaned up — they are the evidence and the scoping source.
+3. **Assess scope & risk.** Determine: which data categories (use the RoPA above), how many data subjects, whether identifiers + financial data were involved (higher risk), whether data was encrypted/pseudonymised (lowers risk). Write the Art. 34 high-risk determination with its reasoning.
+4. **Notify AEPD (≤72h).** If the breach is reportable (any risk to rights, unless unlikely), file with AEPD within 72 hours of awareness. Content (Art. 33(3)): nature of the breach, categories + approximate number of subjects and records, likely consequences, measures taken/proposed, DPO or contact point. If full detail isn't ready, file an initial notification and supplement — do not miss the 72h deadline waiting for completeness.
+5. **Notify affected users (if high risk, Art. 34).** Clear, plain-language notice: what happened, likely consequences, what you're doing, what they should do (e.g. change password), and a contact point. `[CONFIRM: user-notification channel — the transactional email path (P4) once a real email provider is wired; today email send is Noop]`.
+6. **Remediate & close.** Fix the root cause, verify containment, update the incident record with the full timeline and lessons. If measures from `security-model.md` were missing or insufficient, update that doc + this runbook in the same pass.
+7. **Post-incident.** Retain the incident record for accountability (`[CONFIRM: retention period, min. aligned with audit-log/accountability horizons]`). Review whether the DPIA or RoPA needs updating.
+
+**Pre-launch readiness checklist (what makes this runbook real):**
+- [ ] Roles assigned to named people with contact details (`[CONFIRM]`)
+- [ ] AEPD notification channel identified and an account/path confirmed (`[CONFIRM]`)
+- [ ] Incident-record location chosen and access-controlled (`[CONFIRM]`)
+- [ ] A dry-run/tabletop walkthrough completed once before Phase 3 launch
+- [ ] User-notification email path operational (depends on a real email provider replacing `NoopEmailService`)
 
 ---
 
@@ -137,8 +187,9 @@ These must be written, published, and accessible before any user outside yoursel
 - [ ] Privacy Policy written and published
 - [ ] Terms of Service written and published
 - [ ] Cookie Policy in place (if applicable)
-- [ ] Legal basis for all data processing documented
-- [ ] Data breach notification procedure documented
+- [~] Legal basis for all data processing documented — scaffolded in § RoPA (per-activity legal-basis column) + § Legal Basis for Processing table; **counsel must confirm each `[CONFIRM]` basis** before `[x]`.
+- [~] Data breach notification procedure documented — **runbook scaffold drafted** in § Data Breach Notification — Response Runbook (2026-10-05); not `[x]` until roles/contacts/AEPD channel filled and a tabletop walkthrough is done.
+- [~] Record of Processing Activities (RoPA, Art. 30) — **scaffold drafted** in § Record of Processing Activities (2026-10-05); not `[x]` until controller identity, subprocessors, and legal-basis wording are confirmed by counsel.
 - [ ] All user rights implemented (access, erasure, portability, etc.)
 - [ ] Data Processing Agreements signed with hosting provider and any third-party services
 - [ ] HTTPS enforced — no unencrypted connections
