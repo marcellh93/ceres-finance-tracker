@@ -215,6 +215,47 @@ html.sidebar-collapsed {
 }
 
 /*
+ * Long-form legal/policy prose (`.prose-legal`).
+ *
+ * The app has no other long-form reading surface — this recipe exists for
+ * /privacy and /legal only. Constrains measure to ~65ch and sets heading/
+ * paragraph/list rhythm for sustained reading. Composes existing tokens only.
+ */
+.prose-legal {
+  max-width: 65ch;
+  line-height: 1.7;
+  color: var(--color-foreground);
+}
+.prose-legal h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+.prose-legal h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.prose-legal p {
+  margin-bottom: 1rem;
+}
+.prose-legal ul,
+.prose-legal ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+  list-style: disc;
+}
+.prose-legal li {
+  margin-bottom: 0.375rem;
+}
+.prose-legal a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+/*
  * Sonner toast accents.
  *
  * Default Sonner uses a neutral popover background. We tint only the icon

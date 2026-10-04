@@ -17,18 +17,19 @@
 11. [App Shell](#app-shell)
 12. [Forms & validation](#forms--validation)
 13. [Combobox recipe](#combobox-recipe)
-14. [DatePickerField](#datepickerfield)
-15. [Money input](#money-input)
-16. [Delta / PriorComparison row](#delta--priorcomparison-row)
-17. [Tooltipped panel labels & empty states](#tooltipped-panel-labels--empty-states)
-18. [PagePlaceholder & route-change focus](#pageplaceholder--route-change-focus)
-19. [Status block (success / idle side panel)](#status-block-success--idle-side-panel)
-20. [AttachmentDropzone](#attachmentdropzone)
-21. [The `<CardError>` component](#the-carderror-component)
-22. [Toasts](#toasts)
-23. [Showcase route](#showcase-route)
-24. [Known browser console messages](#known-browser-console-messages)
-25. [Known limitations](#known-limitations)
+14. [Long-form prose (`prose-legal`)](#long-form-prose-prose-legal)
+15. [DatePickerField](#datepickerfield)
+16. [Money input](#money-input)
+17. [Delta / PriorComparison row](#delta--priorcomparison-row)
+18. [Tooltipped panel labels & empty states](#tooltipped-panel-labels--empty-states)
+19. [PagePlaceholder & route-change focus](#pageplaceholder--route-change-focus)
+20. [Status block (success / idle side panel)](#status-block-success--idle-side-panel)
+21. [AttachmentDropzone](#attachmentdropzone)
+22. [The `<CardError>` component](#the-carderror-component)
+23. [Toasts](#toasts)
+24. [Showcase route](#showcase-route)
+25. [Known browser console messages](#known-browser-console-messages)
+26. [Known limitations](#known-limitations)
 
 ---
 
@@ -678,6 +679,38 @@ The canonical "searchable dropdown" recipe: shadcn `<Popover>` wrapping a `<Comm
 **Currency lists (`CurrencyCombobox`):** the system holds every currency, but most people use two or three. Pickers that *choose something to filter or budget by* pass `inUseOnly` so they offer only the currencies of the user's accounts (archived accounts count, and the user's default currency is always included) via `GET /api/currencies?inUse=true`. Pickers that *create a currency-bearing thing* (account create/edit, Settings default) keep the full list, because that is how a new currency starts being used. `fallbackCode` shows a currency while `value` is `null` (reports pass the default, which is what the server uses when the URL names none) so the control never reads empty while the data is already in a currency. A saved value that has left the limited list still renders its label.
 
 **When to deviate:** if you need multi-select, use shadcn `<Command>` checkbox patterns rather than this recipe. If you need a non-searchable picker for a small fixed set (≤5 options), prefer a native `<Select>` or `<RadioGroup>`.
+
+---
+
+## Long-form prose (`prose-legal`)
+
+`ProjectCeres.Client/src/index.css`
+
+The only long-form reading surface in the app — rendered legal/policy copy on `/privacy` and `/legal`. Every other surface in the SPA is data-dense (forms, tables, cards); this recipe exists solely for sustained prose reading, and should not be reached for anywhere else.
+
+```tsx
+<article className="prose-legal">
+  <h2>Data we collect</h2>
+  <p>…</p>
+  <h3>Cookies</h3>
+  <ul>
+    <li>…</li>
+  </ul>
+  <p>See our <a href="/privacy">privacy policy</a> for details.</p>
+</article>
+```
+
+**Rhythm decisions:**
+- **Measure:** `max-width: 65ch` — the standard readable line length for body prose; prevents the full-bleed widths used elsewhere in the app from producing unreadably long lines.
+- **Line height:** `1.7`, looser than the app default, for comfortable sustained reading rather than UI density.
+- **Heading rhythm:** `h2` uses `var(--text-xl)` with `2rem` top margin / `0.75rem` bottom margin; `h3` uses `var(--text-lg)` with `1.5rem` top / `0.5rem` bottom — enough separation to read as section breaks without the page feeling sparse.
+- **Paragraphs and lists:** `1rem` bottom margin on `p`, `ul`, `ol`; list items get `0.375rem` bottom margin and standard disc markers via `padding-left: 1.5rem`.
+- **Links:** `var(--color-primary)` with an underline — same accent used everywhere else in the app, so legal copy doesn't introduce a second link style.
+
+**Conventions:**
+- Composes existing tokens only (`--text-xl`, `--text-lg`, `--color-primary`, `--color-foreground`, `--color-muted-foreground`) — no new hex literals or one-off sizes.
+- Lives outside `@layer base`/`@layer components` in `index.css`, alongside the other hand-written selector blocks in that file (Sonner toast accents, switch thumb) — this file has no `@layer components` block yet; when one is introduced, migrate this recipe into it rather than leaving it stranded.
+- Wrap legal/policy body content in a single `<article className="prose-legal">` (or equivalent container) rather than applying the class piecemeal to individual elements.
 
 ---
 
