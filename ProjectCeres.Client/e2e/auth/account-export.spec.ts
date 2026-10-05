@@ -64,4 +64,14 @@ test('Account: mobile — export button meets the 44px touch target and no horiz
     () => document.documentElement.scrollWidth <= window.innerWidth + 1,
   )
   expect(noOverflow, 'no horizontal overflow at 375px').toBe(true)
+
+  // The post-202 confirmation toast must wrap cleanly on a narrow screen (roadmap
+  // 13.8 line: "the post-202 confirmation message wraps cleanly"). Fire the real
+  // request, wait for the toast, and assert it introduces no horizontal overflow.
+  await btn.click()
+  await expect(page.getByText(/email you a download link/i)).toBeVisible({ timeout: 10_000 })
+  const noOverflowWithToast = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  )
+  expect(noOverflowWithToast, 'post-202 toast wraps cleanly; no overflow at 375px').toBe(true)
 })

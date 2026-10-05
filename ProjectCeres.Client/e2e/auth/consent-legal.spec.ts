@@ -105,6 +105,66 @@ test('Consent: 375px viewport — banner buttons meet the 44px touch target, no 
   expect(noOverflow, 'no horizontal overflow at 375px').toBe(true)
 })
 
+test('Consent: 375px — expanded "manage preferences" panel is reachable without horizontal overflow', async ({
+  page,
+  context,
+}) => {
+  // Gap previously left [ ]: the default banner's 375px overflow was covered, but
+  // the expanded manage-preferences panel (3 toggles + Save) was never exercised.
+  await context.clearCookies()
+  await page.setViewportSize({ width: 375, height: 720 })
+  await page.goto('/login')
+
+  await page.getByRole('button', { name: 'Manage preferences' }).click()
+
+  // All three category toggles are reachable (rendered + visible) on a narrow screen.
+  const switches = page.getByRole('switch')
+  await expect(switches).toHaveCount(3)
+  for (let i = 0; i < 3; i++) {
+    await expect(switches.nth(i)).toBeVisible()
+  }
+
+  // Save is the manage-mode primary action and must meet the touch target.
+  const save = page.getByRole('button', { name: 'Save preferences' })
+  await expect(save).toBeVisible()
+  const saveBox = await save.boundingBox()
+  expect(saveBox!.height, 'Save preferences ≥44px tall on mobile').toBeGreaterThanOrEqual(43.5)
+
+  // The expanded panel must not introduce horizontal overflow.
+  const noOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  )
+  expect(noOverflow, 'expanded manage panel: no horizontal overflow at 375px').toBe(true)
+})
+
+test('Consent: no third-party tracking/analytics script loads before a consent choice', async ({
+  page,
+  context,
+}) => {
+  // Gap previously left [ ]: "no tracking scripts before consent" was true by
+  // inspection but unasserted. This pins it — a future analytics tag added to the
+  // pre-consent load (the exact thing the banner exists to gate) fails this test.
+  await context.clearCookies()
+  await page.goto('/login')
+
+  // The banner is showing (no choice made yet) — the pre-consent state.
+  await expect(page.getByRole('button', { name: 'Accept all' })).toBeVisible()
+
+  // Collect every script src on the page. With no consent given, there must be
+  // no cross-origin script (the app's own bundle is same-origin). A third-party
+  // analytics/tracking tag would be cross-origin and fail here.
+  const crossOriginScripts = await page.evaluate(() => {
+    const origin = window.location.origin
+    return Array.from(document.querySelectorAll('script[src]'))
+      .map((s) => (s as HTMLScriptElement).src)
+      .filter((src) => src && !src.startsWith(origin) && !src.startsWith('/'))
+  })
+  expect(
+    crossOriginScripts,
+    `no cross-origin scripts before consent; found: ${crossOriginScripts.join(', ')}`,
+  ).toEqual([])
+})
+
 test('Legal: /privacy and /legal render readably at 375px, no horizontal overflow', async ({
   page,
   context,
