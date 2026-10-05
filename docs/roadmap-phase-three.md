@@ -1890,7 +1890,7 @@ Right-to-erasure:
 Breach notification + DPIA:
 
 - [~] `legal.md` or `security-model.md` § Breach Notification Runbook documents: who decides, who notifies (DPA + affected users), what content, what timeline (72 hours under GDPR) — **runbook scaffold drafted (2026-10-05)** in `legal.md` § Data Breach Notification — Response Runbook: fixed legal spine (72h/AEPD/Art. 33–34), 7-step procedure, pre-launch readiness checklist. `[~]` not `[x]`: roles/contacts/AEPD channel are `[CONFIRM]` and a tabletop walkthrough is still owed before launch.
-- [ ] DPIA completed for Phase 3 launch — covers high-risk processing (financial data + identity data + EU residents)
+- [~] DPIA completed for Phase 3 launch — covers high-risk processing (financial data + identity data + EU residents) — **scaffold drafted (2026-10-05)** in `legal.md` § Data Protection Impact Assessment: DPIA-required determination, processing description (→ RoPA), a risk table mapping each risk source to the existing grounded measure (RLS, Argon2id, TOTP, retention purges, breach runbook), and the Stage-16-cron residual-risk note. `[~]` not `[x]`: necessity/proportionality judgment, residual-risk ratings, and sign-off are counsel/controller calls (complete via AEPD Gestiona EIPD per `security-model.md`).
 - [ ] DPIA outcome filed with DPO if appointed
 
 Localization:

@@ -114,6 +114,32 @@ Each processing activity below is one Art. 30(1) record: purpose, data categorie
 - [ ] A dry-run/tabletop walkthrough completed once before Phase 3 launch
 - [ ] User-notification email path operational (depends on a real email provider replacing `NoopEmailService`)
 
+### Data Protection Impact Assessment (DPIA) — GDPR Art. 35
+
+> **Status: DRAFT scaffold (2026-10-05) — NOT legally reviewed.** The processing description, risk sources, and existing measures below are grounded in the codebase + the RoPA above. The **necessity/proportionality judgments and the residual-risk acceptance are controller/counsel calls** and are left as `[CONFIRM]` — a DPIA's conclusions cannot be auto-generated. `security-model.md` § Article 35 holds the policy on *when* a DPIA is required; this is the document itself. Complete it with the **AEPD Gestiona EIPD** tool (per `security-model.md`) before Phase 3 launch; redo it at Phase 4 (bank connectivity / any automated scoring).
+
+**1. Is a DPIA required?** Yes (advisable→required for this launch). Financial data meets the EDPB "sensitive nature / highly personal" criterion (WP248rev.01); combined with large-scale processing of EU residents' identity + financial data, the threshold is met. `[CONFIRM: counsel's formal necessity determination]`.
+
+**2. Systematic description of the processing.** See § RoPA above (7 activities). In summary: a single-tenant-per-user financial tracker storing user-entered financial data + identity (email) + security telemetry (IP/user-agent), self-hosted, no third-party analytics, no special-category (Art. 9) data, no Art. 22 automated decision-making. Data subjects: registered EU beta users. `[CONFIRM: approximate scale at launch — number of users]`.
+
+**3. Necessity & proportionality.** `[CONFIRM WITH COUNSEL]`: assess that each purpose (RoPA P1–P7) is necessary for the service and that no less-intrusive means achieves it. Data-minimisation is designed in (see § Data Minimisation; no speculative fields) — counsel confirms the proportionality conclusion.
+
+**4. Risks to data subjects + existing measures.** The risk sources below are real; the likelihood/severity ratings and residual-risk acceptance are `[CONFIRM]`.
+
+| Risk to data subjects | Source | Existing measure (grounded in the build) | Likelihood × severity → residual |
+|---|---|---|---|
+| Unauthorised access to another user's financial data (cross-tenant leak) | Multi-tenant DB | PostgreSQL **Row-Level Security** on every `IUserOwned` table + the app runs as a non-`BYPASSRLS` role; integration tests assert cross-user reads return 403/404 | `[CONFIRM: rating]` |
+| Credential compromise | Auth | **Argon2id** password hashing (pinned params), **TOTP MFA** with encrypted-at-rest secrets + replay prevention, session revocation, lockout, breached-password check | `[CONFIRM: rating]` |
+| Data exposure in transit / at the host | Transport / infra | TLS/HTTPS enforced; attachments on filesystem (not world-readable, auth-gated), not BLOBs; least-privilege DB runtime role (DML-only) | `[CONFIRM: rating]` |
+| Excess retention / failure to delete | Retention | Automated retention purges (audit 12mo, failed-login 1yr, soft-deletes 90d) + Art. 17 erasure flow with pseudonymised accountability record | `[CONFIRM: rating]` — note the purge **cron is not scheduled until Stage 16**; until then enforcement is manual (a real residual risk to record) |
+| Breach not detected / not notified in time | Detection / response | Audit + failed-login logging; breach runbook (§ above) with the 72h/AEPD procedure | `[CONFIRM: rating]` |
+| Over-collection via support tickets (free-text PII) | Support | Redact-retain on erasure (`IdentifierRedactor`); `[CONFIRM: any intake-time minimisation guidance]` | `[CONFIRM: rating]` |
+| Third-party processor risk | Subprocessors | **None engaged today** (self-hosted; email is `NoopEmailService`). Once hosting/email providers are added, each needs a DPA (Art. 28) before go-live | `[CONFIRM: rating once processors chosen]` |
+
+**5. Measures to address the risks / reduce residual risk.** Existing measures are in column 3 above and `security-model.md`. `[CONFIRM WITH COUNSEL: any additional measures required to bring each residual risk to acceptable — e.g. schedule the retention cron before launch rather than deferring to Stage 16; sign DPAs before engaging processors]`.
+
+**6. Outcome.** `[CONFIRM WITH COUNSEL]`: the residual-risk acceptance decision, sign-off, and date. **File the outcome with the DPO if appointed** (`[CONFIRM: DPO, or documented statement none is appointed]`). Re-run triggers: Phase 4 bank connectivity, any automated scoring/profiling, any new special-category data, any new subprocessor materially changing the risk profile.
+
 ---
 
 ## Data Retention Policy
@@ -190,6 +216,7 @@ These must be written, published, and accessible before any user outside yoursel
 - [~] Legal basis for all data processing documented — scaffolded in § RoPA (per-activity legal-basis column) + § Legal Basis for Processing table; **counsel must confirm each `[CONFIRM]` basis** before `[x]`.
 - [~] Data breach notification procedure documented — **runbook scaffold drafted** in § Data Breach Notification — Response Runbook (2026-10-05); not `[x]` until roles/contacts/AEPD channel filled and a tabletop walkthrough is done.
 - [~] Record of Processing Activities (RoPA, Art. 30) — **scaffold drafted** in § Record of Processing Activities (2026-10-05); not `[x]` until controller identity, subprocessors, and legal-basis wording are confirmed by counsel.
+- [~] DPIA (Data Protection Impact Assessment, Art. 35) — **scaffold drafted** in § Data Protection Impact Assessment (2026-10-05); not `[x]` until necessity/proportionality judgment, residual-risk ratings, and sign-off are completed by counsel (via AEPD Gestiona EIPD).
 - [ ] All user rights implemented (access, erasure, portability, etc.)
 - [ ] Data Processing Agreements signed with hosting provider and any third-party services
 - [ ] HTTPS enforced — no unencrypted connections
