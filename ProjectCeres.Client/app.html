@@ -28,6 +28,18 @@
         } catch (e) {}
       })();
     </script>
+    <script>
+      // Zod 4 JIT eval-probe suppression. Our strict CSP (Stage 14) has no
+      // 'unsafe-eval'; Zod feature-detects eval by calling Function() once, whose
+      // caught throw still emits a CSP securitypolicyviolation (logged by
+      // /api/csp-report) on every page that runs the forms chunk. Pre-populating
+      // __zod_globalConfig before any module loads makes Zod skip the probe
+      // entirely — the only ordering-proof hook (a config() call in bundled app
+      // code runs too late: the probe fires during schema-module eval first).
+      // No behaviour change: eval is already disallowed, so the JIT path was never
+      // taken. Hashed into csp-hashes.json by compute-csp-hashes.mjs (reads app.html).
+      window.__zod_globalConfig = { jitless: true };
+    </script>
   </head>
   <body>
     <div id="root"></div>
