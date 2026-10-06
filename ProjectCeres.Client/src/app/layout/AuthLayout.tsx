@@ -17,7 +17,10 @@ import { ThemeToggle } from '@/design-system/components/ThemeToggle';
  */
 export function AuthLayout() {
   return (
-    <div className="min-h-dvh w-full bg-background flex flex-col items-center justify-center gap-4 p-4 sm:p-6">
+    <div
+      data-consent-reserve
+      className="min-h-dvh w-full bg-background flex flex-col items-center justify-center gap-4 p-4 sm:p-6"
+    >
       <Card className="w-full max-w-[420px] p-6 sm:p-8 space-y-6">
         <header className="flex flex-col items-center gap-2">
           <BrandMark />

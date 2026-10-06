@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -25,6 +25,7 @@ export function ConsentBanner() {
   const [visible, setVisible] = useState(() => readConsent() === null);
   const [managing, setManaging] = useState(false);
   const [toggles, setToggles] = useState(DEFAULT_TOGGLES);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return onOpenConsentManager(() => {
@@ -37,6 +38,30 @@ export function ConsentBanner() {
       setVisible(true);
     });
   }, []);
+
+  // The banner is fixed to the viewport bottom (z-50), so it would overlay the
+  // bottom of every page's content — including interactive controls at mobile
+  // width. Publish its live height to a CSS var; index.css reserves that much
+  // bottom padding on every scroll container so nothing renders underneath it.
+  // Height is re-measured on resize (the banner wraps at narrow widths / in
+  // manage mode). useLayoutEffect sets it before paint to avoid a flash of overlap.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (!visible || !bannerRef.current) {
+      root.style.setProperty('--consent-banner-h', '0px');
+      return;
+    }
+    const el = bannerRef.current;
+    const publish = () =>
+      root.style.setProperty('--consent-banner-h', `${el.offsetHeight}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.setProperty('--consent-banner-h', '0px');
+    };
+  }, [visible, managing]);
 
   if (!visible) return null;
 
@@ -57,6 +82,7 @@ export function ConsentBanner() {
 
   return (
     <div
+      ref={bannerRef}
       role="region"
       aria-label={t('legal.banner.title')}
       className="fixed inset-x-0 bottom-0 z-50 border-t bg-popover p-4 shadow-lg sm:p-6"

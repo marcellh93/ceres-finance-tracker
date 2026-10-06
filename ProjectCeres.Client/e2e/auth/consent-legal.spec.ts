@@ -186,3 +186,35 @@ test('Legal: /privacy and /legal render readably at 375px, no horizontal overflo
   )
   expect(noOverflow, '/legal: no horizontal overflow at 375px').toBe(true)
 })
+
+test('Consent: the visible banner does not obscure an authed page\'s bottom content at 375px', async ({
+  page,
+  request,
+  baseURL,
+  context,
+}) => {
+  // Regression guard (2026-10-06): the root-mounted banner is fixed bottom-0 z-50,
+  // so while visible (no consent choice yet) it overlaid the bottom of EVERY page's
+  // content — it was clipping the "Erase my account" button on /settings/account at
+  // mobile width, timing out account-erasure.spec.ts. The fix reserves the banner's
+  // height as bottom padding on each layout's scroll container. This pins it: with
+  // the banner showing, a bottom-of-page interactive control must still be clickable.
+  await context.clearCookies() // ensure no consent cookie → banner is showing
+  const user = await createVerifiedUser(request, baseURL!)
+  await page.setViewportSize({ width: 375, height: 720 })
+  await login(page, user.email, DEFAULT_PASSWORD)
+
+  // The banner is visible (first visit, no choice made).
+  await expect(page.getByRole('button', { name: 'Accept all' })).toBeVisible()
+
+  await page.goto('/settings/account')
+  await expect(page.getByRole('heading', { name: 'Danger zone' })).toBeVisible()
+
+  // The erasure trigger sits at the bottom of the Danger-zone card — the exact
+  // control the banner was covering. It must be clickable (not obscured) and open
+  // the dialog. If the banner overlaps it again, this click times out.
+  await page.getByRole('button', { name: 'Erase my account' }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Erase your account permanently' }),
+  ).toBeVisible()
+})

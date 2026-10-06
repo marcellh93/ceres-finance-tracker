@@ -10,7 +10,7 @@ import { Footer } from './Footer';
  */
 export function LegalLayout() {
   return (
-    <div className="min-h-dvh flex flex-col bg-background">
+    <div data-consent-reserve className="min-h-dvh flex flex-col bg-background">
       <header className="border-b px-4 py-4 sm:px-6">
         <BrandMark />
       </header>

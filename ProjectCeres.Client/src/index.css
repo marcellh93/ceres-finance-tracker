@@ -215,6 +215,30 @@ html.sidebar-collapsed {
 }
 
 /*
+ * Consent-banner space reservation.
+ *
+ * ConsentBanner is fixed to the viewport bottom (z-50) and mounted at the app
+ * root, so while it is visible it overlays the bottom of every page's content —
+ * covering interactive controls at mobile width (it was clipping the erasure
+ * button on /settings/account, breaking the e2e). The banner publishes its live
+ * height to `--consent-banner-h` (0px when hidden); here each layout's scroll
+ * container reserves exactly that much bottom padding so nothing renders under it.
+ * Matched to the three layouts: the authed shell's scroll <main>, and the
+ * full-height public columns (AuthLayout card wrapper / LegalLayout).
+ */
+#main-content {
+  padding-bottom: calc(var(--consent-banner-h, 0px) + theme(spacing.4));
+}
+@media (min-width: 768px) {
+  #main-content {
+    padding-bottom: calc(var(--consent-banner-h, 0px) + theme(spacing.6));
+  }
+}
+[data-consent-reserve] {
+  padding-bottom: var(--consent-banner-h, 0px);
+}
+
+/*
  * Long-form legal/policy prose (`.prose-legal`).
  *
  * The app has no other long-form reading surface — this recipe exists for
