@@ -87,7 +87,7 @@ public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReport
         return new IncomeExpenseSummary(currency.Code, currency.Symbol, income, expenses, savings);
     }
 
-    public async Task<ExpenseBreakdown> GetExpenseBreakdownAsync(int currencyId, DateOnly from, DateOnly to)
+    public async Task<ExpenseBreakdown> GetExpenseBreakdownAsync(int currencyId, DateOnly from, DateOnly to, Guid? categoryId = null)
     {
         var currency = await db.Currencies.FindAsync(currencyId)
             ?? throw new InvalidOperationException($"Currency {currencyId} not found.");
@@ -98,7 +98,8 @@ public class ReportService(AppDbContext db, ICurrentUserAccessor user) : IReport
                 t.Date >= from &&
                 t.Date <= to &&
                 t.Account.CurrencyId == currencyId &&
-                t.Category.CategoryType.Name == "Expense")
+                t.Category.CategoryType.Name == "Expense" &&
+                (categoryId == null || t.CategoryId == categoryId))
             .Include(t => t.Category)
             .ToListAsync();
 

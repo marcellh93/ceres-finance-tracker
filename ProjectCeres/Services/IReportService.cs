@@ -32,7 +32,7 @@ public interface IReportService
     Task<IncomeExpenseSummary> GetIncomeExpenseSummaryAsync(int currencyId, DateOnly from, DateOnly to);
 
     /// <summary>Expense totals grouped by category for the given period.</summary>
-    Task<ExpenseBreakdown> GetExpenseBreakdownAsync(int currencyId, DateOnly from, DateOnly to);
+    Task<ExpenseBreakdown> GetExpenseBreakdownAsync(int currencyId, DateOnly from, DateOnly to, Guid? categoryId = null);
 
     /// <summary>Filtered, paginated transaction history.</summary>
     Task<IReadOnlyList<Transaction>> GetTransactionHistoryAsync(

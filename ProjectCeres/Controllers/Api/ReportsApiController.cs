@@ -74,10 +74,10 @@ public class ReportsApiController(
     [HttpGet("expense-breakdown")]
     public async Task<IActionResult> ExpenseBreakdown(
         [FromQuery] int? currencyId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to,
-        [FromQuery] string? format = null)
+        [FromQuery] Guid? categoryId = null, [FromQuery] string? format = null)
     {
         var (cid, start, end) = await ResolveRangeAsync(currencyId, from, to, RangeDefault.MonthStart);
-        var data = await reportService.GetExpenseBreakdownAsync(cid, start, end);
+        var data = await reportService.GetExpenseBreakdownAsync(cid, start, end, categoryId);
         if (IsCsv(format))
         {
             var total = data.Categories.Sum(c => c.Total);

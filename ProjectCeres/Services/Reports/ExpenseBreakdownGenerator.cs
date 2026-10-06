@@ -21,7 +21,8 @@ public class ExpenseBreakdownGenerator(AppDbContext db, ICurrentUserAccessor use
                 t.Date >= from &&
                 t.Date <= to &&
                 t.Account.CurrencyId == currencyId &&
-                t.Category.CategoryType.Name == "Expense")
+                t.Category.CategoryType.Name == "Expense" &&
+                (parameters.CategoryId == null || t.CategoryId == parameters.CategoryId))
             .Include(t => t.Category)
             .ToListAsync();
 

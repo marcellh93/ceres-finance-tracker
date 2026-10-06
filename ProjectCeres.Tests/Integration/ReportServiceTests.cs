@@ -2,6 +2,7 @@ using FluentAssertions;
 using ProjectCeres.Tests.Common;
 using ProjectCeres.Models;
 using ProjectCeres.Services;
+using ProjectCeres.Services.Reports;
 using ProjectCeres.ViewModels;
 
 namespace ProjectCeres.Tests.Integration;
@@ -298,6 +299,72 @@ public class ReportServiceTests : IAsyncLifetime
         var result = await _service.GetExpenseBreakdownAsync(currencyId: 1, from, to);
 
         result.Categories.First().Total.Should().BeGreaterThan(result.Categories.Last().Total);
+    }
+
+    [Fact]
+    public async Task GetExpenseBreakdownAsync_WithCategoryId_ReturnsOnlyThatCategory()
+    {
+        var accountId = await CreateAssetAccountAsync();
+        var from = new DateOnly(2026, 1, 1);
+        var to   = new DateOnly(2026, 12, 31);
+
+        AddTransaction(accountId, HousingCategoryId,   800m, new DateOnly(2026, 3, 1));
+        AddTransaction(accountId, UtilitiesCategoryId, 150m, new DateOnly(2026, 3, 15));
+        await _fixture.Db.SaveChangesAsync();
+
+        var result = await _service.GetExpenseBreakdownAsync(currencyId: 1, from, to, categoryId: UtilitiesCategoryId);
+
+        result.Categories.Should().ContainSingle()
+            .Which.Should().Match<CategoryExpense>(c => c.CategoryName == "Utilities" && c.Total == 150m);
+    }
+
+    [Fact]
+    public async Task ExpenseBreakdownGenerator_WithCategoryId_ReturnsOnlyThatCategory()
+    {
+        var accountId = await CreateAssetAccountAsync();
+        AddTransaction(accountId, HousingCategoryId,   800m, new DateOnly(2026, 3, 1));
+        AddTransaction(accountId, UtilitiesCategoryId, 150m, new DateOnly(2026, 3, 15));
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new ExpenseBreakdownGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var parameters = new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 12, 31), CategoryId: UtilitiesCategoryId);
+
+        var result = (ExpenseBreakdown)await generator.GenerateAsync(parameters);
+
+        result.Categories.Should().ContainSingle()
+            .Which.Should().Match<CategoryExpense>(c => c.CategoryName == "Utilities" && c.Total == 150m);
+    }
+
+    [Fact]
+    public async Task ExpenseBreakdownGenerator_WithoutCategoryId_ReturnsEveryCategory()
+    {
+        var accountId = await CreateAssetAccountAsync();
+        AddTransaction(accountId, HousingCategoryId,   800m, new DateOnly(2026, 3, 1));
+        AddTransaction(accountId, UtilitiesCategoryId, 150m, new DateOnly(2026, 3, 15));
+        await _fixture.Db.SaveChangesAsync();
+
+        var generator = new ExpenseBreakdownGenerator(_fixture.Db, new FakeCurrentUserAccessor(new Guid("00000000-0000-0000-0000-000000000001")));
+        var parameters = new ReportParameters(CurrencyId: 1, From: new DateOnly(2026, 1, 1), To: new DateOnly(2026, 12, 31));
+
+        var result = (ExpenseBreakdown)await generator.GenerateAsync(parameters);
+
+        result.Categories.Select(c => c.CategoryName).Should().Contain(new[] { "Housing / Rent", "Utilities" });
+    }
+
+    [Fact]
+    public async Task GetExpenseBreakdownAsync_WithoutCategoryId_StillReturnsEveryCategory()
+    {
+        var accountId = await CreateAssetAccountAsync();
+        var from = new DateOnly(2026, 1, 1);
+        var to   = new DateOnly(2026, 12, 31);
+
+        AddTransaction(accountId, HousingCategoryId,   800m, new DateOnly(2026, 3, 1));
+        AddTransaction(accountId, UtilitiesCategoryId, 150m, new DateOnly(2026, 3, 15));
+        await _fixture.Db.SaveChangesAsync();
+
+        var result = await _service.GetExpenseBreakdownAsync(currencyId: 1, from, to, categoryId: null);
+
+        result.Categories.Select(c => c.CategoryName).Should().Contain(new[] { "Housing / Rent", "Utilities" });
     }
 
     [Fact]
