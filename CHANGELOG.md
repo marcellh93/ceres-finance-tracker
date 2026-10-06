@@ -291,6 +291,13 @@
 
 #### Fixed
 
+**Dashboard, reports and test stability (2026-10-06)**
+- Fixed the Expense Breakdown category filter: picking a category changed nothing because the server ignored it. The report (and its CSV export, and saved reports) now narrows to that category.
+- Fixed the dashboard's Spendable Balance card so its rows add up: the outstanding balance on cards paid in full each cycle was already subtracted from "Safe to spend" but never shown. It now appears as a "Card balances due" row, and "Budget reserved" explains that an over-limit budget reserves nothing.
+- Fixed the "i" info hints on dashboard labels: they never opened on touch and a click closed them. Hover previews, a click or tap pins them open until an outside click, Esc or a second click.
+- Fixed a once-off failure in the MFA rate-limit tests (a user left by an interrupted run blocked the next run's registration); every auth test class now clears its own stale test users at setup.
+- Refreshed three transitive lockfile entries (`proxy-addr`, `source-map-js`, `@modelcontextprotocol/sdk`) to clear a new advisory wave that was failing the CI dependency audit; no override added (ADR-0079).
+
 **Security (Stage 14 follow-on fixes, 2026-10-03)**
 - Fixed the MFA-enrollment responses so they keep their stricter `no-store, no-cache` caching directive (the new site-wide cache header no longer overrides a stricter one an endpoint already set).
 
