@@ -1,81 +1,70 @@
 #!/usr/bin/env node
-// Stop hook — blocks turn-end when the assistant's final message deflects a
-// KNOWN defect as "pre-existing / not mine / out of scope" AND couples that to
-// an explicit refusal to fix it this turn.
+// Stop hook — enforces that declining to fix a KNOWN defect is explicit and
+// justified, via a marker convention (NOT prose scanning).
 //
-// WHY (2026-10-06): the rule already lives in prose — deep-fix-mode's anti-pattern
-// list ("the age of a bug is irrelevant… labeling a bug's history is a soft
-// deflection even when it's factually true") and feedback_no_flag_without_action.
-// The assistant talked past it anyway, committing a message that said: "not mine
-// to fix in this commit… it's an independent change, pre-existing… I'll flag it,
-// not fold it in." The user has corrected this language repeatedly. Prose was not
-// enough; this is the mechanical catch.
+// WHY (2026-10-06): the rule — "the age of a defect is irrelevant to whether it
+// gets fixed when you are touching the file" (deep-fix-mode anti-pattern list +
+// feedback_no_flag_without_action) — was talked past in prose. The first version
+// of this hook SCANNED prose for "pre-existing / not mine" + a refusal verb. It
+// then false-positived on the assistant's own META-DISCUSSION of the rule (a reply
+// that quoted the forbidden phrase while explaining it). That is the exact limit
+// documented in stop-image-claim-detect.js's header: a prose matcher "loose enough
+// to catch real findings, but tight enough to skip prose that contains the same
+// words" cannot be reconciled in regex.
 //
-// DESIGN — learn from stop-image-claim-detect.js's history: a LOOSE prose scan
-// (the words "pre-existing" / "out of scope" alone) had a documented 100% misfire
-// rate there, because those words have legitimate uses (a real, properly-deferred
-// feature; merely NAMING a bug's age while fixing it). So this hook does NOT match
-// the deflection words alone. It requires the forbidden MOVE: a
-// not-mine/pre-existing/out-of-scope marker CO-OCCURRING with an explicit refusal
-// verb ("I'll flag it not fix", "not mine to fix", "won't touch it", "leave it
-// as-is", "not fold it in") within a short window. Mentioning a bug's age while
-// fixing it, or deferring a real feature WITH a cited reason + receiving line, does
-// not trip it.
+// REWRITE — convention, not prose (mirrors the image-hook's own fix):
+// When the assistant declines to fix a known defect this turn, it MUST wrap the
+// decision in an explicit marker:
 //
-// Bypass: CERES_SKIP_DEFLECTION_HOOK=1 in the session env (use sparingly — the
-// honest path is to fix the defect or state a valid deferral reason, not bypass).
+//   <defer-defect reason="tooling-gap">
+//     <the defect> — <the specific missing tool/dep/infra, with evidence>
+//   </defer-defect>
+//
+//   <defer-defect reason="already-scheduled">
+//     <the defect> — <the receiving stage + its `[ ]` line that covers this>
+//   </defer-defect>
+//
+// The ONLY two valid reasons are "tooling-gap" and "already-scheduled" (the
+// no-unjustified-deferrals pair). The hook blocks the Stop event when a
+// <defer-defect> block is present with a missing/invalid reason, or with a reason
+// but no substantiating body. Prose that merely discusses deflection — or quotes
+// the forbidden phrase while explaining the rule — contains no marker and never
+// trips. Deciding NOT to fix a defect without any marker is still forbidden by the
+// CLAUDE.md rule + deep-fix-mode; this hook mechanically catches the marker misuse,
+// and the absence-of-marker case is caught by review + the prose rule, not here
+// (that case cannot be regex-detected without the false positives this rewrite
+// removes).
+//
+// Bypass: CERES_SKIP_DEFLECTION_HOOK=1 in the session env.
 
 const fs = require("fs");
 const path = require("path");
 
 const SESSION_BYPASS = process.env.CERES_SKIP_DEFLECTION_HOOK === "1";
 
-// A "deflection marker": framing a thing as not-this-turn's-responsibility.
-const DEFLECTION_RE =
-  /\b(not mine to fix|pre-?existing|predates (?:my|this|the current)|not (?:caused by|from) this (?:commit|turn|session|work|change)|out of scope for this (?:commit|turn|fix|change)|independent (?:change|issue|bug) (?:to|in))\b/i;
+const VALID_REASONS = new Set(["tooling-gap", "already-scheduled"]);
+const MARKER_RE = /<defer-defect(\s+reason="([^"]*)")?\s*>([\s\S]*?)<\/defer-defect>/gi;
 
-// A "refusal verb": an explicit decision NOT to act on it now.
-const REFUSAL_RE =
-  /\b(I'?ll flag it,? not|flag it,? not (?:fold|fix)|not fold it in|won'?t (?:touch|fix|fold|change) it|leav(?:e|ing) it (?:as[- ]is|alone|be|untouched)|not (?:going to|gonna) (?:fix|touch|fold)|defer(?:ring)? (?:it|this) (?:without|with no)|so I'?m not (?:gonna|going to) fix)\b/i;
-
-// An "it's actually being fixed / validly deferred" acquittal within the window —
-// suppresses a false positive when the same breath shows action or a valid reason.
-// NEGATION TRAP: "fold it in" / "fix it now" must NOT be immediately negated —
-// "not fold it in" is a REFUSAL, not an acquittal. The (?<!\bnot )-style guard
-// rejects an acquittal phrase preceded by "not"/"won't"/"can't" within a few words.
-// (This was the bug that let the real offense slip: "I'll flag it, not fold it in"
-// matched the bare "fold it in" acquittal and suppressed the block.)
-const ACQUITTAL_RE =
-  /\b(?<!\bnot )(?<!\bnot to )(?<!\bwon'?t )(?<!\bcan'?t )(fix(?:ing|ed)? it now|fold(?:ing)? it in|in the same (?:commit|turn|pass)|receiving (?:stage|line|\[ ?\])|tooling gap|already[- ]scheduled|CERES_SKIP|added a \[ ?\] line)\b/i;
-
-// Split text into PARAGRAPH windows so a deflection and its coupled refusal are
-// scored together (they routinely span several sentences within one paragraph —
-// the real offense was "not mine to fix… it is pre-existing… I'll flag it, not
-// fold it in", three sentences in one paragraph), while a deflection in paragraph
-// A and an unrelated refusal in far-away paragraph Z do NOT couple. A paragraph is
-// a run of lines between blank lines; very long paragraphs are additionally capped
-// into overlapping ~400-char sub-windows so one giant paragraph can't smuggle a
-// coupling across unrelated spans.
-function windows(text) {
+// Returns an array of problems, one per malformed <defer-defect> block. Empty
+// array = no blocks, or every block is valid. Exported for tests.
+function findMarkerProblems(text) {
   if (!text) return [];
-  const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const out = [];
-  const CAP = 400;
-  for (const p of paras) {
-    if (p.length <= CAP) { out.push(p); continue; }
-    for (let i = 0; i < p.length; i += CAP / 2) out.push(p.slice(i, i + CAP));
-  }
-  return out;
-}
-
-// Returns the offending window text, or null. Exported for tests.
-function findDeflection(text) {
-  for (const w of windows(text)) {
-    if (DEFLECTION_RE.test(w) && REFUSAL_RE.test(w) && !ACQUITTAL_RE.test(w)) {
-      return w.trim();
+  const problems = [];
+  const re = new RegExp(MARKER_RE.source, "gi");
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const reason = (m[2] || "").trim();
+    const body = (m[3] || "").trim();
+    if (!reason) {
+      problems.push({ kind: "missing-reason", snippet: body.slice(0, 120) });
+    } else if (!VALID_REASONS.has(reason)) {
+      problems.push({ kind: "invalid-reason", reason, snippet: body.slice(0, 120) });
+    } else if (body.length < 15) {
+      // A valid reason still needs substantiation: the tool gap / the receiving line.
+      problems.push({ kind: "empty-body", reason, snippet: body.slice(0, 120) });
     }
   }
-  return null;
+  return problems;
 }
 
 function lastAssistantText(lines) {
@@ -96,7 +85,7 @@ function lastAssistantText(lines) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { findDeflection, windows, DEFLECTION_RE, REFUSAL_RE, ACQUITTAL_RE };
+  module.exports = { findMarkerProblems, VALID_REASONS, MARKER_RE };
 }
 
 if (require.main === module) {
@@ -119,8 +108,8 @@ if (require.main === module) {
     const text = lastAssistantText(lines);
     if (!text) process.exit(0);
 
-    const offending = findDeflection(text);
-    const outcome = offending ? "blocked" : "passed";
+    const problems = findMarkerProblems(text);
+    const outcome = problems.length === 0 ? "passed" : "blocked";
 
     try {
       const stateDir = path.join(
@@ -135,31 +124,33 @@ if (require.main === module) {
           sessionId: input.session_id || "",
           hook: "deflection-detect",
           outcome,
-          snippet: offending ? offending.slice(0, 200) : "",
+          problems: problems.map((p) => p.kind),
         }) + "\n",
       );
     } catch { /* best-effort */ }
 
-    if (!offending) process.exit(0);
+    if (problems.length === 0) process.exit(0);
 
     const reason = [
-      "🛑 Pre-existing / not-mine deflection on a KNOWN defect.",
+      "🛑 <defer-defect> marker with a missing or invalid justification.",
       "",
-      "Your final message couples a 'not this turn's responsibility' framing with an",
-      "explicit refusal to fix it:",
-      `  “${offending.slice(0, 180)}”`,
+      "Declining to fix a known defect must cite one of exactly two valid reasons —",
+      'reason="tooling-gap" or reason="already-scheduled" — with a substantiating body:',
+      ...problems.map((p) => {
+        if (p.kind === "missing-reason") return `  • missing reason=  (body: “${p.snippet}”)`;
+        if (p.kind === "invalid-reason") return `  • invalid reason="${p.reason}" — only tooling-gap | already-scheduled are valid`;
+        return `  • reason="${p.reason}" but the body is empty — name the tool gap OR the receiving [ ] line`;
+      }),
       "",
       "The age of a defect is irrelevant to whether it gets fixed when you are touching",
-      "the file. 'Pre-existing', 'not mine', 'out of scope for this commit' + 'I'll flag",
-      "it, not fold it in' is the exact soft-deflection deep-fix-mode and",
-      "feedback_no_flag_without_action forbid — repeatedly corrected by the user.",
+      "the file. The valid exits are: FIX IT NOW, or defer with one of the two reasons",
+      "above and real substantiation (the specific missing tool, or the receiving stage's",
+      "`[ ]` line). 'Pre-existing' / 'not mine' / 'out of scope' is never a reason.",
       "",
       "Recovery:",
-      "  • Fix the defect now, in this turn, and say so (then this passes).",
-      "  • OR state a VALID deferral: a tooling gap with evidence, OR an already-scheduled",
-      "    receiving `[ ]` line — not merely that it 'predates my work'.",
-      "  • OR, if it is genuinely a separate FEATURE (not a defect) the user chose to defer,",
-      "    phrase it as that explicit user decision + a receiving line, without the refusal verb.",
+      "  • Fix the defect this turn and remove the marker.",
+      '  • OR complete the marker: reason="tooling-gap" + the missing tool/evidence, or',
+      '    reason="already-scheduled" + the receiving stage and its `[ ]` line.',
       "  • Session bypass (sparingly): CERES_SKIP_DEFLECTION_HOOK=1.",
       "",
       "Audit: .claude/state/deflection-detect/log.jsonl",
