@@ -49,20 +49,49 @@ function withProjectDir(dir, fn) {
   }
 }
 
+// Seed the per-session write-tracker (what track-session-writes.js records on a
+// PostToolUse Edit/Write). getChangedFiles treats these as THIS session's files;
+// an uncommitted working-tree file NOT seeded here belongs to another session.
+function seedTracker(r, sessionId, files) {
+  const dir = path.join(r.dir, ".claude", "state", "run-tests");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${sessionId}.json`), JSON.stringify({ files }));
+}
+
 // ---------------------------------------------------------------------------
 // getChangedFiles — the turn, not the last commit.
 // ---------------------------------------------------------------------------
 
-test("getChangedFiles: sees uncommitted working-tree edits", () => {
+test("getChangedFiles: sees THIS session's uncommitted working-tree edits", () => {
   const r = repo();
   commit(r, "base.txt", "base\n", "chore: base");
   fs.mkdirSync(path.join(r.dir, "ProjectCeres"), { recursive: true });
   fs.writeFileSync(path.join(r.dir, "ProjectCeres", "Program.cs"), "x\n");
+  // The tracker records that THIS session wrote the file (as track-session-writes
+  // would on the Edit). That's what makes the uncommitted file count for this turn.
+  seedTracker(r, "sess-A", ["ProjectCeres/Program.cs"]);
 
-  const files = withProjectDir(r.dir, () => getChangedFiles("no-session", null));
+  const files = withProjectDir(r.dir, () => getChangedFiles("sess-A", null));
   assert.ok(
     files.includes("ProjectCeres/Program.cs"),
-    `expected the uncommitted file, got ${JSON.stringify(files)}`,
+    `expected this session's uncommitted file, got ${JSON.stringify(files)}`,
+  );
+});
+
+test("getChangedFiles: does NOT return a PARALLEL session's uncommitted edits", () => {
+  // The 2026-10-06 cross-session false-block fix: session B (this turn) must not be
+  // gated for session A's uncommitted working-tree work. The file is on disk (shared
+  // tree) but only in session A's tracker, so this session must drop it.
+  const r = repo();
+  commit(r, "base.txt", "base\n", "chore: base");
+  fs.mkdirSync(path.join(r.dir, "ProjectCeres"), { recursive: true });
+  fs.writeFileSync(path.join(r.dir, "ProjectCeres", "Program.cs"), "x\n");
+  seedTracker(r, "sess-A", ["ProjectCeres/Program.cs"]); // the OTHER session owns it
+
+  const files = withProjectDir(r.dir, () => getChangedFiles("sess-B", null));
+  assert.deepStrictEqual(
+    files, [],
+    `this session wrote nothing; a parallel session's file must be dropped, got ${JSON.stringify(files)}`,
   );
 });
 
@@ -90,16 +119,17 @@ test("getChangedFiles: includes commits made during the turn", () => {
   assert.ok(files.includes("ProjectCeres/B.cs"), "second turn commit missing");
 });
 
-test("getChangedFiles: untracked files count as turn changes", () => {
+test("getChangedFiles: THIS session's untracked files count as turn changes", () => {
   const r = repo();
   commit(r, "base.txt", "base\n", "chore: base");
   fs.mkdirSync(path.join(r.dir, "ProjectCeres.Tests"), { recursive: true });
   fs.writeFileSync(path.join(r.dir, "ProjectCeres.Tests", "NewSpec.cs"), "new\n");
+  seedTracker(r, "sess-A", ["ProjectCeres.Tests/NewSpec.cs"]);
 
-  const files = withProjectDir(r.dir, () => getChangedFiles("no-session", null));
+  const files = withProjectDir(r.dir, () => getChangedFiles("sess-A", null));
   assert.ok(
     files.includes("ProjectCeres.Tests/NewSpec.cs"),
-    `untracked file missing, got ${JSON.stringify(files)}`,
+    `this session's untracked file missing, got ${JSON.stringify(files)}`,
   );
 });
 
