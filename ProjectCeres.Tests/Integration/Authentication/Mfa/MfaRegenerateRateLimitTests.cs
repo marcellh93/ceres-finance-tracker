@@ -22,22 +22,9 @@ public class MfaRegenerateRateLimitTests : IAsyncLifetime
 {
     private readonly MfaRateLimitedAuthTestWebApplicationFactory _factory;
     public MfaRegenerateRateLimitTests(MfaRateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
-    public async Task DisposeAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        foreach (var u in um.Users.Where(u => u.Email!.EndsWith("@mfa-rl-test.local")).ToList())
-        {
-            await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
-            await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
-            await db.TotpReplayEntries.IgnoreQueryFilters().Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
-            // Purge owned rows first: deleting the user cascades nothing.
-            await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
-            await um.DeleteAsync(u);
-        }
-    }
+    private const string EmailSuffix = "@mfa-rl-test.local";
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailSuffix);
+    public Task DisposeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailSuffix);
 
     private async Task<(HttpClient client, string sessionCookie, string seed, ApplicationUser user)>
         SetupAuthenticatedMfaUserAsync(string email)

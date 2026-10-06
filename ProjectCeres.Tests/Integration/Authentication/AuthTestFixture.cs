@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectCeres.Data;
 using ProjectCeres.Common.Authentication;
@@ -25,6 +26,32 @@ namespace ProjectCeres.Tests.Integration.Authentication;
 public static class AuthTestFixture
 {
     public const string ValidPassword = "correct horse battery staple";
+
+    /// <summary>
+    /// Removes every user whose email ends with one of <paramref name="emailSuffixes"/>, plus the rows they own.
+    /// Test classes call it at setup so a user left by an interrupted run cannot fail the next registration.
+    /// </summary>
+    public static async Task PurgeUsersByEmailSuffixAsync(IServiceProvider services, params string[] emailSuffixes)
+    {
+        using var scope = services.CreateScope();
+        var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        foreach (var suffix in emailSuffixes)
+        {
+            foreach (var u in um.Users.Where(u => u.Email!.EndsWith(suffix)).ToList())
+            {
+                await db.UserSessions.IgnoreQueryFilters().Where(s => s.UserId == u.Id).ExecuteDeleteAsync();
+                await db.UserMfaBackupCodes.IgnoreQueryFilters().Where(c => c.UserId == u.Id).ExecuteDeleteAsync();
+                await db.TotpReplayEntries.IgnoreQueryFilters().Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
+                await db.FailedLoginAttempts.Where(e => e.UserId == u.Id).ExecuteDeleteAsync();
+                // Purge owned rows first: deleting the user cascades nothing.
+                await UserOwnedCleanup.PurgeUserAsync(db, u.Id);
+                await um.DeleteAsync(u);
+            }
+            await db.FailedLoginAttempts.Where(e => e.EmailAttempted!.EndsWith(suffix)).ExecuteDeleteAsync();
+        }
+    }
 
     public static async Task<ApplicationUser> RegisterUserAsync(
         AuthTestWebApplicationFactory factory, string email, string password = ValidPassword)
