@@ -1935,21 +1935,25 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ---
 
-## Stage 13.b — Inactive-user archival 🔒 LOCKED (Batch 5)
+## Stage 13.b — Inactive-user anonymisation sweep 🔓 UNLOCKED — pending brainstorm (Batch 5)
 
-**Status: 🔒 Locked — split out of the Stage 13 retention slice 2026-10-03, NOT yet brainstormed.** Deferred here because it cannot be built correctly until a documented-policy conflict is resolved (a user/counsel decision), and it is a materially larger build than the Stage 13 flat retention purges.
+**Status: 🔓 Unlocked 2026-10-06 (Decision C) — policy resolved, NOT yet brainstormed.** The documented-policy "conflict" is resolved: inactivity and account-closure are two distinct events, not conflicting numbers. **13.b's scope is now narrowed to the *inactivity* flow only** (the `security-model.md` 12mo/18mo anonymize-in-place policy). The account-closure archive lifecycle (ADR-0029 `CustomerArchive`) is **split out and deferred** to a future account-closure stage — see the deferral line below. Entry point for the next step is `superpowers:brainstorming` (the user directs when).
 
-> **Goal (as described in two conflicting docs — must be reconciled before design):** automatically handle accounts that have gone inactive, per a defined retention period. This is distinct from the user-*requested* GDPR erasure flow already shipped in Stage 13.9 — this one is *inactivity-triggered*.
+> **Goal (resolved scope):** automatically handle accounts that have gone *inactive* (no login for a defined period), per `security-model.md` § inactive-account policy: 12 months no login → retention-warning email; 18 months → anonymize the user-controlled profile + delete non-statutory data, with statutory financial records anonymise-retained (never hard-deleted). Distinct from the user-*requested* GDPR erasure flow (Stage 13.9) and from account-*closure* churn (deferred — below).
 
-### Why it's locked (the blocker to resolve first)
+### Blocker — RESOLVED
 
-- [ ] **Resolve the policy conflict.** `security-model.md` § Data Retention says: 12 months no login → retention-warning email; 18 months → anonymize profile + delete non-statutory data. `legal.md` § Data Retention Policy says something *different*: 30-day grace → 150-day sealed archive → permanent deletion at day 180, tied to an **ADR-0029 `CustomerArchive` entity that does not exist in code**. These are two different mechanisms with different numbers. Decide which is authoritative (ask-before-deviating-from-docs — this is the user's/counsel's call), reconcile the two docs, and only then design.
+- [x] **Policy conflict resolved — Decision C (2026-10-06).** `security-model.md` (inactivity: 12mo/18mo anonymize-in-place) and `legal.md`/ADR-0029 (closure: 30/150/180-day archive) describe two different triggers, not one conflicting policy. 13.b = the inactivity flow; closure/archive is deferred. Both docs annotated with reconciliation notes; decision recorded in `planning-resolved.md` § "Stage 13.b trigger/mechanism". (ask-before-deviating satisfied — user decision.)
 
-### Open questions for the future brainstorm (do not design yet)
+### Open questions for the brainstorm (A-scoped; do not design yet)
 
-- What "archived" means concretely: the ADR-0029 filesystem `CustomerArchive` (a larger build — new entity + registry landing + archive writer + a 180-day deletion job) vs. a simpler profile-anonymisation sweep.
-- The statutory-override interaction: the Ley General Tributaria carve-out (`security-model.md`, `StatutoryRetentionSet`) means financial rows must be reduced-to-minimum / anonymise-retained, never hard-deleted, even for an inactive user.
-- Whether it reuses any of the Stage 13 `RetentionPurge` / SweepSessions cron machinery or needs its own.
+- **`LastLoginAt` prerequisite (load-bearing):** no last-login timestamp exists on `ApplicationUser` (only `CreatedAt`/`SealedAt`/`ErasedAt`); `UserSession.LastUsedAt` is debounced and swept at 90 days, so it cannot measure 12-month inactivity. The brainstorm must design a new `LastLoginAt`/`LastActivityAt` column stamped at the login path + a backfill decision for existing users.
+- **Reuse-vs-extract the statutory anonymise lane:** `ErasureExecutor`'s anonymise-in-place + `StatutoryRetentionSet` classifier already implement "anonymize financial records, never hard-delete" — but its entry point is erasure-specific (reads an `ErasureRequest`, writes `GdprErasureCompleted`). Decide: extract a shared anonymisation service, or add a second caller. Do NOT rebuild the statutory carve-out.
+- **Cron machinery:** the flat `RetentionPurge`/`SweepSessions` `AdminDbContext` + `IgnoreQueryFilters` + `--run-*` pattern fits this inactivity sweep cleanly (it's flat, not per-user-fan-out); confirm the warning-email arm (new `EmailTemplateKey` + EN/ES resx, none exists) during design. Cron *registration* follows the Stage-16 deferred-cron pattern.
+
+### Deferred out of 13.b (Decision C split)
+
+- [ ] **Account-closure archive lifecycle (ADR-0029 `CustomerArchive`).** 30-day grace → 150-day sealed archive file → 180-day permanent deletion, on an explicit account *close*. **Reason:** no account-closure trigger exists in code today (`ClosureType`/`CustomerArchive` are on-paper only); the archive-file mechanism + per-user writer is a materially larger build than the inactivity sweep, and ADR-0029's paid-restoration half is explicitly Phase 5. **Tripwire:** `legal.md` GDPR-checklist line "CustomerArchive background job implemented" stays `[ ]`; this cannot be built until an account-closure feature lands. Scope it to that stage, not 13.b. (`legal.md` § Data Retention churn schedule documents the intended windows.)
 
 > **Back-reference:** the Stage 13 retention checklist line "Inactive user records: archived after defined period" points here; a stage-close audit of Stage 13 re-surfaces this stub.
 

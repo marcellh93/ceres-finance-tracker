@@ -169,6 +169,8 @@ Each processing activity below is one Art. 30(1) record: purpose, data categorie
 
 > **Policy disclosure requirement:** The 30-day grace period and 180-day archive window are product policy, not legal minimums. They must be stated explicitly in the Privacy Policy before Phase 3 launch. If these windows change, the Privacy Policy must be updated before the change takes effect.
 
+> **Reconciliation note (Decision C, 2026-10-06):** This churn lifecycle is triggered by an **explicit account closure** (`ClosureType` recorded at close time, per ADR-0029) — NOT by inactivity. It is distinct from the *inactivity* policy in `security-model.md` § Data Retention (12mo no-login → warning, 18mo → anonymize-in-place), which is the one Stage 13.b builds. **This closure/archive lifecycle is deferred:** no account-closure trigger exists in code today (`ClosureType`/`CustomerArchive` are on-paper only, per ADR-0029), and the paid-restoration half is explicitly Phase 5. It is scoped to whenever an account-closure feature is built, not to Stage 13.b. See `planning-resolved.md` § "Stage 13.b trigger/mechanism".
+
 > **Closure type must be recorded at account closure time.** Natural churn and GDPR erasure have different downstream rules. A user who submitted an erasure request must never have a restoration archive created, even if they later change their mind. See ADR-0029 for the `CustomerArchive` schema and lifecycle.
 
 ---
