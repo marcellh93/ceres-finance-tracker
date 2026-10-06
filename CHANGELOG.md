@@ -296,6 +296,8 @@
 - Fixed the dashboard's Spendable Balance card so its rows add up: the outstanding balance on cards paid in full each cycle was already subtracted from "Safe to spend" but never shown. It now appears as a "Card balances due" row, and "Budget reserved" explains that an over-limit budget reserves nothing.
 - Fixed the "i" info hints on dashboard labels: they never opened on touch and a click closed them. Hover previews, a click or tap pins them open until an outside click, Esc or a second click.
 - Fixed a once-off failure in the MFA rate-limit tests (a user left by an interrupted run blocked the next run's registration); every auth test class now clears its own stale test users at setup.
+- Fixed the reports currency filter showing an empty "Currency" placeholder while the data was already in your default currency; it now shows the default.
+- Changed the currency pickers on the reports filter and the category/goal budget forms to offer only currencies you have an account in (archived accounts count, and your default is always included). Account creation and the Settings default currency still list every currency, because that is how a new one starts being used.
 - Refreshed three transitive lockfile entries (`proxy-addr`, `source-map-js`, `@modelcontextprotocol/sdk`) to clear a new advisory wave that was failing the CI dependency audit; no override added (ADR-0079).
 
 **Security (Stage 14 follow-on fixes, 2026-10-03)**

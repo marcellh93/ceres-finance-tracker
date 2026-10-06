@@ -218,6 +218,7 @@ export function CategoryBudgetForm({
           <CurrencyCombobox
             value={values.currencyId}
             onChange={(id) => set('currencyId', id)}
+            inUseOnly
           />
           {errors.currencyId && <p className="text-xs text-destructive">{errors.currencyId}</p>}
         </div>

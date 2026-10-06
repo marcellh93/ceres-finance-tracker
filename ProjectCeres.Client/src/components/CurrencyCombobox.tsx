@@ -14,13 +14,22 @@ type Props = {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** Offer only currencies the user has an account in (plus their default currency). */
+  inUseOnly?: boolean;
+  /** Currency code to show while `value` is null, e.g. the default a report falls back to. */
+  fallbackCode?: string;
 };
 
-export function CurrencyCombobox({ value, onChange, placeholder = 'Select currency', disabled, className }: Props) {
+export function CurrencyCombobox({ value, onChange, placeholder = 'Select currency', disabled, className, inUseOnly, fallbackCode }: Props) {
   const [open, setOpen] = useState(false);
-  const { data: currencies } = useApi<CurrencyOption[]>('/api/currencies');
-  const list = currencies ?? [];
-  const selected = list.find((c) => c.id === value) ?? null;
+  const { data: allCurrencies } = useApi<CurrencyOption[]>('/api/currencies');
+  const { data: inUseCurrencies } = useApi<CurrencyOption[]>(inUseOnly ? '/api/currencies?inUse=true' : '');
+  const list = (inUseOnly ? inUseCurrencies : allCurrencies) ?? [];
+  // Label from the full list so a saved currency that left the limited list still shows.
+  const selected =
+    (allCurrencies ?? list).find((c) => c.id === value) ??
+    (value === null && fallbackCode ? list.find((c) => c.code === fallbackCode) : undefined) ??
+    null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -60,7 +69,7 @@ export function CurrencyCombobox({ value, onChange, placeholder = 'Select curren
                     setOpen(false);
                   }}
                 >
-                  <Check className={cn('mr-2 h-4 w-4', value === c.id ? 'opacity-100' : 'opacity-0')} />
+                  <Check className={cn('mr-2 h-4 w-4', selected?.id === c.id ? 'opacity-100' : 'opacity-0')} />
                   {c.symbol} {c.code}
                 </CommandItem>
               ))}

@@ -675,6 +675,8 @@ The canonical "searchable dropdown" recipe: shadcn `<Popover>` wrapping a `<Comm
 
 **Inline clear (`onClear`):** opt-in via `onClear?: () => void`. When passed AND a value is selected, the trigger renders a small ✕ button next to the chevron; clicking calls `onClear()` and stops propagation so the popover stays closed. Use it on filter bars (delete the URL param) and on form fields (set state to null/`''`). Omit on surfaces where clearing doesn't make sense.
 
+**Currency lists (`CurrencyCombobox`):** the system holds every currency, but most people use two or three. Pickers that *choose something to filter or budget by* pass `inUseOnly` so they offer only the currencies of the user's accounts (archived accounts count, and the user's default currency is always included) via `GET /api/currencies?inUse=true`. Pickers that *create a currency-bearing thing* (account create/edit, Settings default) keep the full list, because that is how a new currency starts being used. `fallbackCode` shows a currency while `value` is `null` (reports pass the default, which is what the server uses when the URL names none) so the control never reads empty while the data is already in a currency. A saved value that has left the limited list still renders its label.
+
 **When to deviate:** if you need multi-select, use shadcn `<Command>` checkbox patterns rather than this recipe. If you need a non-searchable picker for a small fixed set (≤5 options), prefer a native `<Select>` or `<RadioGroup>`.
 
 ---

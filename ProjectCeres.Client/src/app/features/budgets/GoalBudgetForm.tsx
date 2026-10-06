@@ -191,7 +191,7 @@ export function GoalBudgetForm({ mode, goalType, initialValues, onSubmit, onCanc
         {goalType === 'Spending' && (
           <div className="space-y-1.5">
             <Label htmlFor="gb-currency">Currency</Label>
-            <CurrencyCombobox value={values.currencyId} onChange={(id) => set('currencyId', id)} />
+            <CurrencyCombobox value={values.currencyId} onChange={(id) => set('currencyId', id)} inUseOnly />
             {errors.currencyId && <p className="text-xs text-destructive">{errors.currencyId}</p>}
           </div>
         )}
