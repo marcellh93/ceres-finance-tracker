@@ -837,24 +837,7 @@ function PanelLabel({ children, tooltip }: { children: string; tooltip?: string 
   return (
     <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
       <span>{children}</span>
-      {tooltip && (
-        <TooltipProvider delay={200}>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={`About ${children}`}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Info className="h-3 w-3" />
-                </button>
-              }
-            />
-            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
+      {tooltip && <InfoTip about={children} tip={tooltip} />}
     </div>
   );
 }
@@ -863,8 +846,9 @@ function PanelLabel({ children, tooltip }: { children: string; tooltip?: string 
 **Conventions:**
 
 - Class shape is fixed: `text-xs uppercase tracking-wider text-muted-foreground font-medium`. Don't substitute `text-sm` or drop the tracking — every panel label across the dashboard uses this exact recipe.
-- The Info button must be a real `<button>` with `aria-label="About {label}"`, not a styled `<span>`. Tooltips are not keyboard-reachable when triggered by non-button elements.
-- Tooltip content is capped at `max-w-xs` (320px) and uses `<TooltipProvider delay={200}>` to avoid flashing on hover-through.
+- The Info button is `<InfoTip>` (`src/components/InfoTip.tsx`): a real `<button>` with `aria-label="About {label}"`, not a styled `<span>`, so it is keyboard-reachable.
+- `InfoTip` is a **Popover with `openOnHover`**, not a Tooltip. A Base UI Tooltip opens on mouse hover or keyboard focus only and closes when its trigger is pressed, so on touch the hint never appeared and a click dismissed it. The popover opens on hover (200ms delay), click/tap and focus, and a click on a hover-opened popover keeps it open. Use `Tooltip` only for supplementary labels that are also available some other way.
+- Content is capped at `max-w-xs` (320px).
 - The `?` glyph is `<Info className="h-3 w-3" />` from lucide-react — do not swap for a `(?)` text character or a different lucide icon.
 
 ### Panel empty states

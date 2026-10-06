@@ -1,7 +1,7 @@
-import { CalendarClock, Hourglass, Info } from 'lucide-react';
+import { CalendarClock, Hourglass } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoTip } from '@/components/InfoTip';
 import { Numeric } from '@/components/Numeric';
 import { EquationRow } from '@/components/EquationRow';
 import { useApi } from '../../lib/use-api';
@@ -55,24 +55,7 @@ function PanelLabel({ children, tooltip }: { children: string; tooltip?: string 
   return (
     <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
       <span>{children}</span>
-      {tooltip && (
-        <TooltipProvider delay={200}>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label={`About ${children}`}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Info className="h-3 w-3" />
-                </button>
-              }
-            />
-            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
+      {tooltip && <InfoTip about={children} tip={tooltip} />}
     </div>
   );
 }
