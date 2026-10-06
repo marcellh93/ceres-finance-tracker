@@ -16,7 +16,7 @@ public class RateLimitedAuthEndpointTests : IAsyncLifetime
     public RateLimitedAuthEndpointTests(RateLimitedAuthTestWebApplicationFactory factory)
         => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@rl-test.local");
 
     public async Task DisposeAsync()
     {

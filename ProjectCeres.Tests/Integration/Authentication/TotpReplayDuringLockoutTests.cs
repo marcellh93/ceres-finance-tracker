@@ -13,7 +13,7 @@ public class TotpReplayDuringLockoutTests : IntegrationTestBase<Bucket3AuthFacto
 {
     private readonly Bucket3AuthFactory _factory;
     public TotpReplayDuringLockoutTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@replay-lock-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

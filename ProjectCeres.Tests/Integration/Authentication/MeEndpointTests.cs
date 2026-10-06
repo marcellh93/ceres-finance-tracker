@@ -16,7 +16,7 @@ public class MeEndpointTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncLi
 
     public MeEndpointTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@me-test.local");
 
     public async Task DisposeAsync()
     {

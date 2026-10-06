@@ -30,7 +30,7 @@ public class MfaSecurityEmailTests : IntegrationTestBase<Bucket4AuthFactory>, IA
 
     public MfaSecurityEmailTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailDomain);
 
     public async Task DisposeAsync()
     {

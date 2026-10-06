@@ -16,7 +16,7 @@ public class BackupCodeLockoutBypassTests : IntegrationTestBase<Bucket3AuthFacto
 
     public BackupCodeLockoutBypassTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@bclock-test.local");
 
     public async Task DisposeAsync()
     {

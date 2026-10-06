@@ -14,7 +14,7 @@ public class PersistentCookieDosTests : IntegrationTestBase<Bucket1AuthFactory>,
 {
     private readonly Bucket1AuthFactory _factory;
     public PersistentCookieDosTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@dos-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

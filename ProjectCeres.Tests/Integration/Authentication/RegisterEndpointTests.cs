@@ -20,7 +20,7 @@ public class RegisterEndpointTests : IntegrationTestBase<Bucket3AuthFactory>, IA
         _client = factory.CreateClient();
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@register-test.local", "@register-noenum-test.local");
 
     public async Task DisposeAsync()
     {

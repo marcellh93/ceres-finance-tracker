@@ -13,7 +13,7 @@ public class LoginConcurrencyTests : IntegrationTestBase<Bucket2AuthFactory>, IA
 {
     private readonly Bucket2AuthFactory _factory;
     public LoginConcurrencyTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@conc-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

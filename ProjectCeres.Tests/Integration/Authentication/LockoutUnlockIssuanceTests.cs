@@ -22,7 +22,7 @@ public class LockoutUnlockIssuanceTests : IntegrationTestBase<Bucket3AuthFactory
 
     public LockoutUnlockIssuanceTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailDomain);
 
     public async Task DisposeAsync()
     {

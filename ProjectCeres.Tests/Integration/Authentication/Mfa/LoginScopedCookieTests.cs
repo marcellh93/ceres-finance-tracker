@@ -18,7 +18,7 @@ public class LoginScopedCookieTests : IntegrationTestBase<Bucket2AuthFactory>, I
 
     public LoginScopedCookieTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@scoped-cookie-test.local");
 
     public async Task DisposeAsync()
     {

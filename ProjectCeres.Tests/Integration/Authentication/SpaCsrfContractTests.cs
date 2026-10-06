@@ -24,7 +24,7 @@ public class SpaCsrfContractTests : IntegrationTestBase<Bucket1AuthFactory>, IAs
 
     public SpaCsrfContractTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailSuffix);
 
     public async Task DisposeAsync()
     {

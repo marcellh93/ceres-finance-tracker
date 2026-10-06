@@ -21,7 +21,7 @@ public class MfaDisableTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyncLi
 {
     private readonly Bucket3AuthFactory _factory;
     public MfaDisableTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@disable-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

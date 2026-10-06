@@ -12,7 +12,7 @@ public class LoginCrossFeatureTests : IAsyncLifetime
 {
     private readonly RateLimitedAuthTestWebApplicationFactory _factory;
     public LoginCrossFeatureTests(RateLimitedAuthTestWebApplicationFactory factory) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@cross-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();
@@ -51,7 +51,7 @@ public class LoginCrossFeatureRegressionTests : IntegrationTestBase<Bucket3AuthF
 {
     private readonly Bucket3AuthFactory _factory;
     public LoginCrossFeatureRegressionTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@regress-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

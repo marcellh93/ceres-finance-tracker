@@ -27,7 +27,7 @@ public class ErasedEmailHoldRegistrationTests : IntegrationTestBase<Bucket3AuthF
         _client = factory.CreateClient();
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@erased-hold-test.local");
 
     // This file's tests seed ErasedEmailHolds against fixed, hardcoded emails (not
     // per-test-unique ones), so EmailFingerprint is identical every run. Cleaning up

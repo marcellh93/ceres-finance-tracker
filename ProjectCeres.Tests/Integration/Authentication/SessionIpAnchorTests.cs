@@ -28,7 +28,7 @@ public class SessionIpAnchorTests : IntegrationTestBase<Bucket1AuthFactory>, IAs
 
     public SessionIpAnchorTests(Bucket1AuthFactory factory, Bucket1Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@anchor-test.local");
 
     public async Task DisposeAsync()
     {

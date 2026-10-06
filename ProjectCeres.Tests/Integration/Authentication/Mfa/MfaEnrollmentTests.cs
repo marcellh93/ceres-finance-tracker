@@ -17,7 +17,7 @@ public class MfaEnrollmentTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyn
 
     public MfaEnrollmentTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@mfa-enroll-test.local");
 
     public async Task DisposeAsync()
     {

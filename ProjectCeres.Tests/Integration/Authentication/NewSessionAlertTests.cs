@@ -29,7 +29,7 @@ public class NewSessionAlertTests : IntegrationTestBase<Bucket4AuthFactory>, IAs
 
     public NewSessionAlertTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@newsession-test.local");
 
     public async Task DisposeAsync()
     {

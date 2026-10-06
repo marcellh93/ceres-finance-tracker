@@ -15,7 +15,7 @@ public class MfaPendingCookieTests : IntegrationTestBase<Bucket4AuthFactory>, IA
 {
     private readonly Bucket4AuthFactory _factory;
     public MfaPendingCookieTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@mfa-cookie-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

@@ -22,7 +22,7 @@ public class AccountSealTests : IntegrationTestBase<Bucket4AuthFactory>, IAsyncL
 
     public AccountSealTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@seal-test.local");
 
     public async Task DisposeAsync()
     {

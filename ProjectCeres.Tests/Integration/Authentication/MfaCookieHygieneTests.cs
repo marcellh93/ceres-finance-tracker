@@ -14,7 +14,7 @@ public class MfaCookieHygieneTests : IntegrationTestBase<Bucket3AuthFactory>, IA
 
     public MfaCookieHygieneTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@cookies-test.local");
 
     public async Task DisposeAsync()
     {

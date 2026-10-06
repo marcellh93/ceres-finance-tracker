@@ -20,7 +20,7 @@ public class PersistentCookieRotationTests : IntegrationTestBase<Bucket4AuthFact
 
     public PersistentCookieRotationTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@persist-test.local", "@persist-stamp-test.local");
 
     public async Task DisposeAsync()
     {

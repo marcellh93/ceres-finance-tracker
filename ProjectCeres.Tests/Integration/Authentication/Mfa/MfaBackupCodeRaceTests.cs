@@ -13,7 +13,7 @@ public class MfaBackupCodeRaceTests : IntegrationTestBase<Bucket4AuthFactory>, I
 {
     private readonly Bucket4AuthFactory _factory;
     public MfaBackupCodeRaceTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@bc-race-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

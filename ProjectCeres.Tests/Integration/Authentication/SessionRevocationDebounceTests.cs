@@ -12,7 +12,7 @@ public class SessionRevocationDebounceTests : IntegrationTestBase<Bucket2AuthFac
 {
     private readonly Bucket2AuthFactory _factory;
     public SessionRevocationDebounceTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@debounce-test.local");
     public async Task DisposeAsync()
     {
         using var scope = _factory.Services.CreateScope();

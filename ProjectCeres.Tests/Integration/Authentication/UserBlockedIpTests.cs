@@ -18,7 +18,7 @@ public class UserBlockedIpTests : IntegrationTestBase<Bucket3AuthFactory>, IAsyn
 
     public UserBlockedIpTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@block-test.local");
 
     public async Task DisposeAsync()
     {

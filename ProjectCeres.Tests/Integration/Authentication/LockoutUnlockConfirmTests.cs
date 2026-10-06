@@ -19,7 +19,7 @@ public class LockoutUnlockConfirmTests : IntegrationTestBase<Bucket2AuthFactory>
 
     public LockoutUnlockConfirmTests(Bucket2AuthFactory factory, Bucket2Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailDomain);
 
     public async Task DisposeAsync()
     {

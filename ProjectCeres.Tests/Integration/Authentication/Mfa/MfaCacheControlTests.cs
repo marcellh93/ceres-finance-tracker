@@ -18,7 +18,7 @@ public class MfaCacheControlTests : IntegrationTestBase<Bucket4AuthFactory>, IAs
 
     public MfaCacheControlTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@cache-mfa-test.local");
 
     public async Task DisposeAsync()
     {

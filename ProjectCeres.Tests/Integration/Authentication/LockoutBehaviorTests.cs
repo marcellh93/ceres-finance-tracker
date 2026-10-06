@@ -15,7 +15,7 @@ public class LockoutBehaviorTests : IntegrationTestBase<Bucket4AuthFactory>, IAs
 
     public LockoutBehaviorTests(Bucket4AuthFactory factory, Bucket4Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, "@lockout-test.local");
 
     public async Task DisposeAsync()
     {

@@ -25,7 +25,7 @@ public class BackupCodeLoginSessionFlagTests : IntegrationTestBase<Bucket3AuthFa
 
     public BackupCodeLoginSessionFlagTests(Bucket3AuthFactory factory, Bucket3Database bucketDb) : base(factory, bucketDb) => _factory = factory;
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => AuthTestFixture.PurgeUsersByEmailSuffixAsync(_factory.Services, EmailSuffix);
 
     public async Task DisposeAsync()
     {
