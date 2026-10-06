@@ -9,6 +9,7 @@ const baseHealth: HealthDto = {
   imminentBills: 0,
   laterBills: 0,
   budgetReserve: 0,
+  fullMonthlyDebt: 0,
   runwayMonths: 8,
   avgMonthlyExpense: 1000,
   currentMonthIncome: 3000,
@@ -99,6 +100,45 @@ describe('FinancialHealthCard', () => {
     );
     render(<FinancialHealthCard />);
     expect(await screen.findByText(/safe to spend/i)).toBeDefined();
+  });
+
+  it('shows a "Card balances due" row so the equation sums to Safe to spend', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(
+      mockHealth({ budgetReserve: 174.15, fullMonthlyDebt: 231.89, availableToday: 357.98, safeToSpend: -48.06 }),
+    );
+    render(<FinancialHealthCard />);
+    expect(await screen.findByText('Card balances due')).toBeDefined();
+    expect(screen.getByText(/231\.89/)).toBeDefined();
+  });
+
+  it('shows "Safe to spend" when card balances are the only deduction', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(
+      mockHealth({ laterBills: 0, budgetReserve: 0, fullMonthlyDebt: 231.89, safeToSpend: 126.11 }),
+    );
+    render(<FinancialHealthCard />);
+    expect(await screen.findByText(/safe to spend/i)).toBeDefined();
+  });
+
+  it('gives "Card balances due" an info hint, and rows without a hint none', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(
+      mockHealth({ fullMonthlyDebt: 231.89, safeToSpend: 126.11 }),
+    );
+    render(<FinancialHealthCard />);
+    expect(await screen.findByRole('button', { name: 'About Card balances due' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'About Liquid' })).toBeNull();
+  });
+
+  it('hides "Card balances due" when fullMonthlyDebt is zero', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(mockHealth({ fullMonthlyDebt: 0 }));
+    render(<FinancialHealthCard />);
+    await screen.findByText('Spendable Balance');
+    expect(screen.queryByText('Card balances due')).toBeNull();
+  });
+
+  it('explains on "Budget reserved" that overspent budgets reserve nothing', async () => {
+    (global.fetch as ReturnType<typeof vi.spyOn>).mockResolvedValue(mockHealth({ budgetReserve: 174.15, safeToSpend: 700 }));
+    render(<FinancialHealthCard />);
+    expect(await screen.findByRole('button', { name: 'About Budget reserved' })).toBeDefined();
   });
 
   it('Burn Rate panel shows spent/total caption when both fields are present', async () => {

@@ -18,6 +18,7 @@ export type HealthDto = {
   imminentBills: number | null;
   laterBills: number | null;
   budgetReserve: number | null;
+  fullMonthlyDebt: number | null;
   runwayMonths: number | null;
   avgMonthlyExpense: number | null;
   currentMonthIncome: number | null;

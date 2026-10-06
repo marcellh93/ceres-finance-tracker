@@ -18,6 +18,7 @@ public record HealthSnapshotData(
     decimal? ImminentBills,
     decimal? LaterBills,
     decimal? BudgetReserve,
+    decimal? FullMonthlyDebt,
     decimal? RunwayMonths,
     decimal? AvgMonthlyExpense,
     decimal? CurrentMonthIncome,

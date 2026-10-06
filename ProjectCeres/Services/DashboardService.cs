@@ -111,7 +111,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         var currencyId = settings.DefaultCurrencyId;
         var currency   = settings.DefaultCurrency;
 
-        var (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve) = await GetSpendableBalanceAsync(currencyId);
+        var (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve, fullMonthlyDebt) = await GetSpendableBalanceAsync(currencyId);
         var (runway, avgMonthlyExpense) = await GetRunwayAsync(currencyId);
         var incomeMetrics = await GetIncomeMetricsAsync(currencyId);
         var (burnRate, budgetSpent, budgetTotal) = await GetBudgetBurnRateAsync(currencyId);
@@ -122,6 +122,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
             ImminentBills:        imminentBills,
             LaterBills:           laterBills,
             BudgetReserve:        budgetReserve,
+            FullMonthlyDebt:      fullMonthlyDebt,
             RunwayMonths:         runway,
             AvgMonthlyExpense:    avgMonthlyExpense,
             CurrentMonthIncome:   incomeMetrics.currentMonth,
@@ -148,11 +149,13 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
     ///
     /// BudgetReserve  = SUM(MAX(0, limit − actual spend this month)) per active CategoryBudget
     ///
-    /// SafeToSpend    = AvailableToday − LaterBills − BudgetReserve
+    /// FullMonthlyDebt = outstanding balance on active FullMonthly liabilities
+    ///
+    /// SafeToSpend    = AvailableToday − LaterBills − BudgetReserve − FullMonthlyDebt
     ///
     /// Returns all nulls if there are no qualifying accounts.
     /// </summary>
-    private async Task<(decimal? availableToday, decimal? safeToSpend, decimal? imminentBills, decimal? laterBills, decimal? budgetReserve)> GetSpendableBalanceAsync(int currencyId)
+    private async Task<(decimal? availableToday, decimal? safeToSpend, decimal? imminentBills, decimal? laterBills, decimal? budgetReserve, decimal? fullMonthlyDebt)> GetSpendableBalanceAsync(int currencyId)
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
         const int imminentWindowDays = 7;
@@ -179,7 +182,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
             .ToListAsync();
 
         if (accounts.Count == 0)
-            return (null, null, null, null, null);
+            return (null, null, null, null, null, null);
 
         // These accounts are all Asset accounts (filtered above), so isLiability is
         // always false here — ComputeBalance's liability-leg handling is a no-op for
@@ -288,7 +291,7 @@ public class DashboardService(AppDbContext db, ISettingsService settingsService,
         var availableToday = liquid - imminentBills;
         var safeToSpend    = availableToday - laterBills - budgetReserve - fullMonthlyDebt;
 
-        return (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve);
+        return (availableToday, safeToSpend, imminentBills, laterBills, budgetReserve, fullMonthlyDebt);
     }
 
     /// <summary>

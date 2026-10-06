@@ -1,11 +1,14 @@
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { InfoTip } from '@/components/InfoTip';
 
 type EquationRowProps = {
   label: string;
   value: ReactNode;
   /** Optional className applied to the value's wrapping span. */
   valueClassName?: string;
+  /** Optional explanation, shown in an info tooltip beside the label. */
+  hint?: string;
 };
 
 /**
@@ -17,10 +20,13 @@ type EquationRowProps = {
  * pass a valueClassName like "text-base font-bold text-success"
  * to override the muted default.
  */
-export function EquationRow({ label, value, valueClassName }: EquationRowProps) {
+export function EquationRow({ label, value, valueClassName, hint }: EquationRowProps) {
   return (
     <div className="flex justify-between text-[11px] text-muted-foreground">
-      <span>{label}</span>
+      <span className="flex items-center gap-1.5">
+        {label}
+        {hint && <InfoTip about={label} tip={hint} />}
+      </span>
       <span className={cn(valueClassName)}>{value}</span>
     </div>
   );

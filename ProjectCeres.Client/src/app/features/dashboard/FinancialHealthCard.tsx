@@ -103,7 +103,8 @@ function SpendableEquation({ data }: { data: HealthDto }) {
   const hasImminent = (data.imminentBills ?? 0) !== 0;
   const hasLater = (data.laterBills ?? 0) !== 0;
   const hasReserve = (data.budgetReserve ?? 0) !== 0;
-  const showSafeToSpend = data.safeToSpend !== null && (hasLater || hasReserve);
+  const hasCardDebt = (data.fullMonthlyDebt ?? 0) !== 0;
+  const showSafeToSpend = data.safeToSpend !== null && (hasLater || hasReserve || hasCardDebt);
 
   return (
     <div className="space-y-1.5">
@@ -133,7 +134,15 @@ function SpendableEquation({ data }: { data: HealthDto }) {
       {hasReserve && (
         <EquationRow
           label="Budget reserved"
+          hint="Unspent room left in each category budget this period. A budget that is already over its limit reserves nothing, so it is not netted against the others."
           value={<Numeric>−{sym} {(data.budgetReserve ?? 0).toFixed(2)}</Numeric>}
+        />
+      )}
+      {hasCardDebt && (
+        <EquationRow
+          label="Card balances due"
+          hint="Outstanding balance on credit cards you pay off in full each cycle. It is already owed, so it is not spendable."
+          value={<Numeric>−{sym} {(data.fullMonthlyDebt ?? 0).toFixed(2)}</Numeric>}
         />
       )}
       {showSafeToSpend && (

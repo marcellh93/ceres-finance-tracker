@@ -251,11 +251,11 @@ public class DashboardApiTests(Bucket4Factory factory, Bucket4Database bucketDb)
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.ValueKind.Should().Be(JsonValueKind.Object);
 
-        // All 15 documented fields must be present (values may be null).
+        // All 16 documented fields must be present (values may be null).
         var requiredFields = new[]
         {
             "availableToday", "safeToSpend", "imminentBills", "laterBills",
-            "budgetReserve", "runwayMonths", "avgMonthlyExpense",
+            "budgetReserve", "fullMonthlyDebt", "runwayMonths", "avgMonthlyExpense",
             "currentMonthIncome", "rollingAverageIncome", "incomeDeltaPercent",
             "budgetBurnRate", "budgetSpentMtd", "budgetTotalLimit",
             "currencyCode", "currencySymbol",

@@ -407,7 +407,7 @@ Label on the left, value on the right (justify-between). Use inside a `<dl class
 
 ### `<EquationRow>` — compact muted caption
 
-Smaller (`text-[11px]`) and muted by default. Use inside dense vertical stacks for breakdowns (e.g., Spendable Balance components). Pass `valueClassName` to override the muted default for a headline row.
+Smaller (`text-[11px]`) and muted by default. Use inside dense vertical stacks for breakdowns (e.g., Spendable Balance components). Pass `valueClassName` to override the muted default for a headline row. Pass `hint` to add an info tooltip beside the label when a number needs a one-line "why" (e.g. Budget reserved).
 
 ```tsx
 <EquationRow label="Liquid" value={<Numeric>€ 1,200</Numeric>} />
@@ -415,7 +415,10 @@ Smaller (`text-[11px]`) and muted by default. Use inside dense vertical stacks f
   label="Available today"
   value={<Numeric className="text-base font-bold text-success">€ 430</Numeric>}
 />
+<EquationRow label="Budget reserved" hint="Unspent room left in each budget." value={<Numeric>−€ 174.15</Numeric>} />
 ```
+
+`<InfoTip about tip>` (`src/components/InfoTip.tsx`) is the shared "i" tooltip button used by `PanelLabel` and `EquationRow`.
 
 ### `<Tile>` — KPI surface wrapper
 

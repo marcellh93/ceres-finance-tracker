@@ -839,6 +839,8 @@ public class DashboardServiceTests : IAsyncLifetime
 
         (snapshot.SafeToSpend ?? 0m).Should().Be(baselineSafe - 324.80m,
             "an outstanding balance on a card cleared in full each cycle is money already owed");
+        ((snapshot.FullMonthlyDebt ?? 0m) - (baseline.FullMonthlyDebt ?? 0m)).Should().Be(324.80m,
+            "the card balance is exposed on its own so the dashboard can show it as a line item");
     }
 
     /// <summary>
