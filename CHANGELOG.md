@@ -291,6 +291,11 @@
 
 #### Fixed
 
+**Analyzer review: culture, logging and the CSP endpoint (2026-10-07)**
+- Fixed culture-dependent formatting of machine-readable text (CA1305/CA1310): the dashboard's month keys, the three `Retry-After` headers and the movements export filename now use the invariant culture, so a server running under a calendar-different culture (e.g. Thai, which writes 2026 as 2569) cannot change them. The filename builder also had three dates the analyzer cannot see; they are fixed too.
+- Hardened the anonymous CSP report endpoint: the request body is capped at 16 KB and each report is logged as one bounded single-line entry (first 2,048 characters, control characters replaced), so a caller can no longer write a very large body into the logs or forge extra log lines.
+- Converted the row-level-security interceptor's log calls to source-generated `[LoggerMessage]` methods (it runs whenever a database connection opens). The remaining 42 production log calls are cold paths; CA1848 is now a documented suggestion for production code, not a warning (production build warnings 96 to 39).
+
 **Dashboard, reports and test stability (2026-10-06)**
 - Fixed the Expense Breakdown category filter: picking a category changed nothing because the server ignored it. The report (and its CSV export, and saved reports) now narrows to that category.
 - Fixed the dashboard's Spendable Balance card so its rows add up: the outstanding balance on cards paid in full each cycle was already subtracted from "Safe to spend" but never shown. It now appears as a "Card balances due" row, and "Budget reserved" explains that an over-limit budget reserves nothing.
