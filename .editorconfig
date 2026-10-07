@@ -56,6 +56,16 @@ dotnet_diagnostic.IDE0001.severity = warning
 # format keeps GenerateDocumentationFile off and avoids muting CS1591.
 dotnet_diagnostic.IDE0005.severity = warning
 
+# CA1848 (use [LoggerMessage] delegates) — reviewed 2026-10-07. It is a performance rule: each
+# plain logger.Log*(...) call allocates its arguments before the level check. All 46 production
+# call sites were read: 29 are LogError on failure paths (email-send, job and erasure failures),
+# the rest are per-job summaries and dev/e2e email sinks — cold paths where that cost is
+# immeasurable. The one warm spot, RowLevelSecurityInterceptor (runs when a DB connection opens),
+# was converted to [LoggerMessage]; follow that pattern for any logging added to a per-request or
+# per-query path. Kept as a suggestion, not turned off, so it stays visible in the IDE.
+[ProjectCeres/**.cs]
+dotnet_diagnostic.CA1848.severity = suggestion
+
 # EF Core auto-generated migration files — never hand-edited.
 [ProjectCeres/Migrations/*.cs]
 dotnet_diagnostic.CA1861.severity = none

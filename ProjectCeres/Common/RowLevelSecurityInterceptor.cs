@@ -41,11 +41,17 @@ namespace ProjectCeres.Common;
 /// uses the ceres_admin role which has BYPASSRLS — the GUC is irrelevant there
 /// and is intentionally not registered.
 /// </summary>
-public sealed class RowLevelSecurityInterceptor(
+public sealed partial class RowLevelSecurityInterceptor(
     ICurrentUserAccessor user,
     ILogger<RowLevelSecurityInterceptor> logger)
     : DbConnectionInterceptor
 {
+    [LoggerMessage(Level = LogLevel.Debug, Message = "RLS GUC RESET on pre-auth call site {CallSite}.")]
+    private partial void LogPreAuthReset(string callSite);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "DB connection opened in Background context without a resolved user. Reason: {Reason}. RLS policies will evaluate to zero rows.")]
+    private partial void LogBackgroundWithoutUser(string reason);
+
     private const string GucName = "app.current_user_ref";
 
     public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
@@ -70,15 +76,12 @@ public sealed class RowLevelSecurityInterceptor(
                 return;
 
             case UserContext.PreAuth preAuth:
-                logger.LogDebug("RLS GUC RESET on pre-auth call site {CallSite}.", preAuth.CallSite);
+                LogPreAuthReset(preAuth.CallSite);
                 ExecuteSync(connection, $"RESET \"{GucName}\"");
                 return;
 
             case UserContext.Background background:
-                logger.LogError(
-                    "DB connection opened in Background context without a resolved user. " +
-                    "Reason: {Reason}. RLS policies will evaluate to zero rows.",
-                    background.Reason);
+                LogBackgroundWithoutUser(background.Reason);
                 ExecuteSync(connection, $"RESET \"{GucName}\"");
                 return;
 
@@ -101,16 +104,13 @@ public sealed class RowLevelSecurityInterceptor(
                 return;
 
             case UserContext.PreAuth preAuth:
-                logger.LogDebug("RLS GUC RESET on pre-auth call site {CallSite}.", preAuth.CallSite);
+                LogPreAuthReset(preAuth.CallSite);
                 await ExecuteAsync(connection, $"RESET \"{GucName}\"", cancellationToken)
                     .ConfigureAwait(false);
                 return;
 
             case UserContext.Background background:
-                logger.LogError(
-                    "DB connection opened in Background context without a resolved user. " +
-                    "Reason: {Reason}. RLS policies will evaluate to zero rows.",
-                    background.Reason);
+                LogBackgroundWithoutUser(background.Reason);
                 await ExecuteAsync(connection, $"RESET \"{GucName}\"", cancellationToken)
                     .ConfigureAwait(false);
                 return;
