@@ -453,7 +453,7 @@ public static class SeedDevUser
                     cmd.Transaction = efTx.GetDbTransaction();
                 cmd.CommandText = sql;
                 var result = await cmd.ExecuteScalarAsync();
-                total += Convert.ToInt64(result);
+                total += Convert.ToInt64(result, System.Globalization.CultureInfo.InvariantCulture);
             }
             finally
             {

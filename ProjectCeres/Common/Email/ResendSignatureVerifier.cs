@@ -37,7 +37,7 @@ public sealed class ResendSignatureVerifier : IResendSignatureVerifier
         if (Math.Abs(now - ts) > ToleranceSeconds) return false;
 
         // Strip whsec_ prefix and base64-decode the secret.
-        var keyB64 = secret.StartsWith("whsec_") ? secret["whsec_".Length..] : secret;
+        var keyB64 = secret.StartsWith("whsec_", StringComparison.Ordinal) ? secret["whsec_".Length..] : secret;
         byte[] key;
         try { key = Convert.FromBase64String(keyB64.PadRight((keyB64.Length + 3) / 4 * 4, '=')); }
         catch (FormatException) { return false; }

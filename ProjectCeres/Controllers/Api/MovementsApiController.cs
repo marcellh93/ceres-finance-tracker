@@ -171,13 +171,13 @@ public class MovementsApiController(
             parts.Add(Slugify(accountName));
 
         if (from is { } f && to is { } t)
-            parts.Add($"{f:yyyy-MM-dd}_{t:yyyy-MM-dd}");
+            parts.Add($"{InvariantFormat.Day(f)}_{InvariantFormat.Day(t)}");
         else if (from is { } fOnly)
-            parts.Add($"from-{fOnly:yyyy-MM-dd}");
+            parts.Add($"from-{InvariantFormat.Day(fOnly)}");
         else if (to is { } tOnly)
-            parts.Add($"to-{tOnly:yyyy-MM-dd}");
+            parts.Add($"to-{InvariantFormat.Day(tOnly)}");
         else
-            parts.Add(DateTime.Today.ToString("yyyy-MM-dd"));
+            parts.Add(InvariantFormat.Day(DateTime.Today));
 
         return string.Join("_", parts) + ".csv";
     }

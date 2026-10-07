@@ -207,7 +207,7 @@ public class DashboardApiController(
             }
 
             points.Add(new NetWorthTrendPoint(
-                Month: monthLabel.ToString("yyyy-MM"),
+                Month: InvariantFormat.Month(monthLabel),
                 Assets: Math.Round(assets, 2),
                 Liabilities: Math.Round(liabilities, 2),
                 NetWorth: Math.Round(assets - liabilities, 2)));
@@ -248,7 +248,7 @@ public class DashboardApiController(
             var expenses = monthTx.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
 
             points.Add(new IncomeExpensePoint(
-                Month: monthStart.ToString("yyyy-MM"),
+                Month: InvariantFormat.Month(monthStart),
                 Income: Math.Round(income, 2),
                 Expenses: Math.Round(expenses, 2)));
         }
@@ -348,7 +348,7 @@ public class DashboardApiController(
             var expenses = monthTx.Where(t => t.Category.CategoryType.Name == "Expense").Sum(t => t.Amount);
 
             points.Add(new CashFlowPoint(
-                Month: monthStart.ToString("yyyy-MM"),
+                Month: InvariantFormat.Month(monthStart),
                 NetFlow: Math.Round(income - expenses, 2)));
         }
 

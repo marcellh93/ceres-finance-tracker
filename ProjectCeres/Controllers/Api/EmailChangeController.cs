@@ -71,7 +71,7 @@ public sealed class EmailChangeController : ControllerBase
         }
         catch (EmailChangeService.RateLimitedException ex)
         {
-            Response.Headers.RetryAfter = ex.RetryAfterSeconds.ToString();
+            Response.Headers.RetryAfter = InvariantFormat.Number(ex.RetryAfterSeconds);
             return StatusCode(StatusCodes.Status429TooManyRequests, new
             {
                 error = new { code = "RATE_LIMITED", message = "Too many requests. Please retry shortly." }
