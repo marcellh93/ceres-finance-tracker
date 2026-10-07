@@ -1086,7 +1086,11 @@ Notes:
 - `frame-ancestors 'none'` supersedes `X-Frame-Options: DENY` in modern browsers — both
   are present for full coverage.
 - Violation reports POST to `/api/csp-report` (`CspReportApiController`, `[AllowAnonymous]`,
-  dedicated by-IP rate-limit policy `AuthRateLimitPolicies.CspReportByIp`).
+  dedicated by-IP rate-limit policy `AuthRateLimitPolicies.CspReportByIp`). The body is
+  attacker-controlled, so the request is capped at 16 KB (`[RequestSizeLimit]`) and only the
+  first 2,048 characters are logged, with control characters (CR/LF/escape) replaced by spaces —
+  one bounded, single-line entry per report, so a caller can neither flood the log nor forge
+  extra log lines (`CspReportApiControllerTests`).
 - **`dangerouslySetInnerHTML` is lint-enforced.** `ProjectCeres.Client/eslint.config.js`
   bans the `dangerouslySetInnerHTML` JSX attribute via a `no-restricted-syntax` rule
   (`error`). This uses the built-in rule rather than `eslint-plugin-react`'s `react/no-danger`
