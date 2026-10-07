@@ -26,15 +26,12 @@
 // (a real measurement) passes untouched; only the agent typing into these files is
 // denied.
 //
-// BYPASS (A1, confirmed by the user 2026-10-04) — requires BOTH, mirroring
-// pre-protected-path-gate.js's two-factor model:
-//   (a) env var  CERES_ALLOW_GATE_EDIT=1   (only the user can set a shell var in
-//       their session; the agent's tool calls cannot), AND
-//   (b) the user's most recent message literally names the file being edited
-//       (basename or repo-relative path).
-//   The env var alone is not enough, and the agent asserting "the user approved" in
-//   chat is not enough — the user must have both set the token and named the target.
-//   This is deliberately un-launderable: the agent can only ASK the user to do both.
+// // BYPASS (loosened 2026-10-06, user decision): allowed when the user's most recent
+// message literally names the file being edited (basename or repo-relative path).
+// Single factor — the prior env-var second factor was removed as unusable (it needed
+// a session relaunch to set). The agent cannot satisfy this itself: userMessageContains
+// reads the transcript's last USER message, never assistant text. Weaker than the
+// original two-factor model; the CLAUDE.md force-green rule + user review are the backstop.
 //
 // NOT doom-loop fuel: it reads the tool's file_path (independent evidence), never
 // assistant prose. The agent cannot rephrase its way past it.
@@ -43,7 +40,12 @@ const fs = require("fs");
 const path = require("path");
 
 const PROJECT_DIR = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const STATE_DIR = path.join(PROJECT_DIR, ".claude", "state", "gate-integrity-guard");
+const STATE_DIR = path.join(
+  PROJECT_DIR,
+  ".claude",
+  "state",
+  "gate-integrity-guard",
+);
 
 function allow() {
   process.stdout.write(JSON.stringify({ permissionDecision: "allow" }));
@@ -52,7 +54,10 @@ function allow() {
 
 function deny(reason) {
   process.stdout.write(
-    JSON.stringify({ permissionDecision: "deny", permissionDecisionReason: reason })
+    JSON.stringify({
+      permissionDecision: "deny",
+      permissionDecisionReason: reason,
+    }),
   );
   process.exit(0);
 }
@@ -67,7 +72,7 @@ function log(payload, outcome, summary) {
         outcome,
         summary,
         sessionId: payload.session_id || "",
-      }) + "\n"
+      }) + "\n",
     );
   } catch {
     // best-effort
@@ -89,9 +94,12 @@ function classify(absPath) {
   // gate, and the two PreToolUse shell hooks are .sh), or the hook registration in
   // settings.json. Exclude the hooks' own __tests__/ dir: those are test fixtures,
   // not live gates, and blocking them would wall off the guard's own test suite.
-  if (/^\.claude\/(hooks|skills\/[^/]+\/hooks)\//.test(norm) &&
-      /\.(js|sh)$/.test(norm) &&
-      !/\/__tests__\//.test(norm)) return "gate";
+  if (
+    /^\.claude\/(hooks|skills\/[^/]+\/hooks)\//.test(norm) &&
+    /\.(js|sh)$/.test(norm) &&
+    !/\/__tests__\//.test(norm)
+  )
+    return "gate";
   if (norm === ".claude/settings.json") return "gate";
 
   return null;
@@ -108,7 +116,11 @@ function userMessageContains(transcriptPath, needle) {
   }
   for (let i = lines.length - 1; i >= 0; i--) {
     let entry;
-    try { entry = JSON.parse(lines[i]); } catch { continue; }
+    try {
+      entry = JSON.parse(lines[i]);
+    } catch {
+      continue;
+    }
     if (entry.type !== "user") continue;
     const msg = entry.message;
     let text = "";
@@ -135,7 +147,11 @@ if (require.main === module) {
   process.stdin.on("data", (c) => (raw += c));
   process.stdin.on("end", () => {
     let payload;
-    try { payload = JSON.parse(raw || "{}"); } catch { allow(); }
+    try {
+      payload = JSON.parse(raw || "{}");
+    } catch {
+      allow();
+    }
 
     const toolName = payload.tool_name || "";
     if (!/^(Edit|Write|MultiEdit)$/.test(toolName)) allow();
@@ -150,8 +166,15 @@ if (require.main === module) {
     const kind = classify(abs);
     if (!kind) allow();
 
-    // Two-factor bypass: env token AND the user naming the target in their last message.
-    const envOk = /^(1|true|yes)$/i.test(process.env.CERES_ALLOW_GATE_EDIT || "");
+    // Single-factor bypass (loosened 2026-10-06 by user decision): the user's most
+    // recent message must literally name the target file. The env-var second factor
+    // was removed — it could only be satisfied by a session relaunch (hook processes
+    // inherit Claude Code's launch env, not a mid-session shell), which made the
+    // hatch unusable. Tradeoff the user accepted: weaker than two-factor (a confused
+    // session could self-approve by emitting the filename), backstopped by the
+    // CLAUDE.md force-green rule + user review. The agent still cannot approve itself:
+    // it does not author the user's messages, and the check reads the transcript's
+    // last USER turn, not assistant prose.
     const relForMsg = abs.startsWith(PROJECT_DIR + path.sep)
       ? abs.slice(PROJECT_DIR.length + 1)
       : abs;
@@ -160,12 +183,15 @@ if (require.main === module) {
       userMessageContains(transcriptPath, path.basename(abs)) ||
       userMessageContains(transcriptPath, relForMsg);
 
-    if (envOk && userOk) {
+    if (userOk) {
       log(payload, "bypassed", { file: relForMsg, kind });
       allow();
     }
 
-    const label = kind === "evidence" ? "evidence/proof-of-work artifact" : "gate (check) file";
+    const label =
+      kind === "evidence"
+        ? "evidence/proof-of-work artifact"
+        : "gate (check) file";
     const reason = [
       `🛑 Gate-integrity guard — refusing to edit a ${label}.`,
       "",
