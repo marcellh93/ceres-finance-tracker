@@ -111,6 +111,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<ApplicationUser>().Property(u => u.LastLoginAt)
+            .HasDefaultValueSql("current_timestamp").ValueGeneratedOnAdd();
         ConfigureRelationships(modelBuilder);
         ConfigureUserOwnership(modelBuilder);
         ConfigureGlobalQueryFilters(modelBuilder);

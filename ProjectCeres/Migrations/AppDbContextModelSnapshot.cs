@@ -299,7 +299,9 @@ namespace ProjectCeres.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("LastLoginAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("current_timestamp");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");

@@ -143,7 +143,7 @@ public sealed class AuthController : ControllerBase
         // PreAuthUserScope can set the GUC before CategorySeedService inserts the
         // default categories. EF preserves a non-default Guid set on the entity;
         // Identity.CreateAsync uses Add+SaveChanges and does not regenerate it.
-        var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = request.Email, Email = request.Email };
+        var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = request.Email, Email = request.Email, LastLoginAt = _timeProvider.GetUtcNow().UtcDateTime };
         await using var tx = await _db.BeginPreAuthUserScopeAsync(user.Id, HttpContext.RequestAborted);
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -539,6 +539,14 @@ public sealed class AuthController : ControllerBase
         // persistent cookie — so a superseded row is unreachable by rotation and would
         // otherwise keep a live PersistentTokenHash for the full 30-day lifetime.
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // Stage 13.b: every successful login converges here; reset the inactivity clock and clear any pending warning.
+        await _db.Users
+            .Where(u => u.Id == user.Id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.LastLoginAt, now)
+                .SetProperty(u => u.InactivityWarningSentAt, (DateTime?)null));
+
         await _db.UserSessions
             .Where(s => s.UserId == user.Id
                 && s.RevokedAt == null
