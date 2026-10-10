@@ -92,6 +92,8 @@ public static class InactivitySweep
                 var sent = await warner.NotifyAsync(userId, MonthsUntilAnonymise, ct);
                 if (!sent) continue; // stays eligible next run
 
+                // Email is already out; stamp + audit commit atomically (a failed commit just re-sends next run).
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
                 await db.Users.IgnoreQueryFilters()
                     .Where(u => u.Id == userId)
                     .ExecuteUpdateAsync(s => s.SetProperty(u => u.InactivityWarningSentAt, now), ct);
@@ -104,6 +106,7 @@ public static class InactivitySweep
                     IpAddress = "unknown",
                 });
                 await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
                 warned++;
             }
             catch (Exception ex)
