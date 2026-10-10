@@ -1965,6 +1965,10 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 - [x] New audit actions in the documented-set test; `InactivitySweep`/`UserAnonymiser` in the `IgnoreQueryFilters` allow-list — `ArchitectureTests`.
 - [ ] Cron registration of `--run-inactivity-sweep` — **deferred to Stage 16** (hosting), same split as `--sweep-sessions` / `--run-retention-purge`. The flag + logic ship here; the scheduled trigger is wired at deploy. Tripwire: Stage 16 § Scheduled jobs.
 
+### Follow-ups (non-blocking, found in review)
+
+- [ ] **Warn-loop pre-act re-check symmetry (M1, final review 2026-10-10).** `InactivitySweep`'s anonymise loop re-reads `SealedAt`/`ErasedAt`/`LastLoginAt` immediately before acting; the warn loop does not. Narrow sub-second race on the monthly cron: a user who logs in between the `toWarn` query and the stamp still gets the email (accepted at-least-once) AND has `InactivityWarningSentAt` re-set over the null login just cleared, so a later lapse would skip (not re-warn) them. **Not load-bearing** — the legally-consequential path (anonymise) IS guarded, so no user is ever wrongly anonymised; purely a warn-symmetry nicety. Add the same per-item re-check to the warn loop. **Tripwire:** this line.
+
 ### Deferred out of 13.b (Decision C split)
 
 - [ ] **Account-closure archive lifecycle (ADR-0029 `CustomerArchive`).** 30-day grace → 150-day sealed archive file → 180-day permanent deletion, on an explicit account *close*. **Reason:** no account-closure trigger exists in code today (`ClosureType`/`CustomerArchive` are on-paper only); the archive-file mechanism + per-user writer is a materially larger build than the inactivity sweep, and ADR-0029's paid-restoration half is explicitly Phase 5. **Tripwire:** `legal.md` GDPR-checklist line "CustomerArchive background job implemented" stays `[ ]`; this cannot be built until an account-closure feature lands. Scope it to that stage, not 13.b. (`legal.md` § Data Retention churn schedule documents the intended windows.)
