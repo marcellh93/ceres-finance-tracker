@@ -295,6 +295,12 @@ namespace ProjectCeres.Migrations
                     b.Property<DateTime?>("ErasedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("InactivityWarningSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 

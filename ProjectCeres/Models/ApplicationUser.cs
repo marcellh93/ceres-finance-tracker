@@ -12,4 +12,10 @@ public class ApplicationUser : IdentityUser<Guid>
     // start), cleared if cancelled. ErasedAt is set once the worker completes erasure.
     public DateTime? SealedAt { get; set; }
     public DateTime? ErasedAt { get; set; }
+
+    /// <summary>Last successful login (password, TOTP, or backup code). Measures inactivity for Stage 13.b.</summary>
+    public DateTime LastLoginAt { get; set; }
+
+    /// <summary>Set when the 12-month inactivity warning is sent; cleared to null on every login.</summary>
+    public DateTime? InactivityWarningSentAt { get; set; }
 }
