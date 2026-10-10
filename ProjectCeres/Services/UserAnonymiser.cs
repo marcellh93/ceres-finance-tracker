@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ProjectCeres.Analyzers.Annotations;
 using ProjectCeres.Common;
-using ProjectCeres.Common.Authentication;
 using ProjectCeres.Data;
 
 namespace ProjectCeres.Services;
