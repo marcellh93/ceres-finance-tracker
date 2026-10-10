@@ -358,6 +358,40 @@ function filesForStage(changedFiles, turnStartSha, stageId) {
   return changedFiles.filter((f) => owned.has(f) || uncommitted.has(f));
 }
 
+// A file counts as substantively changed only if its diff since turn-start has at
+// least one changed line that is NOT a using-directive and NOT pure whitespace. A
+// `dotnet format style` using-removal or whitespace reflow is not something a spec,
+// security, or test reviewer can comment on — the same judgment lastReviewableSha()
+// already applies to the STALENESS check, now applied to the slot-REQUIREMENT check
+// too (the two had drifted: a pure using-removal in Migrations/ or Services/ re-fired
+// the 3-agent reviewer-pipeline requirement though the staleness half would have
+// treated it as non-reviewable). Mirrors the DOCS_CONFIG_RE exclusion. Conservative:
+// with no turn window, or on ANY non-trivial changed line, the file gates normally.
+// Pure classifier (exported for tests): given the raw text of a unified diff, is
+// EVERY changed (+/-) line trivial — blank/whitespace or a bare `using X.Y;`? Returns
+// false for an empty changed-set (no evidence of trivial change) so a caller never
+// relaxes the gate on a diff it couldn't read.
+function diffIsTrivial(diffText) {
+  if (!diffText) return false;
+  const changed = diffText
+    .split("\n")
+    .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    .map((l) => l.slice(1)); // drop the +/- marker
+  if (changed.length === 0) return false;
+  const trivial = (line) => {
+    const t = line.replace(/^﻿/, "").trim(); // strip BOM + surrounding ws
+    return t === "" || /^using\s+[\w.]+\s*;$/.test(t);
+  };
+  return changed.every(trivial);
+}
+
+function isTriviallyChanged(file, turnStartSha) {
+  if (!turnStartSha) return false; // no window → cannot prove trivial; gate normally
+  return diffIsTrivial(
+    safeExec(`git diff ${turnStartSha}..HEAD -- "${file}" 2>/dev/null`),
+  );
+}
+
 // Parses one `git status --porcelain=v1` line to its destination path.
 // safeExec trims output, which can strip the leading status space of the first line
 // (" M path" -> "M path"), so a fixed slice(3) eats a real path character — it turned
@@ -643,7 +677,9 @@ function runMain() {
   // like a code turn. filesForStage falls back to the wide set when the stage owns
   // no commits, so nothing that should be gated stops being gated.
   const stageScopedFiles = filesForStage(changedFiles, turnStartSha, stageId);
-  const codeFiles = stageScopedFiles.filter((f) => !DOCS_CONFIG_RE.test(f));
+  const codeFiles = stageScopedFiles
+    .filter((f) => !DOCS_CONFIG_RE.test(f))
+    .filter((f) => !isTriviallyChanged(f, turnStartSha));
   if (codeFiles.length === 0) {
     appendLog(LOG_PATH, {
       ts: new Date().toISOString(),
@@ -791,6 +827,8 @@ if (require.main === module) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     validateReviewerPipeline,
+    diffIsTrivial,
+    isTriviallyChanged,
     porcelainPath,
     SLOT_TABLE,
     sessionWroteCode,
