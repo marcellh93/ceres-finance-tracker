@@ -272,8 +272,9 @@ public class ErasureExecutorTests : IAsyncLifetime
         var env = new Mock<IWebHostEnvironment>();
         env.Setup(e => e.ContentRootPath).Returns(_contentRoot);
 
+        var adminDb = _fixture.CreateAdminContext();
         _executor = new ErasureExecutor(
-            _fixture.CreateAdminContext(), _pseudonym, env.Object, TimeProvider.System,
+            adminDb, _pseudonym, new UserAnonymiser(adminDb, env.Object, TimeProvider.System), TimeProvider.System,
             new LowercaseLookupNormalizer(), lookup,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<ErasureExecutor>.Instance);
     }

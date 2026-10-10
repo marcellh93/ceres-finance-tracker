@@ -56,8 +56,9 @@ public class ErasureWorkerTests : IAsyncLifetime
         var env = new Mock<IWebHostEnvironment>();
         env.Setup(e => e.ContentRootPath).Returns(_contentRoot);
 
+        var adminDb = _fixture.CreateAdminContext();
         _executor = new ErasureExecutor(
-            _fixture.CreateAdminContext(), new ErasurePseudonym(lookup), env.Object, TimeProvider.System,
+            adminDb, new ErasurePseudonym(lookup), new UserAnonymiser(adminDb, env.Object, TimeProvider.System), TimeProvider.System,
             new LowercaseLookupNormalizer(), lookup, NullLogger<ErasureExecutor>.Instance);
     }
 
