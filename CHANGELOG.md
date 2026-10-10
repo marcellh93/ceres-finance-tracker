@@ -6,6 +6,10 @@
 
 #### Added
 
+**Privacy & data (Stage 13.b — inactive-account cleanup, 2026-10-10)**
+- Accounts that go unused are now cleaned up automatically, to meet data-retention obligations. After 12 months with no sign-in, you're emailed a heads-up (in your own language) that your account is inactive and will be anonymised if you don't sign in. After 18 months with no sign-in, the account is anonymised: your profile and personal identifiers are scrubbed and non-essential data deleted, while financial records are kept in anonymised form for the legally-required period. Simply signing in at any point resets the clock and cancels the warning.
+- This is distinct from requesting erasure yourself (Stage 13.9): it's routine housekeeping, so it doesn't place the 30-day hold on your email address — you're free to register again immediately.
+
 **Security (Stage 14 — HTTP security headers + CORS, 2026-10-03)**
 - Every response now carries a strict set of browser-hardening headers: a Content-Security-Policy that only allows scripts and resources from the app itself (blocking injected/malicious scripts — the main defense against cross-site scripting), plus `X-Content-Type-Options`, `X-Frame-Options: DENY` (no embedding in iframes), `Referrer-Policy`, a `Permissions-Policy` that denies camera/microphone/geolocation, and cross-origin isolation headers.
 - The CSP is hash-based, suited to the app's static-file single-page-app model; the two inline startup scripts (theme + sidebar state) are allowed by a fingerprint computed automatically at build time, so they can't silently break or be bypassed.
@@ -283,6 +287,11 @@
 - Config-bound rate limits (`RateLimitOptions`) — login/CSRF/email-per-IP permit counts now bind from config with defaults equal to the prior hardcoded literals; `appsettings.E2E.json` raises them so the single-loopback E2E suite doesn't trip the limiter (a defaults-equal-literals test prevents silent production weakening)
 - E2E test tooling: `playwright.golden.config.ts` (webServer + Chromium/Firefox/WebKit matrix, `workers: 1`, `retries: 0`), `tsconfig.e2e.json` (type-checks `e2e/` via `tsc -b`), `otpauth` dev dep for TOTP code generation, and `pnpm e2e` / `e2e:ui` / `e2e:walk` scripts. The pre-existing agent-walk smoke harness keeps its own config
 - Spec: `docs/superpowers/specs/2026-06-11-stage-9-11-playwright-e2e-foundations-design.md`; plan: `docs/superpowers/plans/2026-06-12-stage-9-11-playwright-e2e-foundations.md`
+
+#### Changed
+
+**Privacy & data (Stage 13.b, 2026-10-10)**
+- The data-scrubbing logic used by account erasure was extracted into a shared service so the new inactivity cleanup reuses exactly the same, already-tested anonymisation steps rather than duplicating them.
 
 #### Removed
 

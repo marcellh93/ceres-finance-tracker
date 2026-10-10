@@ -1853,7 +1853,7 @@ Retention policy:
 - [x] Failed-login records: 1-year cross-tenant auto-purge — `RetentionPurge.PurgeFailedLoginsAsync`. Logic + test shipped; cron at Stage 16.
 - [x] Soft-deleted SavedReports: hard-deleted after 90 days — `RetentionPurge.PurgeSavedReportsAsync`. Logic + test shipped; cron at Stage 16.
 - [x] Soft-deleted import profiles: hard-deleted after 90 days — `RetentionPurge.PurgeImportProfilesAsync` (covers all formats incl. Excel — `ImportProfile` is format-agnostic). **Correction (2026-10-04): this was NOT "already implemented" as this line previously claimed** — verified no purge existed (only a 90-day *display window* for the restore UI, the inverse); built new in this slice. Logic + test shipped; cron at Stage 16.
-- [ ] Inactive user records: archived after defined period — **split out to Stage 13.b (🔒 locked)**: underspecified + `security-model.md`-vs-`legal.md` policy conflict must be resolved before it can be built; not a flat retention purge. See § Stage 13.b.
+- [x] Inactive user records: anonymised after defined period — **delivered in Stage 13.b (✅ 2026-10-10)**: 12-month warning + 18-month anonymise-in-place via `InactivitySweep`, reusing the shared `UserAnonymiser` statutory lanes. (The account-*closure* archive lifecycle, ADR-0029 `CustomerArchive`, remains separately deferred — a different trigger.) See § Stage 13.b.
 - [x] Each retention rule verifiable in code — `RetentionPurgeTests` runs each purge against fixture data with boundary coverage (just-past-horizon deleted, just-inside kept) + soft-delete-null negative assertions. (Policy-doc wording of each rule is tracked under the privacy-policy items, separate slice.)
 
 Full data export:
@@ -1935,9 +1935,9 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ---
 
-## Stage 13.b — Inactive-user anonymisation sweep 🔓 UNLOCKED — pending brainstorm (Batch 5)
+## Stage 13.b — Inactive-user anonymisation sweep ✅ Done (2026-10-10)
 
-**Status: 🔓 Unlocked 2026-10-06 (Decision C) — policy resolved, NOT yet brainstormed.** The documented-policy "conflict" is resolved: inactivity and account-closure are two distinct events, not conflicting numbers. **13.b's scope is now narrowed to the *inactivity* flow only** (the `security-model.md` 12mo/18mo anonymize-in-place policy). The account-closure archive lifecycle (ADR-0029 `CustomerArchive`) is **split out and deferred** to a future account-closure stage — see the deferral line below. Entry point for the next step is `superpowers:brainstorming` (the user directs when).
+**Status: ✅ Done (2026-10-10).** The inactivity flow is built: `InactivitySweep` (`dotnet run -- --run-inactivity-sweep`) warns at 12 months and anonymises at 18 months, reusing the extracted `UserAnonymiser` lanes. See the spec `docs/superpowers/specs/2026-10-10-stage-13b-inactive-user-anonymisation-design.md`, the plan `docs/superpowers/plans/2026-10-10-stage-13b-inactive-user-anonymisation.md`, and [ADR-0083](decisions/ADR-0083-inactivity-anonymisation-shared-lane-no-hold.md). The account-closure archive lifecycle (ADR-0029 `CustomerArchive`) remains **split out and deferred** to a future account-closure stage — see the deferral line below.
 
 > **Goal (resolved scope):** automatically handle accounts that have gone *inactive* (no login for a defined period), per `security-model.md` § inactive-account policy: 12 months no login → retention-warning email; 18 months → anonymize the user-controlled profile + delete non-statutory data, with statutory financial records anonymise-retained (never hard-deleted). Distinct from the user-*requested* GDPR erasure flow (Stage 13.9) and from account-*closure* churn (deferred — below).
 
@@ -1945,11 +1945,25 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 - [x] **Policy conflict resolved — Decision C (2026-10-06).** `security-model.md` (inactivity: 12mo/18mo anonymize-in-place) and `legal.md`/ADR-0029 (closure: 30/150/180-day archive) describe two different triggers, not one conflicting policy. 13.b = the inactivity flow; closure/archive is deferred. Both docs annotated with reconciliation notes; decision recorded in `planning-resolved.md` § "Stage 13.b trigger/mechanism". (ask-before-deviating satisfied — user decision.)
 
-### Open questions for the brainstorm (A-scoped; do not design yet)
+### Design questions — RESOLVED in the build
 
-- **`LastLoginAt` prerequisite (load-bearing):** no last-login timestamp exists on `ApplicationUser` (only `CreatedAt`/`SealedAt`/`ErasedAt`); `UserSession.LastUsedAt` is debounced and swept at 90 days, so it cannot measure 12-month inactivity. The brainstorm must design a new `LastLoginAt`/`LastActivityAt` column stamped at the login path + a backfill decision for existing users.
-- **Reuse-vs-extract the statutory anonymise lane:** `ErasureExecutor`'s anonymise-in-place + `StatutoryRetentionSet` classifier already implement "anonymize financial records, never hard-delete" — but its entry point is erasure-specific (reads an `ErasureRequest`, writes `GdprErasureCompleted`). Decide: extract a shared anonymisation service, or add a second caller. Do NOT rebuild the statutory carve-out.
-- **Cron machinery:** the flat `RetentionPurge`/`SweepSessions` `AdminDbContext` + `IgnoreQueryFilters` + `--run-*` pattern fits this inactivity sweep cleanly (it's flat, not per-user-fan-out); confirm the warning-email arm (new `EmailTemplateKey` + EN/ES resx, none exists) during design. Cron *registration* follows the Stage-16 deferred-cron pattern.
+- [x] **`LastLoginAt` prerequisite.** Added `ApplicationUser.LastLoginAt` (NOT NULL, DB-default `current_timestamp` → existing rows backfilled to "now"; `ValueGeneratedOnAdd` so unset inserts don't send `default(DateTime)`) + nullable `InactivityWarningSentAt`. Stamped at every login (password/TOTP/backup-code) at the `IssueSessionAndCookiesAsync` convergence point and at registration; `InactivityWarningSentAt` cleared on every login so a returning user is re-armed. Login-only clock (not activity) per the policy wording. See `models.md`.
+- [x] **Reuse-vs-extract the statutory lane.** Extracted — the five anonymise lanes moved out of `ErasureExecutor` into a shared `UserAnonymiser.AnonymiseAsync(userId, token, ct)` (no transaction/audit of its own); both erasure and the inactivity sweep call it with their own tail. Inactivity sets `ErasedAt` (login refusal) but writes **no** `GdprErasureCompleted` and **no** `ErasedEmailHold` — not an Art. 17 erasure. ADR-0083.
+- [x] **Cron machinery + warning-email arm.** `InactivitySweep` is a flat cross-tenant find (`AdminDbContext`, allow-listed) + a per-user anonymise loop (atomic per user). New `EmailTemplateKey.InactivityWarning` (EN/ES, 3-key contract); `InactivityWarningNotificationService` resolves the recipient's culture via `ILanguageResolver` (correct in a no-request background sweep) and returns a success bool so a failed send leaves the user eligible to retry. New `AuditLogAction.InactivityWarningSent` / `InactivityAnonymised`. Cron *registration* follows the Stage-16 deferred-cron pattern.
+
+### Verification checklist
+
+- [x] `LastLoginAt` stamped at all three login paths + registration; cleared `InactivityWarningSentAt` on login — `LoginStampsLastLoginTests`.
+- [x] New columns exist + backfill-defaulted — `InactivityColumnsTests` + migrations `AddInactivityTrackingToApplicationUser` / `AddLastLoginAtDbDefault`.
+- [x] 12mo-boundary warning + 18mo-boundary anonymise fire on the correct side of the horizon — `InactivitySweepTests`.
+- [x] Warn-once; returning-user re-arm; failed send does not stamp — `InactivitySweepTests`.
+- [x] Sealed/erased accounts skipped by both groups — `InactivitySweepTests`.
+- [x] Legal line: inactivity writes one `InactivityAnonymised`, zero `GdprErasureCompleted`, no `ErasedEmailHold`; financial rows anonymise-retained — `InactivitySweepTests`.
+- [x] Idempotent second anonymise pass — `InactivitySweepTests`.
+- [x] Erasure flow unchanged after the extraction — existing `ErasureExecutorTests` / `ErasureWorkerTests` still green (regression net).
+- [x] Warning email composes EN + ES — `EmailComposerTests`; recipient culture resolved per-user — `InactivityWarningNotificationServiceTests`.
+- [x] New audit actions in the documented-set test; `InactivitySweep`/`UserAnonymiser` in the `IgnoreQueryFilters` allow-list — `ArchitectureTests`.
+- [ ] Cron registration of `--run-inactivity-sweep` — **deferred to Stage 16** (hosting), same split as `--sweep-sessions` / `--run-retention-purge`. The flag + logic ship here; the scheduled trigger is wired at deploy. Tripwire: Stage 16 § Scheduled jobs.
 
 ### Deferred out of 13.b (Decision C split)
 

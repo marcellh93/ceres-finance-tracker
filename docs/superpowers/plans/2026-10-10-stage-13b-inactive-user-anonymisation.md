@@ -701,6 +701,23 @@ git commit -m "feat(13b): inactivity sweep tool (12mo warn / 18mo anonymise)"
 - Create: `docs/decisions/ADR-00NN-inactivity-anonymisation-reuse-and-no-hold.md` (next free ADR number — grep `docs/decisions/` for the highest)
 - Modify: `CHANGELOG.md`
 
+- [ ] **Step 0: Migrate the local test DBs before the suite run** (carried from Task 1 concern #3)
+
+The WAF test factory does not auto-apply this stage's new migration to the clone/serial
+local test DBs. Run `tools/ci/setup-test-db.sh` (or the project's documented test-DB
+migrate step) so `project_ceres_test` and its bucket clones carry the two new columns,
+else the suite fails on `column "LastLoginAt" does not exist`.
+
+- [ ] **Step 0b: Fix the misleading migrations doc** (carried from Task 1 concern #2 — KNOWN defect, not deferred)
+
+`docs/guide/04-entity-framework-core/03-migrations.md` documents plain
+`dotnet ef database update` in ~5 places (lines 13, 24, 34, 46, 237). That command fails
+with Postgres error 42501 (permission denied) because `ceres_app` has no DDL grant by
+design; the working command is
+`dotnet ef database update --project ProjectCeres --context AppDbContext --connection "<ceres_migrator connection>"`.
+Correct the doc (and the migration-add command if it has the same omission) so a reader
+does not hit 42501. One-paragraph fix; fold into this stage's docs commit.
+
 - [ ] **Step 1: Run the full suite once (background), confirm green**
 
 Run: `dotnet test ProjectCeres.sln` (foreground, once — the Stop hook also runs it; do not run concurrently).
