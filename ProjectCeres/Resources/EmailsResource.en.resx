@@ -154,4 +154,11 @@ Changed your mind? Cancel here: {0}
 
 This request is cancellable for 72 hours. After that window, the erasure becomes irreversible and cannot be undone.</value></data>
   <data name="GdprErasureInitiated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;We received a request to permanently erase your Ceres account and all associated data.&lt;/p&gt;&lt;p&gt;Changed your mind? &lt;a href="{0}"&gt;Cancel this request&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;This request is cancellable for 72 hours. After that window, the erasure becomes irreversible and cannot be undone.&lt;/p&gt;</value></data>
+  <data name="InactivityWarning.Subject" xml:space="preserve"><value>Your Project Ceres account has been inactive</value></data>
+  <data name="InactivityWarning.BodyText" xml:space="preserve"><value>You haven't signed in to your Project Ceres account in a long time.
+
+If there is no sign-in for {0} months in total, your account will be anonymised and your personal data can no longer be recovered.
+
+To keep your account, simply sign in now. That stops the countdown.</value></data>
+  <data name="InactivityWarning.BodyHtml" xml:space="preserve"><value>&lt;p&gt;You haven't signed in to your Project Ceres account in a long time.&lt;/p&gt;&lt;p&gt;If there is no sign-in for {0} months in total, your account will be anonymised and your personal data can no longer be recovered.&lt;/p&gt;&lt;p&gt;To keep your account, simply sign in now. That stops the countdown.&lt;/p&gt;</value></data>
 </root>

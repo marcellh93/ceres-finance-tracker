@@ -92,6 +92,8 @@ public sealed class EmailComposer : IEmailComposer
             (EmailKeys.GdprExportFailed.Subject, EmailKeys.GdprExportFailed.BodyText, EmailKeys.GdprExportFailed.BodyHtml),
         EmailTemplateKey.GdprErasureInitiated =>
             (EmailKeys.GdprErasureInitiated.Subject, EmailKeys.GdprErasureInitiated.BodyText, EmailKeys.GdprErasureInitiated.BodyHtml),
+        EmailTemplateKey.InactivityWarning =>
+            (EmailKeys.InactivityWarning.Subject, EmailKeys.InactivityWarning.BodyText, EmailKeys.InactivityWarning.BodyHtml),
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
     };
 }

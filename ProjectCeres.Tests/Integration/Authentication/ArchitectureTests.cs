@@ -626,6 +626,7 @@ public class ArchitectureTests
             "EmailVerificationRequested", "EmailVerified",
             "SupportTicketCreated", "SupportMessageByAgent",
             "GdprErasureCancelled", "GdprErasureCompleted",
+            "InactivityWarningSent", "InactivityAnonymised",
         };
         Enum.GetNames<AuditLogAction>()
             .Should().BeEquivalentTo(expected);

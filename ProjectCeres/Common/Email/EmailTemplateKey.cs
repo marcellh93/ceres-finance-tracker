@@ -49,4 +49,10 @@ public enum EmailTemplateKey
     /// Stage 13.9. Args: {0} cancel URL.
     /// </summary>
     GdprErasureInitiated,
+
+    /// <summary>
+    /// Warns the user their account has been inactive and will be anonymised. Stage 13.b.
+    /// Args: {0} total months of inactivity before anonymisation.
+    /// </summary>
+    InactivityWarning,  // wired in Stage 13.b
 }

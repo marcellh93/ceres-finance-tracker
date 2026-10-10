@@ -154,4 +154,11 @@ Por favor, solicita una nueva descarga desde la configuración de tu cuenta. Si 
 
 Esta solicitud se puede cancelar durante 72 horas. Después de ese plazo, el borrado será irreversible y no podrá deshacerse.</value></data>
   <data name="GdprErasureInitiated.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Recibimos una solicitud para borrar permanentemente tu cuenta de Ceres y todos los datos asociados.&lt;/p&gt;&lt;p&gt;¿Cambiaste de opinión? &lt;a href="{0}"&gt;Cancela esta solicitud&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;Esta solicitud se puede cancelar durante 72 horas. Después de ese plazo, el borrado será irreversible y no podrá deshacerse.&lt;/p&gt;</value></data>
+  <data name="InactivityWarning.Subject" xml:space="preserve"><value>Tu cuenta de Project Ceres está inactiva</value></data>
+  <data name="InactivityWarning.BodyText" xml:space="preserve"><value>Hace mucho tiempo que no inicias sesión en tu cuenta de Project Ceres.
+
+Si pasan {0} meses en total sin iniciar sesión, tu cuenta será anonimizada y tus datos personales ya no podrán recuperarse.
+
+Para conservar tu cuenta, simplemente inicia sesión ahora. Eso detiene la cuenta atrás.</value></data>
+  <data name="InactivityWarning.BodyHtml" xml:space="preserve"><value>&lt;p&gt;Hace mucho tiempo que no inicias sesión en tu cuenta de Project Ceres.&lt;/p&gt;&lt;p&gt;Si pasan {0} meses en total sin iniciar sesión, tu cuenta será anonimizada y tus datos personales ya no podrán recuperarse.&lt;/p&gt;&lt;p&gt;Para conservar tu cuenta, simplemente inicia sesión ahora. Eso detiene la cuenta atrás.&lt;/p&gt;</value></data>
 </root>

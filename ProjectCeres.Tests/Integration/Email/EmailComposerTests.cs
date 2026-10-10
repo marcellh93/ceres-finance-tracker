@@ -47,6 +47,8 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
     [InlineData(EmailTemplateKey.GdprExportFailed, "es")]
     [InlineData(EmailTemplateKey.GdprErasureInitiated, "en")]
     [InlineData(EmailTemplateKey.GdprErasureInitiated, "es")]
+    [InlineData(EmailTemplateKey.InactivityWarning, "en")]
+    [InlineData(EmailTemplateKey.InactivityWarning, "es")]
     public void Renders_all_templates_en_and_es(EmailTemplateKey key, string culture)
     {
         using var scope = _factory.Services.CreateScope();
@@ -270,6 +272,6 @@ public sealed class EmailComposerTests : IntegrationTestBase<Bucket3AuthFactory>
         var esKeys = esSet!.Cast<System.Collections.DictionaryEntry>().Select(e => (string)e.Key).OrderBy(k => k).ToList();
 
         enKeys.Should().BeEquivalentTo(esKeys);
-        enKeys.Should().HaveCount(60, "20 templates × 3 keys each (GdprErasureInitiated added Stage 13.9 Task 8)");
+        enKeys.Should().HaveCount(63, "21 templates × 3 keys each (InactivityWarning added Stage 13.b)");
     }
 }

@@ -41,4 +41,7 @@ public enum AuditLogAction
 
     GdprErasureCancelled,       // wired in Stage 13.9 — undo of an erasure request
     GdprErasureCompleted,       // wired in Stage 13.9 — erasure completion, pseudonymised UserId in entityType
+
+    InactivityWarningSent,   // wired in Stage 13.b — 12-month inactivity warning email sent
+    InactivityAnonymised,    // wired in Stage 13.b — 18-month inactivity anonymisation executed
 }
