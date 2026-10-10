@@ -805,6 +805,7 @@ public class ArchitectureTests
             "ProjectCeres/Controllers/Api/AuthController.cs",                         // Stage 13.9 Task 6b: D3 re-registration hold check before the registering caller has an account (LockoutUnlockService pattern).
             "ProjectCeres/Tools/ErasureWorker.cs",                                    // Stage 13.9 Task 8: cron sweep of Sealed ErasureRequest rows past their 72h window across all users — SweepSessions/ExportJobWorker pattern.
             "ProjectCeres/Tools/RetentionPurge.cs",                                   // Stage 13: cross-tenant by design — the four retention purges span all users. SweepSessions pattern.
+            "ProjectCeres/Tools/InactivitySweep.cs",                                  // Stage 13.b: cross-tenant by design — the inactivity sweep spans all users. RetentionPurge/ErasureWorker pattern.
         };
 
         var repoRoot = FindRepoRoot();

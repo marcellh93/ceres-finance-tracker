@@ -1022,6 +1022,13 @@ if (args.Length > 0 && args[0] == "--run-retention-purge")
     Environment.Exit(await ProjectCeres.Tools.RetentionPurge.RunAsync(builder));
 }
 
+// Cron-invokable inactivity sweep: 12-month warning email + 18-month anonymisation.
+// Invocation: dotnet run --project ProjectCeres -- --run-inactivity-sweep
+if (args.Length > 0 && args[0] == "--run-inactivity-sweep")
+{
+    Environment.Exit(await ProjectCeres.Tools.InactivitySweep.RunAsync(builder));
+}
+
 var app = builder.Build();
 
 // Forwarded-headers (Stage 14.7): MUST be first so every downstream component

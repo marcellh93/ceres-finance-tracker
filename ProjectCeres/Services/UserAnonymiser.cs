@@ -8,8 +8,8 @@ using ProjectCeres.Data;
 namespace ProjectCeres.Services;
 
 /// <summary>
-/// Shared user-data anonymisation: the statutory/support/purge/export-ZIP lanes
-/// plus the Identity-column scrub (sets ErasedAt). Erasure (Stage 13.9) and the
+/// Shared user-data anonymisation in five steps: statutory, support, purge,
+/// export-job, and the account-identity scrub (sets ErasedAt). Erasure (Stage 13.9) and the
 /// inactivity sweep (Stage 13.b) both call this, each adding its own audit/hold tail.
 /// Runs inside the CALLER's ambient transaction — opens none of its own, writes no
 /// audit row. Cross-tenant by design (AdminDbContext, BYPASSRLS).
