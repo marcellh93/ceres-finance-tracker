@@ -1967,7 +1967,7 @@ Responsive (per [`planning-phase3-responsive.md`](planning-phase3-responsive.md)
 
 ### Follow-ups (non-blocking, found in review)
 
-- [ ] **Warn-loop pre-act re-check symmetry (M1, final review 2026-10-10).** `InactivitySweep`'s anonymise loop re-reads `SealedAt`/`ErasedAt`/`LastLoginAt` immediately before acting; the warn loop does not. Narrow sub-second race on the monthly cron: a user who logs in between the `toWarn` query and the stamp still gets the email (accepted at-least-once) AND has `InactivityWarningSentAt` re-set over the null login just cleared, so a later lapse would skip (not re-warn) them. **Not load-bearing** — the legally-consequential path (anonymise) IS guarded, so no user is ever wrongly anonymised; purely a warn-symmetry nicety. Add the same per-item re-check to the warn loop. **Tripwire:** this line.
+- [x] **Warn-loop pre-act re-check symmetry (M1, final review 2026-10-10; fixed 2026-10-11, commit `056fb822`).** The warn loop now mirrors the anonymise loop's defense-in-depth re-read: before sending + stamping, it re-confirms `SealedAt`/`ErasedAt` null, `InactivityWarningSentAt` still null, and `LastLoginAt` still in the 12–18mo band — so a user who logged in between the `toWarn` query and the stamp is skipped rather than re-flagged. Sweep tests 7/7 green.
 
 ### Deferred out of 13.b (Decision C split)
 
