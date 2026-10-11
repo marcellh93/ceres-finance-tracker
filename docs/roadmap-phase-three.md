@@ -1427,8 +1427,9 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 - [x] The two Razor-CSS build-warning Stop-hook checks (`tailwind-no-utility-classes`, `site-css-size-floor`) + the dead `fileSize` helper + their tests + the `build-warnings.md` rows removed (commit `1ade87e2`, under user gate-edit authorization). Hook tests 29/29 green.
 - [x] Docs: ADR-0084 (+ ADR-0081 partial-supersession note), ADR-0079 Razor-override removal, CLAUDE.md + README + architecture.md cruft deleted, changelog.
 
-**Owed (external actions, not code — tracked, outside this environment's reach):**
-- `docker build .` — the one verification not run (Docker daemon was down in the implementing environment); the Dockerfile diff is static-verified internally consistent. Run it (or let a CI docker job) to confirm the image builds.
+- [x] `docker build .` succeeds — verified 2026-10-12: image `ceres-11-6-verify` built clean. The `spa` stage runs only the Vite SPA build (no Tailwind block), the `site.css` COPY is gone, `RUN test -f wwwroot/dist/app.html` passed, `dotnet publish -p:SkipSpaBuild=true` (no `-p:SkipTailwind`) published and exported the image. The build log shows Vite emitting the SPA's own `inter-*`/`ibm-plex-mono-*` woff2 — confirming the `@fontsource` font independence at build time.
+
+**Owed (external, not code):**
 - Dependabot `GHSA-rj75-hqrm-r3gf` dismissal — resolved by retirement (its lockfile is deleted); leave to auto-resolve on the next scan, or dismiss from the dashboard (needs account access).
 
 **Kept (not cruft):** `AddControllersWithViews()` (antiforgery, `dotnet/aspnetcore#22189`); the React SPA + `@fontsource` pipeline.
