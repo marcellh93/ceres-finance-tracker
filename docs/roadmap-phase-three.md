@@ -1413,6 +1413,25 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 ---
 
+## Stage 11.6 — Retire the dead Razor CSS pipeline ✅ Done (2026-10-11)
+
+**Status: ✅ Done (2026-10-11).** Follow-on to Stage 11's Razor cleanup: Stage 11 deleted the `.cshtml` views but left the Razor-layer Tailwind v3 CSS build (`Styles/app.css` → `wwwroot/css/site.css`) running on every `dotnet build`, styling nothing. Retired in full — which also removed the vulnerable `postcss-selector-parser` transitive dependency (Dependabot `GHSA-rj75-hqrm-r3gf`) by deleting its lockfile, since the `7.x` fix is outside Tailwind 3.4's `^6` range (an override would violate ADR-0079 condition 3). See the spec/plan under `docs/superpowers/{specs,plans}/2026-10-11-stage-11-6-*` and [ADR-0084](decisions/ADR-0084-retire-razor-css-pipeline.md) (partial supersession of [ADR-0081](decisions/ADR-0081-docker-containerization.md)).
+
+### Verification checklist
+
+- [x] `BuildTailwind` MSBuild target + the `ProjectCeres/` pnpm project (`package.json`, `pnpm-lock.yaml`, `tailwind.config.js`, `Styles/app.css`) deleted — `dotnet build ProjectCeres.csproj` succeeds with no `pnpm run build:css` shell-out.
+- [x] No regression — full suite green (Analyzers 50/50, Tests 1563/1563, Specs 5/5, 0 failed).
+- [x] Dockerfile Tailwind block + `site.css` COPY removed, `-p:SkipTailwind` dropped (kept `SkipSpaBuild` + the whole Vite SPA stage). Static-verified no `site.css`/`build:css`/`SkipTailwind`/`Tailwind` reference remains in the Dockerfile. **`docker build` run OWED** — the Docker daemon was down in the implementing environment; the image build is the one verification not yet executed.
+- [x] `wwwroot/fonts/` deleted — the SPA bundles its own fonts via `@fontsource` (17 woff2/woff in `dist/assets`, dist CSS references `url(/dist/assets/…woff2)`, never `/fonts/`); statically proven independent.
+- [x] Stale `SkipTailwind` CI env + comments + runbook `MSB3073` bullet removed; `ci.yml` re-validated.
+- [ ] The two Razor-CSS build-warning Stop-hook checks (`tailwind-no-utility-classes`, `site-css-size-floor`) + their tests removed — **pending user gate-edit authorization** (`surface-build-warnings.js` is guarded by `pre-gate-integrity-guard.js`). Tracked; the checks are inert (they read deleted files) until removed.
+- [x] Docs: ADR-0084 (+ ADR-0081 partial-supersession note), ADR-0079 Razor-override removal, CLAUDE.md + README cruft deleted, changelog.
+- [x] Dependabot `GHSA-rj75-hqrm-r3gf` resolved by retirement — alert dismissal **owed** (needs account access).
+
+**Kept (not cruft):** `AddControllersWithViews()` (antiforgery, `dotnet/aspnetcore#22189`); the React SPA + `@fontsource` pipeline.
+
+---
+
 ## Stage 12 — Sessions + Support SPA pages (Batch 5)
 
 **Status: ✅ CLOSED (2026-09-08).** The whole 12-family is complete. All four SPA surfaces shipped — `/settings/sessions` (12.1–12.3), `/support` (12.4–12.7, conversation model by 12.6), the email-change surfaces (12.8), and the reauth dialog (12.9). The 12.5 family closed this session: **12.5.1** per-session IP anchor (exact-IP, enforced in the validator + the persistent-rotation hop), **12.5.2** admin ticket-list/triage surface, **12.5.3** new-sign-in alert email, **12.5.4** unblock-a-blocked-IP, plus the **A1** composite owner-scoped FK on the follow-up chain. The test-infra sub-stages closed too — **12.8.4** (test type-checking), **12.11** (dev-server stale-shell → `Testing` environment), **12.12** (fresh-clone/CI test-secret self-supply). The 12.8.2 `AssertRlsVisibility` and 12.8.3 `<Alert>` promotion shipped; the manual browser passes were converted to E2E.

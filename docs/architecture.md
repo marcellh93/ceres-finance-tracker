@@ -226,43 +226,28 @@ ProjectCeres/
   Data/
     AppDbContext.cs
     Migrations/
-  Views/               ← Razor .cshtml files, one folder per controller
-  Styles/
-    app.css            ← Tailwind CSS input file — @tailwind directives + @apply component classes
   wwwroot/
-    css/site.css       ← generated CSS output (do not edit by hand — overwritten on every build)
+    dist/              ← built React SPA bundle (Vite output; served as static files)
   uploads/             ← file attachments (outside wwwroot — not publicly accessible)
-  package.json         ← pnpm manifest — Tailwind CSS dev dependency
-  tailwind.config.js   ← Tailwind config — content paths point to all .cshtml files
   Program.cs           ← app startup, DI registration, middleware pipeline, EnsureExistsAsync call
+
+  (Historical, removed: Views/*.cshtml [Stage 11], Styles/app.css + wwwroot/css/site.css +
+   package.json + tailwind.config.js [Stage 11.6, ADR-0084] — the Razor Tailwind pipeline.)
 ```
 
 See `docs/planning.md → Project Structure` for the full annotated directory listing.
 
 ---
 
-## Frontend Build Pipeline (Phase 1)
+## Frontend Build Pipeline (Phase 1 — RETIRED)
 
-Tailwind CSS is the only frontend build step in Phase 1. It runs entirely at build time — no JavaScript is shipped to the browser.
+> **Retired 2026-10-11 ([ADR-0084](decisions/ADR-0084-retire-razor-css-pipeline.md), Stage 11.6).** The Phase-1 Razor Tailwind v3 build described below (`Styles/app.css` → `pnpm run build:css` → `wwwroot/css/site.css`, via an MSBuild pre-build target) no longer exists. Stage 11 deleted the `.cshtml` views; Stage 11.6 deleted the now-dead CSS pipeline it fed. The frontend build is now **only** the React client's Vite + Tailwind v4 pipeline (`ProjectCeres.Client`, → `wwwroot/dist`). This section is kept as Phase-1 history; see the SPA migration doc for the current shape.
 
-```
-Styles/app.css  (Tailwind input — @apply component definitions)
-       │
-       │  pnpm run build:css
-       │  (tailwindcss CLI scans all .cshtml files, generates only used utilities)
-       ↓
-wwwroot/css/site.css  (minified, generated output — served as a static file)
-```
-
-**How the build is triggered:**
-
-| Scenario | Command |
-|----------|---------|
-| Normal development | `dotnet run` / `dotnet build` — MSBuild `<Target BeforeTargets="Build">` runs `pnpm run build:css` automatically |
-| Active view editing | `pnpm --dir ProjectCeres run watch:css` in a second terminal — rebuilds CSS on every `.cshtml` change |
-| CI / production | `dotnet publish` triggers the pre-build target, CSS is included in the published output |
-
-**Phase 2 transition:** When React is introduced, the Tailwind CLI will be replaced by Vite (which includes Tailwind as a PostCSS plugin). The `@apply`-based component classes in `app.css` will be replaced by shadcn/ui React components using inline Tailwind utilities.
+The Phase-1 pipeline (historical): Tailwind CSS ran entirely at build time — `Styles/app.css`
+compiled by the `tailwindcss` CLI (scanning `.cshtml` files) to a minified
+`wwwroot/css/site.css`, triggered by an MSBuild `BeforeTargets="Build"` target. It shipped no
+JavaScript. It was superseded by the React SPA's own Vite pipeline when React was introduced,
+and the vestigial build was removed once no view consumed its output.
 
 ---
 

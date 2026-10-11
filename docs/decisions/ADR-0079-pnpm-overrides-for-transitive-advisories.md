@@ -63,14 +63,18 @@ If an override would violate condition 3, it is not an override — it is an unv
 | `@babel/core` | `^7.29.6` | 7.29.7 | 1 | shadcn → @babel/preset-typescript; eslint-plugin-react-hooks |
 | `esbuild` | `^0.28.1` | 0.28.2 | 1 | vite; tsx |
 
-### `ProjectCeres/package.json`
+### `ProjectCeres/package.json` — REMOVED (Stage 11.6, 2026-10-11)
 
-| Override | Pinned | Resolves to | Cleared | Reached the tree via |
-| --- | --- | --- | --- | --- |
-| `postcss` | `^8.5.23` | 8.5.26 | (shared) | tailwindcss 3.4.19 |
-| `postcss-selector-parser` | `^6.1.3` | 6.1.4 | Dependabot #68 (low, dev) | tailwindcss 3.4 → postcss-nested |
-
-The Razor-layer entries exist because the postcss-family advisories affected this lockfile too. `postcss-selector-parser` was added 2026-09-12 (Dependabot #68 — uncontrolled AST recursion DoS, `>=6.1.0 <6.1.3`, dev-only): pinned to `^6.1.3` (resolves 6.1.4, inside tailwind/postcss-nested's `^6` range — ADR condition 3). Verified: `pnpm --dir ProjectCeres install --frozen-lockfile` + `run build:css` succeed; `pnpm audit` reports no known vulnerabilities.
+> **Update 2026-10-11 (Stage 11.6, [ADR-0084](ADR-0084-retire-razor-css-pipeline.md)).** The
+> entire Razor-layer pnpm project — `ProjectCeres/package.json` and its `pnpm-lock.yaml` — was
+> **deleted** when the dead Tailwind v3 CSS pipeline was retired. Both overrides it held
+> (`postcss` `^8.5.23`, `postcss-selector-parser` `^6.1.3`) are gone with it. Consequently the
+> Dependabot alert `GHSA-rj75-hqrm-r3gf` (`postcss-selector-parser < 7.1.6`, medium) is
+> resolved **by retirement, not by an override**: its fix (`7.1.6`) is a new major that
+> Tailwind 3.4 excludes (`postcss-selector-parser: ^6.1.2`), so an override would have violated
+> condition 3 — deletion was the only clean fix. The Razor lockfile is no longer audited
+> because it no longer exists. (The earlier `^6.1.3` pin for Dependabot #68 is moot for the
+> same reason.)
 
 **None of the thirteen were reachable from application code.** Each was verified individually — no path in `ProjectCeres.Client/src` parses YAML, IP addresses, or URIs; there is no hono server (CORS is ASP.NET Core's); `undici` serves only jsdom inside the test environment. They were fixed because unreachable-today is not unreachable-forever, and because open high-severity alerts on a public portfolio repository carry their own cost.
 

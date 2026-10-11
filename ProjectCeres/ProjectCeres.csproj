@@ -38,7 +38,8 @@
 
   <!-- Stage 11 Task 5: build + stage the SPA for Release only.
        Condition guards: Release (not Debug inner-loop/test), SkipSpaBuild opt-out.
-       Writes to wwwroot/dist/ — disjoint from BuildTailwind (wwwroot/css/). -->
+       Writes to wwwroot/dist/. (The sibling Razor BuildTailwind target was retired in
+       Stage 11.6 / ADR-0084; this is now the only pnpm-driven build target.) -->
   <Target Name="BuildSpaClient" BeforeTargets="Build" Condition="'$(SkipSpaBuild)' != 'true' AND '$(Configuration)' == 'Release'">
     <Exec Command="pnpm install --frozen-lockfile" WorkingDirectory="$(ProjectDir)../ProjectCeres.Client" />
     <Exec Command="pnpm build" WorkingDirectory="$(ProjectDir)../ProjectCeres.Client" />

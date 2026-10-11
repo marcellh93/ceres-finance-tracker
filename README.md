@@ -12,10 +12,9 @@ Single-entry bookkeeping — no double-entry, no debits/credits.
 - **Database:** PostgreSQL, with Row-Level Security on all user-owned tables
 - **ORM:** Entity Framework Core (Npgsql provider)
 - **React client (`ProjectCeres.Client/`):** React 19 + Vite + TypeScript + Tailwind CSS v4 + shadcn/ui (`base-nova` style)
-- **Legacy CSS pipeline:** a Tailwind v3 build (`Styles/app.css` → `wwwroot/css/site.css`) still runs on every `dotnet build`. It is a leftover from the pre-SPA Razor layer and no longer styles anything — see *Known cruft* below.
 - **Analyzers:** custom Roslyn rules (`ProjectCeres.Analyzers`) that enforce project invariants at compile time
 - **Tests:** xUnit, Moq, FluentAssertions (server) · Reqnroll (BDD, `ProjectCeres.Specs`) · Vitest + React Testing Library (client) · Playwright (E2E)
-- **Container:** a hardened multi-stage `Dockerfile` builds a deployment image (SPA + CSS baked in, non-root, no secrets) — see [ADR-0081](docs/decisions/ADR-0081-docker-containerization.md). It is a **deployment** artifact, not the local-dev path: the image expects an external, already-migrated Postgres and runtime-injected config, so use the Quick Start below to run locally. A one-command local `docker compose` stack (app + Postgres + migrations) is deferred to Stage 16.
+- **Container:** a hardened multi-stage `Dockerfile` builds a deployment image (SPA baked in, non-root, no secrets) — see [ADR-0081](docs/decisions/ADR-0081-docker-containerization.md). It is a **deployment** artifact, not the local-dev path: the image expects an external, already-migrated Postgres and runtime-injected config, so use the Quick Start below to run locally. A one-command local `docker compose` stack (app + Postgres + migrations) is deferred to Stage 16.
 
 ### Solution layout
 
@@ -104,10 +103,7 @@ Migrations pass their connection on the command line instead (step 4), so no `Mi
 
 ```bash
 pnpm install --dir ProjectCeres.Client
-pnpm install --dir ProjectCeres
 ```
-
-The second one is required even though its output is unused — an unconditional MSBuild target runs `pnpm run build:css` before every build, so a missing `node_modules` there fails `dotnet build`. See *Known cruft*.
 
 **5. Apply migrations**
 
@@ -152,10 +148,9 @@ pnpm e2e            # Playwright golden-path suite
 
 ## Known cruft
 
-Two leftovers from the pre-SPA architecture that a new contributor will otherwise find confusing:
+A leftover from the pre-SPA architecture that a new contributor will otherwise find confusing:
 
-- **The Tailwind v3 CSS build.** `ProjectCeres/Styles/app.css` compiles to `wwwroot/css/site.css` on every `dotnet build`, but there are no `.cshtml` views left to consume it. The React client has its own Tailwind v4 pipeline. Safe to ignore; a candidate for removal.
-- **`AddControllersWithViews()`** (`Program.cs:30`) rather than `AddControllers()`. Kept deliberately — the comment above it notes it registers the antiforgery filter. No view rendering depends on it.
+- **`AddControllersWithViews()`** (`Program.cs:28`) rather than `AddControllers()`. Kept deliberately — the comment above it notes it registers the antiforgery filter. No view rendering depends on it.
 
 ### Running the tests
 

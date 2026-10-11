@@ -295,6 +295,10 @@
 
 #### Removed
 
+**Build / tooling (Stage 11.6 — retire the dead Razor CSS pipeline, 2026-10-11)**
+- Removed the Razor-layer Tailwind v3 CSS build (`Styles/app.css` → `wwwroot/css/site.css`, the `BuildTailwind` MSBuild target, the `ProjectCeres/` pnpm project, and the orphaned `wwwroot/fonts/`). No `.cshtml` view had consumed it since Stage 11 — it compiled a stylesheet nothing served on every `dotnet build`. The React client keeps its own separate Tailwind v4 + Vite pipeline, unaffected.
+- This also drops the `postcss-selector-parser` dependency advisory (`GHSA-rj75-hqrm-r3gf`) by deleting the lockfile that carried it, rather than pinning an out-of-range override. See ADR-0084.
+
 **Data layer / RLS (Stage 9.5b, 2026-06-02)**
 - `ProjectCeres/Common/UserOwnedTables.cs` (the hand-typed `UserOwnedTables.All` list) — superseded by the model-derived `UserOwnedModel`
 

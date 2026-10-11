@@ -4,6 +4,8 @@
 
 **Status:** Accepted — 2026-09-11 (Stage 12.14). A three-stage `Dockerfile` + `.dockerignore` at the repo root produce a hardened, minimal runtime image; wave-2 hardening and deploy wiring are deferred to Stage 16.
 
+> **Superseded in part by [ADR-0084](ADR-0084-retire-razor-css-pipeline.md) (Stage 11.6, 2026-10-11).** The "two sets of pre-built static assets" premise below (consequence #1) and the Tailwind/`site.css`/`BuildTailwind`/`SkipTailwind` references in the build-stage description are no longer accurate: the Razor-layer Tailwind CSS pipeline was retired, so the image now bakes in **one** asset set (the SPA). The SPA half of this ADR — `BuildSpaClient`, the `spa` stage, `wwwroot/dist`, `SkipSpaBuild` — stands unchanged.
+
 **Phase:** Phase 3 (Hosted Beta) — accelerated out of Stage 16, tracked as §12.14. Sequenced CI (§12.13) → Docker (§12.14) → BDD (§12.15).
 
 **Supersedes:** None.
