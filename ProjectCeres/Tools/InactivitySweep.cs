@@ -87,6 +87,19 @@ public static class InactivitySweep
         var warned = 0;
         foreach (var userId in toWarn)
         {
+            // Re-check immediately before acting, mirroring the anonymise loop (M1): a user
+            // could log in between the toWarn query and here, which clears InactivityWarningSentAt
+            // and refreshes LastLoginAt. Without this, the unconditional stamp below would re-set
+            // the warning flag the login just cleared, leaving a now-active user wrongly flagged
+            // (and skipped, not re-warned, on a later lapse). Re-confirm they are still eligible.
+            var current = await db.Users.IgnoreQueryFilters().AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.SealedAt, u.ErasedAt, u.LastLoginAt, u.InactivityWarningSentAt })
+                .FirstOrDefaultAsync(ct);
+            if (current is null || current.SealedAt != null || current.ErasedAt != null
+                || current.InactivityWarningSentAt != null
+                || current.LastLoginAt > warnCutoff || current.LastLoginAt <= anonCutoff) continue;
+
             try
             {
                 var sent = await warner.NotifyAsync(userId, MonthsUntilAnonymise, ct);
