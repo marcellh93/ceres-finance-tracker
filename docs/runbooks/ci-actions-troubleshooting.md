@@ -89,14 +89,6 @@ doesn't re-derive them.
   needs a prior `dotnet restore ProjectCeres/ProjectCeres.csproj`. Add the restore
   step before provisioning.
 
-- **`MSB3073: "pnpm run build:css" exited with code 127`** in a job with no pnpm.
-  `ProjectCeres.csproj`'s `BuildTailwind` target runs `pnpm run build:css` on
-  *every* build. A pnpm-less job (dotnet-test) or a `dotnet run` subprocess whose
-  PATH drops the pnpm shim (e2e webServer) fails it. Fix: set `SkipTailwind: "true"`
-  as a job-level env — the `BuildTailwind` target has a `'$(SkipTailwind)' != 'true'`
-  condition for exactly this. CSS is irrelevant to the server suite and the E2E
-  stylesheet is the Vite-built SPA bundle, not the Razor `site.css`.
-
 - **Tests that pass locally, fail on a clean CI runner.** These are real bugs CI
   exists to catch — the test was passing on leftover local state a fresh runner
   lacks. Seen: a test needing `wwwroot/dist` staged (gitignored; 404 without it —
