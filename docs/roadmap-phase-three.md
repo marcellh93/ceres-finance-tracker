@@ -1421,12 +1421,15 @@ Import shelving (sub-stage 11.9 — [ADR-0078](decisions/ADR-0078-import-shelved
 
 - [x] `BuildTailwind` MSBuild target + the `ProjectCeres/` pnpm project (`package.json`, `pnpm-lock.yaml`, `tailwind.config.js`, `Styles/app.css`) deleted — `dotnet build ProjectCeres.csproj` succeeds with no `pnpm run build:css` shell-out.
 - [x] No regression — full suite green (Analyzers 50/50, Tests 1563/1563, Specs 5/5, 0 failed).
-- [x] Dockerfile Tailwind block + `site.css` COPY removed, `-p:SkipTailwind` dropped (kept `SkipSpaBuild` + the whole Vite SPA stage). Static-verified no `site.css`/`build:css`/`SkipTailwind`/`Tailwind` reference remains in the Dockerfile. **`docker build` run OWED** — the Docker daemon was down in the implementing environment; the image build is the one verification not yet executed.
+- [x] Dockerfile Tailwind block + `site.css` COPY removed, `-p:SkipTailwind` dropped (kept `SkipSpaBuild` + the whole Vite SPA stage). Static-verified no `site.css`/`build:css`/`SkipTailwind`/`Tailwind` reference remains in the Dockerfile.
 - [x] `wwwroot/fonts/` deleted — the SPA bundles its own fonts via `@fontsource` (17 woff2/woff in `dist/assets`, dist CSS references `url(/dist/assets/…woff2)`, never `/fonts/`); statically proven independent.
 - [x] Stale `SkipTailwind` CI env + comments + runbook `MSB3073` bullet removed; `ci.yml` re-validated.
-- [ ] The two Razor-CSS build-warning Stop-hook checks (`tailwind-no-utility-classes`, `site-css-size-floor`) + their tests removed — **pending user gate-edit authorization** (`surface-build-warnings.js` is guarded by `pre-gate-integrity-guard.js`). Tracked; the checks are inert (they read deleted files) until removed.
-- [x] Docs: ADR-0084 (+ ADR-0081 partial-supersession note), ADR-0079 Razor-override removal, CLAUDE.md + README cruft deleted, changelog.
-- [x] Dependabot `GHSA-rj75-hqrm-r3gf` resolved by retirement — alert dismissal **owed** (needs account access).
+- [x] The two Razor-CSS build-warning Stop-hook checks (`tailwind-no-utility-classes`, `site-css-size-floor`) + the dead `fileSize` helper + their tests + the `build-warnings.md` rows removed (commit `1ade87e2`, under user gate-edit authorization). Hook tests 29/29 green.
+- [x] Docs: ADR-0084 (+ ADR-0081 partial-supersession note), ADR-0079 Razor-override removal, CLAUDE.md + README + architecture.md cruft deleted, changelog.
+
+**Owed (external actions, not code — tracked, outside this environment's reach):**
+- `docker build .` — the one verification not run (Docker daemon was down in the implementing environment); the Dockerfile diff is static-verified internally consistent. Run it (or let a CI docker job) to confirm the image builds.
+- Dependabot `GHSA-rj75-hqrm-r3gf` dismissal — resolved by retirement (its lockfile is deleted); leave to auto-resolve on the next scan, or dismiss from the dashboard (needs account access).
 
 **Kept (not cruft):** `AddControllersWithViews()` (antiforgery, `dotnet/aspnetcore#22189`); the React SPA + `@fontsource` pipeline.
 
