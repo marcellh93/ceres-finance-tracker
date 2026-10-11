@@ -7,10 +7,10 @@ const {
 } = require("../surface-build-warnings.js");
 
 // PostToolUse advisory over Bash output: surfaces warnings that don't fail the
-// build (deprecations, Browserslist staleness, a Tailwind content-glob
-// regression, test-runtime creep). A miss means the warning class it exists to
-// catch scrolls past unnoticed — which is how the site.css regression it cites
-// (f8616087) shipped in the first place.
+// build (deprecations, Browserslist staleness, test-runtime creep). A miss
+// means the warning class it exists to catch scrolls past unnoticed. (The
+// Razor Tailwind content-glob / site.css checks were removed in Stage 11.6
+// when that pipeline was retired — ADR-0084.)
 
 const byId = (id) => CORPUS.find((c) => c.id === id);
 const run = (id, input) => byId(id).check({ command: "", output: "", ...input });
@@ -117,15 +117,6 @@ test("browserslist stays quiet otherwise", () => {
   assert.strictEqual(run("browserslist-outdated", { output: "vite v5 building for production..." }), null);
 });
 
-test("tailwind fires when all utility classes were pruned", () => {
-  const r = run("tailwind-no-utility-classes", { output: "warn - No utility classes were detected" });
-  assert.ok(r && /content/.test(r), r);
-});
-
-test("tailwind stays quiet on a normal build", () => {
-  assert.strictEqual(run("tailwind-no-utility-classes", { output: "Done in 412ms." }), null);
-});
-
 // ── corpus contract ──────────────────────────────────────────────────────
 
 test("every corpus row has a unique id and a check function", () => {
@@ -143,9 +134,9 @@ test("no detector throws on empty input", () => {
 test("no detector fires on a clean, silent build", () => {
   const quiet = { command: "pnpm build", output: "built in 1.2s" };
   for (const c of CORPUS) {
-    // Disk-reading detectors (site.css floor, stale locks) depend on the live
-    // tree, so only the output-driven ones are asserted silent here.
-    if (["site-css-size-floor", "stale-claude-lock"].includes(c.id)) continue;
+    // Disk-reading detectors (stale locks) depend on the live tree, so only
+    // the output-driven ones are asserted silent here.
+    if (["stale-claude-lock"].includes(c.id)) continue;
     assert.strictEqual(c.check(quiet), null, `${c.id} fired on a clean build`);
   }
 });

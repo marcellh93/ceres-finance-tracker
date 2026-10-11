@@ -46,15 +46,6 @@ function writeState(sessionId, state) {
   } catch {}
 }
 
-// Stat helper — returns size in bytes, or null if missing.
-function fileSize(absPath) {
-  try {
-    return fs.statSync(absPath).size;
-  } catch {
-    return null;
-  }
-}
-
 // Stat helper — returns mtime in ms, or null if missing.
 function fileMtimeMs(absPath) {
   try {
@@ -98,26 +89,6 @@ const CORPUS = [
       /caniuse-lite is outdated/i.test(input.output)
         ? "Browserslist outdated. Action: `pnpm dlx update-browserslist-db@latest` (or `pnpm update caniuse-lite browserslist`)."
         : null,
-  },
-  {
-    id: "tailwind-no-utility-classes",
-    check: (input) =>
-      /no utility classes were detected/i.test(input.output)
-        ? "Tailwind tree-shaker pruned all utility classes — check `tailwind.config.js` `content` glob. Razor `.cshtml` files alone aren't enough; `./Styles/**/*.css` must also be included so `@apply` directives are scanned. See commit `f8616087`."
-        : null,
-  },
-  {
-    id: "site-css-size-floor",
-    check: (input) => {
-      // Only fire if the command was a Razor build (dotnet build family,
-      // which triggers the Tailwind pre-build target).
-      if (!/dotnet\s+(build|run)/.test(input.command)) return null;
-      const siteCssPath = path.join(PROJECT_DIR, "ProjectCeres", "wwwroot", "css", "site.css");
-      const size = fileSize(siteCssPath);
-      if (size === null) return null; // not built yet, ignore
-      if (size >= 20_000) return null;
-      return `\`site.css\` is ${size} bytes — below the 20 KB floor. Likely Tailwind content-glob regression (see commit \`f8616087\`). Compare with \`git -C ${PROJECT_DIR} log -p ProjectCeres/tailwind.config.js\`.`;
-    },
   },
   {
     id: "stale-claude-lock",
