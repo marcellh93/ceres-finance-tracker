@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# ---- Stage 1: build the two pnpm projects (SPA + Tailwind CSS) ----
+# ---- Stage 1: build the SPA (Vite) ----
 FROM node:22-alpine AS spa
 # Install pnpm via npm at the pinned 10.33.2 because corepack rejects the hashed
 # packageManager field (+sha512 suffix) in package.json.
@@ -13,13 +13,6 @@ COPY ProjectCeres.Client/package.json ProjectCeres.Client/pnpm-lock.yaml Project
 RUN cd ProjectCeres.Client && pnpm install --frozen-lockfile
 COPY ProjectCeres.Client/ ProjectCeres.Client/
 RUN cd ProjectCeres.Client && pnpm build
-
-# Tailwind (ProjectCeres): build:css -> wwwroot/css/site.css. Needs the Styles/
-# input and the views Tailwind scans (its content globs), so copy the project.
-COPY ProjectCeres/package.json ProjectCeres/pnpm-lock.yaml ProjectCeres/
-RUN cd ProjectCeres && pnpm install --frozen-lockfile
-COPY ProjectCeres/ ProjectCeres/
-RUN cd ProjectCeres && pnpm run build:css
 
 # ---- Stage 2: publish the .NET app (no Node/pnpm here) ----
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
@@ -37,12 +30,11 @@ COPY ProjectCeres.Analyzers.Annotations/ ProjectCeres.Analyzers.Annotations/
 # Bring in the pre-built static assets from the spa stage, then publish with the
 # pnpm-driven MSBuild targets suppressed (this stage has no Node).
 COPY --from=spa /src/ProjectCeres.Client/dist/ ProjectCeres/wwwroot/dist/
-COPY --from=spa /src/ProjectCeres/wwwroot/css/site.css ProjectCeres/wwwroot/css/site.css
 # Fail loud if the SPA shell is missing (otherwise a runtime 404 on GET /).
 RUN test -f ProjectCeres/wwwroot/dist/app.html
 RUN dotnet publish ProjectCeres/ProjectCeres.csproj \
       -c Release -o /app/publish \
-      -p:SkipSpaBuild=true -p:SkipTailwind=true
+      -p:SkipSpaBuild=true
 
 # ---- Stage 3: runtime (minimal, non-root) ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
